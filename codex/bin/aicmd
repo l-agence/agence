@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# V0.0.1
+
+#  Agence :  an Agentic Engineering Collaborative Environment
+#  Author : copyright 2026 Stephane Korning <stefusss@gmail.com>
+#  License : MIT License + Commons clause. 
+# 
+# Agence is a self learning agentic engineering tookit in the form of a git submodule. 
+# Agence is supports knowledge sharing across Multiple teams, projects and repos. 
+# Innovative command line allows seamless transition from chat prompts to shell. 
+# Seamless integration with devops tools like: azure-cli aws-cli gh-cli jfrog terraform , python venv
+# Seamless integration with other AI tools like:  aider, ollama , cursor , copilot-cli 
+# LLM model agnostic and advanced agent routing model <@agent>. 
+# Many pre-defined agent personas but yyou can easily roll your own. 
+# JIRA integration and a hybrid human/agentic task , workflow and project management model. 
+# Human weighed reputation capital influence AI evolution and culture ecosystem via immutable ledger
+# 
+
+MODEL="gpt-4o-mini"
+PROMPT="AICMD.md"
+COMMANDS_FILE="commands.json"
+
+input="$*"
+
+############################################
+# PREFIX DETECTION
+############################################
+
+first_char="${input:0:1}"
+
+if [[ "$first_char" == "+" ]]; then
+    MODE="AI"
+elif [[ "$first_char" == "/" ]]; then
+    MODE="EXTERNAL"
+else
+    MODE="CHAT"
+fi
+
+############################################
+# NORMAL CHAT
+############################################
+
+if [[ "$MODE" == "CHAT" ]]; then
+    openai chat.completions.create \
+        -m "$MODEL" \
+        -g system@"$PROMPT" \
+        -g user:"$input"
+    exit 0
+fi
+
+############################################
+# CALL MODEL
+############################################
+
+response=$(openai chat.completions.create \
+    -m "$MODEL" \
+    -g system@"$PROMPT" \
+    -g user:"$input" \
+    --temperature 0)
+
+############################################
+# AI COMMAND MODE
+############################################
+
+if [[ "$MODE" == "AI" ]]; then
+
+    route=$(echo "$response" | grep '^ROUTE:' | awk '{print $2}')
+    confidence=$(echo "$response" | grep '^CONFIDENCE:' | awk '{print $2}')
+
+    awk "BEGIN {exit !($confidence >= 0.65)}"
+    if [ $? -ne 0 ]; then
+        route="unknown"
+    fi
+
+    case "$route" in
+        plan) echo "Planning...";;
+        refactor) echo "Refactoring...";;
+        explain) echo "Explaining...";;
+        test) echo "Generating tests...";;
+        deploy) echo "Deploying...";;
+        *) echo "Unknown AI command";;
+    esac
+
+    exit 0
+fi
+
+############################################
+# EXTERNAL COMMAND MODE
+############################################
+
+if [[ "$MODE" == "EXTERNAL" ]]; then
+
+    cmd_name=$(echo "$input" | awk '{print substr($1,2)}')
+
+    allowed=$(jq -r --arg cmd "$cmd_name" '.[$cmd]' "$COMMANDS_FILE")
+
+    if [[ "$allowed" != "true" ]]; then
+        echo "External command not allowed."
+        exit 1
+    fi
+
+    echo "Executing external: $input"
+
+    # Strip prefix
+    actual_command="${input:1}"
+
+    eval "$actual_command"
+fi

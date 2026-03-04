@@ -1,0 +1,45 @@
+{
+  "index": "Lessons Learned Index",
+  "version": "1.0",
+  "description": "Structured index for lessons extracted from faults and experience. Each lesson is a JSON object with root cause, solution, and implementation details.",
+  "schema": {
+    "lesson_id": "Unique 8-char hex identifier (e.g., a3f7b2c1)",
+    "date_extracted": "ISO 8601 when lesson was extracted",
+    "agent": "Which agent(s) this applies to (or 'all-agents')",
+    "category": "Topic category (llm-behavior, state-management, performance, infrastructure, etc.)",
+    "title": "Short lesson title",
+    "description": "What we learned",
+    "root_cause": "Why the original fault occurred",
+    "solution": "How to solve/prevent it",
+    "code_pattern": "Code examples or patterns for implementation",
+    "references": "Links to related faults, code, documentation",
+    "status": "active|deprecated|superseded",
+    "applies_to": "Which agents/components this lesson affects",
+    "severity": "critical|high|medium|low"
+  },
+  "lookup_fields": ["category", "agent", "severity", "status", "date_extracted"],
+  "categories": [
+    "infrastructure",
+    "llm-hallucination",
+    "state-corruption",
+    "prompt-injection",
+    "token-overflow",
+    "cost-overrun",
+    "timeout-handling",
+    "api-integration",
+    "concurrency",
+    "data-integrity"
+  ],
+  "entries": [
+    {
+      "lesson_id": "a3f7b2c1",
+      "date_extracted": "2026-03-04T14:45:00Z",
+      "title": "Git symlinks (mode 120000) for cross-platform support",
+      "severity": "high",
+      "status": "active"
+    }
+  ],
+  "total_lessons": 1,
+  "last_updated": "2026-03-04T14:45:00Z",
+  "note": "INDEX.md is human-readable. For automation, query JSON entries directly by lesson_id."
+}

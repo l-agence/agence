@@ -1,0 +1,25 @@
+# ========================================
+# Git-bash specific configuration & hacks
+# ========================================
+# This file is sourced ONLY by git-bash (when $MSYSTEM=MINGW64/MINGW32)
+# It contains workarounds for git-bash quirks that aren't needed in
+# WSL, Cygwin, or native Linux shells.
+
+# Fix for git-bash mv: recursively move directories into existing targets
+# Linux mv automatically places source inside target if target is a dir
+# Git-bash's mv refuses if target dir is non-empty
+mv() {
+    if [[ $# -eq 2 && -d "$2" && -d "$1" ]]; then
+        # Both source and target are directories - use cp+rm pattern
+        /usr/bin/cp -r "$1" "$2/" && /usr/bin/rm -rf "$1"
+    else
+        # Fall back to real mv for all other cases
+        /usr/bin/mv "$@"
+    fi
+}
+
+# Configure Git to properly handle symlinks (mode 120000)
+# This ensures symlinks work cross-platform and display correctly on GitHub
+git config --global core.symlinks true
+
+# Add more git-bash workarounds here as needed

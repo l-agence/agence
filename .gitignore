@@ -1,0 +1,11 @@
+.agence/
+@
+Lib
+Scripts
+.ai.md
+CLAUDE.md
+.github/copilot.md
+.nogit
+.gitmodules
+.aisecrets/
+.private/

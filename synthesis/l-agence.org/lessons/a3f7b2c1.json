@@ -1,0 +1,29 @@
+{
+  "lesson_id": "a3f7b2c1",
+  "date_extracted": "2026-03-04T14:45:00Z",
+  "agent": "@agence",
+  "category": "infrastructure",
+  "title": "Git symlinks (mode 120000) required for cross-platform support",
+  "description": "Windows, Linux, git-bash, and GitHub all handle symlinks differently. Git's native symlink mode (120000) ensures compatibility across all platforms without special handling.",
+  "root_cause": "Initial symlink implementation used OS-level calls (mklink, ln -s) which don't work consistently across platforms and don't show as symlinks on GitHub.",
+  "solution": "Use git commands to create symlinks instead of OS-level tools. Set `core.symlinks = true` in git config to enable proper symlink creation.",
+  "lesson_summary": "Always use git-native symlinks (mode 120000) for cross-platform projects. This works seamlessly in Windows (git-bash), Linux, WSL, macOS, and displays correctly on GitHub.",
+  "code_pattern": {
+    "configure": "git config --global core.symlinks true",
+    "create": "ln -s source target  # Works uniformly across all platforms when core.symlinks=true",
+    "verify": "git ls-files --stage | grep '^120000'  # Shows symlinks in git index"
+  },
+  "implementation": {
+    "file1": "~/.bashrc - Added global git config for all shells",
+    "file2": "bin/.gitbashrc - Added git config for git-bash-specific initialization",
+    "file3": "bin/agence - Updated ^init command to document symlink strategy"
+  },
+  "references": [
+    "nexus/logs/LOGS.json - Log entries for symlink creation",
+    "bin/agence - mode_init() function",
+    "bin/.gitbashrc - Git config initialization section"
+  ],
+  "status": "active",
+  "applies_to": ["@agence", "@aider", "all-agents"],
+  "severity": "high"
+}

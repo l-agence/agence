@@ -1,0 +1,260 @@
+#!/usr/bin/env python3
+"""
+Agence Universal Indexer
+Generates checksums and semantic formtags for any knowledge source:
+- Knowledge bases (URLs, PDFs, documents)
+- Codebase files and modules
+- World model entities
+- Configuration and metadata
+
+Usage:
+    indexer --source kb --format markdown --input INDEX.md --output INDEX.json
+    indexer --source code --format python --input src/ --output codebase-index.json
+    indexer --source worldmodel --config worldmodel.yaml --output world-index.json
+"""
+
+import hashlib
+import json
+import sys
+import argparse
+import os
+from typing import List, Dict, Optional, Any
+from pathlib import Path
+
+# Dewey-like formtag hierarchy for Agence
+# Extensible system for semantic classification
+FORMTAG_HIERARCHY = {
+    # 000-099: Framework Core
+    "000": "Framework Core",
+    "001": "Project Specification",
+    "002": "Architecture Patterns",
+    "010": "Configuration & Setup",
+    "011": "LLM Configuration",
+    "012": "Agent Configuration",
+    
+    # 100-199: Agents & Personas
+    "100": "Agents & Personas",
+    "110": "Agent Core Definitions",
+    "115": "Specialized Agent Patterns",
+    "120": "Agent Implementation",
+    "121": "Agent Personas",
+    "1211": "Ralph Wiggum (Principal Skinner)",
+    "1212": "Claude (Anthropic Base)",
+    "1213": "Chad (DevOps)",
+    "1214": "Aiko (Platform)",
+    "1215": "Claudia (SRE)",
+    "1216": "Aider (Code Editor)",
+    
+    # 200-299: Infrastructure & Operations
+    "200": "Infrastructure & Operations",
+    "210": "Git & Version Control",
+    "211": "Git Workflows",
+    "212": "Git Hooks",
+    "213": "Git Configuration",
+    "220": "CI/CD Pipelines",
+    "230": "Container Orchestration",
+    "240": "Deployment Strategies",
+    
+    # 300-399: Knowledge Management & RAG
+    "300": "Knowledge Management & RAG",
+    "310": "Vector Databases",
+    "320": "Knowledge Capture",
+    "330": "Knowledge Retrieval",
+    "340": "Knowledge Propagation",
+    
+    # 400-499: Domain Knowledge
+    "400": "Domain Knowledge",
+    "410": "Git/VCS Domain",
+    "420": "IaC (Terraform, Bicep)",
+    "421": "Terraform Modules",
+    "422": "Bicep Templates",
+    "430": "Cloud Platforms (AWS, Azure, GCP)",
+    "431": "AWS Services",
+    "432": "Azure Services",
+    "433": "GCP Services",
+    
+    # 500-599: Reliability & SRE
+    "500": "Reliability & SRE",
+    "510": "Observability",
+    "511": "Logging",
+    "512": "Metrics",
+    "513": "Tracing",
+    "520": "Incident Management",
+    "530": "Cost Optimization",
+    
+    # 600-699: Learning & Best Practices
+    "600": "Learning & Best Practices",
+    "610": "LLM Optimization",
+    "611": "Token Efficiency",
+    "612": "Cost Alignment",
+    "613": "Prompt Engineering",
+    "620": "Flavor & Personality",
+    "621": "Flavor Intensity",
+    "630": "Testing & Validation",
+    
+    # 700-799: Codebase Structure
+    "700": "Codebase Structure",
+    "710": "Module Definitions",
+    "720": "Function Exports",
+    "730": "Type Definitions",
+    "740": "Test Coverage",
+    
+    # 800-899: World Model
+    "800": "World Model",
+    "810": "Entity Definitions",
+    "820": "Relationships",
+    "830": "State & Transitions",
+    "840": "Integration Points",
+}
+
+class UniversalIndexer:
+    """Universal indexer for Agence knowledge bases, code, and world models"""
+    
+    def __init__(self, source_type: str = "kb"):
+        self.source_type = source_type  # kb, code, worldmodel
+        self.entries = []
+    
+    def generate_checksum(self, content: str, algorithm: str = "sha256") -> str:
+        """Generate checksum for any content"""
+        if algorithm == "sha256":
+            return hashlib.sha256(content.encode()).hexdigest()[:16]
+        elif algorithm == "sha1":
+            return hashlib.sha1(content.encode()).hexdigest()[:12]
+        elif algorithm == "md5":
+            return hashlib.md5(content.encode()).hexdigest()[:12]
+        return hashlib.sha256(content.encode()).hexdigest()[:16]
+    
+    def index_entry(
+        self,
+        source: str,
+        formtag: str,
+        description: str,
+        metadata: Optional[Dict] = None,
+        content: Optional[str] = None
+    ) -> Dict:
+        """Create indexed entry with checksum and hierarchy"""
+        entry = {
+            "source": source,
+            "checksum": self.generate_checksum(content or source),
+            "formtag": formtag,
+            "hierarchy": FORMTAG_HIERARCHY.get(formtag, "Unclassified"),
+            "description": description,
+            "source_type": self.source_type,
+            "cached": False,
+            "vector_id": None,
+        }
+        if metadata:
+            entry["metadata"] = metadata
+        return entry
+    
+    def index_batch(self, sources: List[tuple]) -> List[Dict]:
+        """
+        Index multiple sources
+        Each source: (source_id, formtag, description, optional_metadata)
+        """
+        for item in sources:
+            source_id = item[0]
+            formtag = item[1]
+            description = item[2]
+            metadata = item[3] if len(item) > 3 else None
+            
+            entry = self.index_entry(source_id, formtag, description, metadata)
+            self.entries.append(entry)
+        
+        return self.entries
+    
+    def to_json(self, pretty: bool = True) -> str:
+        """Export index as JSON"""
+        output = {
+            "version": "0.1.0",
+            "source_type": self.source_type,
+            "entry_count": len(self.entries),
+            "formtag_hierarchy": FORMTAG_HIERARCHY,
+            "entries": self.entries,
+        }
+        if pretty:
+            return json.dumps(output, indent=2)
+        return json.dumps(output)
+    
+    def save_json(self, filepath: str) -> None:
+        """Save index to JSON file"""
+        with open(filepath, "w") as f:
+            f.write(self.to_json(pretty=True))
+        print(f"✓ Saved: {filepath}")
+    
+    def print_index(self) -> None:
+        """Print readable index to stdout"""
+        print("=" * 80)
+        print(f"AGENCE INDEX: {self.source_type.upper()}")
+        print("=" * 80)
+        print()
+        
+        for entry in self.entries:
+            print(f"[{entry['formtag']}] {entry['checksum']}")
+            print(f"  {entry['hierarchy']}")
+            print(f"  {entry['source']}")
+            print(f"  → {entry['description']}")
+            if entry.get('metadata'):
+                print(f"  metadata: {entry['metadata']}")
+            print()
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Agence Universal Indexer"
+    )
+    parser.add_argument(
+        "--source",
+        choices=["kb", "code", "worldmodel"],
+        default="kb",
+        help="Source type to index"
+    )
+    parser.add_argument(
+        "--input",
+        help="Input file or directory"
+    )
+    parser.add_argument(
+        "--output",
+        help="Output JSON file"
+    )
+    parser.add_argument(
+        "--config",
+        help="Configuration file (YAML/JSON)"
+    )
+    parser.add_argument(
+        "--print",
+        action="store_true",
+        help="Print to stdout"
+    )
+    
+    args = parser.parse_args()
+    
+    indexer = UniversalIndexer(source_type=args.source)
+    
+    # Demo: Ralph Wiggum knowledge base
+    ralph_sources = [
+        ("https://awesomeclaude.ai/ralph-wiggum", "1211", 
+         "Ralph Wiggum persona (AwesClaude)", {"url_type": "persona"}),
+        ("https://ralph-wiggum.ai/", "1211",
+         "Ralph Wiggum homepage", {"url_type": "homepage"}),
+        ("https://ralphwiggum.org/", "1211",
+         "Ralph Wiggum TLD", {"url_type": "tld"}),
+        ("https://securetrajectories.substack.com/p/ralph-wiggum-principal-skinner-agent-reliability", "500",
+         "Ralph + Principal Skinner reliability patterns", {"url_type": "article"}),
+        ("https://github.com/ghuntley/how-to-ralph-wiggum", "120",
+         "Ralph Wiggum implementation guide", {"url_type": "repo"}),
+    ]
+    
+    indexer.index_batch(ralph_sources)
+    
+    if args.print:
+        indexer.print_index()
+    
+    if args.output:
+        indexer.save_json(args.output)
+    
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
