@@ -426,7 +426,118 @@ Therefore, recommend Z."
 
 ---
 
-## Summary: The 12 Rules of CODEX
+## Rule 13: Dangerous Operators Require Explicit Approval
+
+**Do**: Always prompt when dangerous shell operators are detected.
+
+**Why**: Shell metacharacters can cause data loss, unintended execution, or information leaks:
+- `>` / `>>`: Silently overwrite or append to files
+- `|`: Pipe can chain unexpected commands
+- `&&` / `;`: Execute multiple commands in sequence
+- `$()` / `` ` ``: Execute arbitrary subcommands
+- `$VAR`: Variable expansion can leak secrets
+
+**Blocked operators** (require explicit user confirmation):
+
+```
+>       Redirect STDOUT (overwrites file)
+>>      Redirect STDOUT (appends to file)
+|       Pipe to another command
+&&      AND operator (execute next if success)
+;       Command separator (always execute next)
+$()     Command substitution
+```
+
+**Examples**:
+
+```bash
+# ❌ BLOCKED: Would redirect without warning
+agence /something > output.txt
+# → ERROR: Dangerous operator '>' detected
+# → Prompt: "Confirm redirect to output.txt? [y/n]"
+
+# ❌ BLOCKED: Pipes without approval
+agence /get-data | grep secret
+# → ERROR: Dangerous operator '|' detected
+# → Prompt: "Confirm pipe to grep? [y/n]"
+
+# ❌ BLOCKED: Command substitution
+agence /run "$(cat file)"
+# → ERROR: Dangerous operator '$()' detected
+
+# ✅ SAFE: Direct command
+agence /deploy app-v1.0
+# → No operators, executes directly
+
+# ✅ APPROVED: With confirmation
+agence /something > output.txt
+# [System prompts for confirmation]
+# User: y
+# [Proceeds with redirect]
+```
+
+**Handling**:
+
+1. **Detect**: Scan input for dangerous operators
+2. **Block**: Refuse execution if detected
+3. **Prompt**: Ask user to confirm (with warning about risks)
+4. **Log**: Record operator usage to audit trail
+
+---
+
+## Rule 14: Use AIDO for Safe Operations
+
+**Do**: Pipe safe reads through `aido` instead of prompting.
+
+**Why**: AIDO (Allow IDempotent Operations) is the opposite of `sudo` - it *reduces* prompting for obviously safe operations:
+
+- **Git inspection**: `aido git status`, `aido git log`
+- **AWS inspection**: `aido aws describe-instances`
+- **PowerShell reads**: `Get-Service`, `Get-Process`
+
+No prompts. Just safe execution.
+
+**Philosophy**: 
+
+`sudo` = privilege escalation  
+`aido` = constraint reduction (only safe ops)
+
+**Examples**:
+
+```bash
+# ✅ SAFE: Use aido, no prompts
+aido git status
+aido git log --oneline -10
+aido aws describe-vpcs
+
+# ❌ BLOCKED: Mutating commands
+aido git push
+# → ERROR: push not whitelisted
+
+aido aws create-instance
+# → ERROR: create-instance blocks mutation operations
+
+# ✅ MUSCLE MEMORY: Can pipe aido safely in scripts
+git_branches=$(aido git branch -a | wc -l)
+aws_count=$(aido aws list-instances | jq '.Reservations | length')
+```
+
+**Whitelisted families**:
+
+- **Git**: status, log, diff, branch, tag, reflog, describe, config --list, show, etc.
+- **AWS**: describe-*, get-*, list-*, head-*, auth status, sts.get-session-token
+- **PowerShell**: Get, Test, Measure, Select, Where, Sort, Group, Compare (verbs only)
+
+**Benefits**:
+
+- Muscle memory for safe operations
+- Zero cognitive overhead for reads
+- Scripts can call them directly
+- Audit trail is implicit (whitelists are the policy)
+
+---
+
+## Summary: The 14 Rules of CODEX
 
 | Rule | Practice | Benefit |
 |------|----------|---------|
@@ -442,6 +553,8 @@ Therefore, recommend Z."
 | **10** | Iterate, don't abandon | Deeper understanding |
 | **11** | Always provide proof of actions | Transparency & accountability |
 | **12** | Cache your context | Token-efficient operation |
+| **13** | Block dangerous operators | Prevent accidental data loss/leaks |
+| **14** | Use AIDO for safe operations | Zero-friction reads + inspections |
 
 ---
 

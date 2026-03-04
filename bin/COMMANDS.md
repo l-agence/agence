@@ -182,6 +182,141 @@ agence ^reload
 
 ---
 
+### `agence ^aido <command>`
+
+**Purpose**: Execute whitelisted read-only and idempotent commands (opposite of sudo).
+
+**Philosophy**: Where `sudo` grants privilege escalation, `aido` grants *constraint reduction* - only allowing safe, non-destructive operations.
+
+**What it does**:
+- Validates command against family-specific whitelists
+- Blocks destructive operations (write, delete, push, etc.)
+- Only allows read-only and query operations
+- Minimal prompts (just execute or block)
+
+**Three command families supported**:
+
+#### 1. Git Commands
+Safe subcommands (read-only, inspection only):
+```bash
+agence ^aido git status
+agence ^aido git log --oneline
+agence ^aido git diff HEAD~1
+agence ^aido git branch -a
+agence ^aido git tag
+agence ^aido git reflog
+agence ^aido git describe
+agence ^aido git config --list
+agence ^aido git remote -v
+agence ^aido git rev-parse HEAD
+agence ^aido git show HEAD
+agence ^aido git ls-files
+agence ^aido git ls-tree HEAD
+agence ^aido git grep "pattern"
+agence ^aido git cat-file -t HEAD
+agence ^aido git ls-remote origin
+```
+
+**Blocked** (even though technically safe in some contexts):
+```
+push      - Remote mutation
+pull      - Remote state change
+merge     - Destructive in conflict
+commit    - Mutates repository
+reset     - Destructive
+rebase    - Destructive
+checkout  - Could lose work
+```
+
+#### 2. AWS Operations
+Safe patterns (describe, get, list, query only):
+```bash
+agence ^aido aws describe-instances
+agence ^aido aws describe-vpcs
+agence ^aido aws get-caller-identity
+agence ^aido aws list-buckets
+agence ^aido aws list-instances --region us-east-1
+agence ^aido aws head-bucket --bucket my-bucket
+agence ^aido aws auth status
+agence ^aido aws sts get-session-token
+```
+
+**Blocked** (any mutation):
+```
+create-*  - Infrastructure mutation
+delete-*  - Destructive
+modify-*  - State change
+update-*  - State change
+put-*     - Write operations
+```
+
+#### 3. PowerShell Verbs
+Safe verb-noun pairs (Get/Test/Measure/etc only):
+```bash
+# When in PowerShell context:
+Get-Service
+Get-Process
+Test-Path C:\logs
+Measure-Object -InputObject $data
+Select-Object -Property Name, Id
+Where-Object { $_.Status -eq 'Running' }
+Sort-Object -Property Created
+Group-Object -Property Key
+Compare-Object $list1 $list2
+```
+
+**Blocked verbs**: Set, New, Remove, Update, Clear, Start, Stop, Restart, etc.
+
+**Usage**:
+
+```bash
+# Git inspection
+agence ^aido git log --oneline -10
+
+# AWS query
+agence ^aido aws describe-instances --region us-west-2
+
+# Enable debug output
+AIDO_DEBUG=1 agence ^aido git status
+```
+
+**Output examples**:
+
+Allowed:
+```
+$ agence ^aido git status
+[AIDO] ✓ Executing: git status
+On branch master
+nothing to commit, working tree clean
+```
+
+Blocked:
+```
+$ agence ^aido git push
+[AIDO] ✗ BLOCKED: Git command not whitelisted: push
+
+Allowed git commands:
+  • status
+  • log
+  • diff
+  • branch
+  • tag
+  ... (full list)
+```
+
+**Why aido matters**:
+
+- **Reduced cognitive load**: No prompts for safe operations
+- **Muscle memory**: Can shell-pipe aido commands in scripts safely
+- **Audit trail**: All allowed operations are obviously safe
+- **Learning tool**: Shows what operations are "blessed" as safe
+
+**Error codes**:
+- `0` = Command executed successfully
+- `1` = Command blocked (not whitelisted)
+
+---
+
 ## Command Structure
 
 All commands follow this validation pipeline:
@@ -200,6 +335,33 @@ Input: agence ^init
 
 ---
 
+## Command Safety & Safeguards
+
+### Dangerous Operators
+
+Agence detects and blocks the following shell metacharacters unless explicitly approved:
+
+```
+>       Redirect STDOUT (file overwrite)
+>>      Redirect STDOUT (file append)
+|       Pipe to another command
+&&      AND operator (conditional execution)
+;       Command separator
+$()     Command substitution
+```
+
+**Why blocked**: Silent file overwrites, unintended command chaining, information leaks.
+
+**Example**:
+
+```bash
+$ agence /something > output.txt
+[WARN] Dangerous operator detected: '>'
+[PROMPT] Confirm? [y/N] y
+```
+
+---
+
 ## Environment Variables
 
 ### Required
@@ -213,6 +375,7 @@ Input: agence ^init
 - `AGENCE_QUIET=1`: Suppress non-error output
 - `AGENCE_LLM_PROVIDER`: LLM provider (default: claude)
 - `ANTHROPIC_API_KEY`: API key for Claude
+- `AGENCE_SKIP_OPERATOR_CHECK=1`: Disable dangerous operator checks (not recommended)
 
 ### Execution Context
 
@@ -222,6 +385,7 @@ Before any command runs:
 2. Paths are normalized to current shell
 3. GIT_REPO and AGENCE_REPO are initialized
 4. Current working directory is validated (must be in one of the repos)
+5. Dangerous operators are detected and blocked (requires user confirmation)
 
 If validation fails → Command aborts (CODEX LAW 2).
 

@@ -1,0 +1,205 @@
+#!/usr/bin/env bash
+
+################################################################################
+# AIDO: Allow IDempotent Operations
+# Whitelisted command executor (opposite of sudo)
+# Allows only safe, read-only, or idempotent commands
+#
+# Usage: aido <command>
+#
+# Author: Stephane Korning 2026
+# License: MIT License with Commons Clause
+################################################################################
+
+# ============================================================================
+# GIT WHITELIST
+# ============================================================================
+
+GIT_SAFE_COMMANDS=(
+    "status"
+    "log"
+    "diff"
+    "branch"
+    "tag"
+    "reflog"
+    "describe"
+    "shortlog"
+    "config.*--list"
+    "remote"
+    "rev-parse"
+    "show"
+    "ls-files"
+    "ls-tree"
+    "grep"
+    "cat-file"
+    "ls-remote"
+)
+
+# ============================================================================
+# AWS WHITELIST
+# ============================================================================
+
+AWS_SAFE_PATTERNS=(
+    "describe-.*"
+    "get-.*"
+    "list-.*"
+    "head-.*"
+    "auth.*status"
+    "auth.*login"
+    "sts.*get.*session.*token"
+)
+
+# ============================================================================
+# POWERSHELL WHITELIST
+# ============================================================================
+
+POWERSHELL_SAFE_VERBS=(
+    "Get"
+    "Test"
+    "Measure"
+    "Select"
+    "Where"
+    "Sort"
+    "Group"
+    "Compare"
+)
+
+# ============================================================================
+# AIDO VALIDATION FUNCTIONS
+# ============================================================================
+
+validate_git_command() {
+    local git_cmd="$1"
+    
+    # Extract the git subcommand (first argument after 'git')
+    local subcommand="${git_cmd#git }"
+    subcommand="${subcommand%% *}"
+    
+    # Check if subcommand is in whitelist
+    for safe_cmd in "${GIT_SAFE_COMMANDS[@]}"; do
+        if [[ "$subcommand" =~ ^${safe_cmd}$ ]]; then
+            return 0
+        fi
+    done
+    
+    return 1
+}
+
+validate_aws_command() {
+    local aws_cmd="$1"
+    
+    # Extract the operation (first argument after 'aws')
+    local operation="${aws_cmd#aws }"
+    
+    # Check if operation matches a safe pattern
+    for safe_pattern in "${AWS_SAFE_PATTERNS[@]}"; do
+        if [[ "$operation" =~ ^${safe_pattern} ]]; then
+            return 0
+        fi
+    done
+    
+    return 1
+}
+
+validate_powershell_command() {
+    local ps_cmd="$1"
+    
+    # Extract the verb (first word of command)
+    local verb="${ps_cmd%% *}"
+    
+    # Check if verb is in whitelist
+    for safe_verb in "${POWERSHELL_SAFE_VERBS[@]}"; do
+        if [[ "$verb" == "$safe_verb" ]] || [[ "$verb" == "${safe_verb}${safe_verb}" ]]; then
+            return 0
+        fi
+    done
+    
+    return 1
+}
+
+# ============================================================================
+# MAIN AIDO ROUTER
+# ============================================================================
+
+main() {
+    local full_command="$*"
+    local first_word="${1,,}"  # Convert to lowercase for matching
+    
+    [[ -z "$full_command" ]] && {
+        cat >&2 <<EOF
+AIDO: Allow IDempotent Operations
+Whitelisted command executor (opposite of sudo)
+
+Usage: aido <command> [args...]
+
+Examples:
+  aido git status
+  aido git log --oneline
+  aido aws describe-instances
+  aido aws sts get-session-token
+
+Whitelisted Git Commands:
+  status, log, diff, branch, tag, reflog, describe, shortlog
+  config --list, remote, rev-parse, show, ls-files, ls-tree
+  grep, cat-file, ls-remote
+
+Whitelisted AWS Patterns:
+  describe-*, get-*, list-*, head-*
+  auth status, auth login
+  sts get-session-token
+
+PowerShell Verbs (in PowerShell context):
+  Get, Test, Measure, Select, Where, Sort, Group, Compare
+
+Environment Variables:
+  AIDO_DEBUG=1  - Show execution trace
+
+EOF
+        return 1
+    }
+    
+    case "$first_word" in
+        git)
+            if validate_git_command "git $2"; then
+                [[ "${AIDO_DEBUG:-0}" == "1" ]] && echo "[AIDO] ✓ Executing: $full_command" >&2
+                eval "$full_command"
+                return $?
+            else
+                echo "[AIDO] ✗ BLOCKED: Git command not whitelisted: $2" >&2
+                echo "" >&2
+                echo "Allowed git commands:" >&2
+                printf "  • %s\n" "${GIT_SAFE_COMMANDS[@]}" >&2
+                return 1
+            fi
+            ;;
+        aws)
+            if validate_aws_command "aws $2"; then
+                [[ "${AIDO_DEBUG:-0}" == "1" ]] && echo "[AIDO] ✓ Executing: $full_command" >&2
+                eval "$full_command"
+                return $?
+            else
+                echo "[AIDO] ✗ BLOCKED: AWS operation not whitelisted: $2" >&2
+                echo "" >&2
+                echo "Allowed AWS patterns:" >&2
+                printf "  • %s\n" "${AWS_SAFE_PATTERNS[@]}" >&2
+                return 1
+            fi
+            ;;
+        *)
+            # Check if it's a PowerShell command (if in PowerShell session)
+            if [[ -n "${PSVersionTable+x}" ]]; then
+                if validate_powershell_command "$first_word"; then
+                    [[ "${AIDO_DEBUG:-0}" == "1" ]] && echo "[AIDO] ✓ Executing: $full_command" >&2
+                    eval "$full_command"
+                    return $?
+                fi
+            fi
+            
+            echo "[AIDO] ✗ BLOCKED: Command not whitelisted: $1" >&2
+            echo "Run 'aido' without arguments to see allowed commands" >&2
+            return 1
+            ;;
+    esac
+}
+
+main "$@"

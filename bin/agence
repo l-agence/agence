@@ -129,6 +129,7 @@ source_if_exists() {
 
 source_if_exists "$AGENCE_LIB/utils.sh"
 source_if_exists "$AGENCE_LIB/logging.sh"
+source_if_exists "$AGENCE_LIB/safeguards.sh"
 source_if_exists "$AGENCE_LIB/router.sh"
 
 # ============================================================================
@@ -380,6 +381,11 @@ mode_ai_routed() {
 
   [[ "$DEBUG" == "1" ]] && echo "[DEBUG] AI-routed mode: $request" >&2
 
+  # Validate request for dangerous operators
+  if ! validate_command "$request"; then
+    return 1
+  fi
+
   # Load router
   router_load_config
 
@@ -437,6 +443,11 @@ mode_external() {
   local cmd_request="$1"
 
   [[ "$DEBUG" == "1" ]] && echo "[DEBUG] External mode: $cmd_request" >&2
+
+  # Validate command for dangerous operators
+  if ! validate_command "$cmd_request"; then
+    return 1
+  fi
 
   # Load permitted commands from config/commands.json
   local commands_file="$AGENCE_ROOT/bin/commands.json"
