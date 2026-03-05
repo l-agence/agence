@@ -520,6 +520,118 @@ agence /push
 
 ---
 
+### `/ghstatus`
+
+**Purpose**: Display repository and pull request status using GitHub CLI.
+
+**What it does**:
+- Shows repository information (visibility, description, fork status)
+- Lists recent pull requests
+- Uses GitHub CLI authentication (not git credentials)
+- Read-only operation (safe)
+
+**Usage**:
+
+```bash
+agence /ghstatus
+
+# Output:
+# [INFO] Repository status:
+# name:             agence-master
+# owner:            l-agence
+# description:      Agence AI Agentic Engineering Toolkit
+# url:              https://github.com/l-agence/agence-master
+# fork:             false
+# 
+# [INFO] Pull requests:
+# Showing 5 of 0 pull requests in l-agence/agence-master
+```
+
+**Requirements**:
+- GitHub CLI must be authenticated (`agence /ghlogin`)
+
+**Safety**: Read-only (uses `aido` whitelisting)
+
+---
+
+### `/ghcommit`
+
+**Purpose**: Commit staged changes with GitHub CLI auth verification.
+
+**What it does**:
+- Verifies GitHub CLI authentication
+- Prompts for commit message
+- Commits all staged files
+- Similar to `/commit` but checks gh auth first
+
+**Usage**:
+
+```bash
+agence /ghcommit
+
+# Prompts:
+# [WARN] This will commit all staged changes using gh auth
+# Enter commit message: Added GitHub CLI commands
+# [main 8f4a2c1] Added GitHub CLI commands
+#  2 files changed, 52 insertions(+)
+```
+
+**Requirements**:
+- GitHub CLI must be authenticated (`agence /ghlogin`) 
+- Files must already be staged (`git add`)
+
+**Safety**:
+- [WARN] message before prompt
+- Auth check before execution
+- Reversible (git reset can undo)
+
+---
+
+### `/ghpush`
+
+**Purpose**: Push changes to remote using GitHub CLI authentication.
+
+**What it does**:
+- Verifies GitHub CLI authentication  
+- Pushes current branch to origin
+- Sets upstream tracking on first push
+- **Requires explicit confirmation**
+
+**Usage**:
+
+```bash
+agence /ghpush
+
+# Output:
+# [WARN] This will push changes using GitHub CLI auth
+# Confirm push to origin? [y/N] y
+# Enumerating objects: 5, done.
+# Counting objects: 100% (5/5), done.
+# Delta compression using up to 8 threads.
+# Compressing objects: 100% (2/2), done.
+# Writing objects: 100% (3/3), 256 bytes | 256.00 KiB/s, done.
+# Total 3 (delta 2), reused 0 (delta 0), reused 1 (delta 0)
+# remote: Resolving deltas: 100% (2/2), done.
+# To github.com:l-agence/agence-master.git
+#    5b7c8a9..8f4a2c1  main -> main
+# branch 'main' set up to track 'origin/main'.
+```
+
+**Requirements**:
+- GitHub CLI must be authenticated (`agence /ghlogin`)
+- Commits must be staged locally (via `/ghcommit` or `/commit`)
+- Push target is current branch to origin
+
+**Safety**:
+- [WARN] displayed before prompt
+- Auth check before execution
+- User must explicitly confirm with 'y'
+- Default is 'N' (no push)
+- Sets upstream tracking automatically
+- **Uses GitHub CLI auth instead of git credentials** (more reliable)
+
+---
+
 ## Command Structure
 
 All commands follow this validation pipeline:
