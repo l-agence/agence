@@ -67,3 +67,32 @@ agence ^branch-delete feature-branch  # Explicit deletion
 **Version**: 0.1.0  
 **Status**: In Effect  
 **Last Updated**: 2026-03-04
+
+---
+
+## Law 5: Sessions Stay Local, Metadata Shared
+
+Local session persistence (`.aisessions/`) is for agent debugging and recovery **only**.
+
+- Raw STDOUT/STDERR/STDIN files `.gitignore`'d and never pushed
+- Sensitive data stays in repo, never leaves
+- Metadata JSON (.meta.json) is selectively shareable for handoffs and knowledge capture
+- No memory/heap/dump broadcasting (stays simple)
+
+```bash
+# ❌ ILLEGAL: Push raw session data
+git add .aisessions/*.typescript
+git commit -m "session logs"
+
+# ✅ LEGAL: Export metadata for handoff
+jq '.exit_code, .lessons, .fault' < .aisessions/SESSION_ID.meta.json > /tmp/handoff.json
+# Share /tmp/handoff.json, never .typescript
+```
+
+See [SESSION-PERSISTENCE.md](../../synthesis/l-agence.org/SESSION-PERSISTENCE.md) for details.
+
+---
+
+**Version**: 0.2.0  
+**Status**: In Effect  
+**Last Updated**: 2026-03-05

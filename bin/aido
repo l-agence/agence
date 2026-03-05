@@ -1,15 +1,99 @@
 #!/usr/bin/env bash
 
 ################################################################################
-# AIDO: Allow IDempotent Operations
-# Whitelisted command executor (opposite of sudo)
+# AIDO: Allow IDempotent Operations + Session Persistence
+# Whitelisted command executor with local session capture
 # Allows only safe, read-only, or idempotent commands
+# Captures STDIN/STDOUT/STDERR via 'script' command to local session dir
 #
 # Usage: aido <command>
+#
+# Session Data Structure:
+#   .aisessions/SESSION_ID.typescript  - Raw output from 'script' command
+#   .aisessions/SESSION_ID.meta.json   - Metadata: cmd, exit, tails, sha256, etc.
 #
 # Author: Stephane Korning 2026
 # License: MIT License with Commons Clause
 ################################################################################
+
+# ============================================================================
+# SESSION CONFIGURATION
+# ============================================================================
+
+# Compute REPO_ROOT dynamically (same as .agencerc)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR/..")" && pwd)"
+
+AIDO_SESSION_DIR="${AIDO_SESSION_DIR:-$REPO_ROOT/nexus/.aisessions}"
+AIDO_AGENT="${AIDO_AGENT:-ai-agent}"
+AIDO_DEBUG="${AIDO_DEBUG:-0}"
+
+# ============================================================================
+# SESSION HELPER FUNCTIONS
+# ============================================================================
+
+session_init() {
+    # Create session directory if it doesn't exist
+    mkdir -p "$AIDO_SESSION_DIR" 2>/dev/null || {
+        echo "[AIDO] ✗ Failed to create session directory: $AIDO_SESSION_DIR" >&2
+        return 1
+    }
+}
+
+generate_session_id() {
+    # Format: agent-YYYYMMDD_HHMMSS-PID-HEXID
+    local timestamp=$(date +%Y%m%d_%H%M%S)
+    local pid=$$
+    local hexid=$(printf '%x' $((RANDOM * 65536 + RANDOM)))
+    echo "${AIDO_AGENT}-${timestamp}-${pid}-${hexid}"
+}
+
+run_with_session() {
+    local full_command="$1"
+    local session_id="$2"
+    local typescript_file="$AIDO_SESSION_DIR/${session_id}.typescript"
+    local meta_file="$AIDO_SESSION_DIR/${session_id}.meta.json"
+    
+    [[ "${AIDO_DEBUG}" == "1" ]] && echo "[AIDO] Session: $session_id" >&2
+    [[ "${AIDO_DEBUG}" == "1" ]] && echo "[AIDO] Typescript: $typescript_file" >&2
+    
+    # Run command inside PTY with 'script' capturing output
+    script --quiet --return --command "$full_command" "$typescript_file" 2>&1
+    local exit_code=$?
+    
+    # Extract tail of stdout and head of stderr for metadata
+    local stdout_tail=$(tail -c 500 "$typescript_file" 2>/dev/null | strings || echo "")
+    local stderr_head=$(head -c 500 "$typescript_file" 2>/dev/null | strings | head -5 || echo "")
+    
+    # Calculate SHA256 of session file
+    local sha256=""
+    if command -v sha256sum &>/dev/null; then
+        sha256=$(sha256sum "$typescript_file" 2>/dev/null | awk '{print $1}')
+    elif command -v shasum &>/dev/null; then
+        sha256=$(shasum -a 256 "$typescript_file" 2>/dev/null | awk '{print $1}')
+    fi
+    
+    # Generate metadata JSON
+    cat > "$meta_file" <<EOF
+{
+  "session_id": "$session_id",
+  "agent": "$AIDO_AGENT",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "command": "$full_command",
+  "exit_code": $exit_code,
+  "typescript_file": "$typescript_file",
+  "sha256": "$sha256",
+  "stdout_tail": "$(echo "$stdout_tail" | jq -Rs .)",
+  "stderr_head": "$(echo "$stderr_head" | jq -Rs .)"
+}
+EOF
+
+    # Output exit code marker (mandatory for session tracking)
+    echo ""
+    echo "=== AI_EXIT_CODE: $exit_code ==="
+    
+    return $exit_code
+}
 
 # ============================================================================
 # GIT WHITELIST
@@ -165,7 +249,7 @@ validate_powershell_command() {
 }
 
 # ============================================================================
-# MAIN AIDO ROUTER
+# MAIN AIDO ROUTER (with Session Capture)
 # ============================================================================
 
 main() {
@@ -174,8 +258,8 @@ main() {
     
     [[ -z "$full_command" ]] && {
         cat >&2 <<EOF
-AIDO: Allow IDempotent Operations
-Whitelisted command executor (opposite of sudo)
+AIDO: Allow IDempotent Operations + Session Persistence
+Whitelisted command executor with local session capture
 
 Usage: aido <command> [args...]
 
@@ -210,17 +294,30 @@ PowerShell Verbs (in PowerShell context):
   Get, Test, Measure, Select, Where, Sort, Group, Compare
 
 Environment Variables:
-  AIDO_DEBUG=1  - Show execution trace
+  AIDO_DEBUG=1          - Show execution trace
+  AIDO_SESSION_DIR      - Override session directory (default: ./.aisessions)
+  AIDO_AGENT            - Agent identifier for session tracking (default: ai-agent)
+
+Session Data:
+  Sessions stored in: $AIDO_SESSION_DIR/
+  Raw output:    SESSION_ID.typescript
+  Metadata:      SESSION_ID.meta.json
 
 EOF
         return 1
     }
     
+    # Initialize session directory
+    session_init || return 1
+    
+    # Generate unique session ID
+    local session_id=$(generate_session_id)
+    
     case "$first_word" in
         git)
             if validate_git_command "git $2"; then
-                [[ "${AIDO_DEBUG:-0}" == "1" ]] && echo "[AIDO] ✓ Executing: $full_command" >&2
-                eval "$full_command"
+                [[ "${AIDO_DEBUG}" == "1" ]] && echo "[AIDO] ✓ Validating: $full_command" >&2
+                run_with_session "$full_command" "$session_id"
                 return $?
             else
                 echo "[AIDO] ✗ BLOCKED: Git command not whitelisted: $2" >&2
@@ -232,8 +329,8 @@ EOF
             ;;
         aws)
             if validate_aws_command "aws $2"; then
-                [[ "${AIDO_DEBUG:-0}" == "1" ]] && echo "[AIDO] ✓ Executing: $full_command" >&2
-                eval "$full_command"
+                [[ "${AIDO_DEBUG:-0}" == "1" ]] && echo "[AIDO] ✓ Validating: $full_command" >&2
+                run_with_session "$full_command" "$session_id"
                 return $?
             else
                 echo "[AIDO] ✗ BLOCKED: AWS operation not whitelisted: $2" >&2
@@ -245,8 +342,8 @@ EOF
             ;;
         gh)
             if validate_gh_command "gh $2 $3 $4 $5"; then
-                [[ "${AIDO_DEBUG:-0}" == "1" ]] && echo "[AIDO] ✓ Executing: $full_command" >&2
-                eval "$full_command"
+                [[ "${AIDO_DEBUG:-0}" == "1" ]] && echo "[AIDO] ✓ Validating: $full_command" >&2
+                run_with_session "$full_command" "$session_id"
                 return $?
             else
                 echo "[AIDO] ✗ BLOCKED: GitHub CLI command not whitelisted: $2" >&2
@@ -260,8 +357,8 @@ EOF
             # Check if it's a PowerShell command (if in PowerShell session)
             if [[ -n "${PSVersionTable+x}" ]]; then
                 if validate_powershell_command "$first_word"; then
-                    [[ "${AIDO_DEBUG:-0}" == "1" ]] && echo "[AIDO] ✓ Executing: $full_command" >&2
-                    eval "$full_command"
+                    [[ "${AIDO_DEBUG:-0}" == "1" ]] && echo "[AIDO] ✓ Validating: $full_command" >&2
+                    run_with_session "$full_command" "$session_id"
                     return $?
                 fi
             fi
@@ -274,4 +371,4 @@ EOF
 }
 
 main "$@"
-test
+

@@ -1,4 +1,9 @@
 .agence/
+.mysecrets/
+.aisecrets/
+nexus/.aisessions/
+nexus/.airuns/
+.private/
 @
 Lib
 Scripts
@@ -7,5 +12,3 @@ CLAUDE.md
 .github/copilot.md
 .nogit
 .gitmodules
-.aisecrets/
-.private/
