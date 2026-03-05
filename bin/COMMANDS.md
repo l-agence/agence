@@ -182,280 +182,87 @@ agence ^reload
 
 ---
 
-### `agence ^learn`
+### `agence ^reindex`
 
-**Purpose**: Scan and absorb changes to Agence files without restarting.
+**Purpose**: Reindex all knowledge bases and update cached semantic formtags.
 
 **What it does**:
-- Scans all monitored Agence files for modifications since last scan
-- Compares file timestamps against internal checkpoint
-- Lists all changed files with modification dates and sizes
-- Re-reads and ingests updated context
-- Summarizes knowledge base state (principles, laws, rules, lessons)
-- Updates internal timestamp for next incremental scan
+- Scans all knowledge bases in `globalcache/`
+- Expires old cache entries (checksums, formtags)
+- Runs semantic indexer on each knowledge base
+- Generates/updates formtags for semantic navigation
+- Reports summary of reindexing activity
 
-**Monitored files**:
-
+**Knowledge bases** (automatically discovered in globalcache/):
 ```
-codex/PRINCIPLES.md          - Maxims and core philosophy
-codex/LAWS.md                - Hard constraints
-codex/RULES.md               - Best practices
-codex/agents/*.md            - Agent personas (Claudia, Ralph, Sonny, Lima, Haiku)
-synthesis/lessons/*.json     - Captured insights and lessons learned
-.github/CLAUDE.md            - Agent context and instructions
-.github/copilot-*.md         - Copilot integration files
+globalcache/
+├── acme.tld/          ← Indexed
+└── l-agence.org/      ← Indexed
+    ├── docs/
+    ├── lessons/
+    └── *.md
 ```
 
 **Usage**:
 
 ```bash
-# After manually updating Agence markdown files
-vi codex/RULES.md              # Update some rules
-agence ^learn                  # Agent re-reads changes
+# Reindex all knowledge bases
+agence ^reindex
 
 # Output:
-# [LEARN] Scanning for modified Agence files...
-# ==========================================
-# ✓ UPDATED: codex/RULES.md
-#   Modified: 2026-03-05 10:23:45
-#   Size: 17250 bytes
+# ==============================================
+#   AGENCE KNOWLEDGE BASE REINDEX (^reindex)
+# ==============================================
+#
+# Knowledge Base Root: /path/to/.agence/globalcache
+#
+# Step 1/3: Scanning knowledge bases...
+#   Found: acme.tld
+#   Found: l-agence.org
+#
+# Step 2/3: Expiring cached metadata...
+#   Expiring cache: acme.tld
+#     ✓ Expired
+#   Expiring cache: l-agence.org
+#     ✓ Expired
+#
+# Step 3/3: Reindexing knowledge bases...
+#   Indexing: acme.tld
+#     ✓ Indexed (formtags generated)
+#   Indexing: l-agence.org
+#     ✓ Indexed (42 files, formtags generated)
+#
+# ==============================================
+#   REINDEX COMPLETE
+# ==============================================
 #
 # Summary:
-#   Files changed: 1
-#   Changed files:
-#     - codex/RULES.md
-#
-# Re-reading context files...
-#   ✓ Principles: 4 maxims
-#   ✓ Laws: 4 constraints
-#   ✓ Rules: 14 practices
-#   ✓ Lessons: 3 captured
-#
-# ==========================================
-# ✓ Context updated successfully!
+#   Knowledge bases processed: 2
+#   Cache entries expired: 15
+#   Formtags updated: 2
 ```
 
 **Why use it**:
 
-- **After local edits**: Update agent knowledge without session restart
-- **Team collaboration**: Pull changes from git and have agent absorb them
-- **Rapid iteration**: Fix rules/principles and see effect immediately
-- **No downtime**: Agent can continue with updated context in same session
+- **After adding new knowledge**: Refresh semantic indexes
+- **After modifying markdown files**: Update formtags and checksums
+- **Cache corruption**: Clear and rebuild all cached metadata
+- **Periodic maintenance**: Keep knowledge bases searchable and tagged
+- **Multi-agent coordination**: Sync knowledge across agent instances
 
-**Incremental scanning**:
-- First run: Scans all files
-- Subsequent runs: Only checks files modified since last `^learn`
-- Timestamp stored in `.agence_learn_timestamp` (not version controlled)
+**How it works**:
 
----
+1. **Scanning**: Discovers all directories in `globalcache/`
+2. **Cache expiration**: Removes old `.index_cache/*.json` files
+3. **Indexing**: Calls `bin/indexer` on each knowledge base
+4. **Formtagging**: Generates semantic formtags using Dewey-like hierarchy
+5. **Reporting**: Shows count of updated indexes and cached entries
 
-### `agence ^save [notes]`
+**Dependencies**:
 
-**Purpose**: Persist current session state for later resumption or handoff.
-
-**What it does**:
-- Captures agent context, execution state, and memory
-- Generates unique session ID (8-char hex timestamp)
-- Saves to `nexus/sessions/session-saved.jsonl`
-- Updates `nexus/sessions/INDEX.md` with session metadata
-- Allows resumption via `agence ^resume SESSION_ID`
-
-**Session data captured**:
-
-```
-session_id         - Unique 8-char hex identifier
-created_at         - ISO 8601 timestamp
-status             - Current status (saved|paused|handoff|completed)
-agent              - Which agent manages this session
-notes              - User-provided context about session
-runstate           - Execution state details:
-  ├─ agent_context     - Current agent memory/context
-  ├─ execution_stack   - Current working directory, file states
-  ├─ memory_state      - Shell env, history, variables
-  ├─ cursor_position   - Active file and line
-  ├─ last_command      - Previous command executed
-  └─ todo_list         - Outstanding tasks/checkpoints
-metadata           - Session metadata:
-  ├─ task_description  - What this session was working on
-  ├─ repo              - Git repository path
-  ├─ priority          - Task priority (low|normal|high)
-  └─ tags              - Topic tags (#deployment, #bug-fix, etc.)
-```
-
-**Usage**:
-
-```bash
-# Save with notes (interactive or direct)
-agence ^save "Implementing OAuth2, halfway through Step 2"
-
-# Save with just timestamp (user prompted for notes)
-agence ^save
-
-# Output:
-# ✓ Session saved!
-#   Session ID:   69a8f74c
-#   Status:       saved
-#   Location:     .agence/nexus/sessions/session-saved.jsonl
-#   Index:        .agence/nexus/sessions/INDEX.md
-#
-# Resume with: agence ^resume 69a8f74c
-```
-
-**Session lifecycle**:
-
-```
-^save (create)
-  ↓
-session-saved.jsonl (persisted)
-  ├─ ^resume (continue)
-  ├─ ^handoff (transfer)
-  └─ ^archive (aged out)
-```
-
-**Finding sessions**:
-
-```bash
-# List all saved sessions
-grep "saved" .agence/nexus/sessions/INDEX.md
-
-# Find sessions for specific agent
-grep "@claudia" .agence/nexus/sessions/INDEX.md
-
-# Find by date range
-grep "2026-03-0" .agence/nexus/sessions/INDEX.md
-```
-
-**Why save sessions**:
-
-- **Interruption recovery**: Resume context after system reboot
-- **Context handoff**: Pass work to another agent with full state
-- **Work tracking**: Historical record of what was being worked on
-- **Institutional memory**: Lessons and decisions captured with context
-
----
-
-### `agence ^commit [message]`
-
-**Purpose**: Commit all changed Agence files to git (respects .gitignore).
-
-**What it does**:
-- Detects modified files in .agence/
-- Respects .gitignore (excludes nexus/, secrets, etc.)
-- Shows summary of what will be committed
-- Prompts for commit message if not provided
-- Uses `git add -A` and `git commit`
-
-**Key principle (LAW 5)**: Never ignore .gitignore - ephemeral state (NEXUS) is never version controlled.
-
-**Usage**:
-
-```bash
-# Commit with inline message
-agence ^commit "Updated rules and agent personas"
-
-# Commit interactively (prompted for message)
-agence ^commit
-
-# Output on success:
-# [COMMIT] Agence Files Summary
-# ==========================================
-# M  codex/RULES.md
-# M  synthesis/l-agence.org/lessons/abc123.json
-# ?? .github/README.md
-# 
-# ==========================================
-#
-# ✓ Committed successfully!
-#   Commit message: Updated rules and agent personas
-#
-# Next: agence ^push (to push to origin)
-```
-
-**What gets committed**:
-- ✅ codex/ - Knowledge (principles, laws, rules, agents)
-- ✅ synthesis/ - Learning and documentation
-- ✅ .github/ - Integration files  
-- ✅ bin/ - Commands and scripts
-- ❌ nexus/ - Excluded (operational state, not tracked)
-
-**What doesn't get committed** (.gitignore):
-```
-nexus/                    # Logs, faults, sessions
-.agence_learn_timestamp   # Context scan checkpoint
-.env, .env.local         # Local secrets
-.vscode/settings.json    # Editor overrides
-```
-
-**Requirements**:
-- Must be in git repository
-- Must have uncommitted changes
-- Must provide commit message (or be prompted)
-
----
-
-### `agence ^push`
-
-**Purpose**: Push committed Agence changes to origin (defaults to current branch, falls back to main).
-
-**What it does**:
-- Detects current git branch
-- Shows push summary (repo, branch, target)
-- Requests confirmation before pushing
-- Pushes to origin with tracking (`git push -u`)
-- Defaults to main on detached HEAD
-
-**Usage**:
-
-```bash
-# Push current branch to origin
-agence ^push
-
-# Output on success:
-# [PUSH] Preparing to push
-# ==========================================
-# Repository: https://github.com/l-agence/agence-master.git
-# Branch:     main
-# Target:     origin/main
-# 
-# This will push to origin/main
-# Continue push? [y/N] y
-#
-# Pushing to origin/main...
-#
-# ✓ Pushed successfully!
-#   Branch: main
-#   Remote: origin
-```
-
-**Branch handling**:
-- Current branch: Auto-detected via `git rev-parse --abbrev-ref HEAD`
-- Detached HEAD: Defaults to main
-- Tracking: Uses `git push -u` to set upstream on first push
-- No hardcoded branch: Always uses current (or main)
-
-**Typical workflow**:
-
-```bash
-# Edit files
-vi codex/RULES.md
-agence ^learn                              # Re-absorb context
-
-# Commit
-agence ^commit "Added new rule about error handling"
-
-# Push to origin
-agence ^push
-
-# Next session (other machine/agent):
-git pull origin main
-agence ^learn                              # Syncs knowledge
-```
-
-**Requirements**:
-- Must be in git repository
-- Must have committed changes to push
-- Must have origin remote configured
-- User confirmation required
+- `bin/indexer` (Python script for semantic indexing)
+- Markdown files with frontmatter/metadata support
+- Write access to knowledge base directories
 
 ---
 
@@ -464,8 +271,6 @@ agence ^learn                              # Syncs knowledge
 **Purpose**: Execute whitelisted read-only and idempotent commands (opposite of sudo).
 
 **Philosophy**: Where `sudo` grants privilege escalation, `aido` grants *constraint reduction* - only allowing safe, non-destructive operations.
-
-
 
 **What it does**:
 - Validates command against family-specific whitelists
