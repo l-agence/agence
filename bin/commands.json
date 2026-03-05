@@ -1,0 +1,65 @@
+{
+  "comment": "Agence Permitted External Commands (mode /)",
+  "description": "Whitelist of external commands that can be executed via 'agence /<command>'",
+  "updated": "2026-03-05",
+  "version": "1.0.0",
+
+  "terraform-commands": {
+    "terraform-plan": true,
+    "terraform-apply": true,
+    "terraform-validate": true,
+    "terraform-fmt": true,
+    "terraform-state": true
+  },
+
+  "git-commands": {
+    "git-status": true,
+    "git-log": true,
+    "git-diff": true,
+    "git-branch": true,
+    "git-tag": true,
+    "git-stash": true,
+    "git-blame": true,
+    "git-push": true,
+    "git-pull": true,
+    "git-merge": true,
+    "git-rebase": true,
+    "git-clone": true,
+    "git-init": true
+  },
+
+  "aws-commands": {
+    "aws-list-buckets": true,
+    "aws-describe-instances": true,
+    "aws-describe-vpcs": true,
+    "aws-describe-security-groups": true,
+    "aws-get-caller-identity": true,
+    "aws-list-stacks": true,
+    "aws-describe-clusters": true
+  },
+
+  "tools": {
+    "gh": true,
+    "copilot": true,
+    "copilot-cli": true,
+    "aider": true,
+    "cursor": true,
+    "docker": true,
+    "kubernetes": true,
+    "ollama": true,
+    "azure": true,
+    "jfrog": true,
+    "terraform": true,
+    "python": true
+  },
+
+  "notes": [
+    "Commands can be invoked via: agence /<command>",
+    "Example: agence /terraform-plan",
+    "Example: agence /git-status",
+    "Example: agence /aws-list-buckets",
+    "Whitelist enforced for security and auditability",
+    "Add new commands by extending this file",
+    "Each command must be explicitly permitted"
+  ]
+}
