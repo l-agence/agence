@@ -20,11 +20,15 @@
 # SESSION CONFIGURATION
 # ============================================================================
 
-# Compute REPO_ROOT dynamically (same as .agencerc)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR/..")" && pwd)"
+# Use AI_ROOT and AI_BIN from environment (set by .agencerc)
+# Fallback: compute from script location
+if [[ -z "$AI_ROOT" || -z "$AI_BIN" ]]; then
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    AI_ROOT="${AI_ROOT:-$(dirname "$script_dir")}"
+    AI_BIN="${AI_BIN:-$script_dir}"
+fi
 
-AIDO_SESSION_DIR="${AIDO_SESSION_DIR:-$REPO_ROOT/nexus/.aisessions}"
+AIDO_SESSION_DIR="${AIDO_SESSION_DIR:-$AI_ROOT/nexus/.aisessions}"
 AIDO_AGENT="${AIDO_AGENT:-ai-agent}"
 AIDO_DEBUG="${AIDO_DEBUG:-0}"
 
@@ -88,10 +92,33 @@ run_with_session() {
 }
 EOF
 
-    # Output exit code marker (mandatory for session tracking)
+    # Call mandatory verification
+    verify_session_script="$AI_BIN/verify-session"
+    if [[ -x "$verify_session_script" ]]; then
+        "$verify_session_script" "$session_id"
+        verify_exit=$?
+        
+        # If verification denied (254), block workflow and return immediately
+        if [[ $verify_exit -eq 254 ]]; then
+            echo ""
+            echo "=== AI_EXIT_CODE: 254 (UNVERIFIED - WORKFLOW BLOCKED) ==="
+            return 254
+        fi
+        
+        # If verification error (1), report and return
+        if [[ $verify_exit -eq 1 ]]; then
+            echo ""
+            echo "=== AI_EXIT_CODE: 1 (VERIFICATION ERROR) ==="
+            return 1
+        fi
+    else
+        echo "[AIDO] ⚠ Warning: verify-session script not found or not executable" >&2
+        echo "[AIDO]   Expected: $verify_session_script" >&2
+    fi
+    
+    # Verification passed (or skipped), output original command exit code
     echo ""
     echo "=== AI_EXIT_CODE: $exit_code ==="
-    
     return $exit_code
 }
 

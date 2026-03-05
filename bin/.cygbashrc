@@ -1,0 +1,112 @@
+#!/bin/bash
+# ============================================================================
+# .cygbashrc - Cygwin Bash Specific Configuration
+# ============================================================================
+# This file is sourced ONLY by Cygwin bash
+# It contains Cygwin-specific workarounds and symlink handling
+#
+# Key differences from git-bash:
+# - Path format: /cygdrive/c/Users/... (NOT /c/Users/...)
+# - Symlink support via `mklink` (Windows) or `ln -s` (native Cygwin)
+# - Environment variables may need Cygwin-specific handling
+
+# ============================================================================
+# SYMLINK STRATEGY FOR CYGWIN
+# ============================================================================
+# Cygwin mklink() - Create proper NTFS symlinks (not Cygwin symlinks)
+# This creates Windows-native symlinks that git can track (mode 120000)
+# and that work on all platforms.
+#
+# Usage: mklink [/D] <link_name> <target>
+# /D = directory symlink
+# Without /D = file symlink
+
+mklink() {
+    local is_dir=false
+    local link_name
+    local target
+    
+    # Parse /D flag
+    if [[ "$1" == "/D" ]]; then
+        is_dir=true
+        link_name="$2"
+        target="$3"
+    else
+        link_name="$1"
+        target="$2"
+    fi
+    
+    # Validate arguments
+    if [[ -z "$link_name" || -z "$target" ]]; then
+        echo "Usage: mklink [/D] <link_name> <target>" >&2
+        return 1
+    fi
+    
+    # Check if target exists
+    if [[ ! -e "$target" && ! -L "$target" ]]; then
+        echo "[ERROR] Target does not exist: $target" >&2
+        return 1
+    fi
+    
+    # Use cmd.exe native mklink for Windows compatibility
+    local cmd_link_name=$(cygpath -w "$link_name" 2>/dev/null || echo "$link_name")
+    local cmd_target=$(cygpath -w "$target" 2>/dev/null || echo "$target")
+    
+    if $is_dir; then
+        cmd /c mklink /D "$cmd_link_name" "$cmd_target"
+    else
+        cmd /c mklink "$cmd_link_name" "$cmd_target"
+    fi
+    
+    if [[ $? -eq 0 ]]; then
+        echo "[LINK] Created: $link_name -> $target"
+        return 0
+    else
+        echo "[ERROR] Failed to create symlink: $link_name -> $target" >&2
+        return 1
+    fi
+}
+
+# ============================================================================
+# PATH CONVERSION HELPERS
+# ============================================================================
+# Cygwin uses /cygdrive/c/... instead of /c/...
+# These helpers ensure cross-platform path compatibility
+
+win_to_cygwin() {
+    # Convert C:\Users\steff to /cygdrive/c/Users/steff
+    cygpath -u "$1"
+}
+
+cygwin_to_win() {
+    # Convert /cygdrive/c/Users/steff to C:\Users\steff
+    cygpath -w "$1"
+}
+
+# ============================================================================
+# ENVIRONMENT SETUP (from .agencerc)
+# ============================================================================
+
+# Ensure AI_BIN is in PATH for agence commands
+if [[ -n "$AI_BIN" && ":$PATH:" != *":$AI_BIN:"* ]]; then
+    export PATH="$AI_BIN:$PATH"
+fi
+
+# Export AGENCE variables for Cygwin compatibility
+export AI_ROOT="${AI_ROOT:-.}"
+export GIT_ROOT="${GIT_ROOT:-.}"
+export AI_BIN="${AI_BIN:-.}"
+# ============================================================================
+# ENVIRONMENT SETUP
+# ============================================================================
+
+# Ensure git can create symlinks
+git config --global core.symlinks true 2>/dev/null
+
+# Use Windows native symlinks in Cygwin
+export CYGWIN=winsymlinks:native
+
+if [[ "${AGENCE_DEBUG:-0}" == "1" ]]; then
+    echo "[CYGWIN] Cygwin bash profile loaded"
+    echo "[CYGWIN] CYGWIN=$CYGWIN"
+fi

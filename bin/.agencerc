@@ -1,0 +1,171 @@
+#!/bin/bash
+# ============================================================================
+# .agencerc - Agence Multi-Shell Bootstrap Profile
+# ============================================================================
+# This is the main entry point for shell initialization.
+# It detects the calling shell and sources the appropriate shell-specific profile.
+#
+# This file should be sourced in your shell's RC file:
+# - bash: source ~/.agence/bin/.agencerc
+# - zsh: source ~/.agence/bin/.agencerc
+# - fish: source ~/.agence/bin/.agencerc (with proper syntax)
+# - PowerShell: . ~/.agence/bin/profile.ps1
+#
+# Environment Detection & Dynamic Variable Setup:
+# - AGENCE_ROOT: Computed from this script's location (not hardcoded)
+# - REPO_ROOT: Detected via git or gh CLI (cross-project compatible)
+# - Shell-specific: Each shell gets its own profile for quirks/workarounds
+
+# ============================================================================
+# STEP 1: Detect Shell & Execution Environment
+# ============================================================================
+
+detect_shell() {
+    # Priority-based detection
+    if [[ -n "${MSYSTEM}" ]]; then
+        # Git-bash sets MSYSTEM=MINGW64, MINGW32, MSYS
+        echo "gitbash"
+    elif [[ "${SHELL}" == */cygwin* ]] || [[ -n "${CYGWIN}" ]]; then
+        # Cygwin bash
+        echo "cygwin"
+    elif [[ "${SHELL}" == */bash ]]; then
+        # Generic bash or WSL
+        if grep -qi microsoft /proc/version 2>/dev/null; then
+            echo "wsl"
+        else
+            echo "bash"
+        fi
+    elif [[ "${SHELL}" == */zsh ]]; then
+        echo "zsh"
+    elif [[ "${SHELL}" == */fish ]]; then
+        echo "fish"
+    else
+        echo "unknown"
+    fi
+}
+
+CURRENT_SHELL=$(detect_shell)
+
+# ============================================================================
+# STEP 2: Compute AGENCE_ROOT Dynamically
+# ============================================================================
+# This script is at: $AGENCE_ROOT/bin/.agencerc
+# So the parent is: $AGENCE_ROOT
+
+compute_agence_root() {
+    # ${BASH_SOURCE[0]} = this script's path
+    local script_path="${BASH_SOURCE[0]}"
+    
+    # Resolve symlinks and relative paths
+    script_path=$(cd "$(dirname "$script_path")" && pwd)/$(basename "$script_path")
+    
+    # Go up: .agencerc -> bin/ -> .agence root
+    local agence_root=$(dirname "$(dirname "$script_path")")
+    
+    echo "$agence_root"
+}
+
+export AI_ROOT=$(compute_agence_root)
+
+# Export AI_BIN (before OS-specific profiles add it to PATH)
+export AI_BIN="$AI_ROOT/bin"
+
+# Legacy aliases for backwards compatibility
+export AGENCE_ROOT="$AI_ROOT"
+export AGENCE_BIN="$AI_BIN"
+
+# ============================================================================
+# STEP 3: Compute REPO_ROOT Dynamically
+# ============================================================================
+# The repo root is the parent of AGENCE_ROOT
+# We can also verify this via git or gh CLI
+
+compute_git_root() {
+    # Method 1: Git-based (always works if in git repo)
+    local git_root=$(git -C "$AI_ROOT" rev-parse --show-superproject-working-tree 2>/dev/null)
+    
+    if [[ -z "$git_root" ]]; then
+        # Method 2: Parent directory (AI_ROOT is a submodule, parent is GIT_ROOT)
+        git_root=$(dirname "$AI_ROOT")
+    fi
+    
+    echo "$git_root"
+}
+
+export GIT_ROOT=$(compute_git_root)
+
+# Legacy alias for backwards compatibility
+export REPO_ROOT="$GIT_ROOT"
+
+# ============================================================================
+# STEP 4: Additional Environment Variables
+# ============================================================================
+
+# GitHub CLI detection
+if command -v gh &>/dev/null; then
+    # Get current gh user
+    export GITHUB_USER=$(gh auth status 2>&1 | grep "Logged in" | awk '{print $3}')
+    export GH_AVAILABLE=true
+else
+    export GH_AVAILABLE=false
+fi
+
+# Git configuration
+export GIT_REPO="$GIT_ROOT"
+
+# Debug output (only if AGENCE_DEBUG=1)
+if [[ "${AGENCE_DEBUG:-0}" == "1" ]]; then
+    echo "[AGENCE] Shell detected: $CURRENT_SHELL"
+    echo "[AGENCE] AI_ROOT=$AI_ROOT"
+    echo "[AGENCE] GIT_ROOT=$GIT_ROOT"
+    echo "[AGENCE] AI_BIN=$AI_BIN"
+    echo "[AGENCE] GITHUB_USER=$GITHUB_USER"
+fi
+
+# ============================================================================
+# STEP 5: Source Shell-Specific Profile
+# ============================================================================
+
+case "$CURRENT_SHELL" in
+    gitbash)
+        if [[ -f "$AI_ROOT/bin/.gitbashrc" ]]; then
+            source "$AI_ROOT/bin/.gitbashrc"
+        fi
+        ;;
+    cygwin)
+        if [[ -f "$AI_ROOT/bin/.cygbashrc" ]]; then
+            source "$AI_ROOT/bin/.cygbashrc"
+        fi
+        ;;
+    wsl|bash)
+        if [[ -f "$AI_ROOT/bin/.linuxrc" ]]; then
+            source "$AGENCE_ROOT/bin/.linuxrc"
+        fi
+        ;;
+    zsh)
+        if [[ -f "$AGENCE_ROOT/bin/.zshrc" ]]; then
+            source "$AGENCE_ROOT/bin/.zshrc"
+        fi
+        ;;
+    *)
+        # No shell-specific profile found, continue with defaults
+        true
+        ;;
+esac
+
+# ============================================================================
+# STEP 6: Common Aliases & Functions (All Shells)
+# ============================================================================
+
+# Quick navigation
+alias agence="bash $AI_ROOT/bin/agence"
+alias ag="bash $AI_ROOT/bin/agence"
+
+# Export for subshells
+export AGENCE_ROOT
+export REPO_ROOT
+export CURRENT_SHELL
+
+if [[ "${AGENCE_DEBUG:-0}" == "1" ]]; then
+    echo "[AGENCE] Profile loaded successfully"
+fi

@@ -85,3 +85,16 @@ mklink() {
 }
 
 # Add more git-bash workarounds here as needed
+# ============================================================================
+# ENVIRONMENT SETUP (from .agencerc)
+# ============================================================================
+
+# Ensure AI_BIN is in PATH for agence commands
+if [[ -n "$AI_BIN" && ":$PATH:" != *":$AI_BIN:"* ]]; then
+    export PATH="$AI_BIN:$PATH"
+fi
+
+# Export AGENCE variables for git-bash compatibility
+export AI_ROOT="${AI_ROOT:-.}"
+export GIT_ROOT="${GIT_ROOT:-.}"
+export AI_BIN="${AI_BIN:-.}"

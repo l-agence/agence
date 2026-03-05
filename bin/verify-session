@@ -1,0 +1,205 @@
+#!/usr/bin/env bash
+
+################################################################################
+# verify-session: Mandatory Session Output Verification
+# 
+# Forces agent to read and confirm .typescript output before proceeding.
+# Exits with 254 (unverified) until user explicitly confirms the session.
+#
+# Usage: verify-session SESSION_ID
+#
+# Exit Codes:
+#   0   - Session verified and approved
+#   254 - Session NOT verified (must confirm before proceeding)
+#   1   - Error (invalid session, file not found, etc.)
+################################################################################
+
+set -e
+
+# ============================================================================
+# VERIFY SETUP
+# ============================================================================
+
+SESSION_ID="${1:-}"
+
+[[ -z "$SESSION_ID" ]] && {
+    cat >&2 <<'EOF'
+ERROR: Session ID required
+
+Usage: verify-session SESSION_ID
+
+Example: verify-session ai-agent-20260305_134036-3375-1d2b09ef
+
+The SESSION_ID must match a .typescript file in nexus/.aisessions/
+EOF
+    exit 1
+}
+
+# Determine AI_ROOT and AI_BIN dynamically
+if [[ -z "$AI_ROOT" || -z "$AI_BIN" ]]; then
+    # Fallback: compute from script location
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    AI_ROOT="${AI_ROOT:-$(dirname "$script_dir")}"
+    AI_BIN="${AI_BIN:-$script_dir}"
+fi
+
+SESSION_DIR="$AI_ROOT/nexus/.aisessions"
+TYPESCRIPT_FILE="$SESSION_DIR/${SESSION_ID}.typescript"
+META_FILE="$SESSION_DIR/${SESSION_ID}.meta.json"
+
+# ============================================================================
+# VALIDATION
+# ============================================================================
+
+[[ ! -f "$TYPESCRIPT_FILE" ]] && {
+    echo "[VERIFY] ✗ Session not found: $SESSION_ID" >&2
+    echo "[VERIFY]   Expected: $TYPESCRIPT_FILE" >&2
+    exit 1
+}
+
+[[ ! -f "$META_FILE" ]] && {
+    echo "[VERIFY] ✗ Session metadata missing: $SESSION_ID" >&2
+    echo "[VERIFY]   Expected: $META_FILE" >&2
+    exit 1
+}
+
+# ============================================================================
+# EXTRACT METADATA
+# ============================================================================
+
+# Try jq first, fallback to grep
+if command -v jq &>/dev/null; then
+    exit_code=$(jq -r '.exit_code' "$META_FILE" 2>/dev/null || echo "?")
+    command=$(jq -r '.command' "$META_FILE" 2>/dev/null || echo "?")
+    timestamp=$(jq -r '.timestamp' "$META_FILE" 2>/dev/null || echo "?")
+else
+    # Fallback to grep (works without jq)
+    exit_code=$(grep -o '"exit_code": [0-9]*' "$META_FILE" | grep -o '[0-9]*' || echo "?")
+    command=$(grep -oP '"command": "\K[^"]*' "$META_FILE" || echo "?")
+    timestamp=$(grep -oP '"timestamp": "\K[^"]*' "$META_FILE" || echo "?")
+fi
+
+typescript_size=$(wc -c < "$TYPESCRIPT_FILE" 2>/dev/null || echo "?")
+typescript_lines=$(wc -l < "$TYPESCRIPT_FILE" 2>/dev/null || echo "?")
+
+# ============================================================================
+# DISPLAY SESSION INFO
+# ============================================================================
+
+cat << EOF
+
+================================================================================
+  SESSION VERIFICATION REQUIRED
+================================================================================
+
+Session ID:   $SESSION_ID
+Timestamp:    $timestamp
+Command:      $command
+Exit Code:    $exit_code
+File:         $TYPESCRIPT_FILE
+Size:         $typescript_size bytes
+Lines:        $typescript_lines
+
+================================================================================
+  SESSION OUTPUT (last 30 lines)
+================================================================================
+
+EOF
+
+tail -30 "$TYPESCRIPT_FILE" 2>/dev/null || echo "[No output available]"
+
+cat << EOF
+
+================================================================================
+  VERIFICATION
+================================================================================
+
+Exit Code Analysis:
+  0   = Command succeeded
+  1+  = Command failed with error
+  ?   = Could not determine
+
+EOF
+
+# Color coding for exit code
+if [[ "$exit_code" == "0" ]]; then
+    echo "  Status: ✓ SUCCESS (exit code 0)"
+elif [[ "$exit_code" != "?" ]]; then
+    echo "  Status: ✗ FAILED (exit code $exit_code)"
+else
+    echo "  Status: ? UNKNOWN (could not read exit code)"
+fi
+
+cat << EOF
+
+================================================================================
+
+Confirm this session output before proceeding?
+
+  - Type 'yes' to verify and proceed (exit 0)
+  - Type 'no'  to reject (exit 254, workflow blocked)
+  - Type 'show' to display full output
+  - Type 'meta' to show metadata JSON
+
+Your choice: EOF
+
+# Read user input
+read -r choice
+
+case "$choice" in
+    yes|YES|y|Y)
+        echo ""
+        echo "✓ Session verified. Proceeding..."
+        exit 0
+        ;;
+    no|NO|n|N)
+        echo ""
+        echo "✗ Session NOT verified. Workflow blocked."
+        echo "   To retry: agence ^sync or re-run the command"
+        exit 254
+        ;;
+    show|SHOW)
+        cat << SHOWEOF
+
+================================================================================
+  FULL SESSION OUTPUT
+================================================================================
+
+SHOWEOF
+        cat "$TYPESCRIPT_FILE"
+        cat << SHOWEOF
+
+================================================================================
+
+SHOWEOF
+        # Recursive call to re-prompt after showing full output
+        "$0" "$SESSION_ID"
+        exit $?
+        ;;
+    meta|META)
+        cat << METAEOF
+
+================================================================================
+  SESSION METADATA
+================================================================================
+
+METAEOF
+        cat "$META_FILE"
+        cat << METAEOF
+
+================================================================================
+
+METAEOF
+        # Recursive call to re-prompt after showing metadata
+        "$0" "$SESSION_ID"
+        exit $?
+        ;;
+    *)
+        echo ""
+        echo "✗ Invalid choice: '$choice'"
+        echo "   Please type: yes, no, show, or meta"
+        # Recursive call to re-prompt
+        "$0" "$SESSION_ID"
+        exit $?
+        ;;
+esac
