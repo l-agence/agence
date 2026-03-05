@@ -481,14 +481,14 @@ mode_external() {
       return $?
       ;;
     push)
-      # Push changes to origin main
-      echo "[WARN] This will push changes from $GIT_REPO to origin main" >&2
-      read -p "Confirm push to origin main? [y/N] " confirm
+      # Push changes to origin (sets upstream on first push)
+      echo "[WARN] This will push changes from $GIT_REPO to origin" >&2
+      read -p "Confirm push to origin? [y/N] " confirm
       if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
         echo "[CANCELLED] Push aborted" >&2
         return 1
       fi
-      git -C "$GIT_REPO" push origin main
+      git -C "$GIT_REPO" push -u origin
       return $?
       ;;
   esac

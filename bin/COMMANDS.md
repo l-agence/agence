@@ -478,11 +478,12 @@ agence /commit
 
 ### `/push`
 
-**Purpose**: Push changes to remote repository (origin main).
+**Purpose**: Push changes to remote repository using upstream branch tracking.
 
 **What it does**:
-- Pushes current branch commits
-- Targets `origin main` branch
+- Pushes current branch commits to origin
+- Uses upstream tracking (respects local→remote mapping)
+- Works with any local branch name
 - **Requires explicit confirmation** (safety guardrail)
 
 **Usage**:
@@ -491,8 +492,8 @@ agence /commit
 agence /push
 
 # Output:
-# [WARN] This will push changes from /path/to/repo to origin main
-# Confirm push to origin main? [y/N] y
+# [WARN] This will push changes from /path/to/repo to origin
+# Confirm push to origin? [y/N] y
 # 
 # Enumerating objects: 3, done.
 # Counting objects: 100% (3/3), done.
@@ -502,19 +503,20 @@ agence /push
 # Total 2 (delta 1), reused 0 (delta 0), reused 1 (delta 0)
 # remote: Resolving deltas: 100% (1/1), done.
 # To github.com:l-agence/agence-master.git
-#    abc1234..def5678  main -> main
+#    abc1234..def5678  master -> main
 ```
 
 **Requirements**:
 - Authentication must be set up (`agence /ghauth` or `agence /ghlogin`)
 - Commits must be staged locally
-- Push target is always `origin main`
+- Upstream tracking must be configured (or command will fail on first push)
 
 **Safety**:
 - [WARN] displayed before prompt
 - User must explicitly confirm with 'y'
 - Default is 'N' (no push)
 - Acts on `$GIT_REPO`
+- Uses standard git push (respects .git/config tracking)
 
 ---
 
