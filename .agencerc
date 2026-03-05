@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+
+################################################################################
+# Agence Common Profile
+#
+# Minimal, clean profile for Agence shell sessions
+# Sourced by: bash --rcfile /path/to/.agencerc
+#
+# Environment Variables (set by agence shell launcher):
+#   AGENT         - Agent name (e.g., "claudia", "ralph", or "@" for Copilot)
+#   SHELL         - Shell type (bash or powershell)
+#   SESSION       - Session ID (e.g., bash-20260305_151234-1234-a1b2)
+################################################################################
+
+# ============================================================================
+# CORE ENVIRONMENT SETUP
+# ============================================================================
+
+# Defaults (should already be exported by launcher)
+export AGENT="${AGENT:-@}"
+export SHELL="${SHELL:-bash}"
+export SESSION="${SESSION:-unknown}"
+
+# ============================================================================
+# PROMPT
+# ============================================================================
+
+export PS1="bash:${SESSION}@${AGENT}: "
+
+# ============================================================================
+# PATH & BASIC TOOLS
+# ============================================================================
+
+# Add Agence bin to PATH if not already there
+if [[ -n "${AI_BIN:-}" ]] && [[ ":$PATH:" != *":$AI_BIN:"* ]]; then
+  export PATH="$AI_BIN:$PATH"
+fi
+
+# ============================================================================
+# ALIASES & FUNCTIONS
+# ============================================================================
+
+alias ll='ls -lh'
+alias la='ls -lah'
+
+# Print session info
+session-info() {
+  echo "═══════════════════════════════════════"
+  echo "  Session Info"
+  echo "═══════════════════════════════════════"
+  echo "Agent:   $AGENT"
+  echo "Shell:   $SHELL"
+  echo "Session: $SESSION"
+  echo "PWD:     $(pwd)"
+  echo "═══════════════════════════════════════"
+}
+
+# ============================================================================
+# AGENT-SPECIFIC CUSTOMIZATION
+# ============================================================================
+# Customize behavior based on $AGENT env var (no separate files)
+
+case "$AGENT" in
+  ralph|claudia|sonny|aider|haiku)
+    # These agents can have custom aliases/functions here
+    ;;
+  @)
+    # Copilot default - no special setup
+    ;;
+esac
+
+[[ "${AGENCE_DEBUG:-0}" == "1" ]] && echo "[.agencerc] Profile loaded: AGENT=$AGENT SHELL=$SHELL"
+

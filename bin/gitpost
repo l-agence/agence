@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+
+################################################################################
+# Agence: Git Post-Hook Command Handler
+# 
+# Purpose: Centralized handler for git post-operation hooks
+# Usage: agence /gitpost [subcommand]
+#
+# Subcommands:
+#   (default/checkout)  Repair symlinks after git checkout/pull
+#
+# Invoked by: .git/hooks/post-checkout
+################################################################################
+
+set -u
+
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AGENCE_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Only run repairs in git-bash context (Windows)
+if [[ -z "${MSYSTEM:-}" ]]; then
+  # Not git-bash, skip repairs
+  exit 0
+fi
+
+# ============================================================================
+# REPAIR SYMLINKS (Windows git-bash compatibility)
+# ============================================================================
+# After git checkout/pull, Windows git-bash may have broken symlinks
+# This repairs them automatically
+
+repair_symlinks() {
+  local debug="${DEBUG:-0}"
+  
+  [[ "$debug" == "1" ]] && echo "[DEBUG] Checking for broken symlinks after git operation..." >&2
+  
+  # Get list of symlinks from git
+  local symlinks=$(git -C "$AGENCE_ROOT" ls-files -s 2>/dev/null | grep "^120000" | awk '{print $NF}')
+  
+  if [[ -z "$symlinks" ]]; then
+    [[ "$debug" == "1" ]] && echo "[DEBUG] No symlinks tracked in git" >&2
+    return 0
+  fi
+  
+  local count=0
+  while IFS= read -r filepath; do
+    [[ -z "$filepath" ]] && continue
+    
+    if [[ -L "$AGENCE_ROOT/$filepath" ]]; then
+      # Already a symlink, skip
+      continue
+    fi
+    
+    if [[ ! -e "$AGENCE_ROOT/$filepath" ]]; then
+      # Symlink doesn't exist, try to recreate it
+      # Git stores symlinks as: "<path to target>"
+      local target=$(git -C "$AGENCE_ROOT" ls-files -s 2>/dev/null | grep "^120000.*$filepath" | awk '{for(i=1;i<=NF;i++) printf "%s ", $i}' | sed 's/.*\s//')
+      
+      if [[ -n "$target" ]]; then
+        mkdir -p "$(dirname "$AGENCE_ROOT/$filepath")" 2>/dev/null
+        ln -sf "$target" "$AGENCE_ROOT/$filepath" 2>/dev/null
+        if [[ $? -eq 0 ]]; then
+          echo "[REPAIR] Created symlink: $filepath -> $target"
+          ((count++))
+        fi
+      fi
+    fi
+  done <<< "$symlinks"
+  
+  if [[ $count -gt 0 ]]; then
+    echo "✓ Repaired $count symlink(s) after git operation"
+  fi
+  
+  return 0
+}
+
+# ============================================================================
+# MAIN ENTRY POINT
+# ============================================================================
+
+main() {
+  local subcommand="${1:-checkout}"
+  
+  case "$subcommand" in
+    checkout|default)
+      repair_symlinks
+      ;;
+    *)
+      echo "Unknown gitpost subcommand: $subcommand" >&2
+      return 1
+      ;;
+  esac
+  
+  return $?
+}
+
+main "$@"

@@ -1,0 +1,134 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Agence: Bash (Copilot Default)",
+      "type": "shell",
+      "command": "${workspaceFolder}/bin/^",
+      "args": ["@ !bash"],
+      "isBackground": false,
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "focus": true,
+        "clear": false
+      },
+      "problemMatcher": [],
+      "runOptions": {
+        "runOn": "folderOpen"
+      }
+    },
+    {
+      "label": "Agence: PowerShell (Copilot Default)",
+      "type": "shell",
+      "command": "${workspaceFolder}/bin/^",
+      "args": ["@ !shell"],
+      "isBackground": false,
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "focus": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Agence: Bash (@ralph)",
+      "type": "shell",
+      "command": "${workspaceFolder}/bin/^",
+      "args": ["@ralph !bash"],
+      "isBackground": false,
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "focus": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Agence: Bash (@sonny)",
+      "type": "shell",
+      "command": "${workspaceFolder}/bin/^",
+      "args": ["@sonny !bash"],
+      "isBackground": false,
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "focus": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Agence: Bash (@aider)",
+      "type": "shell",
+      "command": "${workspaceFolder}/bin/^",
+      "args": ["@aider !bash"],
+      "isBackground": false,
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "focus": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Agence: Bash (@claudia)",
+      "type": "shell",
+      "command": "${workspaceFolder}/bin/^",
+      "args": ["@claudia !bash"],
+      "isBackground": false,
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "focus": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Agence: Bash (@haiku)",
+      "type": "shell",
+      "command": "${workspaceFolder}/bin/^",
+      "args": ["@haiku !bash"],
+      "isBackground": false,
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "focus": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Agence: PowerShell (@ralph)",
+      "type": "shell",
+      "command": "${workspaceFolder}/bin/^",
+      "args": ["@ralph !shell"],
+      "isBackground": false,
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "focus": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Agence: PowerShell (@sonny)",
+      "type": "shell",
+      "command": "${workspaceFolder}/bin/^",
+      "args": ["@sonny !shell"],
+      "isBackground": false,
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "focus": true,
+        "clear": false
+      },
+      "problemMatcher": []
+    }
+  ]
+}

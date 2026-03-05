@@ -307,6 +307,39 @@ show_version() {
 }
 
 # ============================================================================
+# AGENT PREFIX PARSING
+# ============================================================================
+# Parses @agent prefix from input and sets AGENCE_AGENT_PARAM env var
+# Format: @agent !command or @ !command (for Copilot default)
+# If no prefix, defaults to "@" (Copilot autoselect)
+
+parse_agent_prefix() {
+  local input="$1"
+  
+  # Check if input starts with @
+  if [[ "$input" =~ ^@([A-Za-z0-9_-]*)[[:space:]]+(.*) ]]; then
+    # Extract agent name and remaining command
+    local agent_name="${BASH_REMATCH[1]}"
+    local remaining_cmd="${BASH_REMATCH[2]}"
+    
+    # If agent name is empty, it's just "@" (Copilot default)
+    if [[ -z "$agent_name" ]]; then
+      export AGENCE_AGENT_PARAM="@"
+    else
+      export AGENCE_AGENT_PARAM="$agent_name"
+    fi
+    
+    # Return remaining command
+    echo "$remaining_cmd"
+  else
+    # No @agent prefix found, use default "@"
+    export AGENCE_AGENT_PARAM="@"
+    # Return original input
+    echo "$input"
+  fi
+}
+
+# ============================================================================
 # MAIN ENTRY POINT
 # ============================================================================
 
@@ -318,6 +351,9 @@ main() {
     show_help
     exit 0
   fi
+
+  # Parse @agent prefix (sets AGENCE_AGENT_PARAM env var)
+  input=$(parse_agent_prefix "$input")
 
   local first_char="${input:0:1}"
 
@@ -537,6 +573,12 @@ mode_external() {
         return 1
       fi
       git -C "$GIT_REPO" push -u origin
+      return $?
+      ;;
+    gitpost)
+      # Git post-hook: handle post-checkout repairs and other git post-op tasks
+      # This is called both by .git/hooks/post-checkout and manually
+      "$AGENCE_ROOT/bin/gitpost" "${2:-checkout}"
       return $?
       ;;
   esac
@@ -890,12 +932,10 @@ mode_system() {
       return 0
       ;;
     bash)
-      echo "Launching Git Bash..."
-      exec bash --login
+      shell_bash_session
       ;;
     shell)
-      echo "Launching PowerShell..."
-      exec powershell -NoExit
+      shell_powershell_session
       ;;
     *)
       echo "Unknown system command: $sys_cmd" >&2
@@ -905,52 +945,205 @@ mode_system() {
 }
 
 # ============================================================================
-# SYMLINK REPAIR (Windows git-bash compatibility)
+# SHELL SESSIONS: Bash and PowerShell with Session/Agent Pinning
 # ============================================================================
 
-repair_agence_symlinks() {
-  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Checking for broken symlinks..." >&2
+generate_shell_session_id() {
+  # Format: bash-YYYYMMDD_HHMMSS-PID-HEXID or ps-YYYYMMDD_HHMMSS-PID-HEXID
+  local shell_type="$1"
+  local timestamp=$(date +%Y%m%d_%H%M%S)
+  local pid=$$
+  local hexid=$(printf '%x' $((RANDOM * RANDOM)))
   
-  # Get list of symlinks from git
-  local symlinks=$(git -C "$AGENCE_ROOT" ls-files -s 2>/dev/null | grep "^120000" | awk '{print $NF}')
-  
-  if [[ -z "$symlinks" ]]; then
-    [[ "$DEBUG" == "1" ]] && echo "[DEBUG] No symlinks tracked in git" >&2
-    return 0
-  fi
-  
-  local count=0
-  while IFS= read -r filepath; do
-    [[ -z "$filepath" ]] && continue
-    
-    if [[ -L "$AGENCE_ROOT/$filepath" ]]; then
-      # Already a symlink, skip
-      continue
-    fi
-    
-    if [[ ! -e "$AGENCE_ROOT/$filepath" ]]; then
-      # Symlink doesn't exist, try to recreate it
-      # Git stores symlinks as: "<path to target>"
-      local target=$(git -C "$AGENCE_ROOT" ls-files -s 2>/dev/null | grep "^120000.*$filepath" | awk '{for(i=1;i<=NF;i++) printf "%s ", $i}' | sed 's/.*\s//')
-      
-      if [[ -n "$target" ]]; then
-        mkdir -p "$(dirname "$AGENCE_ROOT/$filepath")" 2>/dev/null
-        ln -sf "$target" "$AGENCE_ROOT/$filepath" 2>/dev/null
-        if [[ $? -eq 0 ]]; then
-          echo "[REPAIR] Created symlink: $filepath -> $target"
-          ((count++))
-        fi
-      fi
-    fi
-  done <<< "$symlinks"
-  
-  if [[ $count -gt 0 ]]; then
-    echo ""
-    echo "✓ Repaired $count broken symlink(s)"
-  fi
-  
-  return 0
+  echo "${shell_type}-${timestamp}-${pid}-${hexid}"
 }
+
+get_agent_id() {
+  # Get current agent (default to 'ai-agent' if not set)
+  echo "${AIDO_AGENT:-ai-agent}"
+}
+
+set_vscode_terminal_title() {
+  local title="$1"
+  # VSCode escape sequence for setting terminal title in integrated terminal
+  printf '\033]0;%s\007' "$title"
+}
+
+shell_bash_session() {
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Launching bash session with session tracking..." >&2
+  
+  # Read agent from environment variable
+  # Default to "@" (Copilot autoselect) if not set
+  local agent_id="${AGENCE_AGENT_PARAM:-@}"
+  
+  # Generate session identification
+  local session_id=$(generate_shell_session_id "bash")
+  local vscode_title="bash:${session_id}@${agent_id}"
+  
+  # Create session metadata directory
+  local sessions_dir="${AGENCE_ROOT}/nexus/.aisessions"
+  mkdir -p "$sessions_dir" 2>/dev/null
+  
+  # Store session metadata
+  local session_meta="${sessions_dir}/${session_id}.meta.json"
+  cat > "$session_meta" << EOF
+{
+  "session_id": "$session_id",
+  "session_type": "bash",
+  "agent_id": "$agent_id",
+  "shell": "bash",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "pid": $$,
+  "user": "$(whoami)",
+  "cwd": "$(pwd)"
+}
+EOF
+  
+  echo ""
+  echo "=============================================="
+  echo "  BASH SESSION"
+  echo "=============================================="
+  echo ""
+  echo "Session ID:  $session_id"
+  echo "Agent:       $agent_id"
+  echo "Shell:       bash"
+  echo "Working Dir: $(pwd)"
+  echo "Metadata:    $session_meta"
+  echo ""
+  echo "Title:       $vscode_title"
+  echo ""
+  echo "=============================================="
+  echo ""
+  
+  # Set VSCode terminal title
+  set_vscode_terminal_title "$vscode_title"
+  
+  # Export environment variables that .agencerc will read
+  export AGENT="$agent_id"
+  export SHELL="bash"
+  export SESSION="$session_id"
+  export AGENCE_SESSION_ID="$session_id"
+  export AGENCE_AGENT_ID="$agent_id"
+  export AGENCE_SESSION_TYPE="bash"
+  
+  # Launch bash with common Agence profile
+  exec bash --rcfile "$AGENCE_BIN/.agencerc" -i
+}
+
+shell_powershell_session() {
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Launching PowerShell session with session tracking..." >&2
+  
+  # Read agent from environment variable
+  # Default to "@" (Copilot autoselect) if not set
+  local agent_id="${AGENCE_AGENT_PARAM:-@}"
+  
+  # Generate session identification
+  local session_id=$(generate_shell_session_id "ps")
+  local vscode_title="powershell:${session_id}@${agent_id}"
+  
+  # Create session metadata directory
+  local sessions_dir="${AI_ROOT}/nexus/.aisessions"
+  mkdir -p "$sessions_dir" 2>/dev/null
+  
+  # Store session metadata
+  local session_meta="${sessions_dir}/${session_id}.meta.json"
+  cat > "$session_meta" << EOF
+{
+  "session_id": "$session_id",
+  "session_type": "powershell",
+  "agent_id": "$agent_id",
+  "shell": "powershell",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "pid": $$,
+  "user": "$(whoami)",
+  "cwd": "$(pwd)"
+}
+EOF
+  
+  echo ""
+  echo "=============================================="
+  echo "  POWERSHELL SESSION"
+  echo "=============================================="
+  echo ""
+  echo "Session ID:  $session_id"
+  echo "Agent:       $agent_id"
+  echo "Shell:       powershell"
+  echo "Working Dir: $(pwd)"
+  echo "Metadata:    $session_meta"
+  echo ""
+  echo "Title:       $vscode_title"
+  echo ""
+  echo "=============================================="
+  echo ""
+  
+  # Set VSCode terminal title
+  set_vscode_terminal_title "$vscode_title"
+  
+  # Create PowerShell profile snippet for custom prompt
+  local pwsh_profile_snippet="
+\$env:AGENCE_SESSION_ID = '$session_id'
+\$env:AGENCE_AGENT_ID = '$agent_id'
+\$env:AGENCE_SESSION_TYPE = 'powershell'
+
+function prompt {
+  return 'powershell:${session_id}@${agent_id}: '
+}
+"
+  
+  # Create temporary profile
+  local temp_profile=$(mktemp)
+  echo "$pwsh_profile_snippet" > "$temp_profile"
+  
+  # Launch PowerShell with custom profile and title
+  # On Windows, this uses the native PowerShell executable
+  # On WSL/Linux, this attempts powershell.exe if available
+  if command -v powershell.exe &>/dev/null; then
+    # Windows native PowerShell
+    exec powershell.exe -NoExit -Command "
+      `$env:AGENCE_SESSION_ID = '$session_id'
+      `$env:AGENCE_AGENT_ID = '$agent_id'
+      `$env:AGENCE_SESSION_TYPE = 'powershell'
+      `$env:AGENT = '$agent_id'
+      `$env:SHELL = 'powershell'
+      `$env:SESSION = '$session_id'
+      
+      function prompt {
+        return 'powershell:${session_id}@${agent_id}: '
+      }
+    "
+  elif command -v pwsh &>/dev/null; then
+    # PowerShell Core (cross-platform)
+    export AGENCE_SESSION_ID="$session_id"
+    export AGENCE_AGENT_ID="$agent_id"
+    export AGENCE_SESSION_TYPE="powershell"
+    export AGENT="$agent_id"
+    export SHELL="powershell"
+    export SESSION="$session_id"
+    
+    exec pwsh -NoExit -Command "
+      \$env:AGENCE_SESSION_ID = '$session_id'
+      \$env:AGENCE_AGENT_ID = '$agent_id'
+      \$env:AGENCE_SESSION_TYPE = 'powershell'
+      \$env:AGENT = '$agent_id'
+      \$env:SHELL = 'powershell'
+      \$env:SESSION = '$session_id'
+      
+      function prompt {
+        return 'powershell:${session_id}@${agent_id}: '
+      }
+    "
+  else
+    echo "✗ PowerShell not found (tried powershell.exe and pwsh)"
+    return 1
+  fi
+}
+
+# ============================================================================
+# SYMLINK REPAIR (Windows git-bash compatibility)
+# ============================================================================
+# Delegated to: bin/gitpost
+# Called by: .git/hooks/post-checkout
+# Invoked via: agence /gitpost
 
 # ============================================================================
 # REINDEX: Knowledge Base Indexing & Cache Management
