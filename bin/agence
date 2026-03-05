@@ -449,6 +449,50 @@ mode_external() {
     return 1
   fi
 
+  # =========================================================================
+  # REPO COMMANDS (act on $GIT_REPO)
+  # =========================================================================
+  case "$cmd_request" in
+    ghauth)
+      # GitHub CLI auth status
+      bash "$AGENCE_ROOT/bin/aido" gh auth status
+      return $?
+      ;;
+    ghlogin)
+      # GitHub CLI login (interactive)
+      echo "[INFO] Starting GitHub CLI login..." >&2
+      gh auth login
+      return $?
+      ;;
+    gitstatus)
+      # Git status in $GIT_REPO (read-only, safe)
+      bash "$AGENCE_ROOT/bin/aido" git status
+      return $?
+      ;;
+    commit)
+      # Commit all tracked changes in $GIT_REPO
+      echo "[WARN] This will commit all staged changes to $GIT_REPO" >&2
+      read -p "Enter commit message: " commit_msg
+      if [[ -z "$commit_msg" ]]; then
+        echo "Error: Commit message required" >&2
+        return 1
+      fi
+      git -C "$GIT_REPO" commit -m "$commit_msg"
+      return $?
+      ;;
+    push)
+      # Push changes to origin main
+      echo "[WARN] This will push changes from $GIT_REPO to origin main" >&2
+      read -p "Confirm push to origin main? [y/N] " confirm
+      if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+        echo "[CANCELLED] Push aborted" >&2
+        return 1
+      fi
+      git -C "$GIT_REPO" push origin main
+      return $?
+      ;;
+  esac
+
   # Load permitted commands from config/commands.json
   local commands_file="$AGENCE_ROOT/bin/commands.json"
   

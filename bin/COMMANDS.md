@@ -364,6 +364,160 @@ api POST/PUT/PATCH/DELETE  - Any mutation
 
 ---
 
+## Repo Commands (External Mode)
+
+Quick shortcuts for common repository operations using `agence /<command>` pattern.
+
+All repo commands act on `$GIT_REPO` and include safety confirmations for mutations.
+
+### `/ghauth`
+
+**Purpose**: Check GitHub CLI authentication status.
+
+**What it does**:
+- Shows current logged-in account
+- Displays token scopes and protocol
+- Uses `aido` for read-only safety
+
+**Usage**:
+
+```bash
+agence /ghauth
+
+# Output:
+# github.com
+#   ✓ Logged in to github.com account stefuss (keyring)
+#   - Active account: true
+#   - Git operations protocol: https
+#   - Token: gho_****...
+```
+
+**Equivalent**: `aido gh auth status`
+
+---
+
+### `/ghlogin`
+
+**Purpose**: Authenticate with GitHub CLI.
+
+**What it does**:
+- Interactive GitHub CLI login
+- Sets up token and credentials
+- No guardrail (user confirms interactively)
+
+**Usage**:
+
+```bash
+agence /ghlogin
+
+# Will prompt for authentication method (browser/token)
+```
+
+**Security**: Requires user interaction; cannot be automated.
+
+---
+
+### `/gitstatus`
+
+**Purpose**: Quick git status check in repository.
+
+**What it does**:
+- Shows branch, staged, and unstaged changes
+- Read-only operation (safe)
+- Uses `aido` for whitelisting
+
+**Usage**:
+
+```bash
+agence /gitstatus
+
+# Output:
+# On branch main
+# Changes not staged for commit:
+#   (use "git add <file>..." to update the staged version)
+#   (use "git restore <file>..." to discard changes)
+#         modified:   bin/agence
+#         modified:   lib/aido.sh
+```
+
+**Equivalent**: `aido git status`
+
+---
+
+### `/commit`
+
+**Purpose**: Commit all staged changes with a message.
+
+**What it does**:
+- Prompts for commit message
+- Commits all staged files
+- **Requires confirmation** (safety guardrail)
+
+**Usage**:
+
+```bash
+agence /commit
+
+# Prompts:
+# Enter commit message: Fixed aido GitHub CLI whitelisting
+# [main ef3a921] Fixed aido GitHub CLI whitelisting
+#  2 files changed, 118 insertions(+)
+```
+
+**Requirements**:
+- Files must already be staged (`git add`)
+- Commit message required (non-empty)
+- Acts on `$GIT_REPO`
+
+**Safety**: 
+- [WARN] message displayed before execution
+- User provides commit message
+- Cannot be piped/automated
+
+---
+
+### `/push`
+
+**Purpose**: Push changes to remote repository (origin main).
+
+**What it does**:
+- Pushes current branch commits
+- Targets `origin main` branch
+- **Requires explicit confirmation** (safety guardrail)
+
+**Usage**:
+
+```bash
+agence /push
+
+# Output:
+# [WARN] This will push changes from /path/to/repo to origin main
+# Confirm push to origin main? [y/N] y
+# 
+# Enumerating objects: 3, done.
+# Counting objects: 100% (3/3), done.
+# Delta compression using up to 8 threads.
+# Compressing objects: 100% (2/2), done.
+# Writing objects: 100% (2/2), 500 bytes | 500.00 KiB/s, done.
+# Total 2 (delta 1), reused 0 (delta 0), reused 1 (delta 0)
+# remote: Resolving deltas: 100% (1/1), done.
+# To github.com:l-agence/agence-master.git
+#    abc1234..def5678  main -> main
+```
+
+**Requirements**:
+- Authentication must be set up (`agence /ghauth` or `agence /ghlogin`)
+- Commits must be staged locally
+- Push target is always `origin main`
+
+**Safety**:
+- [WARN] displayed before prompt
+- User must explicitly confirm with 'y'
+- Default is 'N' (no push)
+- Acts on `$GIT_REPO`
+
+---
+
 ## Command Structure
 
 All commands follow this validation pipeline:
