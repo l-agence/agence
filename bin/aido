@@ -92,10 +92,10 @@ run_with_session() {
 }
 EOF
 
-    # Call mandatory verification
-    verify_session_script="$AI_BIN/verify-session"
-    if [[ -x "$verify_session_script" ]]; then
-        "$verify_session_script" "$session_id"
+    # Call mandatory verification via session management tool
+    session_script="$AI_BIN/session"
+    if [[ -x "$session_script" ]]; then
+        "$session_script" "$session_id"
         verify_exit=$?
         
         # If verification denied (254), block workflow and return immediately
@@ -112,8 +112,8 @@ EOF
             return 1
         fi
     else
-        echo "[AIDO] ⚠ Warning: verify-session script not found or not executable" >&2
-        echo "[AIDO]   Expected: $verify_session_script" >&2
+        echo "[AIDO] ⚠ Warning: session script not found or not executable" >&2
+        echo "[AIDO]   Expected: $session_script" >&2
     fi
     
     # Verification passed (or skipped), output original command exit code

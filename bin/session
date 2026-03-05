@@ -1,0 +1,339 @@
+#!/usr/bin/env bash
+
+################################################################################
+# session: Session Management Tool
+# 
+# Manages AI agent session persistence (STDOUT/STDERR/STDIN capture)
+# and provides verification, review, and handoff capabilities.
+#
+# Usage:
+#   session <sessionid>              - Show session status (default = verify)
+#   session status <sessionid>       - Same as above
+#   session resume <sessionid>       - Reread session, set as current
+#   session list                     - List all sessions (text table)
+#   session handoff <sessionid> @agent/@user  - Handoff metadata (TBD)
+#
+# Exit Codes:
+#   0   - Success (session verified/retrieved)
+#   254 - Verification denied (workflow blocked)
+#   1   - Error (missing session, invalid args, etc.)
+################################################################################
+
+set -e
+
+# Determine AI_ROOT and AI_BIN from environment (set by .agencerc)
+if [[ -z "$AI_ROOT" || -z "$AI_BIN" ]]; then
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    AI_ROOT="${AI_ROOT:-$(dirname "$script_dir")}"
+    AI_BIN="${AI_BIN:-$script_dir}"
+fi
+
+SESSION_DIR="$AI_ROOT/nexus/.aisessions"
+
+# ============================================================================
+# SESSION STATUS / VERIFICATION (default mode)
+# ============================================================================
+
+session_status() {
+    local sid="${1:-}"
+    
+    if [[ -z "$sid" ]]; then
+        echo "ERROR: Session ID required" >&2
+        echo "Usage: session <sessionid>" >&2
+        echo "       session status <sessionid>" >&2
+        echo "" >&2
+        echo "The SESSION_ID must match a .typescript file in nexus/.aisessions/" >&2
+        return 1
+    fi
+    
+    local typescript_file="$SESSION_DIR/${sid}.typescript"
+    local meta_file="$SESSION_DIR/${sid}.meta.json"
+    
+    # Validation
+    if [[ ! -f "$typescript_file" ]]; then
+        echo "[SESSION] ✗ Session not found: $sid" >&2
+        echo "[SESSION]   Expected: $typescript_file" >&2
+        return 1
+    fi
+    
+    if [[ ! -f "$meta_file" ]]; then
+        echo "[SESSION] ✗ Session metadata missing: $sid" >&2
+        echo "[SESSION]   Expected: $meta_file" >&2
+        return 1
+    fi
+    
+    # Extract metadata
+    local exit_code command timestamp typescript_size typescript_lines
+    
+    if command -v jq &>/dev/null; then
+        exit_code=$(jq -r '.exit_code' "$meta_file" 2>/dev/null || echo "?")
+        command=$(jq -r '.command' "$meta_file" 2>/dev/null || echo "?")
+        timestamp=$(jq -r '.timestamp' "$meta_file" 2>/dev/null || echo "?")
+    else
+        exit_code=$(grep -o '"exit_code": [0-9]*' "$meta_file" 2>/dev/null | grep -o '[0-9]*' || echo "?")
+        command=$(grep -oP '"command": "\K[^"]*' "$meta_file" 2>/dev/null || echo "?")
+        timestamp=$(grep -oP '"timestamp": "\K[^"]*' "$meta_file" 2>/dev/null || echo "?")
+    fi
+    
+    typescript_size=$(wc -c < "$typescript_file" 2>/dev/null || echo "?")
+    typescript_lines=$(wc -l < "$typescript_file" 2>/dev/null || echo "?")
+    
+    # Display session info
+    echo ""
+    echo "================================================================================"
+    echo "  SESSION VERIFICATION REQUIRED"
+    echo "================================================================================"
+    echo ""
+    echo "Session ID:   $sid"
+    echo "Timestamp:    $timestamp"
+    echo "Command:      $command"
+    echo "Exit Code:    $exit_code"
+    echo "File:         $typescript_file"
+    echo "Size:         $typescript_size bytes"
+    echo "Lines:        $typescript_lines"
+    echo ""
+    echo "================================================================================"
+    echo "  SESSION OUTPUT (last 30 lines)"
+    echo "================================================================================"
+    echo ""
+    
+    tail -30 "$typescript_file" 2>/dev/null || echo "[No output available]"
+    
+    echo ""
+    echo "================================================================================"
+    echo "  VERIFICATION"
+    echo "================================================================================"
+    echo ""
+    
+    if [[ "$exit_code" == "0" ]]; then
+        echo "  Status: ✓ SUCCESS (exit code 0)"
+    elif [[ "$exit_code" != "?" ]]; then
+        echo "  Status: ✗ FAILED (exit code $exit_code)"
+    else
+        echo "  Status: ? UNKNOWN (could not read exit code)"
+    fi
+    
+    echo ""
+    echo "Confirm this session output before proceeding?"
+    echo ""
+    echo "  - Type 'yes' to verify and proceed (exit 0)"
+    echo "  - Type 'no'  to reject (exit 254, workflow blocked)"
+    echo "  - Type 'show' to display full output"
+    echo "  - Type 'meta' to show metadata JSON"
+    echo ""
+    
+    # Read user input
+    read -t 30 -p "Your choice: " -r choice || {
+        echo ""
+        echo "✗ Verification timeout (no input within 30 seconds)"
+        return 1
+    }
+    
+    case "$choice" in
+        yes|YES|y|Y)
+            echo ""
+            echo "✓ Session verified. Proceeding..."
+            return 0
+            ;;
+        no|NO|n|N)
+            echo ""
+            echo "✗ Session NOT verified. Workflow blocked."
+            echo "   To retry: session $sid"
+            return 254
+            ;;
+        show|SHOW)
+            echo ""
+            echo "================================================================================"
+            echo "  FULL SESSION OUTPUT"
+            echo "================================================================================"
+            echo ""
+            cat "$typescript_file"
+            echo ""
+            echo "================================================================================"
+            echo ""
+            # Recursive call to re-prompt
+            session_status "$sid"
+            return $?
+            ;;
+        meta|META)
+            echo ""
+            echo "================================================================================"
+            echo "  SESSION METADATA"
+            echo "================================================================================"
+            echo ""
+            cat "$meta_file"
+            echo ""
+            echo "================================================================================"
+            echo ""
+            # Recursive call to re-prompt
+            session_status "$sid"
+            return $?
+            ;;
+        *)
+            echo ""
+            echo "✗ Invalid choice: '$choice'"
+            echo "   Please type: yes, no, show, or meta"
+            # Recursive call to re-prompt
+            session_status "$sid"
+            return $?
+            ;;
+    esac
+}
+
+# ============================================================================
+# SESSION RESUME
+# ============================================================================
+
+session_resume() {
+    local sid="${1:-}"
+    
+    if [[ -z "$sid" ]]; then
+        echo "ERROR: Session ID required" >&2
+        echo "Usage: session resume <sessionid>" >&2
+        echo "" >&2
+        echo "Sets the session as \"current\" and imports it to the shell context." >&2
+        return 1
+    fi
+    
+    local meta_file="$SESSION_DIR/${sid}.meta.json"
+    
+    if [[ ! -f "$meta_file" ]]; then
+        echo "[SESSION] ✗ Session not found: $sid" >&2
+        return 1
+    fi
+    
+    # Extract command and other metadata
+    local last_command=""
+    local last_exit=""
+    
+    if command -v jq &>/dev/null; then
+        last_command=$(jq -r '.command' "$meta_file" 2>/dev/null)
+        last_exit=$(jq -r '.exit_code' "$meta_file" 2>/dev/null)
+    else
+        last_command=$(grep -oP '"command": "\K[^"]*' "$meta_file" 2>/dev/null)
+        last_exit=$(grep -o '"exit_code": [0-9]*' "$meta_file" 2>/dev/null | grep -o '[0-9]*')
+    fi
+    
+    # Set environment variables for resumed session
+    export AI_CURRENT_SESSION="$sid"
+    export AI_LAST_COMMAND="$last_command"
+    export AI_LAST_EXIT="$last_exit"
+    
+    echo ""
+    echo "✓ Session resumed: $sid"
+    echo ""
+    echo "Command: $last_command"
+    echo "Exit Code: $last_exit"
+    echo ""
+    echo "Environment variables set:"
+    echo "  AI_CURRENT_SESSION=$sid"
+    echo "  AI_LAST_COMMAND=$last_command"
+    echo "  AI_LAST_EXIT=$last_exit"
+    echo ""
+    
+    return 0
+}
+
+# ============================================================================
+# SESSION LIST
+# ============================================================================
+
+session_list() {
+    if [[ ! -d "$SESSION_DIR" ]]; then
+        echo "[SESSION] ✗ No sessions directory: $SESSION_DIR" >&2
+        return 1
+    fi
+    
+    local sessions
+    mapfile -t sessions < <(find "$SESSION_DIR" -name "*.meta.json" -type f 2>/dev/null | sort -r)
+    
+    if [[ ${#sessions[@]} -eq 0 ]]; then
+        echo "No sessions found in $SESSION_DIR"
+        return 0
+    fi
+    
+    # Print header
+    printf "%-45s %-40s %-6s %s\n" "SESSION ID" "COMMAND" "EXIT" "TIMESTAMP"
+    printf '%s\n' "$(printf '=%.0s' {1..125})"
+    
+    # Print each session
+    local meta_file
+    for meta_file in "${sessions[@]}"; do
+        local sid=$(basename "$meta_file" .meta.json)
+        local cmd exit_code timestamp
+        
+        if command -v jq &>/dev/null; then
+            cmd=$(jq -r '.command' "$meta_file" 2>/dev/null | cut -c1-40)
+            exit_code=$(jq -r '.exit_code' "$meta_file" 2>/dev/null)
+            timestamp=$(jq -r '.timestamp' "$meta_file" 2>/dev/null | cut -c1-20)
+        else
+            cmd=$(grep -oP '"command": "\K[^"]*' "$meta_file" 2>/dev/null | cut -c1-40)
+            exit_code=$(grep -o '"exit_code": [0-9]*' "$meta_file" 2>/dev/null | grep -o '[0-9]*')
+            timestamp=$(grep -oP '"timestamp": "\K[^"]*' "$meta_file" 2>/dev/null | cut -c1-20)
+        fi
+        
+        # Color exit code
+        local exit_colored="$exit_code"
+        if [[ "$exit_code" == "0" ]]; then
+            exit_colored="✓ $exit_code"
+        else
+            exit_colored="✗ $exit_code"
+        fi
+        
+        printf "%-45s %-40s %-6s %s\n" "$sid" "$cmd" "$exit_colored" "$timestamp"
+    done
+    
+    return 0
+}
+
+# ============================================================================
+# SESSION HANDOFF (TBD)
+# ============================================================================
+
+session_handoff() {
+    local sid="${1:-}"
+    local agent="${2:-}"
+    
+    if [[ -z "$sid" || -z "$agent" ]]; then
+        echo "HANDOFF: Not yet implemented" >&2
+        echo "" >&2
+        echo "Usage: session handoff <sessionid> @<agent>/@<user>" >&2
+        echo "" >&2
+        echo "This feature will copy session metadata to another agent's context." >&2
+        echo "Currently under development." >&2
+        return 1
+    fi
+    
+    echo "[SESSION] ⏳ Handoff feature coming soon: $sid → $agent" >&2
+    return 1
+}
+
+# ============================================================================
+# MAIN ROUTER
+# ============================================================================
+
+main() {
+    local SESSION_SUBCOMMAND="${1:-status}"
+    local SESSION_ID="${2:-}"
+    
+    case "$SESSION_SUBCOMMAND" in
+        status)
+            session_status "$SESSION_ID"
+            ;;
+        resume)
+            session_resume "$SESSION_ID"
+            ;;
+        list)
+            session_list
+            ;;
+        handoff)
+            session_handoff "$SESSION_ID" "${3:-}"
+            ;;
+        *)
+            # Default: treat first arg as session ID for verification
+            session_status "$SESSION_SUBCOMMAND"
+            ;;
+    esac
+}
+
+main "$@"
