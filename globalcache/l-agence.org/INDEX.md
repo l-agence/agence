@@ -28,3 +28,17 @@
 - **[120][c4d7e2f9a1b6c3a8]** https://github.com/ghuntley/how-to-ralph-wiggum
   - Ralph Wiggum implementation guide and patterns
   - Type: Repository | Status: Unverified | Language: en
+
+### MIT Peers consensus
+- https://arxiv.org/html/2502.20758
+- https://arxiv.org/pdf/2502.20758v3
+- https://arxiv.org/abs/2312.13602 #  Original arXIV MIT weighed LLM peer decisison
+- https://arxiv.org/pdf/2312.13602
+- https://www.sciencedirect.com/science/article/pii/S3050577125000167
+- https://arxiv.org/html/2408.10365v1
+- https://arxiv.org/html/2509.16839v2
+- https://arxiv.org/abs/2509.16839
+- https://arxiv.org/pdf/2510.22593v1
+- https://arxiv.org/abs/2505.11718
+- https://arxiv.org/abs/2510.22593
+
