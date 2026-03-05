@@ -315,6 +315,53 @@ Allowed git commands:
 - `0` = Command executed successfully
 - `1` = Command blocked (not whitelisted)
 
+#### 4. GitHub CLI Commands  
+Safe operations (read-only queries and non-destructive):
+
+```bash
+# Repository lookup
+agence ^aido gh repo view owner/name
+agence ^aido gh repo list --owner stefuss
+agence ^aido gh repo search terraform
+agence ^aido gh repo clone --dry-run owner/name
+
+# Pull Request queries
+agence ^aido gh pr list
+agence ^aido gh pr view 42
+agence ^aido gh pr status
+agence ^aido gh pr checks 42
+
+# Issue queries
+agence ^aido gh issue list
+agence ^aido gh issue view 123
+
+# Actions & Workflows
+agence ^aido gh run list
+agence ^aido gh run view run-id
+agence ^aido gh run download run-id
+agence ^aido gh workflow list
+agence ^aido gh workflow view workflow-id
+
+# Auth & Org
+agence ^aido gh auth status
+agence ^aido gh org list
+
+# API (read-only)
+agence ^aido gh api GET /repos/owner/repo
+agence ^aido gh api GET /user
+```
+
+**Blocked** (any mutation):
+```
+repo create       - Destructive
+repo delete       - Destructive
+pr create         - Mutates
+pr merge          - Mutates
+issue create      - Mutates
+workflow enable   - Mutates
+api POST/PUT/PATCH/DELETE  - Any mutation
+```
+
 ---
 
 ## Command Structure

@@ -50,6 +50,37 @@ AWS_SAFE_PATTERNS=(
 )
 
 # ============================================================================
+# GITHUB CLI WHITELIST
+# ============================================================================
+
+GH_SAFE_PATTERNS=(
+    # Repository commands
+    "repo view.*"
+    "repo list.*"
+    "repo search.*"
+    "repo clone.*--dry-run.*"
+    # Pull Request commands
+    "pr list.*"
+    "pr view.*"
+    "pr status.*"
+    "pr checks.*"
+    # Issue commands
+    "issue list.*"
+    "issue view.*"
+    # Actions commands
+    "run list.*"
+    "run view.*"
+    "run download.*"
+    "workflow list.*"
+    "workflow view.*"
+    # Auth commands
+    "auth status.*"
+    "org list.*"
+    # API commands (only GET method allowed)
+    "api GET.*"
+)
+
+# ============================================================================
 # POWERSHELL WHITELIST
 # ============================================================================
 
@@ -101,6 +132,22 @@ validate_aws_command() {
     return 1
 }
 
+validate_gh_command() {
+    local gh_cmd="$1"
+    
+    # Extract the operation (first argument after 'gh')
+    local operation="${gh_cmd#gh }"
+    
+    # Check if operation matches a safe pattern
+    for safe_pattern in "${GH_SAFE_PATTERNS[@]}"; do
+        if [[ "$operation" =~ ^${safe_pattern} ]]; then
+            return 0
+        fi
+    done
+    
+    return 1
+}
+
 validate_powershell_command() {
     local ps_cmd="$1"
     
@@ -137,6 +184,9 @@ Examples:
   aido git log --oneline
   aido aws describe-instances
   aido aws sts get-session-token
+  aido gh repo list
+  aido gh pr view 42
+  aido gh issue list
 
 Whitelisted Git Commands:
   status, log, diff, branch, tag, reflog, describe, shortlog
@@ -147,6 +197,14 @@ Whitelisted AWS Patterns:
   describe-*, get-*, list-*, head-*
   auth status, auth login
   sts get-session-token
+
+Whitelisted GitHub CLI Commands:
+  Repository: repo view, repo list, repo search, repo clone --dry-run
+  Pull Requests: pr list, pr view, pr status, pr checks
+  Issues: issue list, issue view
+  Actions: run list, run view, run download, workflow list, workflow view
+  Auth: auth status, org list
+  API: api GET ... (read-only)
 
 PowerShell Verbs (in PowerShell context):
   Get, Test, Measure, Select, Where, Sort, Group, Compare
@@ -182,6 +240,19 @@ EOF
                 echo "" >&2
                 echo "Allowed AWS patterns:" >&2
                 printf "  • %s\n" "${AWS_SAFE_PATTERNS[@]}" >&2
+                return 1
+            fi
+            ;;
+        gh)
+            if validate_gh_command "gh $2 $3 $4 $5"; then
+                [[ "${AIDO_DEBUG:-0}" == "1" ]] && echo "[AIDO] ✓ Executing: $full_command" >&2
+                eval "$full_command"
+                return $?
+            else
+                echo "[AIDO] ✗ BLOCKED: GitHub CLI command not whitelisted: $2" >&2
+                echo "" >&2
+                echo "Allowed GitHub CLI patterns:" >&2
+                printf "  • %s\n" "${GH_SAFE_PATTERNS[@]}" >&2
                 return 1
             fi
             ;;
