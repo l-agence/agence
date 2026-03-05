@@ -491,6 +491,46 @@ mode_external() {
       git -C "$GIT_REPO" push -u origin
       return $?
       ;;
+    ghstatus)
+      # GitHub CLI: show repo and PR status
+      echo "[INFO] Repository status:" >&2
+      bash "$AGENCE_ROOT/bin/aido" gh repo view
+      echo && echo "[INFO] Pull requests:" >&2
+      bash "$AGENCE_ROOT/bin/aido" gh pr list --limit 5
+      return $?
+      ;;
+    ghcommit)
+      # GitHub CLI: Commit changes (similar to /commit but with gh auth)
+      echo "[WARN] This will commit all staged changes using gh auth" >&2
+      read -p "Enter commit message: " commit_msg
+      if [[ -z "$commit_msg" ]]; then
+        echo "Error: Commit message required" >&2
+        return 1
+      fi
+      # Verify gh is authenticated
+      if ! bash "$AGENCE_ROOT/bin/aido" gh auth status &>/dev/null; then
+        echo "Error: Not authenticated with gh. Run: agence /ghlogin" >&2
+        return 1
+      fi
+      git -C "$GIT_REPO" commit -m "$commit_msg"
+      return $?
+      ;;
+    ghpush)
+      # GitHub CLI: Push changes (uses gh's authentication)
+      echo "[WARN] This will push changes using GitHub CLI auth" >&2
+      read -p "Confirm push to origin? [y/N] " confirm
+      if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+        echo "[CANCELLED] Push aborted" >&2
+        return 1
+      fi
+      # Verify gh is authenticated
+      if ! bash "$AGENCE_ROOT/bin/aido" gh auth status &>/dev/null; then
+        echo "Error: Not authenticated with gh. Run: agence /ghlogin" >&2
+        return 1
+      fi
+      git -C "$GIT_REPO" push -u origin
+      return $?
+      ;;
   esac
 
   # Load permitted commands from config/commands.json
