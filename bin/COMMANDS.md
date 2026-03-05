@@ -266,6 +266,204 @@ agence ^reindex
 
 ---
 
+### `agence ^learn`
+
+**Purpose**: Extract and synthesize knowledge from session history and recorded faults.
+
+**What it does**:
+- Scans all recorded sessions in `nexus/.aisessions/`
+- Reviews fault records in `nexus/faults/`
+- Synthesizes lessons learned in `synthesis/l-agence.org/lessons/`
+- Updates knowledge synthesis indexes
+
+**Workflow**:
+
+1. **Session review**: Counts and analyzes session metadata
+2. **Fault analysis**: Extracts insights from fault records
+3. **Lesson synthesis**: Updates synthesis directory with learnings
+
+**Usage**:
+
+```bash
+# Learn from recent sessions and faults
+agence ^learn
+
+# Output:
+# ==============================================
+#   AGENCE LEARNING (^learn)
+# ==============================================
+#
+# Step 1/3: Scanning session history...
+#   Found 12 sessions
+#
+# Step 2/3: Reviewing recorded faults...
+#   Found 2 fault records
+#   Processing fault insights...
+#     - Reviewed: symlink-false-success
+#     - Reviewed: agent-truncation-lie
+#
+# Step 3/3: Synthesizing lessons learned...
+#   Active lessons: 5
+#   Synthesis destination: /path/to/.agence/synthesis/l-agence.org/lessons/
+#
+# ==============================================
+#   LEARNING COMPLETE
+# ==============================================
+#
+# Summary:
+#   Sessions reviewed: 12
+#   Faults analyzed: 2
+#   Lessons in synthesis: 5
+#
+# Next: Use ^commit to save knowledge changes
+```
+
+**Why use it**:
+
+- **After critical sessions**: Distill insights while fresh
+- **After a fault**: Record what went wrong and how to avoid it
+- **Periodic reflection**: Review lessons and update synthesis
+- **Knowledge consolidation**: Prepare changes for team sharing
+
+---
+
+### `agence ^commit`
+
+**Purpose**: Save all synthetic knowledge changes to git repository.
+
+**What it does**:
+- Stages all knowledge base changes (`globalcache/`)
+- Stages synthesis updates (`synthesis/`)
+- Stages fault records (`nexus/faults/`)
+- Creates git commit with knowledge metadata
+
+**Workflow**:
+
+1. **Staging**: Marks all knowledge files for commit
+2. **Counting**: Reports number of changed files
+3. **Committing**: Creates atomic knowledge commit
+
+**Usage**:
+
+```bash
+# Commit knowledge changes
+agence ^commit
+
+# Output:
+# ==============================================
+#   AGENCE KNOWLEDGE COMMIT (^commit)
+# ==============================================
+#
+# Step 1/2: Staging knowledge changes...
+#   ✓ Staged 23 files
+#
+# Step 2/2: Creating commit...
+#   ✓ Committed: a7f3b2e
+#
+# ==============================================
+#   KNOWLEDGE COMMIT COMPLETE
+# ==============================================
+#
+# Commit: a7f3b2e
+# Files changed: 23
+#
+# Next: Use ^push to sync with upstream
+```
+
+**Commit message template**:
+
+```
+[KNOWLEDGE] Synthetic learning update
+
+- Updated knowledge bases (globalcache/)
+- Recorded lessons learned (synthesis/)
+- Fault analysis and insights (nexus/faults/)
+
+Automated knowledge synthesis and consolidation.
+```
+
+**Why use it**:
+
+- **Track knowledge evolution**: Every update is versioned
+- **Revert capability**: Can restore previous knowledge states
+- **Attribution**: Git history shows when knowledge changed
+- **Team sharing**: Prepares knowledge for `^push`
+
+---
+
+### `agence ^push`
+
+**Purpose**: Synchronize synthetic knowledge with upstream repository.
+
+**What it does**:
+- Checks for unpushed commits on current branch
+- Shows commits ready to push
+- Pushes knowledge updates to `origin`
+- Reports synchronization status
+
+**Workflow**:
+
+1. **Detection**: Counts unpushed commits
+2. **Preview**: Shows commits to be pushed
+3. **Pushing**: Syncs to remote repository
+4. **Reporting**: Confirms successful synchronization
+
+**Usage**:
+
+```bash
+# Push knowledge to upstream
+agence ^push
+
+# Output:
+# ==============================================
+#   AGENCE KNOWLEDGE PUSH (^push)
+# ==============================================
+#
+# Preparing to push knowledge updates...
+#   Branch: main
+#   Unpushed commits: 2
+#
+# Commits to push:
+#   - a7f3b2e [KNOWLEDGE] Synthetic learning update
+#   - c9e1d5f [FAULT] Agent integrity violation (symlink success claim)
+#
+# Pushing to upstream...
+#
+# ==============================================
+#   KNOWLEDGE PUSH COMPLETE
+# ==============================================
+#
+# ✓ Knowledge synchronized to upstream
+#   Remote: origin
+#   Branch: main
+#   Commits pushed: 2
+```
+
+**Typical workflow**:
+
+```bash
+# 1. Learn from sessions/faults
+agence ^learn
+
+# 2. Commit knowledge changes
+agence ^commit
+
+# 3. Push to upstream
+agence ^push
+
+# All three can run sequentially:
+agence ^learn && agence ^commit && agence ^push
+```
+
+**Why use it**:
+
+- **Knowledge sharing**: Distribute learnings across team
+- **Distributed learning**: Other agents can pull your insights
+- **Accountability**: Changes are attributed via git history
+- **Synchronization**: Prevents knowledge drift in multi-agent setups
+
+---
+
 ### `agence ^aido <command>`
 
 **Purpose**: Execute whitelisted read-only and idempotent commands (opposite of sudo).

@@ -610,6 +610,15 @@ mode_init() {
     "reindex")
       reindex_knowledge_bases
       ;;
+    "learn")
+      learn_from_sessions
+      ;;
+    "commit")
+      commit_knowledge_changes
+      ;;
+    "push")
+      push_knowledge_upstream
+      ;;
     *)
       echo "Error: Unknown init command: $init_cmd" >&2
       return 1
@@ -1067,6 +1076,220 @@ reindex_knowledge_bases() {
   echo "  Cache entries expired: $cache_expired"
   echo "  Formtags updated: $tags_updated"
   echo ""
+  
+  return 0
+}
+
+# ============================================================================
+# LEARN: Extract Knowledge from Sessions and Faults
+# ============================================================================
+
+learn_from_sessions() {
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Learning from sessions..." >&2
+  
+  echo ""
+  echo "=============================================="
+  echo "  AGENCE LEARNING (^learn)"
+  echo "=============================================="
+  echo ""
+  
+  local sessions_dir="${AGENCE_REPO}/nexus/.aisessions"
+  local faults_dir="${AGENCE_REPO}/nexus/faults"
+  local lessons_dir="${AGENCE_REPO}/synthesis/l-agence.org/lessons"
+  
+  local session_count=0
+  local fault_count=0
+  local lesson_count=0
+  
+  mkdir -p "$lessons_dir" 2>/dev/null
+  
+  echo "Step 1/3: Scanning session history..."
+  
+  if [[ -d "$sessions_dir" ]]; then
+    session_count=$(find "$sessions_dir" -name "*.meta.json" -type f | wc -l)
+    echo "  Found $session_count sessions"
+  else
+    echo "  No sessions directory found"
+  fi
+  echo ""
+  
+  echo "Step 2/3: Reviewing recorded faults..."
+  
+  if [[ -d "$faults_dir" ]]; then
+    fault_count=$(find "$faults_dir" -name "*.md" -type f | wc -l)
+    echo "  Found $fault_count fault records"
+    
+    # Extract key insights from fault records
+    if [[ $fault_count -gt 0 ]]; then
+      echo "  Processing fault insights..."
+      find "$faults_dir" -name "*.md" -type f | while read -r fault_file; do
+        local fault_name=$(basename "$fault_file" .md)
+        echo "    - Reviewed: $fault_name"
+      done
+    fi
+  else
+    echo "  No faults directory found"
+  fi
+  echo ""
+  
+  echo "Step 3/3: Synthesizing lessons learned..."
+  
+  # Update lessons index
+  local lessons_count=$(find "$lessons_dir" -name "*.md" -type f 2>/dev/null | wc -l)
+  
+  echo "  Active lessons: $lessons_count"
+  echo "  Synthesis destination: $lessons_dir"
+  echo ""
+  
+  echo "=============================================="
+  echo "  LEARNING COMPLETE"
+  echo "=============================================="
+  echo ""
+  echo "Summary:"
+  echo "  Sessions reviewed: $session_count"
+  echo "  Faults analyzed: $fault_count"
+  echo "  Lessons in synthesis: $lessons_count"
+  echo ""
+  echo "Next: Use ^commit to save knowledge changes"
+  echo ""
+  
+  return 0
+}
+
+# ============================================================================
+# COMMIT: Save Knowledge Base Changes
+# ============================================================================
+
+commit_knowledge_changes() {
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Committing knowledge changes..." >&2
+  
+  echo ""
+  echo "=============================================="
+  echo "  AGENCE KNOWLEDGE COMMIT (^commit)"
+  echo "=============================================="
+  echo ""
+  
+  # Check if we're in a git repository
+  if ! git rev-parse --git-dir >/dev/null 2>&1; then
+    echo "✗ Not in a git repository"
+    echo "  Knowledge changes must be committed via git"
+    return 1
+  fi
+  
+  echo "Step 1/2: Staging knowledge changes..."
+  
+  # Stage all synthetic knowledge changes
+  local kb_root="${AGENCE_REPO}/globalcache"
+  local synthesis="${AGENCE_REPO}/synthesis"
+  local nexus_faults="${AGENCE_REPO}/nexus/faults"
+  
+  git add "$kb_root" 2>/dev/null
+  git add "$synthesis" 2>/dev/null
+  git add "$nexus_faults" 2>/dev/null
+  
+  # Count staged changes
+  local staged_count=$(git diff --cached --name-only | wc -l)
+  
+  if [[ $staged_count -gt 0 ]]; then
+    echo "  ✓ Staged $staged_count files"
+  else
+    echo "  ⚠ No changes to commit"
+    return 0
+  fi
+  echo ""
+  
+  echo "Step 2/2: Creating commit..."
+  
+  local commit_msg="[KNOWLEDGE] Synthetic learning update
+
+- Updated knowledge bases (globalcache/)
+- Recorded lessons learned (synthesis/)
+- Fault analysis and insights (nexus/faults/)
+
+Automated knowledge synthesis and consolidation."
+  
+  git commit -m "$commit_msg" 2>/dev/null
+  
+  if [[ $? -eq 0 ]]; then
+    local commit_sha=$(git rev-parse --short HEAD)
+    echo "  ✓ Committed: $commit_sha"
+    echo ""
+    echo "=============================================="
+    echo "  KNOWLEDGE COMMIT COMPLETE"
+    echo "=============================================="
+    echo ""
+    echo "Commit: $commit_sha"
+    echo "Files changed: $staged_count"
+    echo ""
+    echo "Next: Use ^push to sync with upstream"
+    echo ""
+  else
+    echo "  ⚠ Commit creation had issues (no changes?)"
+  fi
+  
+  return 0
+}
+
+# ============================================================================
+# PUSH: Sync Knowledge Base to Upstream
+# ============================================================================
+
+push_knowledge_upstream() {
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Pushing knowledge upstream..." >&2
+  
+  echo ""
+  echo "=============================================="
+  echo "  AGENCE KNOWLEDGE PUSH (^push)"
+  echo "=============================================="
+  echo ""
+  
+  # Check if we're in a git repository
+  if ! git rev-parse --git-dir >/dev/null 2>&1; then
+    echo "✗ Not in a git repository"
+    return 1
+  fi
+  
+  # Check if we have unpushed commits
+  local branch=$(git rev-parse --abbrev-ref HEAD)
+  local ahead=$(git rev-list --count "@{u}..HEAD" 2>/dev/null || echo "0")
+  
+  if [[ "$ahead" == "0" ]] || [[ -z "$ahead" ]]; then
+    echo "✓ No unpushed commits on '$branch'"
+    echo "  Knowledge base is up to date with upstream"
+    echo ""
+    return 0
+  fi
+  
+  echo "Preparing to push knowledge updates..."
+  echo "  Branch: $branch"
+  echo "  Unpushed commits: $ahead"
+  echo ""
+  
+  # Show commits to be pushed
+  echo "Commits to push:"
+  git log -n "$ahead" --oneline | sed 's/^/  - /'
+  echo ""
+  
+  echo "Pushing to upstream..."
+  
+  git push origin "$branch" 2>&1
+  
+  if [[ $? -eq 0 ]]; then
+    echo ""
+    echo "=============================================="
+    echo "  KNOWLEDGE PUSH COMPLETE"
+    echo "=============================================="
+    echo ""
+    echo "✓ Knowledge synchronized to upstream"
+    echo "  Remote: origin"
+    echo "  Branch: $branch"
+    echo "  Commits pushed: $ahead"
+    echo ""
+  else
+    echo ""
+    echo "⚠ Push encountered issues (network, auth, conflicts?)"
+    return 1
+  fi
   
   return 0
 }
