@@ -1,0 +1,26 @@
+{
+  "lesson_id": "c2d9e5f7",
+  "date_extracted": "2026-03-05T23:00:00Z",
+  "agent": "@peers",
+  "category": "architecture",
+  "title": "@peers consensus agent: weighted expertise scoring > simple majority voting",
+  "description": "Multi-LLM consensus systems should weight each model's vote by its domain expertise, not treat all models as equal. A model with 85% confidence but 0.95 architecture expertise outweighs one with 95% confidence but 0.80 architecture expertise.",
+  "root_cause": "Naive multi-agent consensus treats all votes equally, ignoring that LLMs have different strengths. Claude excels at architecture, GPT-4 at implementation, Gemini at data analysis. Equal weighting dilutes expert opinions.",
+  "solution": "Implement weighted consensus: Weighted Vote = Confidence % × Domain Weighting Factor. Output results in a table showing per-agent findings, votes, weights, and weighted scores. Surface dissenting views — disagreement is signal, not noise.",
+  "lesson_summary": "When building multi-LLM consensus systems, assign domain-specific expertise weights to each model. Use weighted scoring (confidence × weight) rather than simple majority. Always surface valuable disagreements.",
+  "code_pattern": {
+    "formula": "weighted_vote = confidence_pct * domain_weight",
+    "output": "Results table: Agent | Finding | Confidence % | Weight | Weighted Score",
+    "consensus": "Winner = highest weighted_vote sum across peers"
+  },
+  "implementation": {
+    "file1": "codex/agents/peers/agent.md - Full @peers agent specification"
+  },
+  "references": [
+    "globalcache/l-agence.org/INDEX.md - MIT Peers consensus research (arxiv papers)",
+    "codex/agents/peers/agent.md - Weighted consensus architecture"
+  ],
+  "status": "active",
+  "applies_to": ["@peers", "@agence"],
+  "severity": "medium"
+}

@@ -1,0 +1,24 @@
+{
+  "lesson_id": "d7a3c8b1",
+  "date_extracted": "2026-03-05T23:00:00Z",
+  "agent": "@agence",
+  "category": "process",
+  "title": "ADHD scope creep safeguards: hard stops prevent 20hr hyperflow sessions",
+  "description": "Developer with ADHD is vulnerable to infinite iteration feedback loops when working with AI agents. Previous session resulted in 20hr hyperflow and a 137-file PR at 3AM. Safeguards needed to enforce boundaries.",
+  "root_cause": "AI agent interactions create dopamine-driven feedback loops: each small win encourages the next iteration. Without external brakes, the developer-agent pair will optimize indefinitely.",
+  "solution": "Implement session boundaries: visible progress tracking, decision gates ('stop here and ship?'), periodic checkpoints (~45min), hard stops at 2-3hr or 20+ files changed. Make small shipped features feel like wins.",
+  "lesson_summary": "Build scope creep safeguards into the agent workflow itself. The agent should actively propose stopping points rather than waiting for the user to disengage. Small shipped PRs > giant hyperflow PRs.",
+  "code_pattern": {
+    "checkpoint": "Every ~45min: show accomplishments vs out-of-scope items",
+    "decision_gate": "Before expanding: 'Stop here and ship? Or continue with X?'",
+    "hard_stop": "At 2-3hr or 20+ files: suggest commit and defer remaining work"
+  },
+  "implementation": {
+    "status": "negotiated, not yet automated",
+    "next": "Add checkpoint logic to session management"
+  },
+  "references": [],
+  "status": "planned",
+  "applies_to": ["@agence", "all-agents"],
+  "severity": "high"
+}

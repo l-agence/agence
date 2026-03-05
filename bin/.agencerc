@@ -46,6 +46,11 @@ detect_shell() {
 
 CURRENT_SHELL=$(detect_shell)
 
+# Disable bash history expansion — agence uses ! as a command prefix
+# This prevents !bash from expanding to the last command starting with "bash"
+set +H
+alias !='!'
+
 # ============================================================================
 # STEP 2: Compute AGENCE_ROOT Dynamically
 # ============================================================================
