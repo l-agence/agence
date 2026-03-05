@@ -1,0 +1,65 @@
+{
+  "lesson_id": "f8d3a4e2",
+  "date_extracted": "2026-03-04T16:45:00Z",
+  "agent": "@haiku",
+  "category": "shell-compatibility",
+  "title": "ALWAYS use shell-native paths - never mix path formats across shells",
+  "description": "Each shell environment has its own native path format. Using a different shell's path format in your current shell causes path interpretation errors. Backslashes, drive letters, and path prefixes vary by shell and will break commands if mismatched.",
+  "root_cause": "Mixing path formats across shells (e.g., Windows paths in git-bash, git-bash paths in Cygwin) causes commands to fail because shells interpret path separators and special characters differently. Backslashes are often interpreted as escape sequences.",
+  "solution": "ALWAYS use the shell's native path format for the environment you're currently in. Never mix shell path formats. Check your shell type and use the correct path format for that shell.",
+  "lesson_summary": "Shell path formats are NOT interchangeable. Each shell has its native format. Use ONLY that format when executing commands in that shell. Switching shells? Switch path formats too.",
+  "shell_path_formats": {
+    "git-bash": {
+      "format": "/c/Users/username/path or /d/Users/...",
+      "prefix": "/c/ or /d/ for drive letters",
+      "separator": "/ (forward slash)",
+      "example": "/c/Users/steff/git/.agence/bin/agence"
+    },
+    "cygwin": {
+      "format": "/cygdrive/c/Users/username/path",
+      "prefix": "/cygdrive/c/ or /cygdrive/d/",
+      "separator": "/ (forward slash)",
+      "example": "/cygdrive/c/Users/steff/git/.agence/bin/agence"
+    },
+    "wsl": {
+      "format": "/mnt/c/Users/username/path",
+      "prefix": "/mnt/c/ or /mnt/d/",
+      "separator": "/ (forward slash)",
+      "example": "/mnt/c/Users/steff/git/.agence/bin/agence"
+    },
+    "cmd": {
+      "format": "C:\\Users\\username\\path",
+      "prefix": "C:\\ or D:\\",
+      "separator": "\\ (backslash)",
+      "example": "C:\\Users\\steff\\git\\.agence\\bin\\agence"
+    },
+    "powershell": {
+      "format": "C:\\Users\\username\\path (also accepts some forward slash paths)",
+      "prefix": "C:\\ or D:\\",
+      "separator": "\\ (backslash)",
+      "example": "C:\\Users\\steff\\git\\.agence\\bin\\agence"
+    }
+  },
+  "code_examples": {
+    "wrong_git_bash": "mklink C:\\Users\\steff\\git\\.agence\\bin\\^ C:\\Users\\steff\\git\\.agence\\bin\\agence",
+    "right_git_bash": "mklink /c/Users/steff/git/.agence/bin/^ /c/Users/steff/git/.agence/bin/agence",
+    "wrong_cygwin": "mklink /c/Users/steff/git/.agence/bin/^ /c/Users/steff/git/.agence/bin/agence",
+    "right_cygwin": "mklink /cygdrive/c/Users/steff/git/.agence/bin/^ /cygdrive/c/Users/steff/git/.agence/bin/agence",
+    "wrong_wsl": "mklink C:\\Users\\steff\\git\\.agence\\bin\\^ C:\\Users\\steff\\git\\.agence\\bin\\agence",
+    "right_wsl": "mklink /mnt/c/Users/steff/git/.agence/bin/^ /mnt/c/Users/steff/git/.agence/bin/agence"
+  },
+  "implementation": {
+    "rule": "Match command shell to path format",
+    "check_shell": "echo $SHELL or echo $MSYSTEM (for git-bash)",
+    "git_bash_identifier": "$MSYSTEM=MINGW64 or MINGW32",
+    "cygwin_identifier": "$TERM starts with 'xterm' or check uname output"
+  },
+  "references": [
+    "bin/.gitbashrc - mklink() function documents shell-native paths",
+    "bin/agence - symlink creation must detect shell environment",
+    "lessons/a3f7b2c1.json - Git symlinks (mode 120000)"
+  ],
+  "status": "active",
+  "applies_to": ["@haiku", "@aider", "all-agents", "all-shells"],
+  "severity": "critical"
+}

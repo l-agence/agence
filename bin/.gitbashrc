@@ -5,6 +5,11 @@
 # It contains workarounds for git-bash quirks that aren't needed in
 # WSL, Cygwin, or native Linux shells.
 
+# Force native Windows symlinks (no silent fallback to copying)
+# Without this, ln -s will silently copy files instead of creating symlinks
+# when symlink creation fails due to permissions
+export MSYS=winsymlinks:nativestrict
+
 # Fix for git-bash mv: recursively move directories into existing targets
 # Linux mv automatically places source inside target if target is a dir
 # Git-bash's mv refuses if target dir is non-empty
@@ -21,5 +26,62 @@ mv() {
 # Configure Git to properly handle symlinks (mode 120000)
 # This ensures symlinks work cross-platform and display correctly on GitHub
 git config --global core.symlinks true
+
+# mklink() - Create git-tracked symlinks (mode 120000) with proper error handling
+# CRITICAL LESSON (f8d3a4e2): Always use ONLY shell-native paths for your current shell!
+# - git-bash: /c/Users/... (NEVER C:\Users\...)
+# - Cygwin: /cygdrive/c/Users/... (NEVER /c/Users/... or C:\Users\...)
+# - WSL: /mnt/c/Users/... (NEVER /c/Users/... or C:\Users\...)
+# - cmd/PowerShell: C:\Users\... (NEVER /c/Users/...)
+# Mixing path formats breaks commands because shells interpret separators differently!
+# Usage: mklink [/D] <link_name> <target>
+# /D flag creates directory symlink (for directories)
+# Works with git config core.symlinks=true for cross-platform support
+mklink() {
+    local is_dir=false
+    local link_name
+    local target
+    
+    # Parse /D flag for directory symlinks
+    if [[ "$1" == "/D" ]]; then
+        is_dir=true
+        link_name="$2"
+        target="$3"
+    else
+        link_name="$1"
+        target="$2"
+    fi
+    
+    # Validate arguments
+    if [[ -z "$link_name" || -z "$target" ]]; then
+        echo "mklink: Usage: mklink [/D] <link_name> <target>" >&2
+        echo "mklink: CRITICAL: Use git-bash paths (/c/Users/...) NOT Windows (C:\\Users\\...) or Cygwin (/cygdrive/c/...) paths" >&2
+        return 1
+    fi
+    
+    # Check if target exists
+    if [[ ! -e "$target" && ! -L "$target" ]]; then
+        echo "mklink: target '$target' does not exist" >&2
+        echo "mklink: Check path format - must use git-bash native format: /c/Users/... (not C:\\Users\\...)" >&2
+        return 1
+    fi
+    
+    # Check if link already exists
+    if [[ -e "$link_name" || -L "$link_name" ]]; then
+        echo "mklink: link '$link_name' already exists" >&2
+        return 1
+    fi
+    
+    # Create the symlink using Windows mklink command
+    # mklink will be called via cmd.exe to use native Windows symlink support
+    if cmd /c "mklink \"${link_name//\//\\}\" \"${target//\//\\}\"" > /dev/null 2>&1; then
+        echo "mklink: symbolic link created: $link_name -> $target"
+        return 0
+    else
+        echo "mklink: failed to create symlink '$link_name -> $target'" >&2
+        echo "mklink: Ensure you have admin privileges or appropriate file permissions" >&2
+        return 1
+    fi
+}
 
 # Add more git-bash workarounds here as needed
