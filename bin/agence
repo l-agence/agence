@@ -264,7 +264,7 @@ COMMAND MODES:
   agence +<request>            Ask LLM to route/plan action (autonomous mode)
   agence /<cmd>                Execute validated external command
   agence !<sys_cmd>            System command (bash/powershell utilities)
-  agence ^<init_cmd>           Special initialization and session commands
+  agence ^<init_cmd>           Special initialization commands
 
 EXAMPLES:
   agence "How do I deploy this to AWS?"
@@ -272,10 +272,14 @@ EXAMPLES:
   agence /terraform-plan
   agence !help
   agence ^init
-  agence ^save "Working on deployment"
+  agence ^install
   agence ^learn
-  agence ^commit "Updated rules and lessons"
+  agence ^status
+  agence ^stash
+  agence ^fetch
+  agence ^rebase
   agence ^push
+  agence ^sync
 
 ENVIRONMENT VARIABLES:
   GIT_REPO=/path/to/repo       Parent repository (auto-detected if not set)
@@ -585,17 +589,13 @@ mode_external() {
 # ============================================================================
 # MODE: SPECIAL INITIALIZATION
 # ============================================================================
-# Initialize Agence environment and special commands
+# Initialize Agence environment and create required symlinks
 # Example: agence ^init
-# Example: agence ^save (save session state)
 
 mode_init() {
-  local input="$1"
-  local init_cmd="${input%% *}"      # First word is the command
-  local init_args="${input#$init_cmd}" # Rest is arguments
-  init_args="${init_args# }"            # Trim leading space
+  local init_cmd="$1"
 
-  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Init mode: $init_cmd, args: $init_args" >&2
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Init mode: $init_cmd" >&2
 
   case "$init_cmd" in
     "init"|"")
@@ -604,25 +604,8 @@ mode_init() {
     "reload")
       reload_agence_context
       ;;
-    "save")
-      # Save session state: agence ^save [optional notes]
-      save_session "$init_args"
-      return $?
-      ;;
-    "learn")
-      # Learn from modified files: scan and re-read changed Agence files
-      learn_agence_changes
-      return $?
-      ;;
-    "commit")
-      # Commit changed Agence files (respects .gitignore)
-      commit_agence_changes "$init_args"
-      return $?
-      ;;
-    "push")
-      # Push committed Agence changes to origin (defaults to main branch)
-      push_agence_changes
-      return $?
+    "install")
+      install_agence_packages
       ;;
     *)
       echo "Error: Unknown init command: $init_cmd" >&2
@@ -634,67 +617,121 @@ mode_init() {
 }
 
 init_agence_environment() {
-  # Initialize Agence symlinks for parent repo
-  # ONLY creates symlinks if target files do not exist
-  # In this case: AGENCE_REPO == GIT_REPO, but structure supports general case
-  
   [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Initializing Agence environment..." >&2
   
-  local AGENCE_GITHUB="$AGENCE_REPO/.github"
-  local TARGET_GITHUB="$GIT_REPO/.github"
+  echo ""
+  echo "=============================================="
+  echo "  AGENCE INITIALIZATION (^init)"
+  echo "=============================================="
+  echo ""
   
-  # Ensure .github directory exists in target repo
-  if [[ ! -d "$TARGET_GITHUB" ]]; then
-    mkdir -p "$TARGET_GITHUB"
-    [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Created directory: $TARGET_GITHUB" >&2
+  # ========================================================================
+  # Step 1: Source .agencerc to set up environment
+  # ========================================================================
+  echo "Step 1/3: Loading Agence profile (.agencerc)..."
+  
+  local agencerc_path="$AGENCE_REPO/bin/.agencerc"
+  if [[ -f "$agencerc_path" ]]; then
+    source "$agencerc_path" 2>/dev/null
+    if [[ $? -eq 0 ]]; then
+      echo "✓ Profile loaded (Shell: $CURRENT_SHELL, REPO_ROOT: $REPO_ROOT)"
+    else
+      echo "⚠ Profile loaded but with warnings"
+    fi
+  else
+    echo "[WARN] .agencerc not found at $agencerc_path"
   fi
+  echo ""
   
-  # Symlink 1: copilot.md → copilot-instructions.md
+  # ========================================================================
+  # Step 2: Create directory symlinks (globalcache/@, objectcode/@, synthesis/@)
+  # ========================================================================
+  echo "Step 2/3: Creating organization symlinks..."
+  
+  local org_dirs=("globalcache" "objectcode" "synthesis")
+  local org_created=0
+  
+  for dir in "${org_dirs[@]}"; do
+    local org_link="$REPO_ROOT/$dir/@"
+    local org_target="l-agence.org"
+    
+    # Only create if doesn't exist
+    if [[ ! -e "$org_link" ]]; then
+      mkdir -p "$(dirname "$org_link")" 2>/dev/null
+      ln -sf "$org_target" "$org_link" 2>/dev/null
+      
+      if [[ -L "$org_link" || -d "$org_link" ]]; then
+        echo "  ✓ $dir/@ → $org_target"
+        ((org_created++))
+      else
+        echo "  ⚠ $dir/@: symlink creation failed (may try mklink on next checkout)"
+      fi
+    else
+      echo "  ⏭ $dir/@: already exists (user customization preserved)"
+    fi
+  done
+  
+  if [[ $org_created -gt 0 ]]; then
+    echo ""
+    echo "✓ Created $org_created organization symlink(s)"
+  fi
+  echo ""
+  
+  # ========================================================================
+  # Step 3: Create skeleton symlinks (.github/*, CLAUDE.md, etc)
+  # ========================================================================
+  echo "Step 3/3: Creating skeleton symlinks..."
+  
+  local AGENCE_GITHUB="$AGENCE_REPO/.github"
+  local TARGET_GITHUB="$REPO_ROOT/.github"
+  
+  # Ensure .github directory exists
+  mkdir -p "$TARGET_GITHUB" 2>/dev/null
+  
+  # Symlink 3a: copilot-instructions.md
   local source_copilot="$AGENCE_GITHUB/copilot.md"
   local target_copilot="$TARGET_GITHUB/copilot-instructions.md"
   
   if [[ ! -e "$target_copilot" ]]; then
     if [[ -f "$source_copilot" ]]; then
-      # Use git symlink (mode 120000) for cross-platform support
-      ln -s "../.agence/.github/copilot.md" "$target_copilot" 2>/dev/null || \
-      ln -s "$source_copilot" "$target_copilot" 2>/dev/null
-      if [[ $? -eq 0 ]]; then
-        echo "[INFO] Created symlink: $target_copilot → $source_copilot"
+      ln -sf "../.agence/.github/copilot.md" "$target_copilot" 2>/dev/null || \
+      ln -sf "$source_copilot" "$target_copilot" 2>/dev/null
+      if [[ -L "$target_copilot" ]]; then
+        echo "  ✓ .github/copilot-instructions.md → copilot.md"
       else
-        echo "[ERROR] Failed to create symlink: $target_copilot" >&2
-        return 1
+        echo "  ⚠ .github/copilot-instructions.md: creation deferred (post-checkout hook will create)"
       fi
-    else
-      echo "[ERROR] Source file not found: $source_copilot" >&2
-      return 1
     fi
   else
-    [[ "$QUIET" != "1" ]] && echo "[SKIP] Already exists: $target_copilot"
+    echo "  ⏭ .github/copilot-instructions.md: already exists"
   fi
   
-  # Symlink 2: CLAUDE.md → CLAUDE.md (in repo root)
+  # Symlink 3b: CLAUDE.md (in repo root)
   local source_claude="$AGENCE_GITHUB/CLAUDE.md"
-  local target_claude="$GIT_REPO/CLAUDE.md"
+  local target_claude="$REPO_ROOT/CLAUDE.md"
   
   if [[ ! -e "$target_claude" ]]; then
     if [[ -f "$source_claude" ]]; then
-      # Use git symlink (mode 120000) for cross-platform support
-      ln -s ".github/CLAUDE.md" "$target_claude" 2>/dev/null
-      if [[ $? -eq 0 ]]; then
-        echo "[INFO] Created symlink: $target_claude → .github/CLAUDE.md"
+      ln -sf ".github/CLAUDE.md" "$target_claude" 2>/dev/null
+      if [[ -L "$target_claude" ]]; then
+        echo "  ✓ CLAUDE.md → .github/CLAUDE.md"
       else
-        echo "[ERROR] Failed to create symlink: $target_claude" >&2
-        return 1
+        echo "  ⚠ CLAUDE.md: creation deferred (post-checkout hook will create)"
       fi
-    else
-      echo "[ERROR] Source file not found: $source_claude" >&2
-      return 1
     fi
   else
-    [[ "$QUIET" != "1" ]] && echo "[SKIP] Already exists: $target_claude"
+    echo "  ⏭ CLAUDE.md: already exists"
   fi
   
-  echo "[OK] Agence initialization complete"
+  echo ""
+  echo "=============================================="
+  echo "✓ Agence initialization complete!"
+  echo "  Environment: $CURRENT_SHELL"
+  echo "  AGENCE_ROOT=$AGENCE_REPO"
+  echo "  REPO_ROOT=$REPO_ROOT"
+  echo "=============================================="
+  echo ""
+  
   return 0
 }
 
@@ -809,396 +846,16 @@ create_windows_symlink() {
 }
 
 # ============================================================================
-# CONTEXT LEARNING: SCAN AND ABSORB CHANGES
-# ============================================================================
-# Scan modified Agence files, re-read them, and update knowledge base
-# Allows local file updates to be incorporated without agent restart
-# Usage: agence ^learn
-
-learn_agence_changes() {
-  local timestamp_file="$AGENCE_ROOT/.agence_learn_timestamp"
-  local last_scan=$(cat "$timestamp_file" 2>/dev/null || echo "0")
-  local current_scan=$(date +%s)
-  
-  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Learning from Agence changes..." >&2
-  
-  echo ""
-  echo "[LEARN] Scanning for modified Agence files..."
-  echo "=========================================="
-  echo ""
-  
-  # Files that are important to monitor
-  local monitored_files=(
-    "codex/PRINCIPLES.md"
-    "codex/LAWS.md"
-    "codex/RULES.md"
-    "codex/agents/claudia.md"
-    "codex/agents/ralph.md"
-    "codex/agents/sonny.md"
-    "codex/agents/lima.md"
-    "codex/agents/haiku.md"
-    "synthesis/l-agence.org/lessons/*.json"
-    ".github/CLAUDE.md"
-    ".github/copilot-instructions.md"
-  )
-  
-  local found_changes=0
-  local changed_files=""
-  
-  # Check each monitored file
-  for file_pattern in "${monitored_files[@]}"; do
-    # Expand glob patterns
-    for file in $AGENCE_ROOT/$file_pattern; do
-      if [[ -f "$file" ]]; then
-        # Get modification time
-        local file_mtime=$(stat -f%m "$file" 2>/dev/null || stat -c%Y "$file" 2>/dev/null || echo "0")
-        
-        if [[ $file_mtime -gt $last_scan ]]; then
-          local rel_path="${file#$AGENCE_ROOT/}"
-          echo "✓ UPDATED: $rel_path"
-          echo "  Modified: $(date -r "$file" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo 'unknown')"
-          echo "  Size: $(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null) bytes"
-          echo ""
-          
-          changed_files="$changed_files\n  - $rel_path"
-          ((found_changes++))
-        fi
-      fi
-    done
-  done
-  
-  if [[ $found_changes -eq 0 ]]; then
-    echo "✓ No changes detected. Context is current."
-    echo ""
-    return 0
-  fi
-  
-  echo "=========================================="
-  echo ""
-  echo "Summary:"
-  echo "  Files changed: $found_changes"
-  echo "  Changed files:$changed_files"
-  echo ""
-  
-  # Display what was re-read
-  echo "Re-reading context files..."
-  
-  if [[ -f "$AGENCE_ROOT/codex/PRINCIPLES.md" ]]; then
-    local principles_count=$(grep -c "^## Maxim" "$AGENCE_ROOT/codex/PRINCIPLES.md" 2>/dev/null || echo 0)
-    echo "  ✓ Principles: $principles_count maxims"
-  fi
-  
-  if [[ -f "$AGENCE_ROOT/codex/LAWS.md" ]]; then
-    local laws_count=$(grep -c "^## Law" "$AGENCE_ROOT/codex/LAWS.md" 2>/dev/null || echo 0)
-    echo "  ✓ Laws: $laws_count constraints"
-  fi
-  
-  if [[ -f "$AGENCE_ROOT/codex/RULES.md" ]]; then
-    local rules_count=$(grep -c "^## Rule" "$AGENCE_ROOT/codex/RULES.md" 2>/dev/null || echo 0)
-    echo "  ✓ Rules: $rules_count practices"
-  fi
-  
-  if [[ -f "$AGENCE_ROOT/.github/CLAUDE.md" ]]; then
-    local claude_lines=$(wc -l < "$AGENCE_ROOT/.github/CLAUDE.md" 2>/dev/null || echo 0)
-    echo "  ✓ Claude Context: $claude_lines lines"
-  fi
-  
-  # Check for new lessons
-  local lessons_count=$(find "$AGENCE_ROOT/synthesis/l-agence.org/lessons" -name "*.json" 2>/dev/null | wc -l)
-  if [[ $lessons_count -gt 0 ]]; then
-    echo "  ✓ Lessons: $lessons_count captured"
-  fi
-  
-  echo ""
-  echo "=========================================="
-  echo ""
-  echo "✓ Context updated successfully!"
-  echo ""
-  echo "Status:"
-  echo "  ✓ All modified files re-read"
-  echo "  ✓ Knowledge base synchronized"
-  echo "  ✓ Ready to continue with updated context"
-  echo ""
-  
-  # Update timestamp for next scan
-  echo "$current_scan" > "$timestamp_file"
-  
-  return 0
-}
-
-# ============================================================================
-# AGENCE MANAGEMENT: COMMIT
-# ============================================================================
-# Commit all changed Agence files to git (respects .gitignore)
-# Usage: agence ^commit [optional commit message]
-
-commit_agence_changes() {
-  local commit_msg="${1:-}"
-  
-  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Committing Agence changes..." >&2
-  
-  # Check if we have uncommitted changes
-  local status=$(git -C "$AGENCE_ROOT" status --short 2>/dev/null)
-  
-  if [[ -z "$status" ]]; then
-    echo ""
-    echo "✓ No changes to commit. Agence is current with main."
-    return 0
-  fi
-  
-  echo ""
-  echo "[COMMIT] Agence Files Summary"
-  echo "=========================================="
-  echo ""
-  echo "$status" | head -20
-  
-  if [[ $(echo "$status" | wc -l) -gt 20 ]]; then
-    echo "... and $(( $(echo "$status" | wc -l) - 20 )) more files"
-  fi
-  
-  echo ""
-  echo "=========================================="
-  echo ""
-  
-  # Prompt for commit message if not provided
-  if [[ -z "$commit_msg" ]]; then
-    read -p "Enter commit message (or press Enter to show diff first): " commit_msg
-    
-    if [[ -z "$commit_msg" ]]; then
-      echo ""
-      echo "Showing diff of changes..."
-      echo ""
-      git -C "$AGENCE_ROOT" diff --color=auto | head -100
-      echo ""
-      read -p "Enter commit message: " commit_msg
-      if [[ -z "$commit_msg" ]]; then
-        echo "[CANCELLED] No commit message provided."
-        return 1
-      fi
-    fi
-  fi
-  
-  # Stage Agence files (respects .gitignore)
-  git -C "$AGENCE_ROOT" add -A 2>&1
-  
-  if [[ $? -ne 0 ]]; then
-    echo "[ERROR] Failed to stage files" >&2
-    return 1
-  fi
-  
-  # Commit
-  git -C "$AGENCE_ROOT" commit -m "$commit_msg" 2>&1
-  
-  if [[ $? -eq 0 ]]; then
-    echo ""
-    echo "✓ Committed successfully!"
-    echo "  Commit message: $commit_msg"
-    echo ""
-    echo "Next: agence ^push (to push to origin)"
-    return 0
-  else
-    echo "[ERROR] Commit failed" >&2
-    return 1
-  fi
-}
-
-# ============================================================================
-# AGENCE MANAGEMENT: PUSH
-# ============================================================================
-# Push committed Agence changes to origin (defaults to main branch)
-# Usage: agence ^push
-
-push_agence_changes() {
-  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Pushing Agence changes..." >&2
-  
-  # Determine current branch
-  local current_branch=$(git -C "$AGENCE_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
-  
-  # If detached HEAD, default to main
-  if [[ "$current_branch" == "HEAD" ]]; then
-    current_branch="main"
-  fi
-  
-  echo ""
-  echo "[PUSH] Preparing to push"
-  echo "=========================================="
-  echo ""
-  echo "Repository: $(git -C "$AGENCE_ROOT" remote get-url origin 2>/dev/null || echo 'unknown')"
-  echo "Branch:     $current_branch"
-  echo "Target:     origin/$current_branch"
-  echo ""
-  
-  # Check if branch is tracking upstream
-  local upstream=$(git -C "$AGENCE_ROOT" rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
-  
-  if [[ -z "$upstream" || "$upstream" == "$current_branch" ]]; then
-    echo "Status: ⚠ Branch not tracking upstream (first push?)"
-    echo ""
-  fi
-  
-  # Request confirmation
-  echo "This will push to origin/$current_branch"
-  read -p "Continue push? [y/N] " confirm
-  
-  if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
-    echo "[CANCELLED] Push aborted"
-    return 1
-  fi
-  
-  echo ""
-  echo "Pushing to origin/$current_branch..."
-  echo ""
-  
-  # Push with tracking
-  git -C "$AGENCE_ROOT" push -u origin "$current_branch" 2>&1
-  
-  if [[ $? -eq 0 ]]; then
-    echo ""
-    echo "✓ Pushed successfully!"
-    echo "  Branch: $current_branch"
-    echo "  Remote: origin"
-    return 0
-  else
-    echo "[ERROR] Push failed" >&2
-    return 1
-  fi
-}
-
-# ============================================================================
-# SESSION MANAGEMENT: SAVE
-# ============================================================================
-# Save current session state for later resumption or handoff
-# Captures: runstate, notes, task context, execution stack
-# Output: Appends to session-saved.jsonl and updates INDEX.md
-# Usage: agence ^save [optional notes]
-
-save_session() {
-  local notes="${1:-}"
-  
-  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Saving session..." >&2
-  
-  # Ensure sessions directory exists
-  local sessions_dir="$AGENCE_ROOT/nexus/sessions"
-  if [[ ! -d "$sessions_dir" ]]; then
-    mkdir -p "$sessions_dir"
-  fi
-  
-  # Generate unique session ID (8-char hex, based on current timestamp)
-  local session_id=$(printf '%08x' $(($(date +%s) % 0x100000000)))
-  local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-  
-  # Capture runstate from shell history and environment
-  local last_cmd=""
-  local history_count=0
-  
-  if [[ -n "${BASH_HISTORY:-}" ]] && [[ -f "$BASH_HISTORY" ]]; then
-    # Get last few commands from history
-    last_cmd=$(tail -1 "$BASH_HISTORY")
-    history_count=$(wc -l < "$BASH_HISTORY" 2>/dev/null || echo 0)
-  fi
-  
-  local current_pwd="$(normalize_path "$(pwd)")"
-  local current_agent="${AGENCE_AGENT:-unknown}"
-  local shell_env="$AGENCE_SHELL_ENV"
-  
-  # Prompt for optional notes if not provided
-  if [[ -z "$notes" ]]; then
-    echo ""
-    echo "[SESSION SAVE] Capturing current state:"
-    echo "  Session ID:  $session_id"
-    echo "  Timestamp:   $timestamp"
-    echo "  Agent:       $current_agent"
-    echo "  Shell:       $shell_env"
-    echo "  Directory:   $current_pwd"
-    echo "  Repo:        $GIT_REPO"
-    echo ""
-    read -p "Enter session notes (optional): " notes
-  fi
-  
-  # Create session entry (JSON object)
-  local session_entry=$(cat <<EOF
-{
-  "session_id": "$session_id",
-  "created_at": "$timestamp",
-  "last_activity": "$timestamp",
-  "status": "saved",
-  "agent": "$current_agent",
-  "agents": ["$current_agent"],
-  "notes": "$(echo "$notes" | sed 's/"/\\"/g')",
-  "runstate": {
-    "agent_context": "$current_agent execution context",
-    "execution_stack": "Current pwd: $current_pwd",
-    "memory_state": "Shell: $shell_env, History lines: $history_count",
-    "cursor_position": "$current_pwd",
-    "last_command": "$(echo "$last_cmd" | sed 's/"/\\"/g')",
-    "todo_list": []
-  },
-  "metadata": {
-    "task_description": "$(echo "$notes" | sed 's/"/\\"/g')",
-    "repo": "$GIT_REPO",
-    "estimated_duration": "unknown",
-    "priority": "normal",
-    "tags": ["manual-save", "$shell_env"]
-  }
-}
-EOF
-)
-  
-  # Append to session-saved.jsonl
-  echo "$session_entry" >> "$sessions_dir/session-saved.jsonl"
-  
-  if [[ $? -ne 0 ]]; then
-    echo "[ERROR] Failed to save session to JSONL" >&2
-    return 1
-  fi
-  
-  # Update INDEX.md with new session entry
-  local task_desc="${notes:0:30}"
-  [[ ${#notes} -gt 30 ]] && task_desc="${task_desc}..."
-  
-  local index_file="$sessions_dir/INDEX.md"
-  
-  # Insert entry into markdown table (after header, before closing marker)
-  local table_entry="$timestamp | $session_id | @$current_agent | saved       | $task_desc | $timestamp"
-  
-  # Find the marker line and insert before it
-  if grep -q "^─" "$index_file" 2>/dev/null; then
-    # Insert after the header separator
-    sed -i.bak "0,/^─/s/^─.*/\n$table_entry\n&/" "$index_file"
-    [[ -f "$index_file.bak" ]] && rm "$index_file.bak"
-  else
-    # Fallback: append to file
-    echo "$table_entry" >> "$index_file"
-  fi
-  
-  # Success output
-  echo ""
-  echo "✓ Session saved!"
-  echo "  Session ID:   $session_id"
-  echo "  Status:       saved"
-  echo "  Location:     $sessions_dir/session-saved.jsonl"
-  echo "  Index:        $sessions_dir/INDEX.md"
-  echo ""
-  echo "Resume with: agence ^resume $session_id"
-  
-  return 0
-}
-
-# ============================================================================
 # MODE: SYSTEM COMMAND
 # ============================================================================
 # Built-in system utilities
 # Example: agence !help
 # Example: agence !bash (open new shell)
-# Example: agence !save (save current session)
 
 mode_system() {
-  local input="$1"
-  local sys_cmd="${input%% *}"      # First word is the command
-  local sys_args="${input#$sys_cmd}" # Rest is arguments
-  sys_args="${sys_args# }"            # Trim leading space
+  local sys_cmd="$1"
 
-  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] System mode: $sys_cmd, args: $sys_args" >&2
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] System mode: $sys_cmd" >&2
 
   case "$sys_cmd" in
     help)
@@ -1233,6 +890,276 @@ mode_system() {
       return 1
       ;;
   esac
+}
+
+# ============================================================================
+# SYMLINK REPAIR (Windows git-bash compatibility)
+# ============================================================================
+
+repair_agence_symlinks() {
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Checking for broken symlinks..." >&2
+  
+  # Get list of symlinks from git
+  local symlinks=$(git -C "$AGENCE_ROOT" ls-files -s 2>/dev/null | grep "^120000" | awk '{print $NF}')
+  
+  if [[ -z "$symlinks" ]]; then
+    [[ "$DEBUG" == "1" ]] && echo "[DEBUG] No symlinks tracked in git" >&2
+    return 0
+  fi
+  
+  local count=0
+  while IFS= read -r filepath; do
+    [[ -z "$filepath" ]] && continue
+    
+    if [[ -L "$AGENCE_ROOT/$filepath" ]]; then
+      # Already a symlink, skip
+      continue
+    fi
+    
+    if [[ ! -e "$AGENCE_ROOT/$filepath" ]]; then
+      # Symlink doesn't exist, try to recreate it
+      # Git stores symlinks as: "<path to target>"
+      local target=$(git -C "$AGENCE_ROOT" ls-files -s 2>/dev/null | grep "^120000.*$filepath" | awk '{for(i=1;i<=NF;i++) printf "%s ", $i}' | sed 's/.*\s//')
+      
+      if [[ -n "$target" ]]; then
+        mkdir -p "$(dirname "$AGENCE_ROOT/$filepath")" 2>/dev/null
+        ln -sf "$target" "$AGENCE_ROOT/$filepath" 2>/dev/null
+        if [[ $? -eq 0 ]]; then
+          echo "[REPAIR] Created symlink: $filepath -> $target"
+          ((count++))
+        fi
+      fi
+    fi
+  done <<< "$symlinks"
+  
+  if [[ $count -gt 0 ]]; then
+    echo ""
+    echo "✓ Repaired $count broken symlink(s)"
+  fi
+  
+  return 0
+}
+
+# ============================================================================
+# INSTALL: Package Manager Integration
+# ============================================================================
+
+install_agence_packages() {
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Installing Agence packages..." >&2
+  
+  echo ""
+  echo "=============================================="
+  echo "  AGENCE PACKAGE INSTALLATION (^install)"
+  echo "=============================================="
+  echo ""
+  
+  # Detect OS
+  local os_type="unknown"
+  if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "mingw"* ]]; then
+    os_type="windows"
+  elif [[ "$OSTYPE" == "darwin"* ]]; then
+    os_type="macos"
+  elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    os_type="linux"
+  fi
+  
+  echo "Detected OS: $os_type"
+  echo ""
+  
+  case "$os_type" in
+    windows)
+      install_windows_packages
+      ;;
+    macos)
+      install_macos_packages
+      ;;
+    linux)
+      install_linux_packages
+      ;;
+    *)
+      echo "[ERROR] Unsupported OS: $OSTYPE" >&2
+      return 1
+      ;;
+  esac
+  
+  return $?
+}
+
+install_windows_packages() {
+  echo "Installing packages via winget..."
+  echo ""
+  
+  # Define Windows packages (winget IDs)
+  local -a windows_packages=(
+    "GitHub.cli"
+    "aider"
+    "jfrog"
+    "Hashicorp.Terraform"
+    "terrafromLinters.tflint"
+    "Amazon.AWSCli"
+    "Microsoft.AzureCLI"
+    "Google.CloudSDK"
+  )
+  
+  local installed=0
+  local skipped=0
+  local failed=0
+  
+  for pkg in "${windows_packages[@]}"; do
+    echo -n "[$pkg] "
+    
+    # Check if installed || install
+    # winget list returns 0 if found, 1 if not found
+    if winget list --id "$pkg" &>/dev/null 2>&1; then
+      echo "✓ (already installed)"
+      ((skipped++))
+    elif winget install -e --id "$pkg" --accept-package-agreements --accept-source-agreements &>/dev/null 2>&1; then
+      echo "✓ (installed)"
+      ((installed++))
+    else
+      echo "✗ (failed)"
+      ((failed++))
+    fi
+  done
+  
+  echo ""
+  echo "=============================================="
+  echo "Installation summary:"
+  echo "  ✓ Installed: $installed"
+  echo "  ⏭ Already present: $skipped"
+  echo "  ✗ Failed: $failed"
+  echo "=============================================="
+  
+  if [[ $failed -gt 0 ]]; then
+    echo ""
+    echo "Note: Some packages failed. This may be expected if:"
+    echo "  - Package requires manual user interaction"
+    echo "  - Package requires admin elevation"
+    echo "  - Package name/ID changed in winget registry"
+    return 1
+  fi
+  return 0
+}
+
+install_macos_packages() {
+  echo "Installing packages via Homebrew..."
+  echo ""
+  
+  # Check if Homebrew is installed
+  if ! command -v brew &>/dev/null; then
+    echo "[ERROR] Homebrew not found. Install from: https://brew.sh"
+    return 1
+  fi
+  
+  # Define macOS packages (Homebrew formulae)
+  local -a macos_packages=(
+    "gh"
+    "aider"
+    "jfrog-cli"
+    "terraform"
+    "tflint"
+    "awscli"
+    "azure-cli"
+    "google-cloud-sdk"
+  )
+  
+  local installed=0
+  local skipped=0
+  local failed=0
+  
+  for pkg in "${macos_packages[@]}"; do
+    echo -n "[$pkg] "
+    
+    # Check if installed || install
+    if brew list "$pkg" &>/dev/null 2>&1; then
+      echo "✓ (already installed)"
+      ((skipped++))
+    elif brew install "$pkg" &>/dev/null 2>&1; then
+      echo "✓ (installed)"
+      ((installed++))
+    else
+      echo "✗ (failed)"
+      ((failed++))
+    fi
+  done
+  
+  echo ""
+  echo "=============================================="
+  echo "Installation summary:"
+  echo "  ✓ Installed: $installed"
+  echo "  ⏭ Already present: $skipped"
+  echo "  ✗ Failed: $failed"
+  echo "=============================================="
+  
+  if [[ $failed -gt 0 ]]; then
+    return 1
+  fi
+  return 0
+}
+
+install_linux_packages() {
+  echo "Installing packages via system package manager..."
+  echo ""
+  
+  # Detect package manager
+  local pkg_manager="apt-get"
+  local pkg_check_cmd="dpkg -l"
+  
+  if command -v dnf &>/dev/null; then
+    pkg_manager="dnf"
+    pkg_check_cmd="dnf list installed"
+  elif command -v pacman &>/dev/null; then
+    pkg_manager="pacman"
+    pkg_check_cmd="pacman -Q"
+  fi
+  
+  echo "Using package manager: $pkg_manager"
+  echo ""
+  
+  # Define Linux packages
+  local -a linux_packages=(
+    "gh"
+    "aider"
+    "jfrog-cli"
+    "terraform"
+    "tflint"
+    "awscli"
+    "azure-cli"
+    "google-cloud-sdk"
+  )
+  
+  local installed=0
+  local skipped=0
+  local failed=0
+  
+  for pkg in "${linux_packages[@]}"; do
+    echo -n "[$pkg] "
+    
+    # Check if installed || install
+    if $pkg_check_cmd | grep -q "$pkg" &>/dev/null 2>&1; then
+      echo "✓ (already installed)"
+      ((skipped++))
+    elif sudo $pkg_manager install -y "$pkg" &>/dev/null 2>&1; then
+      echo "✓ (installed)"
+      ((installed++))
+    else
+      echo "✗ (failed)"
+      ((failed++))
+    fi
+  done
+  
+  echo ""
+  echo "=============================================="
+  echo "Installation summary:"
+  echo "  ✓ Installed: $installed"
+  echo "  ⏭ Already present: $skipped"
+  echo "  ✗ Failed: $failed"
+  echo "=============================================="
+  
+  if [[ $failed -gt 0 ]]; then
+    return 1
+  fi
+  return 0
 }
 
 # ============================================================================

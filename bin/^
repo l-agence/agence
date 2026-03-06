@@ -131,6 +131,7 @@ source_if_exists "$AGENCE_LIB/utils.sh"
 source_if_exists "$AGENCE_LIB/logging.sh"
 source_if_exists "$AGENCE_LIB/safeguards.sh"
 source_if_exists "$AGENCE_LIB/router.sh"
+source_if_exists "$AGENCE_LIB/format.sh"
 
 # ============================================================================
 # EXECUTION CONTEXT: Git Repo vs Agence Repo
@@ -635,9 +636,21 @@ mode_external() {
 # Example: agence ^init
 
 mode_init() {
-  local init_cmd="$1"
+  local full_input="$1"
+  local init_cmd="${full_input%% *}"   # first word
+  local init_args="${full_input#* }"   # rest after first word
+  # If no space found, args = cmd (no args)
+  [[ "$init_args" == "$full_input" ]] && init_args=""
 
-  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Init mode: $init_cmd" >&2
+  # Parse -j flag from args (sets _AGENCE_FMT=json globally)
+  if [[ "$init_args" == *"-j"* ]]; then
+    _AGENCE_FMT="json"
+    init_args=$(echo "$init_args" | sed 's/ *-j */ /g;s/^ *//;s/ *$//')
+  fi
+  # Auto-detect format if not set by -j
+  agence_detect_format
+
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Init mode: cmd=$init_cmd args=$init_args fmt=$_AGENCE_FMT" >&2
 
   case "$init_cmd" in
     "init"|"")
@@ -660,6 +673,21 @@ mode_init() {
       ;;
     "push")
       push_knowledge_upstream
+      ;;
+    "save")
+      save_session_context
+      ;;
+    "handoff")
+      handoff_to_agent $init_args
+      ;;
+    "pickup")
+      pickup_handoff $init_args
+      ;;
+    "pause")
+      pause_session $init_args
+      ;;
+    "resume")
+      resume_session $init_args
       ;;
     *)
       echo "Error: Unknown init command: $init_cmd" >&2
@@ -1488,6 +1516,670 @@ push_knowledge_upstream() {
 }
 
 # ============================================================================
+# SAVE: Persist Agent Session Context, Lessons & Work Log
+# ============================================================================
+# Creates a save point that clearly identifies:
+#   - Agent ID (who was working)
+#   - Session ID (which session)
+#   - Log ID (unique save identifier for this checkpoint)
+#
+# Outputs: nexus/.aisessions/SAVE-{log_id}.json
+# Contains: session state, recent lessons, work log summary, git diff stats
+
+save_session_context() {
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Saving session context..." >&2
+
+  local agent_id="${AGENCE_AGENT_PARAM:-${AGENCE_AGENT_ID:-@}}"
+  local session_id="${AGENCE_SESSION_ID:-$(generate_shell_session_id save)}"
+  local log_id="save-$(date +%Y%m%d_%H%M%S)-$(printf '%x' $((RANDOM * RANDOM)))"
+
+  local sessions_dir="${AGENCE_ROOT}/nexus/.aisessions"
+  local saves_dir="${AGENCE_ROOT}/nexus/.aisaves"
+  local lessons_dir="${AGENCE_ROOT}/synthesis/l-agence.org/lessons"
+  mkdir -p "$saves_dir" 2>/dev/null
+
+  agence_format_header "AGENCE SAVE (^save) — checkpoint"
+  agence_format_kv "Agent" "$agent_id"
+  agence_format_kv "Session" "$session_id"
+  agence_format_kv "Log ID" "$log_id"
+  echo ""
+
+  # Gather git state
+  local branch=$(git -C "$AGENCE_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+  local commit=$(git -C "$AGENCE_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+  local dirty_count=$(git -C "$AGENCE_ROOT" status --short 2>/dev/null | wc -l | tr -d ' ')
+  local staged_count=$(git -C "$AGENCE_ROOT" diff --cached --name-only 2>/dev/null | wc -l | tr -d ' ')
+
+  # Count lessons
+  local lesson_count=0
+  if [[ -d "$lessons_dir" ]]; then
+    lesson_count=$(find "$lessons_dir" -name "*.json" -not -name "INDEX.json" -type f 2>/dev/null | wc -l | tr -d ' ')
+  fi
+
+  # Count sessions
+  local session_count=0
+  if [[ -d "$sessions_dir" ]]; then
+    session_count=$(find "$sessions_dir" -name "*.meta.json" -type f 2>/dev/null | wc -l | tr -d ' ')
+  fi
+
+  # Recent git log (last 5 commits)
+  local recent_commits=$(git -C "$AGENCE_ROOT" log --oneline -5 2>/dev/null | sed 's/"/\\"/g' | awk '{printf "    \"%s\",\n", $0}' | sed '$ s/,$//')
+
+  # Dirty files list
+  local dirty_files=$(git -C "$AGENCE_ROOT" status --short 2>/dev/null | sed 's/"/\\"/g' | awk '{printf "    \"%s\",\n", $0}' | sed '$ s/,$//')
+
+  # Write save file
+  local save_file="${saves_dir}/${log_id}.json"
+  cat > "$save_file" <<EOF
+{
+  "log_id": "$log_id",
+  "agent_id": "$agent_id",
+  "session_id": "$session_id",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "user": "$(whoami)",
+  "cwd": "$(pwd)",
+  "git": {
+    "branch": "$branch",
+    "commit": "$commit",
+    "dirty_files": $dirty_count,
+    "staged_files": $staged_count
+  },
+  "knowledge": {
+    "lessons_count": $lesson_count,
+    "sessions_count": $session_count
+  },
+  "recent_commits": [
+$recent_commits
+  ],
+  "dirty_files": [
+$dirty_files
+  ]
+}
+EOF
+
+  if [[ "$_AGENCE_FMT" == "json" ]]; then
+    agence_format_json "$(cat "$save_file")"
+  else
+    agence_format_step "1/2" "Session context captured"
+    agence_format_detail "Git: $branch @ $commit ($dirty_count dirty, $staged_count staged)"
+    agence_format_detail "Knowledge: $lesson_count lessons, $session_count sessions"
+    echo ""
+
+    agence_format_step "2/2" "Save file written"
+    agence_format_detail "$save_file"
+    echo ""
+
+    agence_format_footer "SAVE COMPLETE"
+    echo ""
+    agence_format_kv "Log ID" "$log_id"
+    agence_format_kv "Agent" "$agent_id"
+    agence_format_kv "Session" "$session_id"
+    echo ""
+    agence_format_detail "Use ^handoff to transfer to another agent"
+    agence_format_detail "Use ^commit to persist knowledge changes"
+    echo ""
+  fi
+
+  return 0
+}
+
+# ============================================================================
+# HANDOFF: Transfer Session Context Between Agents or to User
+# ============================================================================
+# Creates a handoff record from the current agent to a target agent or user.
+# The handoff includes:
+#   - Source agent + session (who is handing off)
+#   - Target agent or "user" (who receives)
+#   - Context summary (what was being worked on)
+#   - Open items (what still needs to be done)
+#
+# Usage: agence ^handoff <target_agent> [context message]
+#   agence @claudia ^handoff @peers "solve the bash issue"
+#   agence @peers ^handoff user "analysis complete, review results"
+
+handoff_to_agent() {
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Handoff initiated..." >&2
+
+  local target="$1"
+  shift
+  local context_msg="$*"
+
+  local source_agent="${AGENCE_AGENT_PARAM:-${AGENCE_AGENT_ID:-@}}"
+  local session_id="${AGENCE_SESSION_ID:-$(generate_shell_session_id handoff)}"
+  local handoff_id="handoff-$(date +%Y%m%d_%H%M%S)-$(printf '%x' $((RANDOM * RANDOM)))"
+
+  # Validate target
+  if [[ -z "$target" ]]; then
+    echo ""
+    echo "Usage: agence ^handoff <target_agent> [context message]"
+    echo ""
+    echo "Examples:"
+    echo "  agence @claudia ^handoff @peers \"solve the bash issue\""
+    echo "  agence @peers ^handoff user \"analysis complete\""
+    echo "  agence ^handoff @ralph \"auto-iterate on this fix\""
+    echo ""
+    echo "Available agents:"
+    ls "$AGENCE_ROOT/codex/agents/" 2>/dev/null | grep -v '\.md$' | sed 's/^/  @/'
+    return 1
+  fi
+
+  # Strip @ prefix if present for directory lookup, keep for display
+  local target_display="$target"
+  local target_name="${target#@}"
+
+  # Validate target agent exists (unless it's "user")
+  if [[ "$target_name" != "user" ]] && [[ ! -d "$AGENCE_ROOT/codex/agents/$target_name" ]]; then
+    echo "Error: Unknown agent: $target" >&2
+    echo "Available agents:" >&2
+    ls "$AGENCE_ROOT/codex/agents/" 2>/dev/null | grep -v '\.md$' | sed 's/^/  @/' >&2
+    return 1
+  fi
+
+  local handoffs_dir="${AGENCE_ROOT}/nexus/.aihandoffs"
+  mkdir -p "$handoffs_dir" 2>/dev/null
+
+  agence_format_header "AGENCE HANDOFF (^handoff)"
+  agence_format_kv "From" "$source_agent"
+  agence_format_kv "To" "$target_display"
+  agence_format_kv "Session" "$session_id"
+  agence_format_kv "Handoff ID" "$handoff_id"
+  echo ""
+
+  # Auto-save before handoff
+  agence_format_step "1/3" "Auto-saving session context..."
+
+  # Gather git state for the handoff record
+  local branch=$(git -C "$AGENCE_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+  local commit=$(git -C "$AGENCE_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+  local dirty_count=$(git -C "$AGENCE_ROOT" status --short 2>/dev/null | wc -l | tr -d ' ')
+
+  agence_format_detail "Git: $branch @ $commit ($dirty_count dirty)"
+  echo ""
+
+  agence_format_step "2/3" "Creating handoff record..."
+
+  # Recent work (last 5 commits)
+  local recent_commits=$(git -C "$AGENCE_ROOT" log --oneline -5 2>/dev/null | sed 's/"/\\"/g' | awk '{printf "    \"%s\",\n", $0}' | sed '$ s/,$//')
+
+  # Dirty files
+  local dirty_files=$(git -C "$AGENCE_ROOT" status --short 2>/dev/null | sed 's/"/\\"/g' | awk '{printf "    \"%s\",\n", $0}' | sed '$ s/,$//')
+
+  # Escape context message for JSON
+  local context_escaped=$(echo "$context_msg" | sed 's/"/\\"/g')
+
+  local handoff_file="${handoffs_dir}/${handoff_id}.json"
+  cat > "$handoff_file" <<EOF
+{
+  "handoff_id": "$handoff_id",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "source": {
+    "agent": "$source_agent",
+    "session_id": "$session_id"
+  },
+  "target": {
+    "agent": "$target_display",
+    "agent_dir": "$target_name"
+  },
+  "context": "$context_escaped",
+  "git": {
+    "branch": "$branch",
+    "commit": "$commit",
+    "dirty_files": $dirty_count
+  },
+  "recent_commits": [
+$recent_commits
+  ],
+  "pending_files": [
+$dirty_files
+  ],
+  "status": "pending"
+}
+EOF
+
+  agence_format_detail "Handoff record: $handoff_file"
+  echo ""
+
+  agence_format_step "3/3" "Handoff ready"
+  echo ""
+
+  if [[ "$_AGENCE_FMT" == "json" ]]; then
+    agence_format_json "$(cat "$handoff_file")"
+  else
+    agence_format_footer "HANDOFF COMPLETE"
+    echo ""
+    agence_format_kv "Transfer" "$source_agent → $target_display"
+    agence_format_kv "ID" "$handoff_id"
+    if [[ -n "$context_msg" ]]; then
+      agence_format_kv "Context" "$context_msg"
+    fi
+    echo ""
+    agence_format_detail "Next: Switch to $target_display to pick up this handoff"
+    if [[ "$target_name" != "user" ]]; then
+      agence_format_detail "Command: agence $target_display ^pickup"
+    fi
+    echo ""
+  fi
+
+  return 0
+}
+
+# ============================================================================
+# PICKUP: Accept a Pending Handoff (like unix 'fg')
+# ============================================================================
+# Lists pending handoffs for the current agent, or accepts a specific one.
+# Loads the handoff context into the current session — brings work to foreground.
+#
+# Usage:
+#   agence ^pickup                     — list pending handoffs for this agent
+#   agence ^pickup <handoff_id>        — accept a specific handoff
+#   agence @peers ^pickup              — list handoffs targeted at @peers
+
+pickup_handoff() {
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Pickup initiated..." >&2
+
+  local pickup_arg="${1:-}"
+  local current_agent="${AGENCE_AGENT_PARAM:-${AGENCE_AGENT_ID:-@}}"
+  local current_name="${current_agent#@}"
+  local handoffs_dir="${AGENCE_ROOT}/nexus/.aihandoffs"
+
+  if [[ ! -d "$handoffs_dir" ]]; then
+    echo ""
+    echo "No handoffs directory found. Nothing to pick up."
+    return 0
+  fi
+
+  # If no argument, list pending handoffs for this agent
+  if [[ -z "$pickup_arg" ]]; then
+    agence_format_header "AGENCE PICKUP (^pickup) — pending handoffs"
+    agence_format_kv "Agent" "$current_agent"
+    echo ""
+
+    local found=0
+    local json_items=""
+
+    # Find pending handoffs targeted at this agent (or at @/any if current is @)
+    while IFS= read -r f; do
+      [[ -z "$f" ]] && continue
+      local target_agent=$(grep -o '"agent": *"[^"]*"' "$f" | tail -1 | sed 's/.*"agent": *"//;s/"//')
+      local status=$(grep -o '"status": *"[^"]*"' "$f" | sed 's/.*"status": *"//;s/"//')
+      local target_clean="${target_agent#@}"
+
+      if [[ "$status" == "pending" ]] && { [[ "$target_clean" == "$current_name" ]] || [[ "$current_agent" == "@" ]]; }; then
+        local hid=$(grep -o '"handoff_id": *"[^"]*"' "$f" | sed 's/.*"handoff_id": *"//;s/"//')
+        local source=$(grep -o '"agent": *"[^"]*"' "$f" | head -1 | sed 's/.*"agent": *"//;s/"//')
+        local ctx=$(grep -o '"context": *"[^"]*"' "$f" | sed 's/.*"context": *"//;s/"//')
+        local ts=$(grep -o '"timestamp": *"[^"]*"' "$f" | sed 's/.*"timestamp": *"//;s/"//')
+
+        found=$((found + 1))
+
+        if [[ "$_AGENCE_FMT" == "json" ]]; then
+          [[ -n "$json_items" ]] && json_items+=","
+          json_items+="{\"id\":\"$hid\",\"from\":\"$source\",\"context\":\"$ctx\",\"timestamp\":\"$ts\"}"
+        else
+          agence_format_list_item "$found" "$hid" "From=$source|At=$ts|Context=${ctx:-<none>}"
+        fi
+      fi
+    done < <(find "$handoffs_dir" -name "handoff-*.json" -type f 2>/dev/null | sort -r)
+
+    if [[ "$_AGENCE_FMT" == "json" ]]; then
+      agence_format_json "{\"command\":\"pickup\",\"agent\":\"$current_agent\",\"pending\":[$json_items],\"count\":$found}"
+    elif [[ $found -eq 0 ]]; then
+      agence_format_detail "No pending handoffs for $current_agent"
+    else
+      echo "  Total: $found pending handoff(s)"
+      echo ""
+      echo "  Accept with: agence ^pickup <handoff_id>"
+    fi
+    echo ""
+    return 0
+  fi
+
+  # Accept a specific handoff
+  local handoff_file=""
+
+  # Try exact match first
+  if [[ -f "${handoffs_dir}/${pickup_arg}.json" ]]; then
+    handoff_file="${handoffs_dir}/${pickup_arg}.json"
+  else
+    # Try partial match (e.g., user passes just the hex suffix)
+    handoff_file=$(find "$handoffs_dir" -name "*${pickup_arg}*.json" -type f 2>/dev/null | head -1)
+  fi
+
+  if [[ -z "$handoff_file" ]] || [[ ! -f "$handoff_file" ]]; then
+    echo "Error: Handoff not found: $pickup_arg" >&2
+    echo "Use: agence ^pickup   (to list pending handoffs)" >&2
+    return 1
+  fi
+
+  # Verify it's still pending
+  local status=$(grep -o '"status": *"[^"]*"' "$handoff_file" | sed 's/.*"status": *"//;s/"//')
+  if [[ "$status" != "pending" ]]; then
+    echo "Error: Handoff already $status: $pickup_arg" >&2
+    return 1
+  fi
+
+  # Extract handoff info
+  local hid=$(grep -o '"handoff_id": *"[^"]*"' "$handoff_file" | sed 's/.*"handoff_id": *"//;s/"//')
+  local source=$(grep -o '"agent": *"[^"]*"' "$handoff_file" | head -1 | sed 's/.*"agent": *"//;s/"//')
+  local target=$(grep -o '"agent": *"[^"]*"' "$handoff_file" | tail -1 | sed 's/.*"agent": *"//;s/"//')
+  local ctx=$(grep -o '"context": *"[^"]*"' "$handoff_file" | sed 's/.*"context": *"//;s/"//')
+  local hbranch=$(grep -o '"branch": *"[^"]*"' "$handoff_file" | sed 's/.*"branch": *"//;s/"//')
+  local hcommit=$(grep -o '"commit": *"[^"]*"' "$handoff_file" | sed 's/.*"commit": *"//;s/"//')
+
+  agence_format_header "AGENCE PICKUP (^pickup) — accepting handoff"
+  agence_format_kv "Handoff" "$hid"
+  agence_format_kv "From" "$source"
+  agence_format_kv "To" "$current_agent (you)"
+  agence_format_kv "Context" "${ctx:-<none>}"
+  agence_format_kv "Git state" "$hbranch @ $hcommit"
+  echo ""
+
+  agence_format_step "1/2" "Marking handoff as accepted..."
+
+  # Update status in handoff file: pending → accepted
+  sed -i 's/"status": *"pending"/"status": "accepted"/' "$handoff_file"
+
+  # Add pickup metadata
+  local pickup_ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  sed -i "s/\"status\": \"accepted\"/\"status\": \"accepted\",\n  \"picked_up_by\": \"$current_agent\",\n  \"picked_up_at\": \"$pickup_ts\"/" "$handoff_file"
+
+  agence_format_detail "Status: pending → accepted"
+  echo ""
+
+  agence_format_step "2/2" "Context loaded"
+  echo ""
+
+  # Show recent commits and pending files from the handoff
+  if [[ "$_AGENCE_FMT" != "json" ]]; then
+    agence_format_detail "Recent work from $source:"
+    sed -n '/"recent_commits"/,/\]/p' "$handoff_file" | grep -v 'recent_commits\|\[\|\]' | sed 's/^[[:space:]]*"//;s/"[,]*$//' | head -5 | sed 's/^/    /'
+    echo ""
+
+    local pending_count=$(grep -c '"pending_files"' "$handoff_file" 2>/dev/null)
+    if [[ $pending_count -gt 0 ]]; then
+      local pfiles=$(grep -A 50 '"pending_files"' "$handoff_file" | grep '"' | grep -v 'pending_files' | head -10 | sed 's/.*"//;s/".*//' | wc -l | tr -d ' ')
+      agence_format_detail "Pending files: $pfiles"
+    fi
+    echo ""
+  fi
+
+  if [[ "$_AGENCE_FMT" == "json" ]]; then
+    agence_format_json "{\"command\":\"pickup\",\"handoff_id\":\"$hid\",\"from\":\"$source\",\"to\":\"$current_agent\",\"context\":\"${ctx:-}\",\"git\":{\"branch\":\"$hbranch\",\"commit\":\"$hcommit\"},\"status\":\"accepted\",\"picked_up_at\":\"$pickup_ts\"}"
+  else
+    agence_format_footer "PICKUP COMPLETE — you have the ball"
+    echo ""
+    agence_format_kv "Transfer" "$source → $current_agent [ACCEPTED]"
+    agence_format_kv "Context" "${ctx:-<none>}"
+    echo ""
+    agence_format_detail "Use ^save to checkpoint your progress"
+    agence_format_detail "Use ^handoff to pass to another agent"
+    echo ""
+  fi
+
+  return 0
+}
+
+# ============================================================================
+# PAUSE: Suspend Session with Auto-Save (like unix Ctrl+Z)
+# ============================================================================
+# Saves current session state and marks it as paused.
+# Unlike ^save (checkpoint while working), ^pause signals intentional stop.
+#
+# Usage:
+#   agence ^pause                      — pause current session
+#   agence ^pause <session_id>         — pause a specific session by ID
+
+pause_session() {
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Pause initiated..." >&2
+
+  local pause_arg="${1:-}"
+  local agent_id="${AGENCE_AGENT_PARAM:-${AGENCE_AGENT_ID:-@}}"
+  local session_id="${AGENCE_SESSION_ID:-$(generate_shell_session_id pause)}"
+  local pause_id="pause-$(date +%Y%m%d_%H%M%S)-$(printf '%x' $((RANDOM * RANDOM)))"
+
+  local saves_dir="${AGENCE_ROOT}/nexus/.aisaves"
+  local lessons_dir="${AGENCE_ROOT}/synthesis/l-agence.org/lessons"
+  local sessions_dir="${AGENCE_ROOT}/nexus/.aisessions"
+  mkdir -p "$saves_dir" 2>/dev/null
+
+  # Gather git state
+  local branch=$(git -C "$AGENCE_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+  local commit=$(git -C "$AGENCE_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+  local dirty_count=$(git -C "$AGENCE_ROOT" status --short 2>/dev/null | wc -l | tr -d ' ')
+  local staged_count=$(git -C "$AGENCE_ROOT" diff --cached --name-only 2>/dev/null | wc -l | tr -d ' ')
+
+  # Count lessons
+  local lesson_count=0
+  if [[ -d "$lessons_dir" ]]; then
+    lesson_count=$(find "$lessons_dir" -name "*.json" -not -name "INDEX.json" -type f 2>/dev/null | wc -l | tr -d ' ')
+  fi
+
+  # Count sessions
+  local session_count=0
+  if [[ -d "$sessions_dir" ]]; then
+    session_count=$(find "$sessions_dir" -name "*.meta.json" -type f 2>/dev/null | wc -l | tr -d ' ')
+  fi
+
+  # Recent git log
+  local recent_commits=$(git -C "$AGENCE_ROOT" log --oneline -5 2>/dev/null | sed 's/"/\\"/g' | awk '{printf "    \"%s\",\n", $0}' | sed '$ s/,$//')
+
+  # Dirty files
+  local dirty_files=$(git -C "$AGENCE_ROOT" status --short 2>/dev/null | sed 's/"/\\"/g' | awk '{printf "    \"%s\",\n", $0}' | sed '$ s/,$//')
+
+  # Write pause file (same structure as save, but with status=paused)
+  local pause_file="${saves_dir}/${pause_id}.json"
+  cat > "$pause_file" <<EOF
+{
+  "log_id": "$pause_id",
+  "type": "pause",
+  "agent_id": "$agent_id",
+  "session_id": "$session_id",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "status": "paused",
+  "user": "$(whoami)",
+  "cwd": "$(pwd)",
+  "git": {
+    "branch": "$branch",
+    "commit": "$commit",
+    "dirty_files": $dirty_count,
+    "staged_files": $staged_count
+  },
+  "knowledge": {
+    "lessons_count": $lesson_count,
+    "sessions_count": $session_count
+  },
+  "recent_commits": [
+$recent_commits
+  ],
+  "dirty_files": [
+$dirty_files
+  ]
+}
+EOF
+
+  if [[ "$_AGENCE_FMT" == "json" ]]; then
+    agence_format_json "$(cat "$pause_file")"
+  else
+    agence_format_header "AGENCE PAUSE (^pause) — suspending session"
+    agence_format_kv "Agent" "$agent_id"
+    agence_format_kv "Session" "$session_id"
+    agence_format_kv "Pause ID" "$pause_id"
+    echo ""
+
+    agence_format_step "1/2" "Session state saved"
+    agence_format_detail "Git: $branch @ $commit ($dirty_count dirty, $staged_count staged)"
+    agence_format_detail "Knowledge: $lesson_count lessons, $session_count sessions"
+    echo ""
+
+    agence_format_step "2/2" "Session paused"
+    agence_format_detail "$pause_file"
+    echo ""
+
+    agence_format_footer "SESSION PAUSED"
+    echo ""
+    agence_format_kv "Pause ID" "$pause_id"
+    agence_format_kv "Agent" "$agent_id"
+    agence_format_kv "Session" "$session_id"
+    echo ""
+    agence_format_detail "Resume with: agence ^resume $pause_id"
+    agence_format_detail "List paused: agence ^resume"
+    echo ""
+  fi
+
+  return 0
+}
+
+# ============================================================================
+# RESUME: Resume a Paused Session (like unix 'bg'/'fg')
+# ============================================================================
+# Lists paused sessions or resumes a specific one.
+# Loads the paused session context back into the current agent.
+#
+# Usage:
+#   agence ^resume                     — list paused sessions
+#   agence ^resume <pause_id>          — resume a specific paused session
+
+resume_session() {
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Resume initiated..." >&2
+
+  local resume_arg="${1:-}"
+  local current_agent="${AGENCE_AGENT_PARAM:-${AGENCE_AGENT_ID:-@}}"
+  local saves_dir="${AGENCE_ROOT}/nexus/.aisaves"
+
+  if [[ ! -d "$saves_dir" ]]; then
+    echo ""
+    echo "No saves directory found. Nothing to resume."
+    return 0
+  fi
+
+  # If no argument, list paused sessions
+  if [[ -z "$resume_arg" ]]; then
+    agence_format_header "AGENCE RESUME (^resume) — paused sessions"
+    agence_format_kv "Agent" "$current_agent"
+    echo ""
+
+    local found=0
+    local json_items=""
+
+    while IFS= read -r f; do
+      [[ -z "$f" ]] && continue
+      local ftype=$(grep -o '"type": *"[^"]*"' "$f" 2>/dev/null | sed 's/.*"type": *"//;s/"//')
+      local fstatus=$(grep -o '"status": *"[^"]*"' "$f" 2>/dev/null | sed 's/.*"status": *"//;s/"//')
+      local fagent=$(grep -o '"agent_id": *"[^"]*"' "$f" 2>/dev/null | sed 's/.*"agent_id": *"//;s/"//')
+
+      if [[ "$ftype" == "pause" ]] && [[ "$fstatus" == "paused" ]]; then
+        # Show all if current agent is @, otherwise filter by agent
+        if [[ "$current_agent" == "@" ]] || [[ "$fagent" == "$current_agent" ]]; then
+          local pid=$(grep -o '"log_id": *"[^"]*"' "$f" | sed 's/.*"log_id": *"//;s/"//')
+          local pbranch=$(grep -o '"branch": *"[^"]*"' "$f" | sed 's/.*"branch": *"//;s/"//')
+          local pcommit=$(grep -o '"commit": *"[^"]*"' "$f" | sed 's/.*"commit": *"//;s/"//')
+          local pts=$(grep -o '"timestamp": *"[^"]*"' "$f" | sed 's/.*"timestamp": *"//;s/"//')
+          local pdirty=$(grep -o '"dirty_files": *[0-9]*' "$f" | head -1 | sed 's/.*: *//')
+
+          found=$((found + 1))
+
+          if [[ "$_AGENCE_FMT" == "json" ]]; then
+            [[ -n "$json_items" ]] && json_items+=","
+            json_items+="{\"id\":\"$pid\",\"agent\":\"$fagent\",\"branch\":\"$pbranch\",\"commit\":\"$pcommit\",\"dirty\":$pdirty,\"paused_at\":\"$pts\"}"
+          else
+            agence_format_list_item "$found" "$pid" "Agent=$fagent|Git=$pbranch @ $pcommit ($pdirty dirty)|Paused=$pts"
+          fi
+        fi
+      fi
+    done < <(find "$saves_dir" -name "pause-*.json" -type f 2>/dev/null | sort -r)
+
+    if [[ "$_AGENCE_FMT" == "json" ]]; then
+      agence_format_json "{\"command\":\"resume\",\"agent\":\"$current_agent\",\"paused\":[$json_items],\"count\":$found}"
+    elif [[ $found -eq 0 ]]; then
+      agence_format_detail "No paused sessions"
+    else
+      echo "  Total: $found paused session(s)"
+      echo ""
+      echo "  Resume with: agence ^resume <pause_id>"
+    fi
+    echo ""
+    return 0
+  fi
+
+  # Resume a specific paused session
+  local pause_file=""
+
+  # Try exact match
+  if [[ -f "${saves_dir}/${resume_arg}.json" ]]; then
+    pause_file="${saves_dir}/${resume_arg}.json"
+  else
+    # Partial match
+    pause_file=$(find "$saves_dir" -name "*${resume_arg}*.json" -type f 2>/dev/null | head -1)
+  fi
+
+  if [[ -z "$pause_file" ]] || [[ ! -f "$pause_file" ]]; then
+    echo "Error: Paused session not found: $resume_arg" >&2
+    echo "Use: agence ^resume   (to list paused sessions)" >&2
+    return 1
+  fi
+
+  # Verify it's paused
+  local fstatus=$(grep -o '"status": *"[^"]*"' "$pause_file" | sed 's/.*"status": *"//;s/"//')
+  if [[ "$fstatus" != "paused" ]]; then
+    echo "Error: Session is not paused (status: $fstatus): $resume_arg" >&2
+    return 1
+  fi
+
+  # Extract info
+  local pid=$(grep -o '"log_id": *"[^"]*"' "$pause_file" | sed 's/.*"log_id": *"//;s/"//')
+  local pagent=$(grep -o '"agent_id": *"[^"]*"' "$pause_file" | sed 's/.*"agent_id": *"//;s/"//')
+  local psession=$(grep -o '"session_id": *"[^"]*"' "$pause_file" | sed 's/.*"session_id": *"//;s/"//')
+  local pbranch=$(grep -o '"branch": *"[^"]*"' "$pause_file" | sed 's/.*"branch": *"//;s/"//')
+  local pcommit=$(grep -o '"commit": *"[^"]*"' "$pause_file" | sed 's/.*"commit": *"//;s/"//')
+  local pdirty=$(grep -o '"dirty_files": *[0-9]*' "$pause_file" | head -1 | sed 's/.*: *//')
+  local pts=$(grep -o '"timestamp": *"[^"]*"' "$pause_file" | sed 's/.*"timestamp": *"//;s/"//')
+
+  agence_format_header "AGENCE RESUME (^resume) — restoring session"
+  agence_format_kv "Pause ID" "$pid"
+  agence_format_kv "Agent" "$pagent"
+  agence_format_kv "Session" "$psession"
+  agence_format_kv "Paused at" "$pts"
+  agence_format_kv "Git state" "$pbranch @ $pcommit ($pdirty dirty)"
+  echo ""
+
+  agence_format_step "1/2" "Restoring context..."
+
+  # Show recent commits from paused state
+  if [[ "$_AGENCE_FMT" != "json" ]]; then
+    agence_format_detail "Work at time of pause:"
+    sed -n '/"recent_commits"/,/\]/p' "$pause_file" | grep -v 'recent_commits\|\[\|\]' | sed 's/^[[:space:]]*"//;s/"[,]*$//' | head -5 | sed 's/^/    /'
+    echo ""
+  fi
+
+  agence_format_step "2/2" "Marking session as resumed..."
+
+  # Update status: paused → resumed
+  sed -i 's/"status": *"paused"/"status": "resumed"/' "$pause_file"
+
+  # Add resume metadata
+  local resume_ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  sed -i "s/\"status\": \"resumed\"/\"status\": \"resumed\",\n  \"resumed_by\": \"$current_agent\",\n  \"resumed_at\": \"$resume_ts\"/" "$pause_file"
+
+  agence_format_detail "Status: paused → resumed"
+  echo ""
+
+  if [[ "$_AGENCE_FMT" == "json" ]]; then
+    agence_format_json "{\"command\":\"resume\",\"pause_id\":\"$pid\",\"agent\":\"$pagent\",\"session\":\"$psession\",\"git\":{\"branch\":\"$pbranch\",\"commit\":\"$pcommit\",\"dirty\":$pdirty},\"status\":\"resumed\",\"resumed_by\":\"$current_agent\",\"resumed_at\":\"$resume_ts\"}"
+  else
+    agence_format_footer "SESSION RESUMED"
+    echo ""
+    agence_format_kv "Restored" "$pagent session by $current_agent"
+    agence_format_kv "Pause ID" "$pid"
+    echo ""
+    agence_format_detail "Use ^save to checkpoint progress"
+    agence_format_detail "Use ^pause to suspend again"
+    echo ""
+  fi
+
+  return 0
+}
+
+# ============================================================================
 # INSTALL: Package Manager Integration
 # ============================================================================
 
@@ -1539,6 +2231,7 @@ install_windows_packages() {
   # Define Windows packages (winget IDs)
   local -a windows_packages=(
     "GitHub.cli"
+    "jqlang.jq"
     "aider"
     "jfrog"
     "Hashicorp.Terraform"

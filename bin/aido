@@ -32,6 +32,10 @@ AIDO_SESSION_DIR="${AIDO_SESSION_DIR:-$AI_ROOT/nexus/.aisessions}"
 AIDO_AGENT="${AIDO_AGENT:-ai-agent}"
 AIDO_DEBUG="${AIDO_DEBUG:-0}"
 
+# Source format library
+AIDO_LIB="${AI_ROOT}/lib"
+[[ -f "$AIDO_LIB/format.sh" ]] && source "$AIDO_LIB/format.sh"
+
 # ============================================================================
 # SESSION HELPER FUNCTIONS
 # ============================================================================
