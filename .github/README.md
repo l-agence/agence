@@ -1,5 +1,6 @@
 🤖  **l 'Agence** aka **(^)** - An Agentic Engineering Collaborative Environment
-
+# Author:  Stephane Korning 2026 stefusss@gmail.com
+# License : MIT + Commons Clause. 
 ---
 
 ## What is l ' Agence (^)?
