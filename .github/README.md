@@ -1,13 +1,12 @@
-🤖  **l 'Agence** aka **(^)** - An Agentic Engineering Collaborative Environment
-# Author:  Stephane Korning 2026 stefusss@gmail.com
-# License : MIT + Commons Clause. 
+#🤖  **l 'Agence** aka **(^)** - An Agentic Engineering Collaborative Environment
+Author:  Stephane Korning 2026 stefusss@gmail.com
+License : MIT + Commons Clause. 
 ---
 
 ## What is l ' Agence (^)?
-
-L' **Agence** **(^)**is distributed collaborative agentic engineering with : persistent and vectored knowledge management, governance, safe stateful handoffs and workflows. 
--  agence supports agentic and human development and workdlows across multiple orgs, multi projects, multi-repos .
--  vectored nowledge can be private or shared (your choice) across all of these.
+ **L' Agence (^)** :  distributed collaborative agentic engineering with: safe stateful handoffs, workflows, persistent &vectored knowledge management, governance etc. 
+-  agence supports agentic and human development and workdlows across : multiple orgs, multi teams, multi agents,  multi projects, multi-repos .
+-  vectored knowledge can be private or shared (your choice) across all of these.
 -  agence is self learning and capable of independent or guided agentic coding
 -  agence supports well known agentic tools
 -  agence introduces agentic personas to optimise LLM models and token costs to your needs
