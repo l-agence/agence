@@ -1,351 +1,214 @@
-# Agence: Agentic Engineering Collaborative Environment
-# Author : stephane Korning : stefusss@gmail.com
-
-l' Agence is a  distributed, multi-agent framework for collaborative engineering with built-in governance, knowledge management, and state coordination.*
-
+#���  **l 'Agence** aka **(^)** - An Agentic Engineering Collaborative Environment
+- Author:  Stephane Korning 2026 stefusss@gmail.com
+- License : MIT + Commons Clause. 
 ---
 
-## 🎮 Quick Start
+## What is l ' Agence (^)?
+ **L' Agence (^)** :  distributed collaborative agentic engineering with: safe stateful handoffs, workflows, persistent &vectored knowledge management, governance etc. 
+-  agence supports agentic and human development and workdlows across : multiple orgs, multi teams, multi agents,  multi projects, multi-repos .
+-  vectored knowledge can be private or shared (your choice) across all of these.
+-  agence is self learning and capable of independent or guided agentic coding
+-  agence supports well known agentic tools
+-  agence introduces agentic personas to optimise LLM models and token costs to your needs
+-  Innovative cognition model unique in the field.
+-  sophisticated agent and command routing modes including both Chat-prompts and CLI integration.
+-  one unique command-line that augments not replaces your other tools.
+-  OS and LLM model agnostic. 
 
-```bash
-# Chat with default agent
-agence "How do I deploy this?"
-
-# Route to specific agent
-agence @claudia "Review my architecture"
-agence @chad "Debug my CI/CD pipeline"
-agence @ralph "Teach me consistency patterns"
-agence @aiko "Optimize my cloud infrastructure"
-
-# Direct model access
-agence @gpt-4o "Quick analysis"
-agence @haiku "Fast question?"
-```
-
-## 🔧 Execution Environment (CODEX Law 2)
-
-Agence automatically detects your shell environment and normalizes paths accordingly:
-
-- **Git-bash** (MinGW/MSYS2) ✅ Supported
-- **Cygwin** ✅ Supported
-- **PowerShell** 🚧 Coming soon
-- **WSL** (Windows Subsystem for Linux) ✅ Supported
-- **Linux** ✅ Supported
-- **macOS** ✅ Supported
-
-Before any command executes, Agence validates:
-1. **Shell Detection**: Identifies environment and sets path style automatically
-2. **Execution Context**: Verifies `pwd` is in `GIT_REPO/` or `AGENCE_REPO/`
-3. **CODEX Check**: Validates against governance rules
-
-If context validation fails:
-```bash
-$ cd /tmp && agence "test"
-[ERROR] Execution context mismatch (CODEX LAW 2 violation)!
-  pwd: /tmp
-  AGENCE_REPO: /cygdrive/c/Users/steff/git/.agence
-  
-Recovery: cd to your project root or ~/.agence
-```
-
-See [codex/SHELL_DETECTION.md](codex/SHELL_DETECTION.md) and [codex/LAWS.md](codex/LAWS.md) for details.
-
----
-
-## 🧠 COGNOS: Cognitive Framework
-
-Agence is built on **COGNOS** - a 6-layer knowledge and governance system that ensures every decision flows through rules, references multiple knowledge bases, and maintains state across distributed agents.
+Instead of losing context at the end of each session, Agence lets agents:
+- ��� **Save session state** for later resumption
+- ��� **Hand off work** to specialized agents with full context
+- ��� **Build knowledge** that persists across projects
+- ��� **Scale securely** with git-based sharding
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  CODEX (Rules & Laws) - Gates Everything                │
-├─────────────────────────────────────────────────────────┤
-│                                                           │
-│  ┌──────────┐  ┌──────────────┐  ┌──────────┐           │
-│  │ OBJECT   │  │ GLOBAL       │  │ SYNTHESIS│           │
-│  │ CODE     │  │ CACHE        │  │ (Derived)│           │
-│  │(Git)    │  │(External RAG)│  │(Analysis)│           │
-│  └──────────┘  └──────────────┘  └──────────┘           │
-│                                                           │
-├─────────────────────────────────────────────────────────┤
-│  NEXUS (State Database) - Session & Agent State          │
-├─────────────────────────────────────────────────────────┤
-│  ORDINATOR (Workflow Engine) - Matrix Tasks & Projects   │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Layer 1: CODEX (Governance - Do's & Don'Ts)
-
-**The First Law**: *Everything goes through CODEX first for interpretation - no exception.*
-
-```
-codex/
-├── RULES.md      ← Prescriptive guidance (Do's - things we want)
-├── LAWS.md       ← Immutable prohibitions (DON'Ts - things we avoid)
-└── codex.check() ← Pre-flight validation before any command/prompt
-```
-
-Every user command (CLI or prompt) is validated against LAWS before execution. This is non-negotiable.
-
-### Layer 2-4: Knowledge Bases (C-O-G-S)
-
-#### **C = CODEX** | Governance
-- Rules of conduct (RULES.md)
-- Immutable prohibitions (LAWS.md)
-- Pre-flight checks before execution
-
-#### **O = OBJECTCODE** | Code Knowledge
-- Git repository metadata (no checkouts)
-- Module structure & patterns
-- Git SHA tracking (source of truth)
-- Organized by TLD → Repository
-
-#### **G = GLOBALCACHE** | External Semantic Knowledge
-- Articles, documentation, external sources
-- Vectored-light search (Dewey-decimal formtags)
-- Checksums for cache expiry
-- Organized by organizational boundaries (cross-TLD)
-
-#### **S = SYNTHESIS** | Derived Knowledge
-- **Everything we (LLMs + user) discover and create**
-- Keeps original content pristine
-- Analysis, patterns, conclusions we derive
-- TLD/org structure with INDEX.md per org
-- Indexed and cross-referenced
-
-### Layer 5: NEXUS (State Coordination)
-
-**NEXUS** is the persistent state database - critical for:
-- **Session state**: User context across conversations
-- **Agent state**: Current task, progress, results
-- **Job handoffs**: When Chad → Claudia for deeper work
-- **State queries**: "What's the status of that deployment?"
-
-Enables **distributed agent coordination** without losing context.
-
-### Layer 6: ORDINATOR (Workflow Engine)
-
-**ORDINATOR** is the task/project engine - coming soon:
-- Matrix-based project management (linear algebra)
-- Task decomposition to agents
-- Deliverables & timeline tracking
-- Future: JIRA integration
-
----
-
-## 🎯 Model Routing
-
-Agence supports 3 routing levels:
-
-### 1. **Agent Personas** (Lowest Token Overhead)
-
-Pre-tuned system prompts + model + personality. Each agent is optimized for cost and capability.
-
-```bash
-agence @aider "Refactor this function"        # ~5 tokens, offline
-agence @chad "Review my deployment"           # ~10 tokens, DevOps
-agence @aiko "Design my ML pipeline"          # ~10 tokens, Cloud
-agence @ralph "Explain consistency patterns"  # ~20 tokens, Learning
-agence @claudia "Architecture review"         # ~30 tokens, Deep thinking
-```
-
-### 2. **Model Aliases** (No Agent Persona)
-
-Direct LLM access without system prompt injection:
-
-```bash
-agence @gpt-4o "Full analysis"
-agence @claude "Detailed explanation"
-agence @opus4.5 "Complex problem"
-agence @haiku "Quick question?"
-```
-
-### 3. **Default/Fallback**
-
-Uses symlink or auto-select:
-
-```bash
-agence "What should I do?"  # Via @symlink or fallback
+Agent A works on feature → saves state
+        ↓
+Agent B takes over → resumes with full context
+        ↓
+Your project now has institutional memory
 ```
 
 ---
 
-## 🤖 Agents & Personalities
+## ⚡ Install (30 seconds)
 
-Each agent has a **system prompt** (minimal tokens), a **flavor intensity** (0-10 personality dial), and a **cost envelope** aligned with LLM pricing.
-
-### Agent Fleet
-
-| Agent | Model | Tokens | Flavor | Cost/Query | Best For |
-|-------|-------|--------|--------|-----------|----------|
-| **Aider** | aider CLI | ~5 | 0/10 | Negligible | Code patching (offline) |
-| **Chad** | gpt-4o | ~10 | 5/10 | ~$0.006 | DevOps, infrastructure |
-| **Aiko** | haiku | ~10 | 6/10 | ~$0.003 | Cloud, platform, systems |
-| **Ralph** | sonnet | ~20 | 4/10 | ~$0.008 | Learning, reliability |
-| **Claudia** | opus-4.5 | ~30 | 2/10 | ~$0.013 | Architecture, mentoring |
-
-### Flavor Intensity (0-10)
-
-Control personality **without token bloat**:
+Add Agence as a git submodule to your existing project:
 
 ```bash
-agence @chad --flavor=2 "Prod deployment (professional)"
-agence @aiko --flavor=8 "Teach me (fun learning)"
-agence @claudia --flavor=2 "Design patterns (mentor)"
+# Add Agence to your repo
+git submodule add https://github.com/l-agence/agence-master .agence
+
+# Initialize the submodule
+git submodule update --all --init
+
+# Initialize Agence environment (creates symlinks, loads context)
+sh .agence/bin/agence ^init
+
+# Commit
+git add .gitmodules .agence
+git commit -m "Add Agence agent framework"
 ```
 
-Each agent has a **default flavor** tuned for its role.
+That's it. You now have:
+- ��� **Agent collaboration** ready to use
+- ��� **Session persistence** for interrupted work
+- ��� **Knowledge base** (NEXUS/CODEX) living in your repo
+- ��� **Command routing** via `agence` CLI
 
 ---
 
-## 💬 System Prompts & Personality
+## ��� Quick Usage
 
-### How It Works
+```bash
+# Chat with agent about your task
+agence "How do I set up CI/CD for this?"
 
-1. **Agent Definition** (`codex/agents/<name>/agent.md`)
-   - Identity: Who is this agent?
-   - Model: Which LLM + provider?
-   - System prompt: Minimal (2-3 sentences, ~5-30 tokens)
-   - Flavor intensity: 0-10 personality dial
-   - Temperature: Tied to flavor for coherent personality
+# Save session state (agent can resume later)
+agence ^save "Implementing OAuth2, halfway through"
 
-2. **Flavor Injection** (Orthogonal to Model)
-   - Flavor is **not** part of token count
-   - Temperature adjusts with flavor (0/10 → 0.1, 10/10 → 0.9)
-   - Personality scaled without inflation
+# Let an agent autonomously plan and execute
+agence +deploy-to-staging
 
-3. **Example: Ralph Agent**
+# Execute a validated command
+agence /git-status
 
-```json
-{
-  "model": "claude-3-5-sonnet",
-  "provider": "anthropic",
-  "flavor_intensity": 4,
-  "temperature": 0.7,
-  "system_prompt": "Ralph: Cheerful Claude, learns from mistakes, explains simply.\nPrincipal Skinner: Ensures reliability, catches errors, adds structure.\nExpertise: learning, explanations, patterns, teaching reliability."
-}
+# See what's loaded (context, principles, rules)
+agence ^reload
+
+# Get help
+agence !help
 ```
-
-### Cost Alignment
-
-**Model selection = cost control**. Each agent's token overhead is aligned with LLM pricing:
-- **Cheap models** (GPT-4o, Haiku) = thin personas (~10 tokens)
-- **Expensive models** (Opus 4.5) = richer personas (~30 tokens)
-- **Free/offline** (Aider) = minimal (~5 tokens)
-
-This ensures **cost transparency** and **thoughtful agent choice**.
 
 ---
 
-## 📁 Directory Structure
+## ��� Documentation
+
+- **[Architecture](synthesis/l-agence.org/INDEX.md)** - How Agence works (sharding, sessions, handoff)
+- **[Commands](bin/COMMANDS.md)** - Full CLI reference
+- **[Principles](codex/PRINCIPLES.md)** - Core maxims
+- **[Rules](codex/RULES.md)** - Best practices
+- **[Lessons](synthesis/l-agence.org/lessons/)** - Captured insights
+
+---
+
+## ��� What You Get
 
 ```
 .agence/
-├── bin/
-│   ├── agence           ← Entry point (mode dispatch)
-│   ├── indexer          ← Universal semantic indexer
-│   └── commands.json    ← Command mappings
-│
-├── codex/
-│   ├── agents/
-│   │   ├── @             ← Symlink to default agent
-│   │   ├── aider/agent.md
-│   │   ├── chad/agent.md
-│   │   ├── aiko/agent.md
-│   │   ├── ralph/agent.md
-│   │   ├── claudia/agent.md
-│   │   ├── AGENTS.md     ← Quick reference
-│   │   └── ROUTING.md    ← Routing spec
-│   └── CODEX/
-│       ├── RULES.md      ← Do's (prescriptive)
-│       └── LAWS.md       ← DON'Ts (prohibitions)
-│
-├── lib/
-│   ├── router.sh        ← Agent/model resolution
-│   └── llm_provider.py  ← LLM client (TBD)
-│
-├── globalcache/         ← External RAG knowledge
-│   └── l-agence.org/
-│       └── INDEX.md     ← Semantic index (formtags + checksums)
-│
-├── objectcode/          ← Code metadata (git-tracked)
-│   └── [TLD]/[repo]/    ← Module patterns & summaries
-│
-├── synthesis/           ← Derived knowledge (our analysis)
-│   └── [TLD]/[org]/
-│       └── INDEX.md     ← Analysis index
-│
-├── nexus/               ← Session & agent state (TBD)
-│   └── sessions/        ← Persistent state
-│
-└── ordinator/           ← Task/project matrices (TBD)
-    └── projects/        ← Project definitions
+├─ bin/agence                    # Main entry point (symlink or run directly)
+├─ codex/                        # Immutable knowledge
+│  ├─ PRINCIPLES.md              # Maxims (why)
+│  ├─ LAWS.md                    # Hard constraints (must not)
+│  ├─ RULES.md                   # Best practices (should)
+│  └─ agents/                    # Agent personas
+├─ nexus/                        # Operational state (local, ephemeral)
+│  ├─ logs/                      # Activity logs
+│  ├─ faults/                    # Error tracking
+│  └─ sessions/                  # Persisted agent context
+├─ synthesis/                    # Learning & documentation
+│  └─ lessons/                   # Project lessons learned
+├─ .github/                      # Git instructions
+│  └─ CLAUDE.md                  # Agent context & instructions
+└─ lib/                          # Utility functions
 ```
 
 ---
 
-## 🚀 Command Modes
+## ��� Usage Modes
 
-Agence supports 4 command modes (configurable via prefix):
+| Mode | Example | Use When |
+|------|---------|----------|
+| **Chat** | `agence "question"` | Need advice or explanation |
+| **Autonomous** | `agence +deploy-feature` | Want agent to plan & execute |
+| **Command** | `agence /git-status` | Running pre-approved commands |
+| **System** | `agence !help` | Using utilities or agent info |
+| **Special** | `agence ^save` | Save/reload context, init |
 
+---
+
+## ��� How Sessions Work
+
+**Before (traditional):**
+```
+Session 1: Agent works → loses context
+Session 2: Agent starts fresh → repeats work
+```
+
+**With Agence:**
+```
+Session 1: Agent works → agence ^save
+Session 2: Agent or colleague → agence ^resume SESSION_ID → continues
+```
+
+Each session captures:
+- ��� Agent context and memory
+- ��� Todo list and checkpoints  
+- ��� File states and directory
+- ��� Task description and progress
+
+---
+
+## ��� ^ Design Philosophy
+
+**"^ as Trademark"**
+
+The `^` character represents Agence values:
+- **Aleph (א)** - First letter, foundational intelligence
+- **Lambda (λ)** - Function/transformation (what agents do)
+- **Pointer (^)** - Reference to context (persistent memory)
+
+All special commands use `^` prefix:
 ```bash
-# Chat mode (default)
-agence "Ask a question"
-agence @agent "Routed query"
-
-# AI-routed mode (agent plans the action)
-agence +"Deploy to production"  # Claude decides what to do
-
-# External mode (validated command execution)
-agence /git checkout main
-agence /terraform plan
-
-# System mode (built-in utilities)
-agence !status "Show all agent states"
-agence !ls "List agents"
+agence ^init           # Initialize environment
+agence ^save "notes"   # Save session state  
+agence ^resume ID      # Resume session
+agence ^reload         # Reload knowledge base
 ```
 
 ---
 
-## 🔒 Governance: LAWS First
+## ��� Status
 
-**Before anything executes:**
+| Component | Status |
+|-----------|--------|
+| Core Framework | ✅ Working |
+| Session Persistence | ✅ Working |
+| Command Routing | ✅ Working |
+| Multi-Agent Coordination | ��� In Development |
+| Knowledge Sharding | ��� In Development |
+| Session Recovery | ��� In Development |
 
-1. Parse user input (chat, command, or prompt)
-2. Run through CODEX validation
-3. Check against LAWS (immutable prohibitions)
-4. **Lift exception if violating LAW**
-5. Otherwise, proceed to routing
-
-**First Law**: Everything through CODEX first - no exception.
-
----
-
-## 📊 Next Steps (Roadmap)
-
-- [ ] **CODEX**: Implement LAWS pre-flight check in `bin/agence`
-- [ ] **NEXUS**: Build state database (JSON/SQLite backend)
-- [ ] **SYNTHESIS**: Index derived knowledge per org
-- [ ] **ORDINATOR**: Matrix-based task engine (linear algebra)
-- [ ] **LLM Client**: Connect agents to actual API calls
-- [ ] **Tests**: Add integration tests for agent routing
-- [ ] **JIRA**: Future integration for ORDINATOR
+**Current Version:** 0.2.0 (alpha)
 
 ---
 
-## 🎮 Quick Facts (Aiko-style)
+## ��� Security & Isolation
 
-- **Total Agents**: 5 core (Aider, Chad, Aiko, Ralph, Claudia) + TBD slots
-- **Token Efficiency**: 5x improvement over standard persona systems (5-30 vs 100-300+ tokens)
-- **Cost/Query**: $0.003 - $0.013 depending on agent + model
-- **Governance**: Zero-trust (everything through CODEX)
-- **State**: Persistent across sessions via NEXUS
-- **Knowledge**: 4 separate knowledge bases (O-G-S-C) + coordination (N-N)
-
-GG! Ready to collaborate. 🚀
+- ✅ Commands are **whitelisted**, not blacklisted
+- ✅ Destructive operations require **confirmation**
+- ✅ Each project gets isolated sessions (git-based sharding)
+- ✅ Agent handoffs are **explicit** (not automatic)
 
 ---
 
-**Version**: 0.2.0 (alpha)  
-**Last Updated**: 2026-03-04  
-**Framework**: COGNOS (C-O-G-N-O-S)
+## ��� Links
+
+- **GitHub**: [l-agence/agence-master](https://github.com/l-agence/agence-master)
+- **Architecture Docs**: [Full system design](synthesis/l-agence.org/docs/ARCHITECTURE.md)
+- **Issues**: [GitHub Issues](https://github.com/l-agence/agence-master/issues)
+
+---
+
+## ��� License
+
+MIT + Commons Clause  
+See LICENSE.md for details
+
+---
+
+**Questions?** Start with `agence !help` or check [the docs](synthesis/l-agence.org/INDEX.md).
+
+**Want to contribute?** See CONTRIBUTING.md (coming soon).
+
+---
