@@ -726,83 +726,58 @@ init_agence_environment() {
   echo ""
   
   # ========================================================================
-  # Step 2: Create directory symlinks (globalcache/@, objectcode/@, synthesis/@)
+  # Step 2: Copy skeleton files (.github/*, CLAUDE.md, etc)
+  # NOTE: No symlinks to avoid Windows git permission issues
+  # Using file copies instead for cross-platform compatibility
   # ========================================================================
-  echo "Step 2/3: Creating organization symlinks..."
-  
-  local org_dirs=("globalcache" "objectcode" "synthesis")
-  local org_created=0
-  
-  for dir in "${org_dirs[@]}"; do
-    local org_link="$REPO_ROOT/$dir/@"
-    local org_target="l-agence.org"
-    
-    # Only create if doesn't exist
-    if [[ ! -e "$org_link" ]]; then
-      mkdir -p "$(dirname "$org_link")" 2>/dev/null
-      ln -sf "$org_target" "$org_link" 2>/dev/null
-      
-      if [[ -L "$org_link" || -d "$org_link" ]]; then
-        echo "  ✓ $dir/@ → $org_target"
-        ((org_created++))
-      else
-        echo "  ⚠ $dir/@: symlink creation failed (may try mklink on next checkout)"
-      fi
-    else
-      echo "  ⏭ $dir/@: already exists (user customization preserved)"
-    fi
-  done
-  
-  if [[ $org_created -gt 0 ]]; then
-    echo ""
-    echo "✓ Created $org_created organization symlink(s)"
-  fi
-  echo ""
-  
-  # ========================================================================
-  # Step 3: Create skeleton symlinks (.github/*, CLAUDE.md, etc)
-  # ========================================================================
-  echo "Step 3/3: Creating skeleton symlinks..."
+  echo "Step 2/3: Installing skeleton files..."
   
   local AGENCE_GITHUB="$AGENCE_REPO/.github"
   local TARGET_GITHUB="$REPO_ROOT/.github"
+  local files_installed=0
   
   # Ensure .github directory exists
   mkdir -p "$TARGET_GITHUB" 2>/dev/null
   
-  # Symlink 3a: copilot-instructions.md
+  # Copy copilot.md as copilot-instructions.md
   local source_copilot="$AGENCE_GITHUB/copilot.md"
   local target_copilot="$TARGET_GITHUB/copilot-instructions.md"
   
   if [[ ! -e "$target_copilot" ]]; then
     if [[ -f "$source_copilot" ]]; then
-      ln -sf "../.agence/.github/copilot.md" "$target_copilot" 2>/dev/null || \
-      ln -sf "$source_copilot" "$target_copilot" 2>/dev/null
-      if [[ -L "$target_copilot" ]]; then
-        echo "  ✓ .github/copilot-instructions.md → copilot.md"
+      cp "$source_copilot" "$target_copilot" 2>/dev/null
+      if [[ -f "$target_copilot" ]]; then
+        echo "  ✓ .github/copilot-instructions.md (copied)"
+        ((files_installed++))
       else
-        echo "  ⚠ .github/copilot-instructions.md: creation deferred (post-checkout hook will create)"
+        echo "  ⚠ .github/copilot-instructions.md: copy failed"
       fi
     fi
   else
     echo "  ⏭ .github/copilot-instructions.md: already exists"
   fi
   
-  # Symlink 3b: CLAUDE.md (in repo root)
+  # Copy CLAUDE.md to repo root
   local source_claude="$AGENCE_GITHUB/CLAUDE.md"
   local target_claude="$REPO_ROOT/CLAUDE.md"
   
   if [[ ! -e "$target_claude" ]]; then
     if [[ -f "$source_claude" ]]; then
-      ln -sf ".github/CLAUDE.md" "$target_claude" 2>/dev/null
-      if [[ -L "$target_claude" ]]; then
-        echo "  ✓ CLAUDE.md → .github/CLAUDE.md"
+      cp "$source_claude" "$target_claude" 2>/dev/null
+      if [[ -f "$target_claude" ]]; then
+        echo "  ✓ CLAUDE.md (copied)"
+        ((files_installed++))
       else
-        echo "  ⚠ CLAUDE.md: creation deferred (post-checkout hook will create)"
+        echo "  ⚠ CLAUDE.md: copy failed"
       fi
     fi
   else
     echo "  ⏭ CLAUDE.md: already exists"
+  fi
+  
+  if [[ $files_installed -gt 0 ]]; then
+    echo ""
+    echo "✓ Installed $files_installed file(s)"
   fi
   
   echo ""
@@ -811,6 +786,7 @@ init_agence_environment() {
   echo "  Environment: $CURRENT_SHELL"
   echo "  AGENCE_ROOT=$AGENCE_REPO"
   echo "  REPO_ROOT=$REPO_ROOT"
+  echo "  Files: All copies (symlinks replaced for Windows compatibility)"
   echo "=============================================="
   echo ""
   
@@ -888,43 +864,6 @@ reload_agence_context() {
   echo ""
   
   return 0
-}
-
-create_windows_symlink() {
-  local source="$1"
-  local target="$2"
-  
-  # Determine if source is a file or directory
-  local link_type="file"
-  if [[ -d "$source" ]]; then
-    link_type="dir"
-  fi
-  
-  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Creating symlink: $target → $source ($link_type)" >&2
-  
-  if [[ "$AGENCE_OS_WINDOWS" == "1" ]]; then
-    # Windows: Use mklink command (requires admin on some systems)
-    # Type 12019 is for file symlinks, type 12000 is for directory symlinks
-    if [[ "$link_type" == "dir" ]]; then
-      cmd /c mklink /D "$(cygpath -w "$target")" "$(cygpath -w "$source")" 2>/dev/null
-    else
-      cmd /c mklink /H "$(cygpath -w "$target")" "$(cygpath -w "$source")" 2>/dev/null || \
-      cmd /c mklink "$(cygpath -w "$target")" "$(cygpath -w "$source")" 2>/dev/null
-    fi
-    
-    if [[ $? -eq 0 ]]; then
-      return 0
-    else
-      echo "[ERROR] mklink failed. Trying PowerShell method..." >&2
-      # Fallback to PowerShell
-      powershell -Command "New-Item -ItemType SymbolicLink -Path '$(cygpath -w "$target")' -Target '$(cygpath -w "$source")' -Force" 2>/dev/null
-      return $?
-    fi
-  else
-    # Unix/Linux/macOS: Use ln -s
-    ln -s "$source" "$target" 2>/dev/null
-    return $?
-  fi
 }
 
 # ============================================================================
