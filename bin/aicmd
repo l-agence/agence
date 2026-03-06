@@ -1,0 +1,312 @@
+#!/usr/bin/env bash
+
+################################################################################
+# aicmd: AI Command Validator + Shell Executor
+# Validates redirects, pipes, and environment for interactive shell sessions
+#
+# Usage (standalone):
+#   aicmd validate <command>     - Validate command (redirects, pipes)
+#   aicmd sanitize               - Sanitize environment for safe spawn
+#
+# Usage (sourced):
+#   source bin/aicmd
+#   validate_command "git log | grep commit"
+#   validate_redirect "> /dev/null"
+#
+# Author: Stephane Korning 2026
+# License: MIT License with Commons Clause
+################################################################################
+
+set -euo pipefail
+
+# ============================================================================
+# SAFE REDIRECT TARGETS
+# ============================================================================
+
+# Paths/devices always safe for redirects
+declare -a SAFE_REDIRECT_TARGETS=(
+    "/dev/null"
+    "/dev/stderr"
+    "/dev/stdout"
+    "/dev/stdin"
+)
+
+# ============================================================================
+# SAFE PIPE TARGETS
+# ============================================================================
+
+# Commands that safely receive piped input
+declare -a SAFE_PIPE_COMMANDS=(
+    "grep"
+    "head"
+    "tail"
+    "sort"
+    "uniq"
+    "wc"
+    "cut"
+    "awk"
+    "sed"
+    "jq"
+    "tr"
+    "column"
+    "less"
+    "more"
+    "tee"
+    "xargs"
+    "paste"
+    "join"
+    "comm"
+)
+
+# ============================================================================
+# ENVIRONMENT SANITIZATION
+# ============================================================================
+
+# Variables that could enable escape/exploit (stripped before spawn)
+declare -a DANGEROUS_ENV_VARS=(
+    "LD_PRELOAD"
+    "LD_LIBRARY_PATH"
+    "PYTHONPATH"
+    "RUBYLIB"
+    "PERL5LIB"
+    "NODE_PATH"
+    "PATH"  # Will be reset to /usr/bin:/bin
+)
+
+sanitize_environment() {
+    # Print clean environment suitable for subprocess spawn
+    # Preserves only safe variables
+    
+    # Safe variables to preserve
+    local safe_vars=(
+        "AI_ROOT"
+        "AI_BIN"
+        "AI_ROLE"
+        "AI_SESSION"
+        "AI_AGENT"
+        "GIT_ROOT"
+        "_AGENCE_FMT"
+        "HOME"
+        "USER"
+        "SHELL"
+        "TERM"
+        "LANG"
+        "TZ"
+    )
+    
+    # Build safe environment
+    local safe_env=""
+    for var in "${safe_vars[@]}"; do
+        if [[ -n "${!var:-}" ]]; then
+            safe_env+="$var='${!var:-}' "
+        fi
+    done
+    
+    # Force safe PATH
+    safe_env+="PATH='/usr/bin:/bin' "
+    
+    echo "$safe_env"
+}
+
+# ============================================================================
+# REDIRECT VALIDATION
+# ============================================================================
+
+is_safe_redirect_target() {
+    local target="$1"
+    
+    # Check against safe targets
+    for safe_target in "${SAFE_REDIRECT_TARGETS[@]}"; do
+        if [[ "$target" == "$safe_target" ]]; then
+            return 0
+        fi
+    done
+    
+    # Check if path is within workspace (if GIT_ROOT set)
+    if [[ -n "${GIT_ROOT:-}" ]]; then
+        local abs_target
+        abs_target=$(cd "$GIT_ROOT" && readlink -f "$target" 2>/dev/null || echo "")
+        if [[ -n "$abs_target" && "$abs_target" == "$GIT_ROOT"* ]]; then
+            return 0
+        fi
+    fi
+    
+    return 1
+}
+
+validate_redirect() {
+    local redirect_expr="$1"
+    
+    # Extract target from redirect: >file, >>file, 2>file, etc.
+    # Format: [0-9]*>[>]?<target>
+    local target
+    if [[ "$redirect_expr" =~ ([0-9]*)[\>]+([\>]?).*([^[:space:]]+)$ ]]; then
+        target="${BASH_REMATCH[3]}"
+        
+        # Allow stream merging (2>&1, 1>&2)
+        if [[ "$target" == "&"[0-9] ]]; then
+            return 0
+        fi
+        
+        # Validate target
+        if is_safe_redirect_target "$target"; then
+            return 0
+        else
+            echo "[AICMD] ✗ BLOCKED: Unsafe redirect target: $target" >&2
+            echo "[AICMD]   Safe targets: /dev/null, /dev/stderr, or workspace paths" >&2
+            return 1
+        fi
+    fi
+    
+    return 0
+}
+
+# ============================================================================
+# PIPE VALIDATION
+# ============================================================================
+
+is_safe_pipe_command() {
+    local cmd="$1"
+    
+    for safe_cmd in "${SAFE_PIPE_COMMANDS[@]}"; do
+        if [[ "$cmd" == "$safe_cmd" ]]; then
+            return 0
+        fi
+    done
+    
+    return 1
+}
+
+validate_pipe() {
+    local pipe_chain="$1"
+    
+    # Split by pipes and validate each stage
+    local IFS='|'
+    read -ra PIPES <<< "$pipe_chain"
+    
+    for pipe in "${PIPES[@]}"; do
+        # Trim whitespace
+        pipe=$(echo "$pipe" | xargs)
+        
+        # Extract command (first word)
+        local cmd="${pipe%% *}"
+        
+        # First stage of pipe can be any whitelisted command
+        # (validated elsewhere)
+        # Subsequent stages must be safe pipe recipients
+        if [[ "$pipe" != "${PIPES[0]}" ]]; then
+            if ! is_safe_pipe_command "$cmd"; then
+                echo "[AICMD] ✗ BLOCKED: Unsafe pipe target: $cmd" >&2
+                echo "[AICMD]   Safe pipe targets:" >&2
+                printf "[AICMD]     • %s\n" "${SAFE_PIPE_COMMANDS[@]}" >&2
+                return 1
+            fi
+        fi
+    done
+    
+    return 0
+}
+
+# ============================================================================
+# COMMAND VALIDATION
+# ============================================================================
+
+validate_command() {
+    local full_cmd="$1"
+    
+    # Extract parts: base command | pipes > redirects
+    local base_cmd="${full_cmd%%[|>]*}"
+    local pipes_and_redirects="${full_cmd#*[|>]}"
+    
+    # Validate any pipes
+    if [[ "$full_cmd" == *"|"* ]]; then
+        validate_pipe "$(echo "$full_cmd" | grep -o '[^>]*')" || return 1
+    fi
+    
+    # Validate any redirects
+    local redirect_pattern='[0-9]*[\>][^|]*'
+    while [[ "$full_cmd" =~ $redirect_pattern ]]; do
+        validate_redirect "${BASH_REMATCH[0]}" || return 1
+        full_cmd="${full_cmd#*${BASH_REMATCH[0]}}"
+    done
+    
+    return 0
+}
+
+# ============================================================================
+# WHITELIST HELPERS (can be overridden by caller)
+# ============================================================================
+
+# Check if command is whitelisted (caller can override with their own)
+is_whitelisted_command() {
+    local cmd="$1"
+    
+    # Default: allow git, gh, aws basic commands
+    case "$cmd" in
+        git|gh|aws|ls|cat|pwd|echo|grep|head|tail|tee)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# ============================================================================
+# MAIN DISPATCHER
+# ============================================================================
+
+main() {
+    local mode="${1:-help}"
+    
+    case "$mode" in
+        validate)
+            # aicmd validate "<command>"
+            validate_command "${2:-.}" || exit 1
+            echo "[AICMD] ✓ Command valid"
+            exit 0
+            ;;
+        sanitize)
+            # aicmd sanitize - output clean environment
+            sanitize_environment
+            exit 0
+            ;;
+        help|"")
+            cat >&2 <<'EOF'
+AICMD: AI Command Validator + Shell Executor
+
+Usage:
+  aicmd validate <command>    - Validate command syntax (redirects, pipes)
+  aicmd sanitize              - Output sanitized environment
+
+Examples:
+  aicmd validate "git log | grep commit"
+  aicmd validate "cat file > output.txt"
+  aicmd validate "curl https://example.com 2>/dev/null"
+
+Safe Redirect Targets:
+  /dev/null, /dev/stderr, /dev/stdout, workspace paths
+
+Safe Pipe Commands:
+  grep, head, tail, sort, uniq, wc, cut, awk, sed, jq, tr, column, less, tee, xargs
+
+Environment Variables:
+  When sourced, provides functions:
+    - sanitize_environment    - Output clean subprocess environment
+    - validate_command        - Validate full command
+    - validate_redirect       - Validate single redirect
+    - validate_pipe           - Validate pipe chain
+EOF
+            exit 0
+            ;;
+        *)
+            echo "[AICMD] ✗ Unknown mode: $mode" >&2
+            exit 1
+            ;;
+    esac
+}
+
+# If called directly (not sourced), execute main
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
