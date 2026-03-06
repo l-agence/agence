@@ -1,8 +1,7 @@
 .agence/
 .mysecrets/
 .aisecrets/
-nexus/.aisessions/
-nexus/.airuns/
+nexus/.ai*/
 .private/
 @
 Lib
