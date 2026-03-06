@@ -1,10 +1,19 @@
-🤖 ^ **Agence** - Multi-Agent Persistent Knowledge Base
-
+#🤖  **l 'Agence** aka **(^)** - An Agentic Engineering Collaborative Environment
+- Author:  Stephane Korning 2026 stefusss@gmail.com
+- License : MIT + Commons Clause. 
 ---
 
-## What is Agence?
-
-**Agence** is a distributed agent collaboration framework that brings **persistent memory** and **intelligent handoffs** to AI-assisted development.
+## What is l ' Agence (^)?
+ **L' Agence (^)** :  distributed collaborative agentic engineering with: safe stateful handoffs, workflows, persistent &vectored knowledge management, governance etc. 
+-  agence supports agentic and human development and workdlows across : multiple orgs, multi teams, multi agents,  multi projects, multi-repos .
+-  vectored knowledge can be private or shared (your choice) across all of these.
+-  agence is self learning and capable of independent or guided agentic coding
+-  agence supports well known agentic tools
+-  agence introduces agentic personas to optimise LLM models and token costs to your needs
+-  Innovative cognition model unique in the field.
+-  sophisticated agent and command routing modes including both Chat-prompts and CLI integration.
+-  one unique command-line that augments not replaces your other tools.
+-  OS and LLM model agnostic. 
 
 Instead of losing context at the end of each session, Agence lets agents:
 - 💾 **Save session state** for later resumption
