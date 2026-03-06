@@ -726,18 +726,40 @@ init_agence_environment() {
   echo ""
   
   # ========================================================================
-  # Step 2: Copy skeleton files (.github/*, CLAUDE.md, etc)
+  # Step 2: Copy skeleton files + merge gitignore
   # NOTE: No symlinks to avoid Windows git permission issues
   # Using file copies instead for cross-platform compatibility
   # ========================================================================
-  echo "Step 2/3: Installing skeleton files..."
+  echo "Step 2/4: Installing skeleton files..."
   
   local AGENCE_GITHUB="$AGENCE_REPO/.github"
   local TARGET_GITHUB="$REPO_ROOT/.github"
+  local AGENCE_BIN="$AGENCE_REPO/bin"
+  local TARGET_BIN="$REPO_ROOT/bin"
   local files_installed=0
   
   # Ensure .github directory exists
   mkdir -p "$TARGET_GITHUB" 2>/dev/null
+  mkdir -p "$TARGET_BIN" 2>/dev/null
+  
+  # Copy agence script as ^ (command launcher)
+  local source_agence="$AGENCE_BIN/agence"
+  local target_caret="$TARGET_BIN/^"
+  
+  if [[ ! -e "$target_caret" ]]; then
+    if [[ -f "$source_agence" ]]; then
+      cp -p "$source_agence" "$target_caret" 2>/dev/null
+      if [[ -f "$target_caret" ]]; then
+        chmod +x "$target_caret" 2>/dev/null
+        echo "  ✓ bin/^ (command launcher copied)"
+        ((files_installed++))
+      else
+        echo "  ⚠ bin/^: copy failed"
+      fi
+    fi
+  else
+    echo "  ⏭ bin/^: already exists"
+  fi
   
   # Copy copilot.md as copilot-instructions.md
   local source_copilot="$AGENCE_GITHUB/copilot.md"
@@ -745,7 +767,7 @@ init_agence_environment() {
   
   if [[ ! -e "$target_copilot" ]]; then
     if [[ -f "$source_copilot" ]]; then
-      cp "$source_copilot" "$target_copilot" 2>/dev/null
+      cp -p "$source_copilot" "$target_copilot" 2>/dev/null
       if [[ -f "$target_copilot" ]]; then
         echo "  ✓ .github/copilot-instructions.md (copied)"
         ((files_installed++))
@@ -763,7 +785,7 @@ init_agence_environment() {
   
   if [[ ! -e "$target_claude" ]]; then
     if [[ -f "$source_claude" ]]; then
-      cp "$source_claude" "$target_claude" 2>/dev/null
+      cp -p "$source_claude" "$target_claude" 2>/dev/null
       if [[ -f "$target_claude" ]]; then
         echo "  ✓ CLAUDE.md (copied)"
         ((files_installed++))
@@ -781,12 +803,34 @@ init_agence_environment() {
   fi
   
   echo ""
+  echo "Step 3/4: Merging .gitignore patterns..."
+  
+  # Merge agence .gitignore patterns into target repo's .gitignore
+  local source_gitignore="$AGENCE_GITHUB/.gitignore"
+  local target_gitignore="$REPO_ROOT/.gitignore"
+  local gitignore_merger="$AGENCE_BIN/gitignore-merge.sh"
+  
+  if [[ -f "$gitignore_merger" && -f "$source_gitignore" ]]; then
+    # Run the merge script
+    if "$gitignore_merger" "$source_gitignore" "$target_gitignore" 2>&1 | grep -v "^\\[GITIGNORE\\]" > /dev/null; then
+      echo "  ✓ .gitignore patterns merged"
+    else
+      echo "  ⚠ .gitignore: merge encountered issues (check manually)"
+    fi
+  else
+    echo "  ⚠ .gitignore merge skipped (merger or source not found)"
+  fi
+  
+  echo ""
+  echo "Step 4/4: Finalizing initialization..."
+  echo ""
   echo "=============================================="
   echo "✓ Agence initialization complete!"
   echo "  Environment: $CURRENT_SHELL"
   echo "  AGENCE_ROOT=$AGENCE_REPO"
   echo "  REPO_ROOT=$REPO_ROOT"
-  echo "  Files: All copies (symlinks replaced for Windows compatibility)"
+  echo "  Files: All copies (no symlinks for cross-platform)"
+  echo "  .gitignore: Merged agence patterns"
   echo "=============================================="
   echo ""
   
