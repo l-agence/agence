@@ -83,12 +83,12 @@ agence !help
 ---
 
 ## 📚 Documentation
-
-- **[Architecture](synthetic/l-agence.org/docs/INDEX.md)** - How Agence works (sharding, sessions, handoff)
+- **[Documentation](synthetic/l-agence.org/docs/INDEX.md)**  Overview - What is Agence and why is it different?.
+- **[Architecture](synthetic/l-agence.org/docs/INDEX.md)** - How Agence works (sharding, sessions, handoffs, )
 - **[Commands](bin/COMMANDS.md)** - Full CLI reference
-- **[Principles](codex/PRINCIPLES.md)** - Core maxims
-- **[Laws](codex/LAWS.md)** - Best practices
-- **[Rules](codex/RULES.md)** - Best practices
+- **[Principles](codex/PRINCIPLES.md)** - Core LLM Maxims
+- **[Laws](codex/LAWS.md)** - Mal practices to Avoid.
+- **[Rules](codex/RULES.md)** - Best practices to Follow.
 - **[Lessons](synthetic/l-agence.org/lessons/)** - Captured insights
 - **[faults](synthetic/l-agence.org/faults/)** - Captured faults
 - **[logs](synthetic/l-agence.org/logs/)** - Captured logs
@@ -112,7 +112,8 @@ agence !help
 ├─ synthetic/                    # Learning & documentation
 │  └─ lessons/                   # Project lessons learned
 ├─ .github/                      # Git instructions
-│  └─ CLAUDE.md                  # Agent context & instructions
+│  ├─ copilot-instructions.md    # Generic LLM Agent context & instructions
+│  └─ CLAUDE.md                  # Anthropic LLM Agent context & instructions
 └─ lib/                          # Utility functions
 ```
 
