@@ -9,23 +9,28 @@
 Agence is a **distributed agent collaboration system** that solves persistent memory and multi-tenant isolation through **git-based sharding**.
 
 ```
-┌─────────────────────────────────────────────────────┐
-│         Agence Master Repository                    │
-│    (l-agence/agence-master - reference impl)        │
-└────────────────┬────────────────────────────────────┘
-                 │
-         [Git Clone/Pull]
-                 │
-    ┌────────────┼────────────┐
-    ↓            ↓            ↓
+┌───────────────────────────────────────────┐
+│    Agence Master Repository               │
+│ (l-agence/agence-master - reference impl) │
+└──────────────────┬────────────────────────┘
+                   │
+           [Git Clone/Pull:]
+             [CODEX]        : Governance
+             [OBJECTCODE]   : CODE-base
+             [GLOBALCACHE]  : RAG-base
+             [ORCHESTRATOR] : Workflows
+             [SYNTHETIC]    : DWM-Base 
+                   │
+    ┌──────────────┼────────────┐
+    ↓              ↓            ↓
 ┌────────────┐ ┌────────────┐ ┌────────────┐
 │ Agence     │ │ Agence     │ │ Agence     │
 │ Shard A    │ │ Shard B    │ │ Shard C    │
 │(Team Repo) │ │(Org Repo)  │ │(Project)   │
 └────────────┘ └────────────┘ └────────────┘
-     │              │              │
-  [NEXUS]       [NEXUS]        [NEXUS]
-  [CODEX]       [CODEX]        [CODEX]
+     │             │              │
+  [NEXUS]       [NEXUS]        [NEXUS]    : Local States
+  [HERMETIC]    [HERMETIC]     [HERMETIC] : Secret-base
 ```
 
 ---
@@ -132,14 +137,19 @@ Development Organization
 │  │  ├─ LAWS.md
 │  │  ├─ RULES.md
 │  │  └─ agents/ (local personas)
-│  ├─ nexus/ (local, not versioned)
-│  │  ├─ logs/
-│  │  ├─ faults/
-│  │  └─ sessions/
 │  ├─ synthetic/ (versioned)
 │  │  ├─ lessons/ (project-specific)
 │  │  └─ docs/
 │  └─ .gitignore (excludes nexus/)
+
+┌─ Not Shared: Instance
+│  ├─ nexus/ (local states, not versioned)
+│  │  ├─ logs/
+│  │  ├─ faults/
+│  │  └─ sessions/
+│  ├─ hermetic/  (private local knowledge)
+│  │  ├─ lessons/ (project-specific)
+│  │  └─ docs/
 ```
 
 ---
@@ -245,11 +255,17 @@ agence /terraform-apply # ❌ Blocked (destructive)
 
 ```
 codex/agents/
-├─ claudia.md         # Lead architect, context manager
-├─ ralph.md           # DevOps, infrastructure
-├─ sonny.md           # Backend, data layer
-├─ lima.md            # Frontend, UI
-└─ haiku.md           # Code review, quality
+├─ @claudia        # (opus)    Principal SRE and architect. Visionary Evolution. 
+├─ @chad           # (GPT)     free & cost-optimized but Safe and reliable devops/cloudops. Stability. 
+├─ @aiko           # (haiku)   lead CI/CD DevOps SRE, infrastructure prototyping. Disruptive innovator. 
+├─ @sonya          # (sonnet)  Full Stack Dev lead and SRE. Deep detailed elegant coding. Backend, data layer.
+├─ @ralph          # (ralph)   Ralph Wiggum iteration loop
+├─ @olena          # (ollama)  free & Secure guard-railed On-premises local Ollama sessions.
+├─ @peers          # (3-peers) MIT style 3-peer LLM agent weighed consensus. Strategic planning, Unsolvable P1 problems, RCA reviews.
+└─ @pilot          # (copilot) Copilot agent session.  Code review, quality
+
+ ... or you can roll your own !
+
 ```
 
 Each agent has:
