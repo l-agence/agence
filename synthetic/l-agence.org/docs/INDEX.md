@@ -10,12 +10,13 @@ l' Agence is a  distributed, multi-agent framework for collaborative engineering
 ```bash
 # Chat with default agent
 agence "How do I deploy this?"
+^ "validate and open PR "
 
 # Route to specific agent
 agence @claudia "Review my architecture"
-agence @chad "Debug my CI/CD pipeline"
+^ @chad "Debug my CI/CD pipeline"
 agence @ralph "Teach me consistency patterns"
-agence @aiko "Optimize my cloud infrastructure"
+^  @aiko "Optimize my cloud infrastructure"
 
 # Direct model access
 agence @gpt-4o "Quick analysis"
