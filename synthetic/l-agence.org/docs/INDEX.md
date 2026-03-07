@@ -191,15 +191,22 @@ agence "What should I do?"  # Via @symlink or fallback
 
 Each agent has a **system prompt** (minimal tokens), a **flavor intensity** (0-10 personality dial), and a **cost envelope** aligned with LLM pricing.
 
-### Agent Fleet
+### Agent Fleet - from lowest cost to highest ...
 
 | Agent | Model | Tokens | Flavor | Cost/Query | Best For |
 |-------|-------|--------|--------|-----------|----------|
-| **Aider** | aider CLI | ~5 | 0/10 | Negligible | Code patching (offline) |
-| **Chad** | gpt-4o | ~10 | 5/10 | ~$0.006 | DevOps, infrastructure |
-| **Aiko** | haiku | ~10 | 6/10 | ~$0.003 | Cloud, platform, systems |
-| **Ralph** | sonnet | ~20 | 4/10 | ~$0.008 | Learning, reliability |
-| **Claudia** | opus-4.5 | ~30 | 2/10 | ~$0.013 | Architecture, mentoring |
+| **@**| autoselect | varies | N/A | varies | Default. let Copilot auto-select moddel. NO Persona.  |
+| **@Olena**| ollama | Free! | 5/10 | ~$0.00 | Local On-Premises ollama cluster - secure LLM |
+| **@Chad** | gpt-4o | ~10 | 5/10 | ~$0.001 | Cheap but safe & reliable CloudOps, infrastructure |
+| **@Aiko** | haiku | ~10 | 6/10 | ~$0.003 | Sr. CI/CD DevOps/CloudOps, prototyping and disruptive innovation|
+| **@Sonya** | sonnet | ~20 | 4/10 | ~$0.008 | Full Stack Dev lead and SRE. Deep Learning, reliability, detailed code |
+| **@Claudia** | opus-4.5 | ~30 | 2/10 | ~$0.013 | Principal SRE and Architect, mentoring, Visionary Evolution |
+| **@Aider** | aider CLI | ~5 | 0/10 | Negligible | aider Agentic Coding loop (offline) - autonomous coding |
+| **@Ralph** | sonnet | ~20 | 4/10 | ~$0.008 | Safe Ralph Wiggum Agentic iteration loop,  Learning, reliability |
+| **@Pilot** | copilot | ~20 | 4/10 | ~$0.008 | GitHub copilot  Agentic session ,  Learning, reliability |
+| **@Peers** | 3-LLMs | ~20 | 4/10 | ~$$$ | MIT- style  3x LLM Peers Consensus. Most expensive but most powerful.  |
+| **@GPT.4.1|@opus|@o1|@<model>** | you chooose | varies| N/A |  varies | Route to LLM [model.<ver>]. NO Persona  |
+    * Depending on   your budget, @Peers is best used for limited: { Strategic-Planning, Impossible-Problem-Solving, RCA analysis etc}. 
 
 ### Flavor Intensity (0-10)
 
@@ -207,7 +214,7 @@ Control personality **without token bloat**:
 
 ```bash
 agence @chad --flavor=2 "Prod deployment (professional)"
-agence @aiko --flavor=8 "Teach me (fun learning)"
+^ @aiko --flavor=8 "Teach me (fun learning)"
 agence @claudia --flavor=2 "Design patterns (mentor)"
 ```
 
