@@ -2,7 +2,6 @@
 # These patterns ensure agence framework files are properly ignored
 
 # Agence runtime artifacts
-.ai_runtime/
 .aisecrets/
 .aisession_cache/
 

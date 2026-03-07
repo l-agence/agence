@@ -124,7 +124,7 @@ setup_bash_session() {
 
 setup_pwsh_session() {
     # For PowerShell, we delegate to a .ps1 wrapper that can handle pwsh syntax
-    local ps_wrapper="${GIT_ROOT}/.ai_runtime/ai-shell.ps1"
+    local ps_wrapper="${GIT_ROOT}/bin/ai-shell.ps1"
     
     if [[ ! -f "$ps_wrapper" ]]; then
         echo "[AI-SHELL] ✗ PowerShell wrapper not found: $ps_wrapper" >&2
