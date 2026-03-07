@@ -738,6 +738,25 @@ init_agence_environment() {
   local TARGET_BIN="$REPO_ROOT/bin"
   local files_installed=0
   
+  # Standalone mode: skeleton files ARE the working copies — skip all copies
+  if [[ "$AGENCE_REPO" == "$REPO_ROOT" ]]; then
+    echo "  ⏭ Standalone mode: skeleton files are working copies (no copy needed)"
+    echo ""
+    echo "Step 3/4: Merging .gitignore patterns..."
+    echo "  ⏭ Standalone mode: .gitignore is the source (no merge needed)"
+    echo ""
+    echo "Step 4/4: Finalizing initialization..."
+    echo ""
+    echo "=============================================="
+    echo "✓ Agence initialization complete! (standalone mode)"
+    echo "  Environment: $CURRENT_SHELL"
+    echo "  AGENCE_ROOT=$AGENCE_REPO"
+    echo "  REPO_ROOT=$REPO_ROOT"
+    echo "  Mode: Standalone (skeleton files = working copies)"
+    echo "=============================================="
+    return 0
+  fi
+
   # Ensure .github directory exists
   mkdir -p "$TARGET_GITHUB" 2>/dev/null
   mkdir -p "$TARGET_BIN" 2>/dev/null
@@ -761,41 +780,37 @@ init_agence_environment() {
     echo "  ⏭ bin/^: already exists"
   fi
   
-  # Copy copilot.md as copilot-instructions.md
-  local source_copilot="$AGENCE_GITHUB/copilot.md"
-  local target_copilot="$TARGET_GITHUB/copilot-instructions.md"
-  
-  if [[ ! -e "$target_copilot" ]]; then
-    if [[ -f "$source_copilot" ]]; then
-      cp -p "$source_copilot" "$target_copilot" 2>/dev/null
-      if [[ -f "$target_copilot" ]]; then
-        echo "  ✓ .github/copilot-instructions.md (copied)"
-        ((files_installed++))
-      else
-        echo "  ⚠ .github/copilot-instructions.md: copy failed"
+  # Copy skeleton files with managed-file header
+  # Header tells agents to edit the source in .agence/.github/, not the copy
+  copy_skeleton() {
+    local src="$1" tgt="$2" label="$3"
+    if [[ ! -e "$tgt" ]]; then
+      if [[ -f "$src" ]]; then
+        # Stamp copy with managed-file header (relative to $REPO_ROOT)
+        local rel_src="${src#$REPO_ROOT/}"
+        printf '<!-- AGENCE MANAGED — Do not edit. Source: %s -->\n' "$rel_src" > "$tgt"
+        cat "$src" >> "$tgt"
+        if [[ -f "$tgt" ]]; then
+          echo "  ✓ $label (copied with header)"
+          ((files_installed++))
+        else
+          echo "  ⚠ $label: copy failed"
+        fi
       fi
+    else
+      echo "  ⏭ $label: already exists"
     fi
-  else
-    echo "  ⏭ .github/copilot-instructions.md: already exists"
-  fi
-  
-  # Copy CLAUDE.md to repo root
-  local source_claude="$AGENCE_GITHUB/CLAUDE.md"
-  local target_claude="$REPO_ROOT/CLAUDE.md"
-  
-  if [[ ! -e "$target_claude" ]]; then
-    if [[ -f "$source_claude" ]]; then
-      cp -p "$source_claude" "$target_claude" 2>/dev/null
-      if [[ -f "$target_claude" ]]; then
-        echo "  ✓ CLAUDE.md (copied)"
-        ((files_installed++))
-      else
-        echo "  ⚠ CLAUDE.md: copy failed"
-      fi
-    fi
-  else
-    echo "  ⏭ CLAUDE.md: already exists"
-  fi
+  }
+
+  # copilot-instructions.md → .github/copilot-instructions.md
+  copy_skeleton "$AGENCE_GITHUB/copilot-instructions.md" \
+    "$TARGET_GITHUB/copilot-instructions.md" \
+    ".github/copilot-instructions.md"
+
+  # CLAUDE.md → repo root
+  copy_skeleton "$AGENCE_GITHUB/CLAUDE.md" \
+    "$REPO_ROOT/CLAUDE.md" \
+    "CLAUDE.md"
   
   if [[ $files_installed -gt 0 ]]; then
     echo ""

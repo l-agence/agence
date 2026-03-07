@@ -1,6 +1,7 @@
 ./CLAUDE.md
 .github/copilot-instructions.md
 ./.gitignore
+./.gitmodules
 .agence/
 .mysecrets/
 .aisecrets/
