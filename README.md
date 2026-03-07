@@ -84,11 +84,14 @@ agence !help
 
 ## 📚 Documentation
 
-- **[Architecture](synthesis/l-agence.org/INDEX.md)** - How Agence works (sharding, sessions, handoff)
+- **[Architecture](synthetic/l-agence.org/docs/INDEX.md)** - How Agence works (sharding, sessions, handoff)
 - **[Commands](bin/COMMANDS.md)** - Full CLI reference
 - **[Principles](codex/PRINCIPLES.md)** - Core maxims
+- **[Laws](codex/LAWS.md)** - Best practices
 - **[Rules](codex/RULES.md)** - Best practices
-- **[Lessons](synthesis/l-agence.org/lessons/)** - Captured insights
+- **[Lessons](synthetic/l-agence.org/lessons/)** - Captured insights
+- **[faults](synthetic/l-agence.org/faults/)** - Captured faults
+- **[logs](synthetic/l-agence.org/logs/)** - Captured logs
 
 ---
 
@@ -106,7 +109,7 @@ agence !help
 │  ├─ logs/                      # Activity logs
 │  ├─ faults/                    # Error tracking
 │  └─ sessions/                  # Persisted agent context
-├─ synthesis/                    # Learning & documentation
+├─ synthetic/                    # Learning & documentation
 │  └─ lessons/                   # Project lessons learned
 ├─ .github/                      # Git instructions
 │  └─ CLAUDE.md                  # Agent context & instructions
@@ -195,7 +198,7 @@ agence ^reload         # Reload knowledge base
 ## 🔗 Links
 
 - **GitHub**: [l-agence/agence-master](https://github.com/l-agence/agence-master)
-- **Architecture Docs**: [Full system design](synthesis/l-agence.org/docs/ARCHITECTURE.md)
+- **Architecture Docs**: [Full system design](synthetic/l-agence.org/docs/ARCHITECTURE.md)
 - **Issues**: [GitHub Issues](https://github.com/l-agence/agence-master/issues)
 
 ---
@@ -207,7 +210,7 @@ See LICENSE.md for details
 
 ---
 
-**Questions?** Start with `agence !help` or check [the docs](synthesis/l-agence.org/INDEX.md).
+**Questions?** Start with `agence !help` or check [the docs](synthetic/l-agence.org/INDEX.md).
 
 **Want to contribute?** See CONTRIBUTING.md (coming soon).
 

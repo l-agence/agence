@@ -1314,7 +1314,7 @@ learn_from_sessions() {
   
   local sessions_dir="${AGENCE_REPO}/nexus/.aisessions"
   local faults_dir="${AGENCE_REPO}/nexus/faults"
-  local lessons_dir="${AGENCE_REPO}/synthesis/l-agence.org/lessons"
+  local lessons_dir="${AGENCE_REPO}/synthetic/l-agence.org/lessons"
   
   local session_count=0
   local fault_count=0
@@ -1367,7 +1367,7 @@ learn_from_sessions() {
   echo "Summary:"
   echo "  Sessions reviewed: $session_count"
   echo "  Faults analyzed: $fault_count"
-  echo "  Lessons in synthesis: $lessons_count"
+  echo "  Lessons in synthetic: $lessons_count"
   echo ""
   echo "Next: Use ^commit to save knowledge changes"
   echo ""
@@ -1399,11 +1399,11 @@ commit_knowledge_changes() {
   
   # Stage all synthetic knowledge changes
   local kb_root="${AGENCE_REPO}/globalcache"
-  local synthesis="${AGENCE_REPO}/synthesis"
+  local synthetic="${AGENCE_REPO}/synthetic"
   local nexus_faults="${AGENCE_REPO}/nexus/faults"
   
   git add "$kb_root" 2>/dev/null
-  git add "$synthesis" 2>/dev/null
+  git add "$synthetic" 2>/dev/null
   git add "$nexus_faults" 2>/dev/null
   
   # Count staged changes
@@ -1422,10 +1422,10 @@ commit_knowledge_changes() {
   local commit_msg="[KNOWLEDGE] Synthetic learning update
 
 - Updated knowledge bases (globalcache/)
-- Recorded lessons learned (synthesis/)
+- Recorded lessons learned (synthetic/)
 - Fault analysis and insights (nexus/faults/)
 
-Automated knowledge synthesis and consolidation."
+Automated knowledge synthetic consolidation."
   
   git commit -m "$commit_msg" 2>/dev/null
   
@@ -1533,7 +1533,7 @@ save_session_context() {
 
   local sessions_dir="${AGENCE_ROOT}/nexus/.aisessions"
   local saves_dir="${AGENCE_ROOT}/nexus/.aisaves"
-  local lessons_dir="${AGENCE_ROOT}/synthesis/l-agence.org/lessons"
+  local lessons_dir="${AGENCE_ROOT}/synthetic/l-agence.org/lessons"
   mkdir -p "$saves_dir" 2>/dev/null
 
   agence_format_header "AGENCE SAVE (^save) — checkpoint"
@@ -1936,7 +1936,7 @@ pause_session() {
   local pause_id="pause-$(date +%Y%m%d_%H%M%S)-$(printf '%x' $((RANDOM * RANDOM)))"
 
   local saves_dir="${AGENCE_ROOT}/nexus/.aisaves"
-  local lessons_dir="${AGENCE_ROOT}/synthesis/l-agence.org/lessons"
+  local lessons_dir="${AGENCE_ROOT}/synthetic/l-agence.org/lessons"
   local sessions_dir="${AGENCE_ROOT}/nexus/.aisessions"
   mkdir -p "$saves_dir" 2>/dev/null
 

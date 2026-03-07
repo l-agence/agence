@@ -227,7 +227,7 @@ full table scans because the index was on the wrong column.
 Let me save this pattern to SYNTHESIS."
 
 # Aiko then saves to:
-# synthesis/l-agence.org/database-patterns/index-optimization.md
+# synthetic/l-agence.org/database-patterns/index-optimization.md
 ```
 
 ---

@@ -111,6 +111,6 @@ LLM / Agent Request
 
 ## References
 
-- [SESSION-PERSISTENCE.md](../synthesis/l-agence.org/SESSION-PERSISTENCE.md) - Full documentation
+- [SESSION-PERSISTENCE.md](../synthetic/l-agence.org/SESSION-PERSISTENCE.md) - Full documentation
 - [LAWS.md](../codex/LAWS.md) - CODEX Law 5 (Sessions Stay Local)
 - [bin/aido](../bin/aido) - Implementation

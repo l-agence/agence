@@ -96,7 +96,7 @@ When an error is detected:
 
 1. **Log the fault immediately** — Record it before attempting anything else
 2. **Pause and disclose** — Do NOT attempt auto-remediation; explain the error clearly
-3. **Wait for direction** — Joint human-AI synthesis on next steps
+3. **Wait for direction** — Joint human-AI synthetic on next steps
 4. **NO cascade fixes** — Panic-driven rollbacks often compound damage
 
 **Why**: Each "quick fix" attempt made without confirmation risks introducing new errors. A simple mistake compounds exponentially if we rush to undo it recklessly.

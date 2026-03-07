@@ -89,7 +89,7 @@ jq '.exit_code, .lessons, .fault' < .aisessions/SESSION_ID.meta.json > /tmp/hand
 # Share /tmp/handoff.json, never .typescript
 ```
 
-See [SESSION-PERSISTENCE.md](../../synthesis/l-agence.org/SESSION-PERSISTENCE.md) for details.
+See [SESSION-PERSISTENCE.md](../../synthetic/l-agence.org/SESSION-PERSISTENCE.md) for details.
 
 ---
 

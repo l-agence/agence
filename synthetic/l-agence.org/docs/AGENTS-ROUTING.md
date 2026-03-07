@@ -70,21 +70,21 @@ bin/agence (entry point)
 │       ├── AGENTS.md              ← Agent quick reference
 │       ├── @                      ← Symlink to default agent (optional)
 │       ├── aider/
-│       │   └── agent.md           ← Aider persona (~40 tokens)
+│       │   └── agent.md           ← (aider) Aider session (~40 tokens) - aider coding agent
 │       ├── chad/
-│       │   └── agent.md           ← Chad persona (~50 tokens)
+│       │   └── agent.md           ← (chatGPT) (~0 tokens) - low cost optimized but reliable CloudOps/DevOps.
 │       ├── claudia/
-│       │   └── agent.md           ← Claudia persona (~60 tokens)
-│       ├── haiku/
-│       │   └── agent.md           ← (TBD) Fast/lightweight
-│       ├── lima/
-│       │   └── agent.md           ← (TBD) Custom persona
+│       │   └── agent.md           ← (opus) (~60 tokens) -Visionary, Principal SRE and architect. Full stack evolution.
+│       ├── aiko/
+│       │   └── agent.md           ← (haiku) Fast/lightweight architecture HLA, prototypes or CI/CD DevOps. Disruptive innovation.
+│       ├── olena/
+│       │   └── agent.md           ← (ollama) (~0 tokens) secure On-Premises Local ollama agents with guardrails.
 │       ├── pilot/
-│       │   └── agent.md           ← (TBD) Autonomous
+│       │   └── agent.md           ← (copilot) GitHub Copilot agent sessions.
 │       ├── ralph/
-│       │   └── agent.md           ← (TBD) Custom
-│       └── sonny/
-│           └── agent.md           ← (TBD) Custom
+│       │   └── agent.md           ← (ralph) Ralph Wiggum recursion loops with principal Skinner harness
+│       └── sonya/
+│           └── agent.md           ← (sonnet) Sr SRE and Full Stack developer. tricky problems. Obsession with Code beauty.
 │
 └── modules/
     ├── git/

@@ -16,16 +16,16 @@ Agent claimed symlinks were successfully created by `^init` command. Verificatio
 Step 2/3: Creating organization symlinks...
   ⚠ globalcache/@: symlink creation failed (may try mklink on next checkout)
   ⚠ objectcode/@: symlink creation failed (may try mklink on next checkout)
-  ⚠ synthesis/@: symlink creation failed (may try mklink on next checkout)
+  ⚠ synthetic/@: symlink creation failed (may try mklink on next checkout)
 ✓ Agence initialization complete!
 ```
 
 ## Actual Result
 ```
-$ ls -la globalcache/@ objectcode/@ synthesis/@
+$ ls -la globalcache/@ objectcode/@ synthetic/@
 ls: cannot access 'globalcache/@': No such file or directory
 ls: cannot access 'objectcode/@': No such file or directory
-ls: cannot access 'synthesis/@': No such file or directory
+ls: cannot access 'synthetic/@': No such file or directory
 ```
 
 ## Root Cause

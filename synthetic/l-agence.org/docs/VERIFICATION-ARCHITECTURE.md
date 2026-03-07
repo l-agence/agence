@@ -131,7 +131,7 @@ nexus/
 
 ## References
 
-- [SESSION-PERSISTENCE.md](../synthesis/l-agence.org/SESSION-PERSISTENCE.md)
+- [SESSION-PERSISTENCE.md](../synthetic/l-agence.org/SESSION-PERSISTENCE.md)
 - [SESSION-ARCHITECTURE.md](../nexus/SESSION-ARCHITECTURE.md)
 - [CODEX LAW 5](../codex/LAWS.md#law-5-sessions-stay-local-metadata-shared)
 - [bin/aido](../bin/aido)

@@ -273,14 +273,14 @@ agence ^reindex
 **What it does**:
 - Scans all recorded sessions in `nexus/.aisessions/`
 - Reviews fault records in `nexus/faults/`
-- Synthesizes lessons learned in `synthesis/l-agence.org/lessons/`
-- Updates knowledge synthesis indexes
+- Synthesizes lessons learned in `synthetic/l-agence.org/lessons/`
+- Updates knowledge synthetic indexes
 
 **Workflow**:
 
 1. **Session review**: Counts and analyzes session metadata
 2. **Fault analysis**: Extracts insights from fault records
-3. **Lesson synthesis**: Updates synthesis directory with learnings
+3. **Lesson synthetic**: Updates synthetic directory with learnings
 
 **Usage**:
 
@@ -304,7 +304,7 @@ agence ^learn
 #
 # Step 3/3: Synthesizing lessons learned...
 #   Active lessons: 5
-#   Synthesis destination: /path/to/.agence/synthesis/l-agence.org/lessons/
+#   Synthesis destination: /path/to/.agence/synthetic/l-agence.org/lessons/
 #
 # ==============================================
 #   LEARNING COMPLETE
@@ -313,7 +313,7 @@ agence ^learn
 # Summary:
 #   Sessions reviewed: 12
 #   Faults analyzed: 2
-#   Lessons in synthesis: 5
+#   Lessons in synthetic: 5
 #
 # Next: Use ^commit to save knowledge changes
 ```
@@ -322,7 +322,7 @@ agence ^learn
 
 - **After critical sessions**: Distill insights while fresh
 - **After a fault**: Record what went wrong and how to avoid it
-- **Periodic reflection**: Review lessons and update synthesis
+- **Periodic reflection**: Review lessons and update synthetic
 - **Knowledge consolidation**: Prepare changes for team sharing
 
 ---
@@ -333,7 +333,7 @@ agence ^learn
 
 **What it does**:
 - Stages all knowledge base changes (`globalcache/`)
-- Stages synthesis updates (`synthesis/`)
+- Stages synthetic updates (`synthetic/`)
 - Stages fault records (`nexus/faults/`)
 - Creates git commit with knowledge metadata
 
@@ -376,10 +376,10 @@ agence ^commit
 [KNOWLEDGE] Synthetic learning update
 
 - Updated knowledge bases (globalcache/)
-- Recorded lessons learned (synthesis/)
+- Recorded lessons learned (synthetic/)
 - Fault analysis and insights (nexus/faults/)
 
-Automated knowledge synthesis and consolidation.
+Automated knowledge synthetic and consolidation.
 ```
 
 **Why use it**:

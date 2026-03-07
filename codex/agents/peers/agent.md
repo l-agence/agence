@@ -193,7 +193,7 @@ Key principle: A model with 85% confidence but 0.95 expertise weight may outweig
 - [ ] Peers orchestrator shell (`peers.sh` or similar)
 - [ ] Flavor routing logic (code/light/heavy)
 - [ ] Multi-model parallel calling
-- [ ] Response aggregation & synthesis
+- [ ] Response aggregation & synthetic
 
 **Phase 2 (Future)**:
 - [ ] @peers ^solve with RCA

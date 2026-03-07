@@ -39,7 +39,7 @@ Agence is a **distributed agent collaboration system** that solves persistent me
 - **Location**: `l-agence/agence-master` (GitHub)
 - **Contents**: 
   - Base framework (bin/agence entry point)
-  - Template structure (codex/, nexus/, synthesis/)
+  - Template structure (codex/, nexus/, synthetic/)
   - Standard command definitions
   - Agent personas library
 - **Role**: Template, not runtime - never stores operational data
@@ -119,7 +119,7 @@ Development Organization
 **Key Properties:**
 1. Each repo contains its own `.agence/` directory
 2. `.agence/.gitignore` excludes nexus/ (operational state)
-3. `.agence/codex/` and `.agence/synthesis/` are versioned
+3. `.agence/codex/` and `.agence/synthetic/` are versioned
 4. Sessions can be exported for cross-shard handoff
 
 ### 3.3 Distribution Model
@@ -136,7 +136,7 @@ Development Organization
 │  │  ├─ logs/
 │  │  ├─ faults/
 │  │  └─ sessions/
-│  ├─ synthesis/ (versioned)
+│  ├─ synthetic/ (versioned)
 │  │  ├─ lessons/ (project-specific)
 │  │  └─ docs/
 │  └─ .gitignore (excludes nexus/)
