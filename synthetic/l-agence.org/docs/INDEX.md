@@ -71,7 +71,7 @@ that ensures every decision flows through rules, references multiple knowledge b
 │                                                           │
 │ ┌──────────┐ ┌──────────────┐ ┌───────────┐ ┌───────────┐ │
 │ │OBJECTCODE│ │ GLOBALCACHE  │ │ SYNTHETIC │ │ HERMETIC  │ │
-│ │(Git,etc) │ │(External RAG)│ │(sharedDWM)│ │(privaeDWM)│ │
+│ │(Git,etc) │ │(External RAG)│ │(sharedDWM)│ │(secretDWM)│ │
 │ └──────────┘ └──────────────┘ └───────────┘ └───────────┘ │
 │                                                           │
 ├───────────────────────────────────────────────────────────┤
