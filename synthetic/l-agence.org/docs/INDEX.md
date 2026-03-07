@@ -35,7 +35,7 @@ Agence automatically detects your shell environment and normalizes paths accordi
 
 Before any command executes, Agence validates:
 1. **Shell Detection**: Identifies environment and sets path style automatically
-2. **Execution Context**: Verifies `pwd` is in `GIT_REPO/` or `AGENCE_REPO/`
+2. **Execution Context**: Verifies `pwd` is in `GIT_REPO/` or `AI_REPO/`
 3. **CODEX Check**: Validates against governance rules
 
 If context validation fails:
@@ -48,7 +48,7 @@ $ cd /tmp && agence "test"
 Recovery: cd to your project root or ~/.agence
 ```
 
-See [codex/SHELL_DETECTION.md](codex/SHELL_DETECTION.md) and [codex/LAWS.md](codex/LAWS.md) for details.
+See [codex/SHELL_DETECTION.md](SHELL_DETECTION.md) and [codex/LAWS.md](../codex/LAWS.md) for details.
 
 ---
 
@@ -86,8 +86,9 @@ that ensures every decision flows through rules, references multiple knowledge b
 
 ```
 codex/
-├── RULES.md      ← Prescriptive guidance (Do's - things we want)
-├── LAWS.md       ← Immutable prohibitions (DON'Ts - things we avoid)
+├── PRINCIPLES.md ← LLM value system & guidance (Philosophy of approach)
+├── RULES.md      ← Prescriptive guidance (DO's - things we want)
+├── LAWS.md       ← Immutable prohibitions (DON'Ts - things we MUST avoid)
 └── codex.check() ← Pre-flight validation before any command/prompt
 ```
 
