@@ -56,14 +56,14 @@ See [codex/SHELL_DETECTION.md](codex/SHELL_DETECTION.md) and [codex/LAWS.md](cod
 
 Agence is built on **COGNOS** - a 6-layer knowledge and governance system (+1 secret layer) 
 that ensures every decision flows through rules, references multiple knowledge bases, and maintains state across distributed agents.
-(C) = Codex         : The Governance Engine - principles, laws & rules.
-(O) = ObjectCode    : Code-enabled KnowledgeBase - git integration. 
-(G) - GlobalCache   : Semantic RAG KnowledgeBase - vector-like . 
-(N) - Nexus         : Local State database - never shared.
-(O) - Orchestrator  : matrix-based project management and worklows. 
-(S) - Synthetic     : our Derived World Model - Human + AI Sentience.
+- (C) = Codex         : The Governance Engine - principles, laws & rules.
+- (O) = ObjectCode    : Code-enabled KnowledgeBase - git integration. 
+- (G) - GlobalCache   : Semantic RAG KnowledgeBase - vector-like . 
+- (N) - Nexus         : Local State database - never shared.
+- (O) - Orchestrator  : matrix-based project management and worklows. 
+- (S) - Synthetic     : our Derived World Model - Human + AI Sentience.
 +
-(H) - Hermetic      : Our Secret World Model. - Selectively Shared.
+- (H) - Hermetic      : Our Secret World Model. - Selectively Shared.
 ```
 ┌───────────────────────────────────────────────────────────┐
 │  CODEX (Rules & Laws) - Gates Everything                  │
