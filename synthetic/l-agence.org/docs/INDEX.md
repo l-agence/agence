@@ -57,21 +57,20 @@ See [codex/SHELL_DETECTION.md](codex/SHELL_DETECTION.md) and [codex/LAWS.md](cod
 Agence is built on **COGNOS** - a 6-layer knowledge and governance system that ensures every decision flows through rules, references multiple knowledge bases, and maintains state across distributed agents.
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  CODEX (Rules & Laws) - Gates Everything                │
-├─────────────────────────────────────────────────────────┤
+┌───────────────────────────────────────────────────────────┐
+│  CODEX (Rules & Laws) - Gates Everything                  │
+├───────────────────────────────────────────────────────────┤
 │                                                           │
-│  ┌──────────┐  ┌──────────────┐  ┌──────────┐           │
-│  │ OBJECT   │  │ GLOBAL       │  │ SYNTHESIS│           │
-│  │ CODE     │  │ CACHE        │  │ (Derived)│           │
-│  │(Git)    │  │(External RAG)│  │(Analysis)│           │
-│  └──────────┘  └──────────────┘  └──────────┘           │
+│ ┌──────────┐ ┌──────────────┐ ┌───────────┐ ┌───────────┐ │
+│ │OBJECTCODE│ │ GLOBALCACHE  │ │ SYNTHETIC │ │ HERMETIC  │ │
+│ │(Git,etc) │ │(External RAG)│ │(sharedDWM)│ │(privaeDWM)│ │
+│ └──────────┘ └──────────────┘ └───────────┘ └───────────┘ │
 │                                                           │
-├─────────────────────────────────────────────────────────┤
-│  NEXUS (State Database) - Session & Agent State          │
-├─────────────────────────────────────────────────────────┤
-│  ORDINATOR (Workflow Engine) - Matrix Tasks & Projects   │
-└─────────────────────────────────────────────────────────┘
+├───────────────────────────────────────────────────────────┤
+│ NEXUS (State Database) - Session & Agent State            │
+├───────────────────────────────────────────────────────────┤
+│ ORCHESTRATOR (Workflow Engine) - Matrix Tasks & Projects  │
+└───────────────────────────────────────────────────────────┘
 ```
 
 ### Layer 1: CODEX (Governance - Do's & Don'Ts)
@@ -106,8 +105,17 @@ Every user command (CLI or prompt) is validated against LAWS before execution. T
 - Checksums for cache expiry
 - Organized by organizational boundaries (cross-TLD)
 
-#### **S = SYNTHESIS** | Derived Knowledge
+#### **S = SYNTHETIC** | Derived Knowledge
 - **Everything we (LLMs + user) discover and create**
+- Keeps original content pristine
+- Analysis, patterns, conclusions we derive
+- TLD/org structure with INDEX.md per org
+- Indexed and cross-referenced
+
+#### **H = HERMETIC** | Derived Knowledge - The "Secret-Base"
+- ** private knowledge we (LLMs + user) discover and create**
+- Same as SYNTHETIC knowledge but not shared in git.
+- Selectively share/promote knowledge to SYNTHETIC. -You choose.
 - Keeps original content pristine
 - Analysis, patterns, conclusions we derive
 - TLD/org structure with INDEX.md per org
