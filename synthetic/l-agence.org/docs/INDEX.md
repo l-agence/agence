@@ -65,24 +65,23 @@ that ensures every decision flows through rules, references multiple knowledge b
 +
 - (H) - Hermetic      : Our Secret World Model. - Selectively Shared.
 ```
-┌───────────────────────────────────────────────────────────┐
-│  CODEX (Rules & Laws) - Gates Everything                  │
-├───────────────────────────────────────────────────────────┤
-│                                                           │
-│ ┌──────────┐ ┌──────────────┐ ┌───────────┐ ┌───────────┐ │
-│ │OBJECTCODE│ │ GLOBALCACHE  │ │ SYNTHETIC │ │ HERMETIC  │ │
-│ │(Git,etc) │ │(External RAG)│ │(sharedDWM)│ │(secretDWM)│ │
-│ └──────────┘ └──────────────┘ └───────────┘ └───────────┘ │
-│                                                           │
-├───────────────────────────────────────────────────────────┤
-│ ORCHESTRATOR (Workflow Engine) - Matrix Tasks & Projects  │
-├───────────────────────────────────────────────────────────┤
-│ NEXUS (State Database) - Session & Agent State            │
-└───────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  CODEX (Rules & Laws) - Gates Everything                     │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│ ┌──────────┐ ┌──────────────┐ ┌─────────────┐ ┌────────────┐ │
+│ │OBJECTCODE│ │ GLOBALCACHE  │ │ SYNTHETIC   │ │ HERMETIC   │ │
+│ │(Git,etc) │ │(External RAG)│ │(shared DWM) │ │(secret DWM)│ │
+│ └──────────┘ └──────────────┘ └─────────────┘ └────────────┘ │
+│                                                              │
+├──────────────────────────────────────────────────────────────┤
+│ ORCHESTRATOR (Workflow Engine) - Matrix Tasks & Projects     │
+├──────────────────────────────────────────────────────────────┤
+│ NEXUS (State Database) - Session & Agent State               │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ### Layer 1: CODEX (Governance - Do's & Don'Ts)
-
 **The First Law**: *Everything goes through CODEX first for interpretation - no exception.*
 
 ```
@@ -95,7 +94,6 @@ codex/
 Every user command (CLI or prompt) is validated against LAWS before execution. This is non-negotiable.
 
 ### Layer 2-4: Knowledge Bases (C-O-G-S)
-
 #### **C = CODEX** | Governance
 - Rules of conduct (RULES.md)
 - Immutable prohibitions (LAWS.md)
@@ -120,17 +118,7 @@ Every user command (CLI or prompt) is validated against LAWS before execution. T
 - TLD/org structure with INDEX.md per org
 - Indexed and cross-referenced
 
-#### **H = HERMETIC** | Derived Knowledge - The "Secret-Base"
-- ** private knowledge we (LLMs + user) discover and create**
-- Same as SYNTHETIC knowledge but not shared in git.
-- Selectively share/promote knowledge to SYNTHETIC. -You choose.
-- Keeps original content pristine
-- Analysis, patterns, conclusions we derive
-- TLD/org structure with INDEX.md per org
-- Indexed and cross-referenced
-
 ### Layer 5: NEXUS (State Coordination)
-
 **NEXUS** is the persistent state database - critical for:
 - **Session state**: User context across conversations
 - **Agent state**: Current task, progress, results
@@ -140,12 +128,23 @@ Every user command (CLI or prompt) is validated against LAWS before execution. T
 Enables **distributed agent coordination** without losing context.
 
 ### Layer 6: ORDINATOR (Workflow Engine)
-
 **ORDINATOR** is the task/project engine - coming soon:
 - Matrix-based project management (linear algebra)
 - Task decomposition to agents
 - Deliverables & timeline tracking
 - Future: JIRA integration
+
+
+### Layer 7: HERMETIC (Secret Knowledge Base)
+#### **H = HERMETIC** | Secret Derived Knowledge - The "Secret-Base"
+- ** private knowledge we (LLMs + user) discover and create**
+- Same as SYNTHETIC knowledge but not shared in git.
+- Selectively share/promote knowledge to SYNTHETIC. -You choose.
+- Keeps original content pristine
+- Analysis, patterns, conclusions we derive
+- TLD/org structure with INDEX.md per org
+- Indexed and cross-referenced
+
 
 ---
 
