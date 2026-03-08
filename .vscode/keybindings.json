@@ -1,0 +1,12 @@
+[
+  {
+    "key": "alt+shift+4", // tiled bash session
+    "command": "workbench.action.tasks.runTask",
+    "args": "Agentic Bash Session (ai-shell)"
+  },
+  {
+    "key": "alt+shift+5", // tiled powershell session
+    "command": "workbench.action.tasks.runTask",
+    "args": "Agentic PowerShell Session (ai-shell)"
+  }
+]

@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 
 ################################################################################
-# ai-shell.sh: Unified shell wrapper for multi-session VS Code terminals
+# ibash: Interactive shell with agentic policy enforcement
 #
-# Handles both bash and PowerShell, enforces CODEX validation, captures session
-# logs via 'script' command, and maintains chroot-like $GIT_ROOT isolation.
+# Hardened interactive shell for users, with:
+#   - Session logging
+#   - CODEX validation
+#   - Agentic policy enforcement (aipolicy)
+#   - PATH restriction, env sanitization, signal blocking
 #
-# Usage: ai-shell.sh <shell_type>
+# Usage: ibash
 # Environment variables (set by VS Code extension):
 #   AI_ROLE       - Terminal role: "shared", "planner", "coder", "anchor"
 #   AI_SESSION    - Session ID (e.g., "abc123-2026-03-06")
@@ -16,19 +19,34 @@
 # Features:
 #   - Session logging via 'script' → nexus/.aisessions/
 #   - CODEX validation on every command
+#   - Agentic policy enforcement (aipolicy)
 #   - Path sandbox enforcement (no escape from GIT_ROOT)
 #   - Format.sh output control (text/md/json)
-#   - Cross-platform (bash + pwsh support)
 ################################################################################
 
+
+# Security: fail on error, unset, or pipefail
 set -euo pipefail
+
+# Restrict PATH to safe locations
+export PATH="/usr/bin:/bin:${AI_BIN:-.}:."
+
+# Unset risky env vars
+unset HISTFILE PROMPT_COMMAND CDPATH ENV BASH_ENV SHELLOPTS IFS
+
+# Block dangerous signals
+trap '' SIGINT SIGQUIT SIGTSTP SIGTERM
 
 # ============================================================================
 # ENVIRONMENT SETUP
 # ============================================================================
 
-# Determine shell type from argument
-SHELL_TYPE="${1:-bash}"
+
+# If not set by caller, derive from env
+if [[ -z "${GIT_ROOT:-}" ]]; then
+    # Try to find .agence root by looking for .git or specific markers
+    GIT_ROOT="$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/..\" && pwd)"
+fi
 
 # If not set by caller, derive from env
 if [[ -z "${GIT_ROOT:-}" ]]; then
@@ -36,10 +54,11 @@ if [[ -z "${GIT_ROOT:-}" ]]; then
     GIT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 fi
 
+
 # Session metadata (provided by VS Code extension)
-AI_ROLE="${AI_ROLE:-shared}"
+AI_ROLE="${AI_ROLE:-interactive}"
 AI_SESSION="${AI_SESSION:-unknown}"
-AI_AGENT="${AI_AGENT:-default}"
+AI_AGENT="${AI_AGENT:-user}"
 
 # Session logging paths
 SESSION_DIR="${GIT_ROOT}/nexus/.aisessions"
@@ -73,20 +92,23 @@ EOF
 }
 
 # ============================================================================
-# CODEX VALIDATION + FORMAT LIBRARY
+
+# CODEX VALIDATION + FORMAT LIBRARY + POLICY
 # ============================================================================
 
-load_codex_and_format() {
+load_codex_and_format_and_policy() {
     # Source CODEX validation (if exists)
     if [[ -f "$GIT_ROOT/codex/LAWS.sh" ]]; then
         source "$GIT_ROOT/codex/LAWS.sh"
     fi
-    
     # Source format library for output control
     if [[ -f "$GIT_ROOT/lib/format.sh" ]]; then
         source "$GIT_ROOT/lib/format.sh"
-        # Export format mode for child processes
         export _AGENCE_FMT="${_AGENCE_FMT:-text}"
+    fi
+    # Source agentic policy (if exists)
+    if [[ -f "$GIT_ROOT/bin/aipolicy" ]]; then
+        source "$GIT_ROOT/bin/aipolicy"
     fi
 }
 
@@ -119,31 +141,41 @@ setup_bash_session() {
 }
 
 # ============================================================================
-# POWERSHELL SHELL SETUP
-# ============================================================================
 
-setup_pwsh_session() {
-    # For PowerShell, we delegate to a .ps1 wrapper that can handle pwsh syntax
-    local ps_wrapper="${GIT_ROOT}/bin/ai-shell.ps1"
-    
-    if [[ ! -f "$ps_wrapper" ]]; then
-        echo "[AI-SHELL] ✗ PowerShell wrapper not found: $ps_wrapper" >&2
-        return 1
-    fi
-    
-    # Export environment variables for PowerShell subprocess
+# Hardened interactive shell setup
+setup_ibash_session() {
+    # Start script command to capture all I/O
+    script_cmd="script --quiet --return --command 'bash --noprofile --norc -i' '$SESSION_LOG'"
     export GIT_ROOT AI_ROLE AI_SESSION AI_AGENT SESSION_LOG SESSION_META
-    
-    # Invoke PowerShell with wrapper and session logging
-    # Note: 'script' doesn't work well with pwsh, so we use Out-File in PS1 instead
-    pwsh -NoProfile -NoExit -File "$ps_wrapper" || {
-        echo "[AI-SHELL] ✗ PowerShell session failed"
+    export PS1="[\${AI_ROLE}@\${AI_SESSION:0:8}] \$ "
+
+    # Pre-command hook: enforce policy on every command
+    preexec_policy() {
+        local cmdline="$BASH_COMMAND"
+        local cmd="${cmdline%% *}"
+        local args=( $cmdline )
+        # Only check non-empty commands
+        if [[ -n "$cmd" && $(declare -F aipolicy_command) ]]; then
+            aipolicy_command "$cmd" "${args[@]:1}"
+            local rc=$?
+            if [[ $rc -ne 0 ]]; then
+                echo "[AIPOLICY] Blocked: $cmdline" >&2
+                return $rc
+            fi
+        fi
+    }
+    # Set trap for DEBUG to run preexec_policy before each command
+    if declare -F aipolicy_command >/dev/null; then
+        export -f preexec_policy
+        trap preexec_policy DEBUG
+    fi
+
+    # Launch interactive shell with logging
+    eval "$script_cmd" || {
+        echo "[IBASH] ✗ Interactive shell launch failed"
         return 1
     }
 }
-
-# ============================================================================
-# SANDBOX PATH ENFORCEMENT
 # ============================================================================
 
 sandbox_cd() {
@@ -179,48 +211,26 @@ fi
 # MAIN EXECUTION
 # ============================================================================
 
+
 main() {
-    # Initialize session metadata
     init_session_logging
-    
-    # Load CODEX + format library
-    load_codex_and_format
-    
-    # Print session header
+    load_codex_and_format_and_policy
     echo ""
     echo "╔════════════════════════════════════════════════════════════════╗"
-    echo "║  AGENCE SESSION SHELL                                          ║"
+    echo "║  AGENCE INTERACTIVE SHELL (ibash)                             ║"
     echo "╠════════════════════════════════════════════════════════════════╣"
     echo "║  Role:       $AI_ROLE"
     echo "║  Session:    $AI_SESSION"
     echo "║  Agent:      $AI_AGENT"
-    echo "║  Shell:      $SHELL_TYPE"
     echo "║  Root:       $GIT_ROOT"
     echo "║  Log:        $SESSION_LOG"
     echo "╚════════════════════════════════════════════════════════════════╝"
     echo ""
-    
-    # Change to repo root (chroot-like)
     cd "$GIT_ROOT" || {
-        echo "[AI-SHELL] ✗ Failed to cd to $GIT_ROOT" >&2
+        echo "[IBASH] ✗ Failed to cd to $GIT_ROOT" >&2
         return 1
     }
-    
-    # Dispatch to shell type
-    case "$SHELL_TYPE" in
-        bash)
-            setup_bash_session
-            ;;
-        pwsh|powershell)
-            setup_pwsh_session
-            ;;
-        *)
-            echo "[AI-SHELL] ✗ Unknown shell type: $SHELL_TYPE" >&2
-            echo "[AI-SHELL]   Supported: bash, pwsh, powershell" >&2
-            return 1
-            ;;
-    esac
+    setup_ibash_session
 }
 
-# Execute main block
 main "$@"

@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+# aipolicy: Shared agentic shell policy for aibash and aishell
+# Usage: source ./bin/aipolicy (bash) or . ./bin/aipolicy (pwsh)
+
+# =====================
+# Bash Policy Section
+# =====================
+if [ -n "$BASH_VERSION" ]; then
+  # Whitelist of allowed external commands (add more as needed)
+  AIPOLICY_WHITELIST=(gh terraform jf aws az python pre-commit)
+
+
+  # Helper: check if command is whitelisted
+  aipolicy_is_whitelisted() {
+    local cmd="$1"
+    for allowed in "${AIPOLICY_WHITELIST[@]}"; do
+      if [[ "$cmd" == "$allowed" ]]; then return 0; fi
+    done
+    return 1
+  }
+
+  # Granular subcommand/argument policy (sample skeleton)
+  aipolicy_granular() {
+    local cmd="$1"; shift
+    case "$cmd" in
+      git)
+        case "$1" in
+          status|log|diff|branch|help|list|show) return 0 ;;
+          clean|push|reset|rebase|checkout|merge|commit|dbx) echo "[AIPOLICY] git $1 is denied" >&2; return 127 ;;
+          *) return 1 ;;
+        esac
+        ;;
+      terraform)
+        case "$1" in
+          init)
+            if [[ "$2" == "-upgrade" ]]; then echo "[AIPOLICY] terraform init -upgrade is denied" >&2; return 127; else return 0; fi ;;
+          validate|plan|fmt|version|providers|output|state|show|graph|help|list|login|logout|workspace) return 0 ;;
+          apply|destroy|import|force-unlock|taint|untaint) echo "[AIPOLICY] terraform $1 is denied" >&2; return 127 ;;
+          *) return 1 ;;
+        esac
+        ;;
+      gh)
+        case "$1 $2" in
+          "auth status"|"repo list"|"issue list"|"pr list"|"help"|"auth login") return 0 ;;
+          *) return 1 ;;
+        esac
+        ;;
+      jf)
+        case "$1" in
+          login|help|list|status) return 0 ;;
+          *) return 1 ;;
+        esac
+        ;;
+      aws)
+        case "$1" in
+          help|list|status|login|sts|get-caller-identity|s3|ec2|iam|configure) return 0 ;;
+          *) return 1 ;;
+        esac
+        ;;
+      az)
+        case "$1" in
+          help|login|logout|account|ad|aks|batch|billing|cloud|configure|extension|find|group|identity|keyvault|monitor|network|policy|role|storage|subscription|version) return 0 ;;
+          *) return 1 ;;
+        esac
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
+  # Override command lookup to enforce policy
+  aipolicy_command() {
+    local cmd="$1"; shift
+    # Allow anything in $AI_BIN, $GIT_ROOT/bin, /usr/bin, /bin
+    case "$(command -v "$cmd")" in
+      "$AI_BIN"/*|"$GIT_ROOT"/bin/*|/usr/bin/*|/bin/*)
+        return 0
+        ;;
+      *)
+        aipolicy_is_whitelisted "$cmd" && aipolicy_granular "$cmd" "$@" && return 0
+        echo "[AIPOLICY] Command '$cmd' is not allowed in agentic shell" >&2
+        return 127
+        ;;
+    esac
+  }
+
+  # Example: block rm -rf /
+  alias rm='echo "[AIPOLICY] rm is disabled in agentic shells" >&2; false'
+
+  # Extension point: add more bash-specific policy here
+  return 0
+fi
+
+# =========================
+# PowerShell Policy Section
+# =========================
+if [ -n "$PSVersionTable" ]; then
+  # Whitelist of allowed external commands (add more as needed)
+  $global:AIPOLICY_WHITELIST = @('gh','terraform','jf','aws','az','python','pre-commit')
+
+
+  function aipolicy_is_whitelisted($cmd) {
+    return $global:AIPOLICY_WHITELIST -contains $cmd
+  }
+
+  # Granular subcommand/argument policy (sample skeleton)
+  function aipolicy_granular($cmd, $args) {
+    switch ($cmd) {
+      'git' {
+        switch ($args[0]) {
+          'status'|'log'|'diff'|'branch'|'help'|'list'|'show' { return $true }
+          'clean'|'push'|'reset'|'rebase'|'checkout'|'merge'|'commit'|'dbx' { Write-Error "[AIPOLICY] git $($args[0]) is denied"; return $false }
+          default { return $false }
+        }
+      }
+      'terraform' {
+        switch ($args[0]) {
+          'init' { if ($args -contains '-upgrade') { Write-Error '[AIPOLICY] terraform init -upgrade is denied'; return $false } else { return $true } }
+          'validate'|'plan'|'fmt'|'version'|'providers'|'output'|'state'|'show'|'graph'|'help'|'list'|'login'|'logout'|'workspace' { return $true }
+          'apply'|'destroy'|'import'|'force-unlock'|'taint'|'untaint' { Write-Error "[AIPOLICY] terraform $($args[0]) is denied"; return $false }
+          default { return $false }
+        }
+      }
+      'gh' {
+        $sub = ($args[0] + ' ' + $args[1])
+        switch ($sub) {
+          'auth status'|'repo list'|'issue list'|'pr list'|'help'|'auth login' { return $true }
+          default { return $false }
+        }
+      }
+      'jf' {
+        switch ($args[0]) {
+          'login'|'help'|'list'|'status' { return $true }
+          default { return $false }
+        }
+      }
+      'aws' {
+        switch ($args[0]) {
+          'help'|'list'|'status'|'login'|'sts'|'get-caller-identity'|'s3'|'ec2'|'iam'|'configure' { return $true }
+          default { return $false }
+        }
+      }
+      'az' {
+        switch ($args[0]) {
+          'help'|'login'|'logout'|'account'|'ad'|'aks'|'batch'|'billing'|'cloud'|'configure'|'extension'|'find'|'group'|'identity'|'keyvault'|'monitor'|'network'|'policy'|'role'|'storage'|'subscription'|'version' { return $true }
+          default { return $false }
+        }
+      }
+      default { return $false }
+    }
+  }
+
+  function aipolicy_command($cmd, $args) {
+    $resolved = (Get-Command $cmd -ErrorAction SilentlyContinue).Source
+    if ($resolved -match "^($env:AI_BIN|$env:GIT_ROOT/bin|/usr/bin|/bin)") {
+      return $true
+    }
+    if (aipolicy_is_whitelisted $cmd -and (aipolicy_granular $cmd $args)) { return $true }
+    Write-Error "[AIPOLICY] Command '$cmd' is not allowed in agentic shell"
+    return $false
+  }
+
+  # Example: disable Remove-Item
+  Set-Alias Remove-Item Out-Null
+
+  # Extension point: add more PowerShell-specific policy here
+}

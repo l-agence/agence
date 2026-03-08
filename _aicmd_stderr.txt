@@ -1,0 +1,23 @@
+AICMD: AI Command Validator + Shell Executor
+
+Usage:
+  aicmd validate <command>    - Validate command syntax (redirects, pipes)
+  aicmd sanitize              - Output sanitized environment
+
+Examples:
+  aicmd validate "git log | grep commit"
+  aicmd validate "cat file > output.txt"
+  aicmd validate "curl https://example.com 2>/dev/null"
+
+Safe Redirect Targets:
+  /dev/null, /dev/stderr, /dev/stdout, workspace paths
+
+Safe Pipe Commands:
+  grep, head, tail, sort, uniq, wc, cut, awk, sed, jq, tr, column, less, tee, xargs
+
+Environment Variables:
+  When sourced, provides functions:
+    - sanitize_environment    - Output clean subprocess environment
+    - validate_command        - Validate full command
+    - validate_redirect       - Validate single redirect
+    - validate_pipe           - Validate pipe chain

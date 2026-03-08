@@ -1,0 +1,15 @@
+[?2004h]0;MINGW64:/c/Users/steff/git/.agence
+[32msteff@Ninja7 [35mMINGW64 [33m~/git/.agence[36m (main)[0m
+$ ^C[?2004l[?2004h[?2004l
+[?2004h]0;MINGW64:/c/Users/steff/git/.agence
+[32msteff@Ninja7 [35mMINGW64 [33m~/git/.agence[36m (main)[0m
+$  chmod +x ./bin/aicmd
+[?2004l[?2004h]0;MINGW64:/c/Users/steff/git/.agence
+[32msteff@Ninja7 [35mMINGW64 [33m~/git/.agence[36m (main)[0m
+$ ^C[?2004l[?2004h[?2004l
+[?2004h]0;MINGW64:/c/Users/steff/git/.agence
+[32msteff@Ninja7 [35mMINGW64 [33m~/git/.agence[36m (main)[0m
+$  ./bin/aicmd >_aicmd_stdout.txt 2>_aicmd_stderr.txt
+[?2004l[?2004h]0;MINGW64:/c/Users/steff/git/.agence
+[32msteff@Ninja7 [35mMINGW64 [33m~/git/.agence[36m (main)[0m
+$ 

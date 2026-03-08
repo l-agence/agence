@@ -80,12 +80,13 @@ Local session persistence (`.aisessions/`) is for agent debugging and recovery *
 - No memory/heap/dump broadcasting (stays simple)
 
 ```bash
+
 # ❌ ILLEGAL: Push raw session data
 git add .aisessions/*.typescript
-git commit -m "session logs"
+git commit -m "aisession logs"
 
 # ✅ LEGAL: Export metadata for handoff
-jq '.exit_code, .lessons, .fault' < .aisessions/SESSION_ID.meta.json > /tmp/handoff.json
+jq '.exit_code, .lessons, .fault' < .aisessions/AISESSION_ID.meta.json > /tmp/handoff.json
 # Share /tmp/handoff.json, never .typescript
 ```
 

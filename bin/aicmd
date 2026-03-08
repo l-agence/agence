@@ -257,8 +257,79 @@ is_whitelisted_command() {
 # ============================================================================
 
 main() {
-    local mode="${1:-help}"
-    
+    # Support: aicmd [@agent] [bash|shell] ...
+    local arg1="${1:-}"
+    local arg2="${2:-}"
+    local agent=""
+    local shell_mode=""
+    local shift_count=0
+
+
+    # Detect and warn about &shell or &powershell misuse
+    if [[ "$arg1" =~ ^@ && ( "$arg2" == "&shell" || "$arg2" == "&powershell" ) ]]; then
+        echo "[AICMD] ✗ Do not use '&shell' or '&powershell' as arguments. Use: aicmd @agent shell" >&2
+        exit 1
+    fi
+    if [[ "$arg1" == "&shell" || "$arg1" == "&powershell" ]]; then
+        echo "[AICMD] ✗ Do not use '&shell' or '&powershell' as arguments. Use: aicmd shell" >&2
+        exit 1
+    fi
+
+    # Detect @agent prefix
+    if [[ "$arg1" =~ ^@ ]]; then
+        agent="$arg1"
+        shell_mode="$arg2"
+        shift_count=2
+    elif [[ "$arg1" == "bash" || "$arg1" == "shell" ]]; then
+        shell_mode="$arg1"
+        shift_count=1
+    fi
+
+    # If shell_mode is set, launch the appropriate shell script
+    if [[ -n "$shell_mode" ]]; then
+        shift $shift_count
+        local extra_args=("$@")
+        if [[ "$shell_mode" == "bash" ]]; then
+            local shell_script="$(dirname "$0")/ai-shell.sh"
+            if [[ ! -x "$shell_script" ]]; then
+                echo "[AICMD] ✗ ai-shell.sh not found or not executable: $shell_script" >&2
+                exit 1
+            fi
+            if [[ -n "$agent" ]]; then
+                AGENT="$agent" "$shell_script" "${extra_args[@]}"
+            else
+                "$shell_script" "${extra_args[@]}"
+            fi
+            exit $?
+        elif [[ "$shell_mode" == "shell" ]]; then
+            local shell_script="$(dirname "$0")/ai-shell.ps1"
+            if [[ ! -f "$shell_script" ]]; then
+                echo "[AICMD] ✗ ai-shell.ps1 not found: $shell_script" >&2
+                exit 1
+            fi
+            # Use pwsh or powershell to launch, robust to calling from Bash or PowerShell
+            if command -v pwsh &>/dev/null; then
+                if [[ -n "$agent" ]]; then
+                    AGENT="$agent" pwsh -NoExit -File "$shell_script" "${extra_args[@]}"
+                else
+                    pwsh -NoExit -File "$shell_script" "${extra_args[@]}"
+                fi
+            elif command -v powershell &>/dev/null; then
+                if [[ -n "$agent" ]]; then
+                    AGENT="$agent" powershell -NoExit -File "$shell_script" "${extra_args[@]}"
+                else
+                    powershell -NoExit -File "$shell_script" "${extra_args[@]}"
+                fi
+            else
+                echo "[AICMD] ✗ No PowerShell interpreter found (pwsh or powershell)" >&2
+                exit 1
+            fi
+            exit $?
+        fi
+    fi
+
+    # Fallback to original modes
+    local mode="$arg1"
     case "$mode" in
         validate)
             # aicmd validate "<command>"
@@ -278,11 +349,15 @@ AICMD: AI Command Validator + Shell Executor
 Usage:
   aicmd validate <command>    - Validate command syntax (redirects, pipes)
   aicmd sanitize              - Output sanitized environment
+  aicmd [@agent] bash [...]   - Launch ai-shell.sh (Bash session)
+  aicmd [@agent] shell [...]  - Launch ai-shell.ps1 (PowerShell session)
 
 Examples:
   aicmd validate "git log | grep commit"
-  aicmd validate "cat file > output.txt"
-  aicmd validate "curl https://example.com 2>/dev/null"
+  aicmd bash                  # launches ai-shell.sh
+  aicmd @ralph bash           # launches ai-shell.sh with AGENT=@ralph
+  aicmd shell                 # launches ai-shell.ps1
+  aicmd @sonny shell          # launches ai-shell.ps1 with AGENT=@sonny
 
 Safe Redirect Targets:
   /dev/null, /dev/stderr, /dev/stdout, workspace paths

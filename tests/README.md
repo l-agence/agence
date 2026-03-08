@@ -7,7 +7,7 @@ This directory contains all tests for the Agence project, organized by category.
 ```
 tests/
   unit/          - Unit tests (individual components, functions, modules)
-  integration/   - Integration tests (multi-component workflows, session lifecycle)
+  integration/   - Integration tests (multi-component workflows, aisession lifecycle)
   guardrails/    - Guardrails & safety verification tests
   fixtures/      - Test data, mock responses, test fixtures (when added)
   README.md      - This file
@@ -30,8 +30,8 @@ bash tests/run-unit-tests.sh
 ### Integration Tests
 
 ```bash
-# Test session creation and lifecycle
-bash tests/integration/test-sessions.sh
+# Test aisession creation and lifecycle
+bash tests/integration/test-aisessions.sh
 
 # Test agent routing with actual LLM
 bash tests/integration/test-agent-routing.sh
@@ -68,7 +68,7 @@ bash tests/guardrails/test-permissions.sh
 
 (To be implemented)
 
-- `test-sessions.sh` - Session creation, tracking, environment variables
+- `test-aisessions.sh` - Aisession creation, tracking, environment variables
 - `test-agent-routing.sh` - Agent selection, prefix parsing, env var propagation
 - `test-shell-launch.sh` - Bash/PowerShell launch with profiles
 
