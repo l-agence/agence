@@ -1,62 +1,8 @@
-#!/usr/bin/env bash
 
-################################################################################
-# aicmd: AI Command Validator + Shell Executor
-# Validates redirects, pipes, and environment for interactive shell sessions
-#
-# Usage (standalone):
-#   aicmd validate <command>     - Validate command (redirects, pipes)
-#   aicmd sanitize               - Sanitize environment for safe spawn
-#
-# Usage (sourced):
-#   source bin/aicmd
-#   validate_command "git log | grep commit"
-#   validate_redirect "> /dev/null"
-#
-# Author: Stephane Korning 2026
-# License: MIT License with Commons Clause
-################################################################################
+# aicmd is now a library. Source lib/aicmd-lib.sh in agentic shells.
+# Example:
+#   source "$AGENCE_ROOT/lib/aicmd-lib.sh"
 
-set -euo pipefail
-
-# ============================================================================
-# SAFE REDIRECT TARGETS
-# ============================================================================
-
-# Paths/devices always safe for redirects
-declare -a SAFE_REDIRECT_TARGETS=(
-    "/dev/null"
-    "/dev/stderr"
-    "/dev/stdout"
-    "/dev/stdin"
-)
-
-# ============================================================================
-# SAFE PIPE TARGETS
-# ============================================================================
-
-# Commands that safely receive piped input
-declare -a SAFE_PIPE_COMMANDS=(
-    "grep"
-    "head"
-    "tail"
-    "sort"
-    "uniq"
-    "wc"
-    "cut"
-    "awk"
-    "sed"
-    "jq"
-    "tr"
-    "column"
-    "less"
-    "more"
-    "tee"
-    "xargs"
-    "paste"
-    "join"
-    "comm"
-)
 
 # ============================================================================
 # ENVIRONMENT SANITIZATION

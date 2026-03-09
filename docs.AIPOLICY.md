@@ -1,7 +1,7 @@
 # Agentic Shell Policy: Design Philosophy
 
 ## Overview
-Agentic shell policy (`aipolicy`) is designed for safety, auditability, and accident prevention—not strict containment or true security. This approach is a pragmatic response to technical limitations in distinguishing human and agentic execution without OS-level segregation (dedicated users, containers, or VMs).
+Agentic shell policy (`aipolicy`) is the single source of truth for all policy rules governing agentic shell execution. It is designed for safety, auditability, and accident prevention—not strict containment or true security. Descriptive instructions and rationale are now documented in AISAFEGUARDS.md for clarity.
 
 ## Rationale
 - **Simplicity**: Avoids complex, brittle containment mechanisms.
