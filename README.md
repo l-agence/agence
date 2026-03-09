@@ -50,6 +50,26 @@ git add .gitmodules .agence
 git commit -m "Add Agence agent framework"
 ```
 
+---
+
+**Session Logging Dependency:**
+
+
+Agentic shells use the `script` utility (from util-linux or bsdutils) for session logging. This is available by default on most Linux distributions, but **not** on Windows Git Bash or Cmder. To enable session logging on Windows, use one of the following:
+
+- **MSYS2 (Recommended for advanced users):**
+        1. Download and install MSYS2 from https://www.msys2.org/
+        2. Open the MSYS2 shell
+        3. Run: `pacman -Syu` (update package database and core system)
+        4. Run: `pacman -S util-linux` (installs `script`)
+
+- **Cygwin:** Install the `util-linux` package (provides `script`)
+- **WSL:** Install `bsdutils` or `util-linux` with `sudo apt install bsdutils`
+
+**Note:** Git Bash (from Git for Windows or Cmder) does not support `pacman` or installing `script`. For session logging, use MSYS2, Cygwin, or WSL.
+
+If `script` is not found, agentic shells will still run, but session logging will be disabled and a warning will be shown.
+
 That's it. You now have:
 - 🎯 **Agent collaboration** ready to use
 - 💾 **Session persistence** for interrupted work

@@ -74,11 +74,30 @@ AI_ROLE="${AI_ROLE:-agentic}"
 AI_SESSION="${AI_SESSION:-unknown}"
 AI_AGENT="${AI_AGENT:-robot}"
 
-# Call aisession to initialize session log and metadata
-if command -v "$GIT_ROOT/bin/aisession" &>/dev/null; then
-	"$GIT_ROOT/bin/aisession" init "$AI_SESSION" "$AI_ROLE" "$AI_AGENT" "$SHELL_TYPE" "$GIT_ROOT"
+
+# Check for script utility (session logging dependency)
+if ! command -v script &>/dev/null; then
+	echo ""
+	echo "╔════════════════════════════════════════════════════════════════╗"
+	echo "║  WARNING: 'script' utility not found                         ║"
+	echo "╠════════════════════════════════════════════════════════════════╣"
+	echo "║  Session logging is DISABLED.                                ║"
+	echo "║  To enable session logging, install 'script' (util-linux)    ║"
+	echo "║  - On Linux: sudo apt install bsdutils or util-linux         ║"
+	echo "║  - On Cygwin: setup-x86_64.exe, add util-linux               ║"
+	echo "║  - On WSL: sudo apt install bsdutils or util-linux           ║"
+	echo "║  - On MSYS2: pacman -S util-linux                            ║"
+	echo "║  - Not available in Git Bash/Cmder by default                ║"
+	echo "╚════════════════════════════════════════════════════════════════╝"
+	SESSION_LOGGING_ENABLED=0
 else
-	echo "[AISHA] Warning: aisession not found, session logging not initialized" >&2
+	SESSION_LOGGING_ENABLED=1
+	# Call aisession to initialize session log and metadata
+	if command -v "$GIT_ROOT/bin/aisession" &>/dev/null; then
+		"$GIT_ROOT/bin/aisession" init "$AI_SESSION" "$AI_ROLE" "$AI_AGENT" "$SHELL_TYPE" "$GIT_ROOT"
+	else
+		echo "[AISHA] Warning: aisession not found, session logging not initialized" >&2
+	fi
 fi
 
 # CODEX VALIDATION + FORMAT LIBRARY (same as ai-shell.sh)
