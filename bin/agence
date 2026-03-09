@@ -304,6 +304,8 @@ EOF
 
 show_version() {
   echo "Agence version 0.1.0 (alpha)"
+  echo "[VERSION]: 0.1.0 (alpha)"
+  echo "[RELEASE]: main"
 }
 
 # ============================================================================

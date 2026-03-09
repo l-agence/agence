@@ -182,9 +182,8 @@ agence ^reload         # Reload knowledge base
 | Knowledge Sharding | 🔄 In Development |
 | Session Recovery | 🔄 In Development |
 
-**Current Version:** 0.2.0 (alpha)
-
----
+[VERSION]: 0.2.0 (alpha)
+[RELEASE]: main
 
 ## 🔐 Security & Isolation
 

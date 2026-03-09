@@ -31,8 +31,8 @@ set -euo pipefail
 # Restrict PATH to safe locations
 export PATH="/usr/bin:/bin:${AI_BIN:-.}:."
 
-# Unset risky env vars
-unset HISTFILE PROMPT_COMMAND CDPATH ENV BASH_ENV SHELLOPTS IFS
+# Unset risky env vars (skip SHELLOPTS, which is readonly in Bash)
+unset HISTFILE PROMPT_COMMAND CDPATH ENV BASH_ENV IFS
 
 # Block dangerous signals
 trap '' SIGINT SIGQUIT SIGTSTP SIGTERM
@@ -80,7 +80,7 @@ init_session_logging() {
   "session_id": "$AI_SESSION",
   "role": "$AI_ROLE",
   "agent": "$AI_AGENT",
-  "shell": "$SHELL_TYPE",
+    "shell": "bash",
   "timestamp_start": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "git_root": "$GIT_ROOT",
   "typescript_file": "$SESSION_LOG",
@@ -122,7 +122,10 @@ setup_bash_session() {
     
     # Export environment for child bash
     export GIT_ROOT AI_ROLE AI_SESSION AI_AGENT SESSION_LOG SESSION_META
-    export PS1="[\${AI_ROLE}@\${AI_SESSION:0:8}] \$ "
+    # Set PS1 to ^:<top-level-dir> >
+    local topdir
+    topdir="$(basename "$GIT_ROOT")"
+    export PS1="^:${topdir}> "
     
     # Load user's .bashrc if exists (but NOT .bash_profile to avoid side effects)
     if [[ -f "$HOME/.bashrc" ]]; then
@@ -145,32 +148,35 @@ setup_bash_session() {
 # Hardened interactive shell setup
 setup_ibash_session() {
     # Start script command to capture all I/O
-    script_cmd="script --quiet --return --command 'bash --noprofile --norc -i' '$SESSION_LOG'"
+    # Allow passing arguments to bash (e.g., -c 'cmd', --rcfile ...)
+    script_cmd="script --quiet --return --command 'bash --noprofile --norc -i "$@"' '$SESSION_LOG'"
     export GIT_ROOT AI_ROLE AI_SESSION AI_AGENT SESSION_LOG SESSION_META
     export PS1="[\${AI_ROLE}@\${AI_SESSION:0:8}] \$ "
 
-    # Pre-command hook: enforce policy on every command
-    preexec_policy() {
-        local cmdline="$BASH_COMMAND"
-        local cmd="${cmdline%% *}"
-        local args=( $cmdline )
-        # Only check non-empty commands
-        if [[ -n "$cmd" && $(declare -F aipolicy_command) ]]; then
-            aipolicy_command "$cmd" "${args[@]:1}"
-            local rc=$?
-            if [[ $rc -ne 0 ]]; then
-                echo "[AIPOLICY] Blocked: $cmdline" >&2
-                return $rc
+
+    # Only set policy trap in interactive shells
+    if [[ $- == *i* ]]; then
+        preexec_policy() {
+            local cmdline="$BASH_COMMAND"
+            local cmd="${cmdline%% *}"
+            local args=( $cmdline )
+            # Only check non-empty commands
+            if [[ -n "$cmd" && $(declare -F aipolicy_command) ]]; then
+                aipolicy_command "$cmd" "${args[@]:1}"
+                local rc=$?
+                if [[ $rc -ne 0 ]]; then
+                    echo "[AIPOLICY] Blocked: $cmdline" >&2
+                    return $rc
+                fi
             fi
+        }
+        if declare -F aipolicy_command >/dev/null; then
+            export -f preexec_policy
+            trap preexec_policy DEBUG
         fi
-    }
-    # Set trap for DEBUG to run preexec_policy before each command
-    if declare -F aipolicy_command >/dev/null; then
-        export -f preexec_policy
-        trap preexec_policy DEBUG
     fi
 
-    # Launch interactive shell with logging
+    # Launch interactive shell with logging, passing any arguments
     eval "$script_cmd" || {
         echo "[IBASH] ✗ Interactive shell launch failed"
         return 1
@@ -200,12 +206,10 @@ sandbox_cd() {
     fi
 }
 
-# Override cd for this session (for bash)
-if [[ "$SHELL_TYPE" == "bash" ]]; then
-    builtin_cd() {
-        sandbox_cd "$@"
-    }
-fi
+# Always override cd for ibash
+builtin_cd() {
+    sandbox_cd "$@"
+}
 
 # ============================================================================
 # MAIN EXECUTION
@@ -230,7 +234,7 @@ main() {
         echo "[IBASH] ✗ Failed to cd to $GIT_ROOT" >&2
         return 1
     }
-    setup_ibash_session
+    setup_ibash_session "$@"
 }
 
 main "$@"

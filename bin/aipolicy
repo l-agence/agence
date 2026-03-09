@@ -72,9 +72,21 @@ if [ -n "$BASH_VERSION" ]; then
   # Override command lookup to enforce policy
   aipolicy_command() {
     local cmd="$1"; shift
+    # Dynamically determine AI_BIN if not set
+    if [[ -z "${AI_BIN:-}" ]]; then
+      if [[ -n "${GIT_ROOT:-}" && -d "$GIT_ROOT/.agence/bin" ]]; then
+        AI_BIN="$GIT_ROOT/.agence/bin"
+      elif command -v gh >/dev/null 2>&1; then
+        # Try to get repo root via gh (if available)
+        GIT_ROOT="$(gh repo view --json rootDirectory -q .rootDirectory 2>/dev/null || echo "$GIT_ROOT")"
+        if [[ -d "$GIT_ROOT/.agence/bin" ]]; then
+          AI_BIN="$GIT_ROOT/.agence/bin"
+        fi
+      fi
+    fi
     # Allow anything in $AI_BIN, $GIT_ROOT/bin, /usr/bin, /bin
     case "$(command -v "$cmd")" in
-      "$AI_BIN"/*|"$GIT_ROOT"/bin/*|/usr/bin/*|/bin/*)
+      "${AI_BIN:-}"/*|"$GIT_ROOT"/bin/*|/usr/bin/*|/bin/*)
         return 0
         ;;
       *)
