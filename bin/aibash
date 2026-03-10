@@ -1,3 +1,55 @@
+# HELP FUNCTION
+if [[ "$1" == "help" || "$1" == "--help" ]]; then
+		cat <<EOF
+aibash: Agentic (robot) Bash shell
+
+Usage:
+	aibash [--session <id>] [--agent <name>] [--role <role>] [--shell <bash>] [--] [command ...]
+
+Options:
+	--session <id>   Unique session ID (required for logging)
+	--agent <name>   Agent name (default: robot)
+	--role <role>    Agent role (default: agentic)
+	--shell <bash>   Shell type (default: bash)
+	--               End of options, pass remaining as command
+	help, --help     Show this help message
+
+Examples:
+	aibash --session my-session --agent haiku --role agentic --shell bash
+	aibash --session s1 -- echo "Hello from agentic shell"
+
+Description:
+	Secure, session-logged, agent-only shell for autonomous/background agent work.
+	Not for interactive human use. All I/O is logged. Exits cleanly when stdin closes.
+EOF
+		exit 0
+fi
+# HELP FUNCTION
+show_help() {
+		cat <<EOF
+aibash: Agentic (robot) Bash shell
+
+Usage:
+	aibash [--session <id>] [--agent <name>] [--role <role>] [--shell <bash>] [--] [command ...]
+
+Options:
+	--session <id>   Unique session ID (required for logging)
+	--agent <name>   Agent name (default: robot)
+	--role <role>    Agent role (default: agentic)
+	--shell <bash>   Shell type (default: bash)
+	--               End of options, pass remaining as command
+	help, --help     Show this help message
+
+Examples:
+	aibash --session my-session --agent haiku --role agentic --shell bash
+	aibash --session s1 -- echo "Hello from agentic shell"
+
+Description:
+	Secure, session-logged, agent-only shell for autonomous/background agent work.
+	Not for interactive human use. All I/O is logged. Exits cleanly when stdin closes.
+EOF
+}
+
 #!/usr/bin/env bash
 
 # aibash: Agentic (robot) shell - replaces legacy ai-shell.sh
@@ -68,8 +120,9 @@ if [[ -f "$GIT_ROOT/codex/LAWS.sh" ]]; then
 	# Example: codex_validate_shell || { echo '[AISHA] ✗ CODEX policy violation' >&2; exit 99; }
 fi
 
+
 # Argument parsing for --session, --agent, --role, and command
-SHELL_TYPE="bash"
+SHELL_TYPE=""
 USER_COMMAND=()
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -88,10 +141,37 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-# Set defaults if not provided
-AI_ROLE="${AI_ROLE:-agentic}"
-AI_SESSION="${AI_SESSION:-unknown}"
-AI_AGENT="${AI_AGENT:-robot}"
+# Robust defaults
+# --agent: default to "@" (Copilot AutoSelect)
+AI_AGENT="${AI_AGENT:-@}"
+
+# --shell: default to "bash" (Agence default)
+SHELL_TYPE="${SHELL_TYPE:-bash}"
+
+# --role: agentic if not interactive, else interactive
+if [[ -z "${AI_ROLE:-}" ]]; then
+	if [[ -t 0 && -t 1 ]]; then
+		AI_ROLE="interactive"
+	else
+		AI_ROLE="agentic"
+	fi
+fi
+
+# --session: generate if not provided
+if [[ -z "${AI_SESSION:-}" ]]; then
+	if [[ "$AI_ROLE" == "agentic" ]]; then
+		# Prefer short hex for agentic jobs
+		if command -v openssl &>/dev/null; then
+			AI_SESSION="robo$(openssl rand -hex 4)"
+		elif command -v uuidgen &>/dev/null; then
+			AI_SESSION="robo$(uuidgen | tr -d '-' | cut -c1-8)"
+		else
+			AI_SESSION="robo$$"
+		fi
+	else
+		AI_SESSION="term$$"
+	fi
+fi
 
 if [[ -z "${GIT_ROOT:-}" ]]; then
 	GIT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -194,6 +274,11 @@ sandbox_cd() {
 
 # MAIN EXECUTION (agentic: no banners, minimal output)
 main() {
+		# Help handler
+		if [[ "$1" == "help" || "$1" == "--help" ]]; then
+			show_help
+			exit 0
+		fi
 	init_session_logging
 	load_codex_and_format
 	cd "$GIT_ROOT" || {
