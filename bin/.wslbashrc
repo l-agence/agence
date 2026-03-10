@@ -1,0 +1,16 @@
+# .wslbashrc - WSL-specific profile for Agence agentic shells
+# Source this in aibash/ibash if running under WSL
+
+# Set WSL-specific environment variables
+export AGENCE_SHELL_ENV="wsl"
+export PATH="/usr/local/bin:/usr/bin:$PATH"
+
+# Optional: Set prompt or other WSL-specific tweaks
+# export PS1="[WSL] $PS1"
+
+# Enable color support if available
+if command -v dircolors &>/dev/null; then
+    eval "$(dircolors -b)"
+fi
+
+# Add any WSL-specific initialization here

@@ -72,6 +72,7 @@ mkdir -p "$SESSION_DIR" 2>/dev/null || true
 # SESSION LOGGING INITIALIZATION
 # ============================================================================
 
+# Session logging: check for trusted 'script' utility
 init_session_logging() {
     # Create initial metadata if not exists
     if [[ ! -f "$SESSION_META" ]]; then
@@ -80,7 +81,7 @@ init_session_logging() {
   "session_id": "$AI_SESSION",
   "role": "$AI_ROLE",
   "agent": "$AI_AGENT",
-    "shell": "bash",
+  "shell": "bash",
   "timestamp_start": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "git_root": "$GIT_ROOT",
   "typescript_file": "$SESSION_LOG",
@@ -88,6 +89,38 @@ init_session_logging() {
   "exit_code": null
 }
 EOF
+    fi
+
+    # Check for script utility (session logging dependency)
+    if command -v script &>/dev/null; then
+        SCRIPT_PATH="$(command -v script)"
+        # Only allow if in trusted locations
+        if [[ "$SCRIPT_PATH" == "/usr/bin/script" || "$SCRIPT_PATH" == "/bin/script" ]]; then
+            SESSION_LOGGING_ENABLED=1
+        else
+            echo "[SECURITY WARNING] 'script' found at $SCRIPT_PATH, which is not a standard location."
+            echo "Proceed with session logging? [y/N]"
+            read -r answer
+            if [[ "$answer" =~ ^[Yy]$ ]]; then
+                SESSION_LOGGING_ENABLED=1
+            else
+                SESSION_LOGGING_ENABLED=0
+            fi
+        fi
+    else
+        echo ""
+        echo "╔════════════════════════════════════════════════════════════════╗"
+        echo "║  WARNING: 'script' utility not found                         ║"
+        echo "╠════════════════════════════════════════════════════════════════╣"
+        echo "║  Session logging is DISABLED.                                ║"
+        echo "║  To enable session logging, install 'script' (util-linux)    ║"
+        echo "║  - On Linux: sudo apt install bsdutils or util-linux         ║"
+        echo "║  - On Cygwin: setup-x86_64.exe, add util-linux               ║"
+        echo "║  - On WSL: sudo apt install bsdutils or util-linux           ║"
+        echo "║  - On MSYS2: pacman -S util-linux                            ║"
+        echo "║  - Not available in Git Bash/Cmder by default                ║"
+        echo "╚════════════════════════════════════════════════════════════════╝"
+        SESSION_LOGGING_ENABLED=0
     fi
 }
 

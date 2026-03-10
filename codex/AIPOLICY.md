@@ -1,7 +1,45 @@
-# Agentic Shell Policy: Design Philosophy
+
+# Agentic Shell Policy: Tiered Capability Model
 
 ## Overview
-Agentic shell policy (`aipolicy`) is the single source of truth for all policy rules governing agentic shell execution. It is designed for safety, auditability, and accident prevention—not strict containment or true security. Descriptive instructions and rationale are now documented in AISAFEGUARDS.md for clarity.
+This policy uses a tiered capability model for agentic shell command execution. Instead of a flat whitelist/blacklist, commands are classified into four risk-based tiers. This simplifies policy maintenance and escalation logic for agentic shells and agentic sudo (aido).
+
+## Capability Tiers
+
+| Tier | Meaning                   | Example Commands                | Policy Action           |
+|------|---------------------------|---------------------------------|------------------------|
+| T0   | Pure read-only            | git status, ls, terraform plan  | Auto-execute           |
+| T1   | Local workspace mutation  | git add, terraform fmt          | Ask/confirm            |
+| T2   | Remote/cloud mutation     | git push, terraform apply       | Confirm/escalate       |
+| T3   | System-level privileged   | sudo, rm -rf, systemctl         | Block or require human |
+
+### T0: Pure Read-Only
+Inspection commands that do not mutate local files, infrastructure, or remote services. Auto-executed by agents.
+
+### T1: Local Workspace Mutation
+Commands that modify the local workspace but not remote/cloud state. Require confirmation.
+
+### T2: Remote/Cloud Mutation
+Commands that modify remote systems, infrastructure, or cloud services. Require strong confirmation and escalation.
+
+### T3: System-Level Privileged
+Commands capable of damaging the OS or exfiltrating secrets. Blocked or require explicit human approval.
+
+## Example Policy Flow
+
+1. Agent proposes command
+2. Router classifies command into a tier
+3. Policy check determines if auto, confirm, escalate, or block
+4. aido (agentic sudo) enforces escalation/confirmation as needed
+
+## YAML Policy Structure
+See codex/AIPOLICY.yaml for the canonical tier definitions, command lists, and escalation rules.
+
+## Global Safety
+Global forbidden operators and patterns are enforced regardless of tier (see YAML for details).
+
+## Maintenance
+Update codex/AIPOLICY.yaml to add or reclassify commands/tier logic. This model enables clear, auditable, and extensible policy for agentic shells.
 
 ## Rationale
 - **Simplicity**: Avoids complex, brittle containment mechanisms.
