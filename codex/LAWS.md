@@ -94,6 +94,18 @@ See [SESSION-PERSISTENCE.md](../synthetic/l-agence.org/docs/SESSION-PERSISTENCE.
 
 ---
 
-**Version**: 0.2.0  
+---
+
+## Law 6: Edit Only With Versioning
+
+- Never edit a file unless it is versioned and backed up (commit or stash).
+
+## Law 7: Upstream Actions Require Review
+
+- Never push, pull, or fetch from upstream without explicit human review.
+
+---
+
+**Version**: 0.3.0  
 **Status**: In Effect  
-**Last Updated**: 2026-03-05
+**Last Updated**: 2026-03-10
