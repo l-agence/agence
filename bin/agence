@@ -1,3 +1,59 @@
+        export)
+          # ^session export <id> <@user>
+          local sid=$(echo "$args" | awk '{print $1}')
+          local target=$(echo "$args" | awk '{print $2}')
+          if [[ -z "$sid" || -z "$target" ]]; then
+            echo "Usage: ^session export <session_id> <@user>"
+            return 1
+          fi
+          local meta="$sessions_dir/$sid.meta.json"
+          local export_dir="$GIT_REPO/.agence-sessions"
+          mkdir -p "$export_dir"
+          if [[ -f "$meta" ]]; then
+            # Only export safe fields
+            jq '{session_id, agent_id, role, timestamp, owner, assigned, summary: .summary // "", exported_by: "$USER", exported_to: $target, exported_at: "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' --arg target "$target" "$meta" > "$export_dir/$sid.export.json"
+            echo "Session $sid exported for $target: $export_dir/$sid.export.json"
+          else
+            echo "Session $sid not found."
+          fi
+          ;;
+        import)
+          # ^session import <file>
+          local file="$args"
+          if [[ -z "$file" || ! -f "$file" ]]; then
+            echo "Usage: ^session import <exported_file.json>"
+            return 1
+          fi
+          local sid=$(jq -r '.session_id' "$file")
+          local meta="$sessions_dir/$sid.meta.json"
+          cp "$file" "$meta"
+          echo "Imported session $sid from $file."
+          ;;
+        push)
+          # ^session push <id>
+          local sid="$args"
+          local export_dir="$GIT_REPO/.agence-sessions"
+          if [[ -z "$sid" || ! -f "$export_dir/$sid.export.json" ]]; then
+            echo "Usage: ^session push <session_id> (must export first)"
+            return 1
+          fi
+          git -C "$GIT_REPO" add ".agence-sessions/$sid.export.json"
+          git -C "$GIT_REPO" commit -m "[session] Exported session $sid for handoff" || echo "No changes to commit."
+          git -C "$GIT_REPO" push
+          echo "Pushed session $sid export to origin."
+          ;;
+        pull)
+          # ^session pull <id>
+          local sid="$args"
+          local export_dir="$GIT_REPO/.agence-sessions"
+          git -C "$GIT_REPO" pull
+          if [[ -f "$export_dir/$sid.export.json" ]]; then
+            cp "$export_dir/$sid.export.json" "$sessions_dir/$sid.meta.json"
+            echo "Pulled and imported session $sid from origin."
+          else
+            echo "Session $sid export not found after pull."
+          fi
+          ;;
 
 #!/usr/bin/env bash
 
@@ -226,11 +282,143 @@ EXAMPLES:
     ANTHROPIC_API_KEY            API key for Claude
 EOF
 }
+        list)
+          echo "[SESSION LIST] Active sessions:"
+          local count=0
+          for meta in "$sessions_dir"/*.meta.json; do
+            [[ ! -f "$meta" ]] && continue
+            local sid=$(jq -r '.session_id // .sessionID' "$meta" 2>/dev/null)
+            local agent=$(jq -r '.agent_id // .agentID' "$meta" 2>/dev/null)
+            local role=$(jq -r '.role' "$meta" 2>/dev/null)
+            local ts=$(jq -r '.timestamp' "$meta" 2>/dev/null)
+            local owner=$(jq -r '.owner // empty' "$meta" 2>/dev/null)
+            local assigned=$(jq -r '.assigned // empty' "$meta" 2>/dev/null)
+            echo "  - $sid  agent=$agent  role=$role  started=$ts  owner=${owner:-n/a}  assigned=${assigned:-n/a}"
+            ((count++))
+          done
+          [[ $count -eq 0 ]] && echo "  (no sessions found)"
+          ;;
+        view)
+          if [[ -z "$args" ]]; then
+            echo "Usage: ^session view <session_id>"
+            return 1
+          fi
+          local meta="$sessions_dir/$args.meta.json"
+          if [[ -f "$meta" ]]; then
+            jq '.' "$meta"
+          else
+            echo "Session $args not found."
+          fi
+          ;;
+                handoff)
+                  # ^session handoff <id> <@agent>
+                  local sid=$(echo "$args" | awk '{print $1}')
+                  local target=$(echo "$args" | awk '{print $2}')
+                  if [[ -z "$sid" || -z "$target" || "$target" != @* ]]; then
+                    echo "Usage: ^session handoff <session_id> <@agent>"
+                    echo "  (handoff is for local agent assignment only)"
+                    return 1
+                  fi
+                  local meta="$sessions_dir/$sid.meta.json"
+                  if [[ -f "$meta" ]]; then
+                    jq --arg a "$target" '.assigned = $a' "$meta" > "$meta.tmp" && mv "$meta.tmp" "$meta"
+                    echo "Session $sid handed off to local agent $target."
+                  else
+                    echo "Session $sid not found."
+                  fi
+                  ;;
+                assign)
+                  # ^session assign <id> <@user>
+                  local sid=$(echo "$args" | awk '{print $1}')
+                  local target=$(echo "$args" | awk '{print $2}')
+                  if [[ -z "$sid" || -z "$target" || "$target" != @* ]]; then
+                    echo "Usage: ^session assign <session_id> <@user>"
+                    echo "  (assign is for remote human assignment only; triggers safe export)"
+                    return 1
+                  fi
+                  # Export sanitized metadata for remote human assignment
+                  local meta="$sessions_dir/$sid.meta.json"
+                  local export_dir="$GIT_REPO/.agence-sessions"
+                  mkdir -p "$export_dir"
+                  if [[ -f "$meta" ]]; then
+                    jq '{session_id, agent_id, role, timestamp, owner, assigned: $target, summary: .summary // "", exported_by: "$USER", exported_to: $target, exported_at: "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' --arg target "$target" "$meta" > "$export_dir/$sid.export.json"
+                    echo "Session $sid assigned to remote user $target (exported: $export_dir/$sid.export.json)"
+                  else
+                    echo "Session $sid not found."
+                  fi
+                  ;;
+        attach)
+          if [[ -z "$args" ]]; then
+            echo "Usage: ^session attach <session_id>"
+            return 1
+          fi
+          local meta="$sessions_dir/$args.meta.json"
+          if [[ -f "$meta" ]]; then
+            echo "Attaching to session $args..."
+            export AGENCE_SESSION_ID="$args"
+            export AGENCE_AGENT_ID=$(jq -r '.agent_id // .agentID' "$meta" 2>/dev/null)
+            export AGENCE_SESSION_TYPE=$(jq -r '.role' "$meta" 2>/dev/null)
+            # Optionally launch a shell or agent context here
+            echo "[INFO] Environment variables set for session $args."
+          else
+            echo "Session $args not found."
+          fi
+          ;;
+        detach)
+          echo "Detaching from current session..."
+          unset AGENCE_SESSION_ID AGENCE_AGENT_ID AGENCE_SESSION_TYPE
+          echo "[INFO] Detached."
+          ;;
+        pause)
+          if [[ -z "$args" ]]; then
+            echo "Usage: ^session pause <session_id>"
+            return 1
+          fi
+          local meta="$sessions_dir/$args.meta.json"
+          if [[ -f "$meta" ]]; then
+            jq '. + {status: "paused", paused_at: "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' "$meta" > "$meta.tmp" && mv "$meta.tmp" "$meta"
+            echo "Session $args paused."
+          else
+            echo "Session $args not found."
+          fi
+          ;;
+        resume)
+          if [[ -z "$args" ]]; then
+            echo "Usage: ^session resume <session_id>"
+            return 1
+          fi
+          local meta="$sessions_dir/$args.meta.json"
+          if [[ -f "$meta" ]]; then
+            jq 'del(.status, .paused_at)' "$meta" > "$meta.tmp" && mv "$meta.tmp" "$meta"
+            echo "Session $args resumed."
+          else
+            echo "Session $args not found."
+          fi
+          ;;
         replay)
-          echo "[SESSION REPLAY] Not yet implemented."
+          if [[ -z "$args" ]]; then
+            echo "Usage: ^session replay <session_id>"
+            return 1
+          fi
+          local meta="$sessions_dir/$args.meta.json"
+          if [[ -f "$meta" ]]; then
+            echo "[SESSION REPLAY] Not yet implemented. (Would replay commands for $args)"
+          else
+            echo "Session $args not found."
+          fi
           ;;
         kill)
-          echo "[SESSION KILL] Not yet implemented."
+          if [[ -z "$args" ]]; then
+            echo "Usage: ^session kill <session_id>"
+            return 1
+          fi
+          local meta="$sessions_dir/$args.meta.json"
+          if [[ -f "$meta" ]]; then
+            jq '. + {status: "killed", killed_at: "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' "$meta" > "$meta.tmp" && mv "$meta.tmp" "$meta"
+            echo "Session $args killed."
+          else
+            echo "Session $args not found."
+          fi
           ;;
         delete)
           if [[ -z "$args" ]]; then
