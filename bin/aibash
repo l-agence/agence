@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# aisha.sh: Agentic (robot) shell - based on ai-shell.sh
+# aibash: Agentic (robot) shell - replaces legacy ai-shell.sh
 # Purpose: Secure, session-logged, agent-only shell for autonomous/background agent work
 #
 # This shell is intended to be launched via spawn (Node.js, Python, etc.), NOT interactively by a human.
@@ -29,8 +29,13 @@
 
 
 
-# --- SECURITY HARDENING ---
+
 set -euo pipefail
+
+# Set GIT_ROOT early to avoid unbound variable errors
+if [[ -z "${GIT_ROOT:-}" ]]; then
+	GIT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+fi
 
 # Restrict PATH to minimal safe binaries, include $AI_BIN and . if set
 if [[ -n "${AI_BIN:-}" ]]; then
@@ -62,7 +67,6 @@ if [[ -f "$GIT_ROOT/codex/LAWS.sh" ]]; then
 	source "$GIT_ROOT/codex/LAWS.sh"
 	# Example: codex_validate_shell || { echo '[AISHA] ✗ CODEX policy violation' >&2; exit 99; }
 fi
-
 
 # Argument parsing for --session, --agent, --role, and command
 SHELL_TYPE="bash"
@@ -135,7 +139,7 @@ if [[ $SESSION_LOGGING_ENABLED -eq 1 ]]; then
 	fi
 fi
 
-# CODEX VALIDATION + FORMAT LIBRARY (same as ai-shell.sh)
+# CODEX VALIDATION + FORMAT LIBRARY (same as legacy ai-shell.sh)
 load_codex_and_format() {
 	if [[ -f "$GIT_ROOT/codex/LAWS.sh" ]]; then
 		source "$GIT_ROOT/codex/LAWS.sh"
@@ -170,7 +174,7 @@ setup_bash_session() {
 	fi
 }
 
-# SANDBOX PATH ENFORCEMENT (same as ai-shell.sh)
+# SANDBOX PATH ENFORCEMENT (same as legacy ai-shell.sh)
 sandbox_cd() {
 	local target="${1:-.}"
 	local abs_path

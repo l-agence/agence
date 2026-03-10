@@ -236,9 +236,13 @@ main() {
         shift $shift_count
         local extra_args=("$@")
         if [[ "$shell_mode" == "bash" ]]; then
-            local shell_script="$(dirname "$0")/ai-shell.sh"
+            local shell_script="$(dirname "$0")/aibash"
+            # Normalize Windows path to Git Bash format if needed
+            if [[ "$shell_script" =~ ^[A-Za-z]: ]]; then
+                shell_script="/$(echo "$shell_script" | sed 's#\\#/#g' | sed 's#^\([A-Za-z]\):#/\1#g')"
+            fi
             if [[ ! -x "$shell_script" ]]; then
-                echo "[AICMD] ✗ ai-shell.sh not found or not executable: $shell_script" >&2
+                echo "[AICMD] ✗ aibash not found or not executable: $shell_script" >&2
                 exit 1
             fi
             if [[ -n "$agent" ]]; then
@@ -295,13 +299,13 @@ AICMD: AI Command Validator + Shell Executor
 Usage:
   aicmd validate <command>    - Validate command syntax (redirects, pipes)
   aicmd sanitize              - Output sanitized environment
-  aicmd [@agent] bash [...]   - Launch ai-shell.sh (Bash session)
+    aicmd [@agent] bash [...]   - Launch aibash (Bash session)
   aicmd [@agent] shell [...]  - Launch ai-shell.ps1 (PowerShell session)
 
 Examples:
   aicmd validate "git log | grep commit"
-  aicmd bash                  # launches ai-shell.sh
-  aicmd @ralph bash           # launches ai-shell.sh with AGENT=@ralph
+    aicmd bash                  # launches aibash
+    aicmd @ralph bash           # launches aibash with AGENT=@ralph
   aicmd shell                 # launches ai-shell.ps1
   aicmd @sonny shell          # launches ai-shell.ps1 with AGENT=@sonny
 
