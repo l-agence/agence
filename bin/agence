@@ -8,10 +8,6 @@
 # Author: Stephane Korning 2026
 # License: MIT License with Commons Clause
 #
-# NOTE: This script is also copied as '^' for a quick shortcut and unified interface.
-#       Any modifications to this file should be mirrored to '^' to ensure consistency.
-  
-detect_shell_environment
 
 # Shell environment detection function
 detect_shell_environment() {
@@ -31,6 +27,11 @@ detect_shell_environment() {
   [[ "${AGENCE_DEBUG:-0}" == "1" ]] && \
     echo "[DEBUG] Shell: $AGENCE_SHELL_ENV, Path style: $AGENCE_PATH_STYLE, OS: W=$AGENCE_OS_WINDOWS L=$AGENCE_OS_LINUX" >&2
 }
+
+# NOTE: This script is also copied as '^' for a quick shortcut and unified interface.
+#       Any modifications to this file should be mirrored to '^' to ensure consistency.
+
+detect_shell_environment
 
 detect_shell_environment
 
@@ -223,73 +224,8 @@ EXAMPLES:
     AGENCE_QUIET=1               Suppress non-essential output
     AGENCE_LLM_PROVIDER=claude   LLM provider (anthropic, openai, ollama)
     ANTHROPIC_API_KEY            API key for Claude
-
-
-# Shell environment detection function
-detect_shell_environment() {
-  # Additional detection for git-bash (MSYSTEM variable)
-  if [[ -n "${MSYSTEM:-}" ]]; then
-    export AGENCE_SHELL_ENV="git-bash"
-    export AGENCE_OS_WINDOWS=1
-    export AGENCE_PATH_STYLE="mingw"
-  fi
-
-  # Additional detection for PowerShell
-  if [[ -n "${PSVersionTable+x}" ]] || [[ "$SHELL" == *"powershell"* ]]; then
-    export AGENCE_SHELL_ENV="powershell"
-    export AGENCE_PATH_STYLE="windows"
-  fi
-
-  [[ "${AGENCE_DEBUG:-0}" == "1" ]] && \
-    echo "[DEBUG] Shell: $AGENCE_SHELL_ENV, Path style: $AGENCE_PATH_STYLE, OS: W=$AGENCE_OS_WINDOWS L=$AGENCE_OS_LINUX" >&2
+EOF
 }
-
-          "reload")
-            reload_agence_context
-            ;;
-          "install")
-            install_agence_packages
-            ;;
-          "reindex")
-            reindex_knowledge_bases
-            ;;
-          "learn")
-            learn_from_sessions
-            ;;
-          "commit")
-            commit_knowledge_changes
-            ;;
-          "push")
-            push_knowledge_upstream
-            ;;
-          "save")
-            save_session_context
-            ;;
-          "handoff")
-            handoff_to_agent $init_args
-            ;;
-          "pickup")
-            pickup_handoff $init_args
-            ;;
-          "pause")
-            pause_session $init_args
-            ;;
-          "resume")
-            resume_session $init_args
-            ;;
-          "version")
-            show_version
-            ;;
-          *)
-            echo "Error: Unknown init command: $init_cmd" >&2
-            return 1
-            ;;
-        esac
-        return 0
-      }
-            echo "Session $args not found."
-          fi
-          ;;
         replay)
           echo "[SESSION REPLAY] Not yet implemented."
           ;;
