@@ -1,23 +1,191 @@
 #!/usr/bin/env bash
+
 ################################################################################
-# SWARM - Synchronic Work Agentic Resource Manager (v1.1)
-# Author: Stephane Korning 2026 
-# Purpose: Compute TASKS -> WORKFLOWS -> PROJECTS matrices
-# Supports DAG/blocking propagation, human/agent assignment, and workflow/project aggregation
+# SWARM - Synchronic Work Agentic Resource Manager (v1.2)
+# Author: Stephane Korning 2026
+# Purpose: Multi-agent, multi-repo, matrix-driven orchestration of tasks, workflows, projects
+# Adds context/agent/knowledge routing, modular CLI, per-task files, knowledge ops, dependency resolution
 # Requires: bash, jq, awk
 ################################################################################
 
-# ------------------------------
-# 0️⃣ Configuration
-# ------------------------------
-AI_ROOT=${AI_ROOT:-"$HOME/.agence/nexus/organic"}
-mkdir -p "$AI_ROOT"
 
-TASK_JSON="$AI_ROOT/tasks.json"
-SCORED_JSON="$AI_ROOT/tasks_scored.json"
-RUNNABLE_JSON="$AI_ROOT/tasks_runnable.json"
-WORKFLOW_JSON="$AI_ROOT/workflows.json"
-PROJECT_JSON="$AI_ROOT/projects.json"
+# ---------- Context / Routing ----------
+resolve_context() {
+  local synthetic_dir="$AI_ROOT/synthetic"
+  local link="$synthetic_dir/@"
+  local default_context="l-agence.org"
+  if [ -L "$link" ]; then
+    local ctx
+    ctx=$(readlink "$link")
+    while [ -L "$synthetic_dir/$ctx" ]; do
+      ctx=$(readlink "$synthetic_dir/$ctx")
+    done
+    echo "$ctx"
+  else
+    echo "$default_context"
+  fi
+}
+
+resolve_agent() {
+  local agent_link="$AI_ROOT/agents/@"
+  local default_agent="@copilot"
+  if [ -L "$agent_link" ]; then
+    readlink "$agent_link"
+  else
+    echo "$default_agent"
+  fi
+}
+
+resolve_sec_label() {
+  echo "${1:-internal}"
+}
+
+# ---------- Paths ----------
+context_path() {
+  local type="$1"
+  echo "$AI_ROOT/synthetic/$(resolve_context)/$type"
+}
+
+agent_path() {
+  local type="$1"
+  echo "$(context_path $type)/$(resolve_agent)"
+}
+
+sec_path() {
+  local type="$1"
+  local sec_label
+  sec_label=$(resolve_sec_label "$2")
+  echo "$(context_path $type)/$sec_label"
+}
+
+# ---------- Task Operations ----------
+add_task() {
+  local task_json="$1"
+  local task_dir
+  task_dir=$(context_path "tasks")
+  mkdir -p "$task_dir"
+  local id
+  id=$(jq -r '.task_id' <<< "$task_json")
+  echo "$task_json" > "$task_dir/$id.json"
+}
+
+list_tasks() {
+  local task_dir
+  task_dir=$(context_path "tasks")
+  jq -s '.' "$task_dir"/*.json 2>/dev/null
+}
+
+update_task_status() {
+  local task_id="$1"
+  local status="$2"
+  local task_file
+  task_file="$(context_path "tasks")/$task_id.json"
+  if [ -f "$task_file" ]; then
+    jq --arg s "$status" '.status=$s' "$task_file" > "$task_file.tmp" && mv "$task_file.tmp" "$task_file"
+  fi
+}
+
+# ---------- DAG / Dependency Handling ----------
+resolve_dependencies() {
+  local task_file="$1"
+  jq -r '
+    .dependencies // [] |
+    map(
+      if startswith("^") then {type:"hard",task:.[1:]} 
+      elif startswith(";") then {type:"soft",task:.[1:]} 
+      else {type:"soft",task:.} end
+    )
+  ' "$task_file"
+}
+
+# ---------- Knowledge Operations ----------
+commit_hermetic() {
+  local type="$1"
+  local obj_file="$2"
+  local dest
+  dest=$(context_path "$type")
+  mkdir -p "$dest"
+  cp "$obj_file" "$dest/"
+}
+
+share_synthetic() {
+  local type="$1"
+  local obj_file="$2"
+  local sec_label="${3:-internal}"
+  local dest
+  dest=$(sec_path "$type" "$sec_label")
+  mkdir -p "$dest"
+  cp "$obj_file" "$dest/"
+}
+
+# ---------- Job Execution ----------
+run_task() {
+  local task_id="$1"
+  local task_file
+  task_file="$(context_path "tasks")/$task_id.json"
+  if [ ! -f "$task_file" ]; then echo "Task $task_id not found"; return 1; fi
+  local status
+  status=$(jq -r '.status' "$task_file")
+  # Handle human override / pause / agent run
+  case "$status" in
+    "~"* | "$"* )
+      echo "Human assigned task $task_id ready for execution"
+      ;;
+    "%"* | "&"* )
+      echo "Agent assigned task $task_id executing"
+      ;;
+    "_"* | "#"* )
+      echo "Task $task_id is paused/held, skipping execution"
+      return 0
+      ;;
+    * )
+      echo "Unknown task status $status"
+      return 1
+      ;;
+  esac
+  # simulate execution (extend for real command)
+  echo "Executing task $task_id ..."
+  sleep 1
+  update_task_status "$task_id" "-$task_id"  # mark completed
+}
+
+# ---------- Matrix / Progress ----------
+compute_progress() {
+  local workflow_file="$1"
+  awk -f "$AI_BIN/matrix.awk" "$workflow_file"
+}
+
+# ---------- CLI Command Parsing ----------
+usage() {
+  cat <<EOF
+Usage: swarm <command> [args]
+Commands:
+  add-task '<JSON>'           Add a task
+  list-tasks                  List all tasks
+  update-task <id> <status>  Update task status
+  run-task <id>               Execute a task (human/agent)
+  commit-hermetic <type> <file>
+  share-synthetic <type> <file> [sec_label]
+  compute-progress <workflow_file>
+EOF
+}
+
+if [ $# -lt 1 ]; then
+  usage
+  exit 1
+fi
+
+cmd="$1"; shift
+case "$cmd" in
+  add-task) add_task "$1" ;;
+  list-tasks) list_tasks ;;
+  update-task) update_task_status "$1" "$2" ;;
+  run-task) run_task "$1" ;;
+  commit-hermetic) commit_hermetic "$1" "$2" ;;
+  share-synthetic) share_synthetic "$1" "$2" "$3" ;;
+  compute-progress) compute_progress "$1" ;;
+  *) usage ;;
+esac
 
 # ------------------------------
 # 1️⃣ Compute TASKS Numeric Scores
