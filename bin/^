@@ -1,4 +1,4 @@
-        export)
+export
           # ^session export <id> <@user>
           local sid=$(echo "$args" | awk '{print $1}')
           local target=$(echo "$args" | awk '{print $2}')

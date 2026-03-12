@@ -1,5 +1,19 @@
 
 # Agentic Shell Policy: Tiered Capability Model
+(aido + policy + confirmation) is basically the same security pattern used in serious autonomous agent runtimes:
+
+policy → capability tier → escalation path
+
+Instead of one huge whitelist/blacklist, you define capability tiers. The router evaluates the command and assigns it a tier. Then we have sudo-like privilege via aido (sudo for AI) and aido  decides if escalation is allowed.
+
+aido  has 2 modes of operation : 
+- like sudo for robots but requires a user prompt confirmation to execute.
+- the opposite of sudo. executes safe whitelisted commands with low prrompts.
+
+so aido allows  near promptless execution of safe commands AND fully prompted escalation confirmation for unsafe commands. 
+
+This dramatically simplifies policy maintenance.
+
 
 ## Overview
 This policy uses a tiered capability model for agentic shell command execution. Instead of a flat whitelist/blacklist, commands are classified into four risk-based tiers. This simplifies policy maintenance and escalation logic for agentic shells and agentic sudo (aido).

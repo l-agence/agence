@@ -1036,3 +1036,31 @@ agence ^init
 - [bin/agence](./agence) - Main script
 
 test commit at Wed, Mar  4, 2026  7:23:14 PM
+
+---
+
+## Agence Command Grammar (EBNF)
+
+A robust, extensible grammar for all Agence task, routing, and metadata constructs:
+
+```
+<command>      ::= <task_expr> { ";" <task_expr> }
+<task_expr>    ::= [<priority>] <repo> ":" <task> { ":" <metadata> } [<dependency>]
+<priority>     ::= "*" | "**" | "***"
+<repo>         ::= <identifier>
+<task>         ::= <identifier>
+<metadata>     ::= <key> "=" <value>
+<key>          ::= "agent" | "sec" | "org" | "shard" | "team" | "token_cost" | ...
+<value>        ::= <identifier> | <string>
+<dependency>   ::= "^" <task_expr> | ";" <task_expr>
+<identifier>   ::= (letter | digit | "_" | "-")+ 
+<string>       ::= '"' { any character except '"' } '"'
+```
+
+- Prefixes: `*`, `**`, `***` for priority; `$`, `~`, `%`, `&`, `_`, `#`, `+`, `-`, `!`, `?` for state.
+- Routing: `@` can appear in metadata values (e.g., `agent=@ralph`, `org=@acme.ltd`, `sec=@internal`).
+- Multiple tasks can be chained with `;`.
+- Metadata is extensible: any key-value pair separated by `:`.
+- Dependencies: `^` for hard, `;` for soft.
+
+This grammar ensures all Agence commands and task expressions are robust, extensible, and easy to parse.

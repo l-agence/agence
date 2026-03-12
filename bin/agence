@@ -1,4 +1,4 @@
-        export)
+export)
           # ^session export <id> <@user>
           local sid=$(echo "$args" | awk '{print $1}')
           local target=$(echo "$args" | awk '{print $2}')
@@ -244,6 +244,34 @@ fi
 # ============================================================================
 # HELP / VERSION
 # ============================================================================
+
+usage() {
+  cat <<EOF
+Usage: agence <command> [args]
+
+Agence supports robust, extensible command and routing syntax:
+
+EBNF Grammar:
+  <command>      ::= <task_expr> { ";" <task_expr> }
+  <task_expr>    ::= [<priority>] <repo> ":" <task> { ":" <metadata> } [<dependency>]
+  <priority>     ::= "*" | "**" | "***"
+  <repo>         ::= <identifier>
+  <task>         ::= <identifier>
+  <metadata>     ::= <key> "=" <value>
+  <key>          ::= "agent" | "sec" | "org" | "shard" | "team" | ...
+  <value>        ::= <identifier> | <string>
+  <dependency>   ::= "^" <task_expr> | ";" <task_expr>
+  <identifier>   ::= (letter | digit | "_" | "-")+ 
+  <string>       ::= '"' { any character except '"' } '"'
+
+Routing: '@' can be used for agent, org, repo, security-level, etc.
+Prefixes: '*', '$', '~', '%', '&', '_', '#', '+', '-', '!', '?' for state/priority.
+
+Examples:
+  agence *repo:task:agent=@ralph:sec=internal ; repo2:task2
+  agence @org:team:sec=secret repo:task
+EOF
+}
 
 show_help() {
   cat << 'EOF'

@@ -1,4 +1,62 @@
-# Agence Agent Routing
+
+# Agence Command & Task Routing Constructs
+
+| Symbol / Prefix | Meaning / Use Case | Notes / Examples |
+|-----------------|-------------------|------------------|
+| ~task           | Human-assigned, working | Assigned by human, ready to start |
+| $task           | Human actively working | Human currently executing task |
+| %task           | Agent-assigned | Swarm chooses agent for execution |
+| &task           | Agent actively executing | Running independently without human intervention |
+| _task           | Paused / deferred | Task temporarily held, can be resumed |
+| #task           | Held by human | Requires human unlocking to proceed |
+| +task           | Pending addition | Task created but not yet started |
+| -task           | Completed task | Marks successful completion |
+| ^task           | Hard dependency | Must complete before dependent tasks |
+| ;<task>         | Soft dependency | Can run in parallel but logically dependent |
+| >subtask        | Child task | Subtask of a parent task |
+| <subtask        | Parent task | Parent of a given subtask |
+| *               | Priority | Numeric or star-based priority indicator |
+| token_cost      | Cost in tokens / resource allocation | Used for heatmap routing to appropriate agent/model |
+| @agent          | Explicit agent routing | e.g., @copilot, @ralph, @ollama |
+| @               | Default agent / current agent | Shorthand for auto-selection |
+| @org:shard:team:sec-label | Security and routing path | e.g., @acme.ltd:shard1:teamA:secret |
+| ~commit         | Hermetic knowledge commit | Local-only knowledge saved, not shared upstream |
+| ^commit         | Synthetic knowledge commit | Shared knowledge saved in default shard |
+| ~share          | Share hermetic object selectively | ~share lesson42.json @team |
+| ; (in ;<task>)  | Soft dependency operator | Allows parallel start |
+| :               | Metadata separator | repo:task:agent format |
+| F(x)            | Function notation | Standard linear algebra function reference |
+| M(x)            | Matrix notation | Generic matrix assignment (A=M(x)) |
+| [ , ], { , }    | Reserved for arrays / lists / matrices | Not used for task states to avoid confusion |
+| !task           | Task failed or warning | Triggered when task errors |
+| ?task           | Task waiting on human or agent input | Suspended until resolved |
+| ~=              | Human-assigned (alternative notation) | Optional shorthand for clarity |
+| %completion     | Completion / progress calculation | Used in workflows / projects |
+| workflow = sum(tasks) | Matrix math / aggregation | Sum of negative elements = progress, positive = remaining |
+| project = sum(workflows) | Project-level matrix calculation | Aggregates multiple workflows |
+
+**Notes:**
+
+- **Task states and ownership:**
+   - Humans: ~, $, #, _
+   - Agents: %, &
+- **Dependencies:**
+   - Hard ^ must complete first
+   - Soft ; can run in parallel but still dependent logically
+   - Child/parent subtasks: > and <
+- **Routing & security:**
+   - @ symlinks for default org/agent
+   - Full security routing path for selective sharing and agent assignment
+- **Matrix / workflow:**
+   - Arithmetic symbols +/- represent task state in matrix
+   - Aggregation is additive, supports linear algebra calculations
+- **Knowledge types:**
+   - Hermetic = local only
+   - Synthetic = shared in default org/shard
+
+---
+
+# Agent Routing (Legacy Section)
 
 Dynamic agent and LLM model routing for Agence.
 
