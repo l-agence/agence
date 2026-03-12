@@ -1,4 +1,22 @@
-# Agent Routing Architecture
+# Agent Routing Architecture (Canonical)
+
+This document describes the agent routing architecture and references the canonical universal `@` routing and state prefix model. All code and documentation must conform to the canonical definitions in codex/agents/ROUTING.md.
+
+## Universal Routing Prefix: `@`
+
+- `@` is the universal routing prefix for agent, org, team, repo, security label, etc.
+- Usage patterns:
+  - `@agent` — explicit agent routing (e.g., @ralph, @copilot)
+  - `@org`, `@team`, `@shard`, `@sec` — explicit org/team/shard/security routing
+  - `@` alone — default/current agent or context (resolved via symlink or config)
+- Appears in metadata: `agent=@ralph`, `org=@acme.ltd`, `sec=@internal`
+- Supported in all command grammars and EBNF definitions.
+
+## Canonical State Prefix Table
+
+See codex/agents/ROUTING.md for the canonical state prefix table and full glossary.
+
+
 
 ## Overview
 

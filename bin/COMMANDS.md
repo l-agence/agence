@@ -1,4 +1,7 @@
-# Agence Commands
+
+# Agence Commands (Canonical Routing)
+
+All command modes and grammars must conform to the canonical universal `@` routing and state prefix model. See codex/agents/ROUTING.md for the canonical table and glossary.
 
 **Comprehensive reference for all Agence initialization and special commands.**
 
@@ -1057,10 +1060,10 @@ A robust, extensible grammar for all Agence task, routing, and metadata construc
 <string>       ::= '"' { any character except '"' } '"'
 ```
 
-- Prefixes: `*`, `**`, `***` for priority; `$`, `~`, `%`, `&`, `_`, `#`, `+`, `-`, `!`, `?` for state.
-- Routing: `@` can appear in metadata values (e.g., `agent=@ralph`, `org=@acme.ltd`, `sec=@internal`).
+- Prefixes: `*`, `**`, `***` for priority; `$`, `~`, `%`, `&`, `_`, `#`, `+`, `-`, `!`, `?` for state (see canonical table).
+- Routing: `@` is the universal routing prefix for agent, org, team, repo, security, etc. (see canonical table).
 - Multiple tasks can be chained with `;`.
 - Metadata is extensible: any key-value pair separated by `:`.
 - Dependencies: `^` for hard, `;` for soft.
 
-This grammar ensures all Agence commands and task expressions are robust, extensible, and easy to parse.
+This grammar ensures all Agence commands and task expressions are robust, extensible, and easy to parse. All routing and state prefixes must match the canonical definitions in codex/agents/ROUTING.md.

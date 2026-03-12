@@ -1,4 +1,36 @@
-# Symlink-Based Context Routing in Agence
+# Symlink-Based Context Routing in Agence (Canonical)
+
+This document describes the canonical use of the universal `@` routing prefix for context, agent, org, team, and security routing in Agence. All code and documentation must conform to the canonical routing and state prefix model (see codex/agents/ROUTING.md).
+
+## Universal Routing Prefix: `@`
+
+- `@` is the universal routing prefix for agent, org, team, repo, security label, etc.
+- Usage patterns:
+  - `@agent` — explicit agent routing (e.g., @ralph, @copilot)
+  - `@org`, `@team`, `@shard`, `@sec` — explicit org/team/shard/security routing
+  - `@` alone — default/current agent or context (resolved via symlink or config)
+- Appears in metadata: `agent=@ralph`, `org=@acme.ltd`, `sec=@internal`
+- Supported in all command grammars and EBNF definitions.
+
+## Canonical State Prefix Table
+
+| Prefix | Meaning                        | Who/When                |
+|--------|-------------------------------|-------------------------|
+| ~      | Human assigned                | Human, ready to start   |
+| $      | Human in progress             | Human, actively working |
+| %      | Agent assigned                | Agent, queued           |
+| &      | Agent executing               | Agent, running          |
+| _      | Paused/deferred               | Either                  |
+| #      | Held by human                 | Human, locked           |
+| +      | Pending addition              | Either                  |
+| -      | Completed                     | Either                  |
+| ^      | Hard dependency               | N/A                     |
+| ;      | Soft dependency               | N/A                     |
+| >/<    | Child/parent task             | N/A                     |
+| @      | Routing (agent/org/etc.)      | N/A                     |
+
+For full canonical routing and state prefix definitions, see codex/agents/ROUTING.md.
+
 
 l'Agence implements an elegant context-resolution system using local @ symlinks as active context pointers. This approach solves several hard problems in distributed tooling:
 
@@ -6,7 +38,7 @@ l'Agence implements an elegant context-resolution system using local @ symlinks 
 - User-local context switching
 - Git compatibility without merge conflicts
 
-## 1️⃣ The @ Context Pointer
+## 1️⃣ The @ Context Pointer (Universal Routing)
 
 - `@` → current default context
 - Implemented as a symlink: `@ -> mycompany.com` inside each relevant directory.
@@ -48,16 +80,15 @@ synthetic/
 Global default: mycompany.com
 Team subdirectory override: mycompany.com:teamA
 
-## 4️⃣ Agent Routing Symmetry
+## 4️⃣ Agent Routing Symmetry (Universal)
 
-The same pattern exists for agents:
+The same universal `@` routing pattern applies for agents, orgs, teams, and security:
 - `@agent` for specific agent
-- `@` for current agent
+- `@org` for specific org
+- `@team` for specific team
+- `@` for current/default context or agent
 
-Grammar:
-| Symbol | Meaning |
-|--------|---------|
-| @      | current context |
+See canonical table above.
 | @agent | specific agent |
 | @org   | specific org |
 | @team  | specific team |
