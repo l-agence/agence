@@ -1,6 +1,6 @@
 # Agent Routing Architecture (Canonical)
 
-This document describes the agent routing architecture and references the canonical universal `@` routing and state prefix model. All code and documentation must conform to the canonical definitions in codex/agents/ROUTING.md.
+This document describes the agent routing architecture and references the canonical universal `@` routing and state prefix model. All code and documentation must conform to the canonical definitions in synthetic/l-agence.org/docs/ROUTING.md.
 
 ## Universal Routing Prefix: `@`
 
@@ -14,7 +14,7 @@ This document describes the agent routing architecture and references the canoni
 
 ## Canonical State Prefix Table
 
-See codex/agents/ROUTING.md for the canonical state prefix table and full glossary.
+See synthetic/l-agence.org/docs/ROUTING.md for the canonical state prefix table and full glossary.
 
 
 

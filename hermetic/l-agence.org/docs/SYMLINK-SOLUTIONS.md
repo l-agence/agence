@@ -65,6 +65,21 @@ winln -s target link
 **Concept:** Let git fail silently, then use PowerShell post-checkout hook to create symlinks
 **Limitations:** PowerShell may also need UAC or Developer Mode
 
+## Additional Solution: Use Cygwin-Bash for Real Directory Symlinks
+
+- Cygwin-bash can create real directory symlinks on Windows that are correctly interpreted in git-bash.
+- **Workaround:** Manually create the default routing "@" symlinks via Cygwin once. Since "@" is .gitignored, this works fine for local context routing.
+- This provides a reliable way to get true symlinks for Agence routing on Windows.
+
+## Additional Workaround: Cygwin ln in Git-Bash
+
+- Git-bash does not include /usr/local/bin by default, but will use it if created.
+- Copy the Cygwin version of ln.exe (e.g., C:\cygwin\bin\ln.exe) into /usr/local/bin/ln.exe in your git-bash environment.
+- When calling ln from git-bash, explicitly use /usr/local/bin/ln.exe to create true symlinks.
+- The Cygwin-linked ln works fine for creating real symlinks in git-bash.
+- This workaround avoids the directory copy issue and produces true symlinks.
+- (MSYS ln may also work, but not yet tested.)
+
 ## Root Cause Analysis
 
 | Factor | Impact |
@@ -74,6 +89,10 @@ winln -s target link
 | **UAC Elevation** | ❌ Blocks even admins (unless Dev Mode) |
 | **Developer Mode** | ❌ Likely NOT enabled on user's system |
 | **Git Bash Detection** | ✅ MSYS git-bash doesn't auto-enable symlinks |
+
+## Outstanding Issues
+
+- Directory symlinks produced in GIT-BASH appear to create directory copies and not true symlinks, which is inconvenient. This issue is still not resolved.
 
 ## Recommended Path Forward for Agence
 

@@ -1,0 +1,4 @@
+#!/bin/sh
+
+# Do not use symlink to support file system that symlink not available
+exec "${0%/*}/../lib/shellspec/shellspec" "$@"

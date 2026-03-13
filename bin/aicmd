@@ -1,43 +1,54 @@
-# aicmd is now a library. Source lib/aicmd-lib.sh in agentic shells.
-# Example:
-#   source "$AGENCE_ROOT/lib/aicmd-lib.sh"
+#!/usr/bin/env bash
+# aicmd: Agentic command/session wrapper for all shells
+# Ensures correct environment, session capture, and validation for all commands/tests
+
+# Source Agence environment
+source "$(dirname "$0")/.agencerc"
+
+# Source command validation library
+source "$AI_ROOT/lib/aicmd-lib.sh"
 
 
-# ============================================================================
-# ENVIRONMENT SANITIZATION
-# ============================================================================
+# Universal agentic wrapper logic
+set -e
 
-# Variables that could enable escape/exploit (stripped before spawn)
-declare -a DANGEROUS_ENV_VARS=(
-    "LD_PRELOAD"
-    "LD_LIBRARY_PATH"
-    "PYTHONPATH"
-    "RUBYLIB"
-    "PERL5LIB"
-    "NODE_PATH"
-    "PATH"  # Will be reset to /usr/bin:/bin
-)
+# Generate unique session ID
+session_id="aicmd-$(date +%Y%m%d_%H%M%S)-$$-$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+session_dir="$AI_ROOT/nexus/.aisessions"
+typescript_file="$session_dir/${session_id}.typescript"
+meta_file="$session_dir/${session_id}.meta.json"
 
-sanitize_environment() {
-    # Print clean environment suitable for subprocess spawn
-    # Preserves only safe variables
-    
-    # Safe variables to preserve
-    local safe_vars=(
-        "AI_ROOT"
-        "AI_BIN"
-        "AI_ROLE"
-        "AI_SESSION"
-        "AI_AGENT"
-        "GIT_ROOT"
-        "_AGENCE_FMT"
-        "HOME"
-        "USER"
-        "SHELL"
-        "TERM"
-        "LANG"
-        "TZ"
-    )
+mkdir -p "$session_dir"
+
+# Run command under script for full I/O capture
+if command -v script &>/dev/null; then
+    script --quiet --return --command "${*}" "$typescript_file"
+    exit_code=$?
+else
+    # Fallback: run directly, capture output
+    "${@}" | tee "$typescript_file"
+    exit_code=${PIPESTATUS[0]:-$?}
+fi
+
+# Write minimal metadata
+cat > "$meta_file" <<EOF
+{
+    "session_id": "$session_id",
+    "command": "${*}",
+    "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+    "exit_code": $exit_code,
+    "typescript_file": "$typescript_file"
+}
+EOF
+
+# If aisession is available, verify session
+if [[ -x "$AI_BIN/aisession" ]]; then
+    "$AI_BIN/aisession" status "$session_id"
+    verify_exit=$?
+    exit $verify_exit
+else
+    exit $exit_code
+fi
     
     # Build safe environment
     local safe_env=""
