@@ -1,3 +1,22 @@
+#!/usr/bin/env bash
+
+Describe 'Agence CLI' {
+  Include bin/agence
+
+  It 'shows help with --help' {
+    When run bash bin/agence --help
+    The status should be 0
+    The output should include 'Usage:'
+    The output should include 'Agence'
+  }
+
+  It 'shows version with --version' {
+    When run bash bin/agence --version
+    The status should be 0
+    The output should include 'Agence'
+  }
+}
+#!/usr/bin/env bash -x
 Describe 'Agence CLI' {
   Include bin/agence
 
