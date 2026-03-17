@@ -9,8 +9,6 @@
 # License: MIT License with Commons Clause
 ################################################################################
 
-set -euo pipefail
-
 # ROUTER CONFIG (stub, to be expanded)
 ROUTER_CONFIG_PATH="${ROUTER_CONFIG_PATH:-$HOME/.agence/config.yaml}"
 

@@ -1,0 +1,8 @@
+# ShellSpec project marker
+# Use absolute path - Windows PATH pollution in WSL requires explicit shell path
+--shell /bin/bash
+# Run examples from project root so validate_execution_context passes
+--execdir @project
+# Pre-set GIT_ROOT/AI_ROOT so When run subprocesses bypass slow WSL git detection
+--env GIT_ROOT=/mnt/c/Users/steff/git/.agence
+--env AI_ROOT=/mnt/c/Users/steff/git/.agence
