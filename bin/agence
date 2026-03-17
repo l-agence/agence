@@ -10,6 +10,9 @@
 
 # Shell environment detection function
 detect_shell_environment() {
+  # Default to POSIX if not detected
+  export AGENCE_PATH_STYLE="${AGENCE_PATH_STYLE:-posix}"
+
   # Additional detection for git-bash (MSYSTEM variable)
   if [[ -n "${MSYSTEM:-}" ]]; then
     export AGENCE_SHELL_ENV="git-bash"
@@ -45,12 +48,18 @@ detect_shell_environment
 # Handles conversion between path styles based on detected environment
 normalize_path() {
   local path="$1"
-  
+
   # If cygwin, convert /cygdrive/c/ to /c/ (mingw style)
-  if [[ "$AGENCE_PATH_STYLE" == "mingw" ]] && [[ "$path" == /cygdrive/* ]]; then
-    path="${path/\/cygdrive\//\/}"
+  if [[ "$AGENCE_PATH_STYLE" == "mingw" ]]; then
+    # Use double slash to prevent MSYS2 path mangling
+    if [[ "$path" == /* && "$path" != //*/ ]]; then
+      path="/${path}"
+    fi
+    if [[ "$path" == /cygdrive/* ]]; then
+      path="${path/\/cygdrive\//\/}"
+    fi
   fi
-  
+
   # If Windows (for PowerShell), convert to Windows style (C:\...)
   if [[ "$AGENCE_PATH_STYLE" == "windows" ]]; then
     # Convert unix paths to Windows paths
@@ -61,7 +70,7 @@ normalize_path() {
       path="${drive}:${rest//\//\\}"
     fi
   fi
-  
+
   echo "$path"
 }
 
@@ -100,17 +109,24 @@ init_execution_context() {
   export GIT_REPO="${GIT_REPO:-}"
   
 
-  # Try to detect GIT_REPO by walking up directory tree from current pwd
+  # Try to detect GIT_REPO using git-native method
   if [[ -z "$GIT_REPO" ]]; then
-    local current_dir="$(normalize_path "$(pwd)")"
-    local check_dir="$current_dir"
-    while [[ "$check_dir" != "/" ]]; do
-      if [[ -d "$check_dir/.git" ]]; then
-        export GIT_REPO="$check_dir"
-        break
-      fi
-      check_dir="$(dirname "$check_dir")"
-    done
+    local git_root
+    git_root=$(git rev-parse --show-toplevel 2>/dev/null | sed -e 's/.://')
+    if [[ -n "$git_root" ]]; then
+      export GIT_REPO="$(normalize_path "$git_root")"
+    else
+      # Fallback: walk up directory tree
+      local current_dir="$(normalize_path "$(pwd)")"
+      local check_dir="$current_dir"
+      while [[ "$check_dir" != "/" ]]; do
+        if [[ -d "$check_dir/.git" ]]; then
+          export GIT_REPO="$check_dir"
+          break
+        fi
+        check_dir="$(dirname "$check_dir")"
+      done
+    fi
   else
     # Normalize GIT_REPO if it was manually set
     export GIT_REPO="$(normalize_path "$GIT_REPO")"
@@ -191,6 +207,10 @@ fi
 # HELP / VERSION
 # ============================================================================
 
+show_version() {
+  echo "Agence version 0.2.2-agence-swarm-sessions"
+}
+
 show_help() {
   cat << 'EOF'
 Agence: Agentic Engineering Collaboration Environment
@@ -222,82 +242,19 @@ COMMAND MODES:
 
 EXAMPLES:
   agence "How do I deploy this to AWS?"
-  agenc        replay)
-          echo "[SESSION REPLAY] Not yet implemented."
-          ;;
-        kill)
-          echo "[SESSION KILL] Not yet implemented."
-          ;;
-        delete)
-          if [[ -z "$args" ]]; then
-            echo "Usage: ^session delete <session_id>"
-            return 1
-          fi
-          local meta="$sessions_dir/$args.meta.json"
-          if [[ -f "$meta" ]]; then
-            rm "$meta"
-            echo "Session $args deleted."
-          else
-            echo "Session $args not found."
-          fi
-          ;;
-        prune)
-          echo "[SESSION PRUNE] Cleaning up old sessions..."
-          find "$sessions_dir" -name '*.meta.json' -mtime +30 -exec rm {} \;
-          echo "Prune complete."
-          ;;
-        *)
-          echo "Unknown ^session command: $subcmd"
-          return 1
-          ;;
-      esac
-      return 0
-    }
-    *)
-e +plan-vpc-infrastructure
-    AGENCE_QUIET=1               Suppress non-essential output
-    AGENCE_LLM_PROVIDER=claude   LLM provider (anthropic, openai, ollama)
-    ANTHROPIC_API_KEY            API key for Claude
-EOF
-}
-        replay)
-          echo "[SESSION REPLAY] Not yet implemented."
-          ;;
-        kill)
-          echo "[SESSION KILL] Not yet implemented."
-          ;;
-        delete)
-          if [[ -z "$args" ]]; then
-            echo "Usage: ^session delete <session_id>"
-            return 1
-          fi
-          local meta="$sessions_dir/$args.meta.json"
-          if [[ -f "$meta" ]]; then
-            rm "$meta"
-            echo "Session $args deleted."
-          else
-            echo "Session $args not found."
-          fi
-          ;;
-        prune)
-          echo "[SESSION PRUNE] Cleaning up old sessions..."
-          find "$sessions_dir" -name '*.meta.json' -mtime +30 -exec rm {} \;
-          echo "Prune complete."
-          ;;
-        *)
-          echo "Unknown ^session command: $subcmd"
-          return 1
-          ;;
-      esac
-      return 0
-    }
-    *)
-      # Default: chat mode
-      mode_chat "$input"
-      ;;
-  esac
+  agence +plan-vpc-infrastructure
+  agence !status
+  agence ^init
+  agence ^session-list
+  agence /terraform-plan
+  agence /gitstatus
 
-  exit $?
+ENVIRONMENT VARIABLES:
+  AGENCE_QUIET=1               Suppress non-essential output
+  AGENCE_LLM_PROVIDER=claude   LLM provider (anthropic, openai, ollama)
+  ANTHROPIC_API_KEY            API key for Claude
+
+EOF
 }
 
 # ============================================================================
@@ -1366,5 +1323,38 @@ install_linux_packages() {
 # ============================================================================
 # ENTRY POINT
 # ============================================================================
+
+main() {
+  local cmd="$1"
+  shift || true
+
+  case "$cmd" in
+    help|"--help"|"-h")
+      show_help
+      ;;
+    version|"--version"|"-v")
+      show_version
+      ;;
+    +*)
+      mode_ai_routed "${cmd#+}" "$@"
+      ;;
+    /*)
+      mode_external "${cmd#/}" "$@"
+      ;;
+    !*)
+      mode_system "${cmd#!}" "$@"
+      ;;
+    ^*)
+      mode_init "${cmd#^}" "$@"
+      ;;
+    ""|chat)
+      mode_chat "$@"
+      ;;
+    *)
+      # Default: treat as chat
+      mode_chat "$cmd" "$@"
+      ;;
+  esac
+}
 
 main "$@"
