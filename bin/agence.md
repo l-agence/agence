@@ -2,6 +2,10 @@
 
 You operate in dual command mode.
 
+## Version
+
+- 0.1.1
+
 ## PREFIX RULES
 
 1. "+<command>" → AI command
