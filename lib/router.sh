@@ -86,9 +86,46 @@
 #                  Comparable to: Cline Act mode, Aider --editor-model
 #                  Danger: HIGH — acts on real files/APIs/infra.
 #                  Models: claude-sonnet-4-5, gpt-4o, codestral, gpt-4.1
+#                  Sub-tiered by blast_radius (see below).
+#
+# blast_radius — code mode sub-tiers (v0.5.0 planned)
+# ─────────────────────────────────────────────────────
+#  The 'code' mode is further refined by AGENCE_BLAST_RADIUS:
+#
+#  small     T0/T1  Standalone script, <100 lines, no shared deps.
+#                   Wrong execution = fix the script. Low blast.
+#                   Models: kwaipilot/free, haiku, codestral-small
+#
+#  medium    T1/T2  Single component, 100-500 lines, touches 1-2 libs.
+#                   Wrong execution = module broken. Moderate blast.
+#                   Models: haiku-3-5, gpt-4o-mini, mistral-small
+#
+#  large     T2/T3  Shared library, 500-1000+ lines, many callers/importers.
+#                   Wrong execution = many dependents break. High blast.
+#                   Models: claude-sonnet-4-5, gpt-4o, codestral-latest
+#
+#  critical  T3/T4  1000+ lines, cross-repo workflow, release commit,
+#                   multi-repo git orchestration, infra libs.
+#                   Wrong execution = multi-repo breakage or release incident.
+#                   Models: claude-opus-4-5, gpt-o1, gpt-4.1 (max quality)
+#
+#  blast_radius detection heuristics (auto-detect in v0.5):
+#    - file LOC: wc -l (simple proxy for complexity)
+#    - import fan-out: grep -r "source.*file" | wc -l (how many callers)
+#    - cross-repo: AGENCE_CROSS_REPO_COUNT > 0 → critical minimum
+#    - file path: lib/* / codex/* → large minimum; bin/* scripts → small
+#    - active PR/release context: → critical minimum
+#
+#  Usage (future):
+#    AGENCE_BLAST_RADIUS=critical agence "commit all repos in this release"
+#    AGENCE_BLAST_RADIUS=small agence "write a helper script to rotate logs"
+#
+#  Relationship to bin/swarm cross-repo workflows:
+#    Multi-repo workflows detected by swarm automatically set blast_radius=critical.
+#    This ensures the highest-quality model is used when touching multiple repos.
 #
 # Override hierarchy:
-#   AGENCE_LLM_MODEL (explicit) > mode table > provider default
+#   AGENCE_LLM_MODEL (explicit) > blast_radius table > mode table > provider default
 #
 # Extended thinking (deep reasoning — future v0.5):
 #   Claude claude-3-7-sonnet+ supports {"thinking": {"type":"enabled", budget_tokens:N}}
@@ -898,6 +935,14 @@ Action type definitions:
 #   router_auto_route() extends this to per-call granularity within a task.
 #   Both use the same cost-tier table for consistency.
 #
+# TODO(v0.5): implement AGENCE_BLAST_RADIUS
+#   - add _router_model_for_blast_radius() case table
+#     (blast:provider → model, overriding the code mode table)
+#   - auto-detect blast_radius in router_code() from:
+#       wc -l $target_file, grep fan-out, AGENCE_CROSS_REPO_COUNT
+#   - bin/swarm sets AGENCE_BLAST_RADIUS=critical for cross-repo runs
+#   - AGENCE_BLAST_RADIUS=critical forces T3/T4 regardless of mode
+
 # TODO(v0.4): implement router_auto_route()
 #   - parse ACTION/CONFIDENCE from router_plan_action()
 #   - walk cost tiers lowest→highest
