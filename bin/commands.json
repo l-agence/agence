@@ -1,8 +1,8 @@
 {
   "comment": "Agence Permitted External Commands (mode /)",
   "description": "Whitelist of external commands that can be executed via 'agence /<command>'",
-  "updated": "2026-03-05",
-  "version": "1.0.0",
+  "updated": "2026-03-18",
+  "version": "1.0.1",
 
   "terraform-commands": {
     "terraform-plan": true,
@@ -11,6 +11,24 @@
     "terraform-fmt": true,
     "terraform-state": true
   },
+
+  "tf-shortcut-commands": {
+    "_comment": "Shortcuts handled directly in mode_external via route_tf_command (AIPOLICY tier model). Not subject to terraform-commands whitelist — these bypass the jq check. Listed here for documentation only.",
+    "_tiers": "T0=auto-execute  T2=warn+confirm (infra state mutation)  T3=blocked (destroy — HIGHEST ESCALATION)",
+    "_policy": "See codex/AIPOLICY.yaml terraform section for canonical whitelist/blacklist",
+    "tf":         { "tier": "router", "desc": "Generic /tf <subcmd> [args...] — full AIPOLICY tier routing" },
+    "tfvalidate": { "tier": "T0",     "desc": "terraform validate — syntax/config check (whitelist)" },
+    "tfauth":     { "tier": "T0",     "desc": "terraform login — auth check / Terraform Cloud registry (whitelist)" },
+    "tflogin":    { "tier": "T0",     "desc": "terraform login — alias for /tfauth (whitelist)" },
+    "tfplan":     { "tier": "T0",     "desc": "terraform plan [args] — non-destructive change preview (whitelist)" },
+    "tfinit":     { "tier": "T0",     "desc": "terraform init — provider install, no --upgrade (whitelist)" },
+    "tflint":     { "tier": "T0",     "desc": "tflint [args] — Terraform linter, code quality (whitelist)" },
+    "tfupgrade":  { "tier": "T2",     "desc": "terraform init --upgrade — provider upgrade (restricted, warn+confirm)" },
+    "tfapply":    { "tier": "T2",     "desc": "terraform apply [args] — provision infra (restricted, warn+confirm)" },
+    "tfdestroy":  { "tier": "T3",     "desc": "terraform apply --destroy — HIGHEST ESCALATION: BLOCKED (run manually)" },
+    "precommit":  { "tier": "T0",     "desc": "pre-commit run [args] — git pre-commit hooks / code quality (whitelist)" }
+  },
+
 
   "git-commands": {
     "git-status": true,

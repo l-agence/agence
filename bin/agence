@@ -177,7 +177,7 @@ fi
 # ============================================================================
 
 show_version() {
-  echo "Agence version 0.2.2-agence-swarm-sessions"
+  echo "Agence version 0.2.3"
 }
 
 show_help() {
@@ -550,6 +550,129 @@ route_gh_command() {
   esac
 }
 
+# ==============================================================================
+# TERRAFORM COMMAND ROUTER — AIPOLICY Tier Model
+# Classifies terraform subcommands per codex/AIPOLICY.yaml:
+#   T0  auto-execute : whitelist (read-only / non-destructive: validate, fmt,
+#                      version, providers, show, graph, output, login, plan,
+#                      init [no --upgrade], state list/show/pull)
+#   T1  light-confirm: unclassified/unknown subcommands
+#   T2  warn+confirm : restricted (state mutation: apply, init --upgrade,
+#                      import, taint, workspace changes, state mv/rm)
+#   T3  blocked      : HIGHEST ESCALATION — destroy operations only
+#                      (apply --destroy, destroy) — run manually after review
+# ==============================================================================
+route_tf_command() {
+  local subcmd="${1:-}"
+  shift || true
+  local args=("$@")
+  local work_dir="${GIT_ROOT:-$(pwd)}"
+
+  if [[ -z "$subcmd" ]]; then
+    cat >&2 <<'TFUSAGE'
+Usage: agence /tf <subcommand> [args...]
+
+Terraform subcommand tiers (codex/AIPOLICY.yaml):
+  T0 auto     : validate fmt version providers show graph output
+                login plan state(list/show/pull) init[no --upgrade]
+  T1 confirm  : (unclassified subcommands)
+  T2 confirm  : apply  init --upgrade  import  taint  untaint
+                refresh  workspace  state(mv/rm/push/replace-provider)
+  T3 blocked  : destroy  apply --destroy  (HIGHEST ESCALATION — run manually)
+
+Shortcuts:
+  agence /tfvalidate             terraform validate
+  agence /tfauth                 terraform login
+  agence /tflogin                terraform login
+  agence /tfplan [args]          terraform plan [args]
+  agence /tfinit [args]          terraform init (no --upgrade)
+  agence /tfupgrade              terraform init --upgrade   [T2]
+  agence /tfapply [args]         terraform apply [args]     [T2]
+  agence /tfdestroy              terraform apply --destroy  [T3 BLOCKED]
+  agence /tflint [args]          tflint [args]
+  agence /precommit [args]       pre-commit run [args]
+TFUSAGE
+    return 1
+  fi
+
+  # Scan args for escalating flags
+  local has_upgrade=false has_destroy=false
+  for _a in "${args[@]}"; do
+    [[ "$_a" == "--upgrade"  || "$_a" == "-upgrade"  ]] && has_upgrade=true
+    [[ "$_a" == "--destroy"  || "$_a" == "-destroy"  ]] && has_destroy=true
+  done
+
+  local tier
+  case "$subcmd" in
+    # T0 — read-only / non-destructive
+    validate|fmt|version|providers|show|graph|output|login|console)
+      tier="T0" ;;
+    plan)
+      tier="T0" ;;
+    init)
+      [[ "$has_upgrade" == "true" ]] && tier="T2" || tier="T0" ;;
+    state)
+      case "${args[0]:-}" in
+        list|show|pull|"")              tier="T0" ;;
+        mv|rm|push|replace-provider|\
+        force-unlock)                   tier="T2" ;;
+        *)                              tier="T1" ;;
+      esac ;;
+    # T2 — infrastructure mutation
+    apply)
+      [[ "$has_destroy" == "true" ]] && tier="T3" || tier="T2" ;;
+    import|taint|untaint|refresh|workspace)
+      tier="T2" ;;
+    # T3 — HIGHEST ESCALATION: destroy
+    destroy)
+      tier="T3" ;;
+    # T1 — unclassified
+    *)
+      tier="T1" ;;
+  esac
+
+  # Verify terraform is available (all tiers)
+  if ! command -v terraform &>/dev/null; then
+    echo "Error: terraform not found. Install: agence ^install" >&2
+    return 1
+  fi
+
+  case "$tier" in
+    T0)
+      [[ "${DEBUG:-0}" == "1" ]] && \
+        echo "[AIPOLICY T0] terraform $subcmd${args[*]:+ ${args[*]}}" >&2
+      terraform "$subcmd" "${args[@]}"
+      return $?
+      ;;
+    T1)
+      echo "[AIPOLICY T1] Unclassified: terraform $subcmd${args[*]:+ ${args[*]}}" >&2
+      read -p "Execute? [y/N] " -r _tc; echo
+      [[ $_tc =~ ^[Yy]$ ]] || { echo "[CANCELLED]" >&2; return 1; }
+      terraform "$subcmd" "${args[@]}"
+      return $?
+      ;;
+    T2)
+      echo "[AIPOLICY T2] Restricted: terraform $subcmd${args[*]:+ ${args[*]}}" >&2
+      echo "[WARN] This operation mutates infrastructure state." >&2
+      read -p "Confirm terraform $subcmd${args[*]:+ ${args[*]}}? [y/N] " -r _tc; echo
+      [[ $_tc =~ ^[Yy]$ ]] || { echo "[CANCELLED]" >&2; return 1; }
+      terraform "$subcmd" "${args[@]}"
+      return $?
+      ;;
+    T3)
+      echo "[AIPOLICY T3] BLOCKED: HIGHEST ESCALATION — destroy operation." >&2
+      echo "[DESTROY] 'terraform $subcmd${args[*]:+ ${args[*]}}' will permanently destroy infrastructure." >&2
+      echo "[ESCALATION REQUIRED] Review 'agence /tfplan' output, then run manually if certain:" >&2
+      if [[ "$has_destroy" == "true" || "$subcmd" == "destroy" ]]; then
+        printf "  terraform -chdir=%q apply --destroy\n" "$work_dir" >&2
+      else
+        printf "  terraform -chdir=%q %s%s\n" "$work_dir" "$subcmd" "${args[*]:+ ${args[*]}}" >&2
+      fi
+      return 1
+      ;;
+  esac
+}
+
 # Execute pre-approved external commands
 # Example: agence /terraform-plan
 
@@ -755,6 +878,87 @@ mode_external() {
     status|log|remote|fetch|pull)
       # Shortcuts: delegate to route_git_command with cmd_request as subcmd
       route_git_command "$cmd_request" "${@:2}"
+      return $?
+      ;;
+
+    # -------------------------------------------------------------------------
+    # TERRAFORM SHORTCUTS — routed through route_tf_command (AIPOLICY tiers)
+    # -------------------------------------------------------------------------
+    # /tf           → generic /tf <subcmd> [args...] with full AIPOLICY routing
+    # /tfvalidate   → T0  terraform validate
+    # /tfauth       → T0  terraform login  (auth check / registry login)
+    # /tflogin      → T0  terraform login  (alias for tfauth)
+    # /tfplan       → T0  terraform plan [args...]
+    # /tfinit       → T0  terraform init   (without --upgrade)
+    # /tflint       → T0  tflint [args...]
+    # /tfupgrade    → T2  terraform init --upgrade   (warn+confirm)
+    # /tfapply      → T2  terraform apply [args...]  (warn+confirm)
+    # /tfdestroy    → T3  terraform apply --destroy  (HIGHEST ESCALATION — BLOCKED)
+    # /precommit    → T0  pre-commit run [args...]   (code quality hooks)
+    # -------------------------------------------------------------------------
+    tf)
+      # Generic: agence /tf <subcmd> [args...]
+      route_tf_command "${@:2}"
+      return $?
+      ;;
+    tfvalidate)
+      # T0: terraform validate
+      route_tf_command "validate" "${@:2}"
+      return $?
+      ;;
+    tfauth|tflogin)
+      # T0: terraform login — auth check / Terraform Cloud/registry login
+      route_tf_command "login" "${@:2}"
+      return $?
+      ;;
+    tfplan)
+      # T0: terraform plan (non-destructive, shows change set only)
+      route_tf_command "plan" "${@:2}"
+      return $?
+      ;;
+    tfinit)
+      # T0: terraform init (no --upgrade flag)
+      route_tf_command "init" "${@:2}"
+      return $?
+      ;;
+    tfupgrade)
+      # T2: terraform init --upgrade (restricted — confirm required)
+      route_tf_command "init" "--upgrade" "${@:2}"
+      return $?
+      ;;
+    tfapply)
+      # T2: terraform apply (restricted — warn+confirm required)
+      route_tf_command "apply" "${@:2}"
+      return $?
+      ;;
+    tfdestroy)
+      # T3: terraform apply --destroy (HIGHEST ESCALATION — BLOCKED, run manually)
+      route_tf_command "apply" "--destroy" "${@:2}"
+      return $?
+      ;;
+    tflint)
+      # T0: tflint — Terraform linter
+      if ! command -v tflint &>/dev/null; then
+        echo "Error: tflint not found. Install: agence ^install" >&2
+        return 1
+      fi
+      tflint "${@:2}"
+      return $?
+      ;;
+    precommit)
+      # T0: pre-commit — code quality hooks (pre-commit run [--all-files])
+      if command -v pre-commit &>/dev/null; then
+        pre-commit run "${@:2}"
+      else
+        # Fallback: run .git/hooks/pre-commit directly if present
+        local hook="${GIT_ROOT:-$(pwd)}/.git/hooks/pre-commit"
+        if [[ -x "$hook" ]]; then
+          "$hook" "${@:2}"
+        else
+          echo "Error: pre-commit not found. Install: pip install pre-commit" >&2
+          return 1
+        fi
+      fi
       return $?
       ;;
   esac

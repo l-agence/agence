@@ -872,6 +872,118 @@ agence /ghcommit
 
 ---
 
+---
+
+## Terraform / IaC Commands (External Mode)
+
+Terraform shortcuts use `agence /tf*` pattern. All commands are tier-classified per `codex/AIPOLICY.yaml`.
+
+| Command | Tier | Maps to | Notes |
+|---------|------|---------|-------|
+| `/tf <subcmd> [args]` | router | `terraform <subcmd> [args]` | Generic — full tier routing |
+| `/tfvalidate` | T0 ✅ | `terraform validate` | Auto-execute |
+| `/tfauth` | T0 ✅ | `terraform login` | Auth check / registry login |
+| `/tflogin` | T0 ✅ | `terraform login` | Alias for `/tfauth` |
+| `/tfplan [args]` | T0 ✅ | `terraform plan [args]` | Non-destructive preview |
+| `/tfinit [args]` | T0 ✅ | `terraform init` | No `--upgrade` |
+| `/tflint [args]` | T0 ✅ | `tflint [args]` | Terraform linter |
+| `/tfupgrade` | T2 ⚠️ | `terraform init --upgrade` | warn+confirm |
+| `/tfapply [args]` | T2 ⚠️ | `terraform apply [args]` | warn+confirm |
+| `/tfdestroy` | T3 🔴 | `terraform apply --destroy` | **HIGHEST ESCALATION — BLOCKED** |
+| `/precommit [args]` | T0 ✅ | `pre-commit run [args]` | Code quality hooks |
+
+**Tier legend:**
+- **T0** — auto-execute (non-destructive, read-only or idempotent)
+- **T1** — light confirm (unclassified subcommands via `/tf`)
+- **T2** — warn + confirm (infrastructure state mutation)
+- **T3** — BLOCKED: HIGHEST ESCALATION (destroy operations; copy printed command and run manually)
+
+### `/tf`
+
+Generic terraform router. All subcommands pass through `route_tf_command()` for AIPOLICY tier classification.
+
+```bash
+agence /tf validate
+agence /tf fmt --check
+agence /tf plan -out=tfplan
+agence /tf state list
+agence /tf apply          # T2: prompts for confirm
+agence /tf apply --destroy  # T3: BLOCKED
+```
+
+### `/tfvalidate`
+
+```bash
+agence /tfvalidate
+# → terraform validate
+```
+
+### `/tfplan`
+
+```bash
+agence /tfplan
+agence /tfplan -out=tfplan.out
+# → terraform plan [args]  (T0: non-destructive, auto-execute)
+```
+
+### `/tfinit`
+
+```bash
+agence /tfinit
+# → terraform init  (no --upgrade)
+```
+
+### `/tfauth` / `/tflogin`
+
+```bash
+agence /tfauth
+# → terraform login  (T0: auth check / Terraform Cloud login)
+```
+
+### `/tfupgrade` ⚠️
+
+```bash
+agence /tfupgrade
+# → terraform init --upgrade
+# [AIPOLICY T2] warn+confirm required
+```
+
+### `/tfapply` ⚠️
+
+```bash
+agence /tfapply
+agence /tfapply -auto-approve   # still prompts via agence
+# [AIPOLICY T2] warn+confirm required
+```
+
+### `/tfdestroy` 🔴 HIGHEST ESCALATION
+
+```bash
+agence /tfdestroy
+# [AIPOLICY T3] BLOCKED — will NOT execute.
+# Prints the exact command to run manually after reviewing /tfplan output.
+```
+
+### `/tflint`
+
+```bash
+agence /tflint
+agence /tflint --format compact
+# → tflint [args]  (T0: auto-execute; requires tflint installed)
+```
+
+### `/precommit`
+
+Runs git pre-commit hooks via the `pre-commit` tool (or falls back to `.git/hooks/pre-commit`).
+
+```bash
+agence /precommit
+agence /precommit --all-files
+# → pre-commit run [args]  (T0: auto-execute)
+```
+
+---
+
 ### `/ghpush`
 
 **Purpose**: Push changes to remote using GitHub CLI authentication.
