@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ################################################################################
-# router.sh: Agence Agent/Model Routing Library  v0.3.0
+# router.sh: Agence Agent/Model Routing Library  v0.4.0
 #
 # Multi-provider LLM backend for bin/agence and other entry points.
 #
@@ -69,12 +69,50 @@
 ################################################################################
 
 # ============================================================================
+# OPERATIONAL MODES  (AGENCE_ROUTER_MODE)
+# ============================================================================
+#
+# Agence distinguishes three operational modes, each mapped to a cost tier:
+#
+#  query  T0/free  General Q&A, status checks, quick lookups.
+#                  Danger: minimal — wrong answer = ask again.
+#                  Models: groq/llama-3.3-70b, kwaipilot (free), haiku, gemini-flash
+#
+#  plan   T1/cheap Architecture, step planning, analysis, review.
+#                  Comparable to: Cline Plan mode, Aider --architect
+#                  Models: haiku-3-5, gpt-4o-mini, mistral-small, gemini-flash
+#
+#  code   T2/T3    Code generation, editing, execution, tool calls.
+#                  Comparable to: Cline Act mode, Aider --editor-model
+#                  Danger: HIGH — acts on real files/APIs/infra.
+#                  Models: claude-sonnet-4-5, gpt-4o, codestral, gpt-4.1
+#
+# Override hierarchy:
+#   AGENCE_LLM_MODEL (explicit) > mode table > provider default
+#
+# Extended thinking (deep reasoning — future v0.5):
+#   Claude claude-3-7-sonnet+ supports {"thinking": {"type":"enabled", budget_tokens:N}}
+#   Aider --think-tokens; Claude Code --thinking
+#   AGENCE_ROUTER_THINKING_BUDGET=8000  (0=disabled, billed as output tokens)
+#   Recommendation: code mode only, complex architectural problems
+#
+# Security tiering alignment (mirrors AIPOLICY in bin/agence):
+#   T0 free  ↔ AIPOLICY T0  safe read-only ops
+#   T1 cheap ↔ AIPOLICY T1  standard ops
+#   T2 mid   ↔ AIPOLICY T2  warn+confirm
+#   T3 smart ↔ AIPOLICY T3  highest escalation
+
+# ============================================================================
 # DEFAULTS
 # ============================================================================
 
 ROUTER_CONFIG_PATH="${ROUTER_CONFIG_PATH:-${HOME}/.agence/config.yaml}"
 
-# Default models per provider (override via env or config.yaml)
+# Operational mode: query | plan | code
+# Override per-call: AGENCE_ROUTER_MODE=code agence "write tests for..."
+AGENCE_ROUTER_MODE="${AGENCE_ROUTER_MODE:-query}"
+
+# Default models per provider (used when no mode is active, override via env or config.yaml)
 ROUTER_DEFAULT_MODEL_ANTHROPIC="${ROUTER_DEFAULT_MODEL_ANTHROPIC:-claude-sonnet-4-5}"
 ROUTER_DEFAULT_MODEL_OPENAI="${ROUTER_DEFAULT_MODEL_OPENAI:-gpt-4o}"
 ROUTER_DEFAULT_MODEL_AZURE="${ROUTER_DEFAULT_MODEL_AZURE:-gpt-4o}"
@@ -124,6 +162,60 @@ _yaml_get() {
     | sed 's/^[^:]*:[[:space:]]*//' \
     | tr -d '"'"'" \
     | xargs 2>/dev/null
+}
+
+# _router_model_for_mode <provider> [mode]
+# Returns the model for the given provider + operational mode.
+# AGENCE_LLM_MODEL (explicit) always wins over the mode table.
+_router_model_for_mode() {
+  local provider="${1:-${AGENCE_LLM_PROVIDER:-}}"
+  local mode="${2:-${AGENCE_ROUTER_MODE:-query}}"
+  [[ -n "${AGENCE_LLM_MODEL:-}" ]] && { echo "$AGENCE_LLM_MODEL"; return 0; }
+  case "${mode}:${provider}" in
+    # QUERY — T0 free (general Q&A, status, quick lookups)
+    query:anthropic)   echo "claude-haiku-3-5" ;;
+    query:openai)      echo "gpt-4o-mini" ;;
+    query:azure)       echo "gpt-4o-mini" ;;
+    query:gemini)      echo "gemini-2.0-flash" ;;
+    query:mistral)     echo "mistral-small-latest" ;;
+    query:groq)        echo "llama-3.3-70b-versatile" ;;
+    query:openrouter)  echo "kwaipilot/kat-coder-latest" ;;
+    query:grok)        echo "grok-3-mini-fast" ;;
+    query:qwen)        echo "qwen-turbo" ;;
+    query:copilot)     echo "auto" ;;
+    query:cline)       echo "kwaipilot/kat-coder-latest" ;;
+    query:ollama)      echo "${ROUTER_DEFAULT_MODEL_OLLAMA:-llama3.2}" ;;
+    # PLAN — T1 cheap (architecture, step planning, analysis)
+    # Comparable: Cline Plan mode, Aider --architect
+    plan:anthropic)    echo "claude-haiku-3-5" ;;
+    plan:openai)       echo "gpt-4o-mini" ;;
+    plan:azure)        echo "gpt-4o-mini" ;;
+    plan:gemini)       echo "gemini-2.0-flash" ;;
+    plan:mistral)      echo "mistral-small-latest" ;;
+    plan:groq)         echo "llama-3.3-70b-versatile" ;;
+    plan:openrouter)   echo "meta-llama/llama-3.3-70b-instruct" ;;
+    plan:grok)         echo "grok-3-mini-fast" ;;
+    plan:qwen)         echo "qwen-plus" ;;
+    plan:copilot)      echo "auto" ;;
+    plan:cline)        echo "kwaipilot/kat-coder-latest" ;;
+    plan:ollama)       echo "${ROUTER_DEFAULT_MODEL_OLLAMA:-llama3.2}" ;;
+    # CODE — T2/T3 capable (code gen, editing, execution, tool calls)
+    # Comparable: Cline Act mode, Aider --editor-model
+    # Danger: HIGH — acts on real files/APIs/infra
+    code:anthropic)    echo "claude-sonnet-4-5" ;;
+    code:openai)       echo "gpt-4o" ;;
+    code:azure)        echo "gpt-4o" ;;
+    code:gemini)       echo "gemini-1.5-pro" ;;
+    code:mistral)      echo "codestral-latest" ;;
+    code:groq)         echo "llama-3.3-70b-versatile" ;;
+    code:openrouter)   echo "anthropic/claude-3.5-sonnet" ;;
+    code:grok)         echo "grok-3-fast" ;;
+    code:qwen)         echo "qwen-max" ;;
+    code:copilot)      echo "gpt-4.1" ;;
+    code:cline)        echo "claude-sonnet-4-5" ;;
+    code:ollama)       echo "${ROUTER_DEFAULT_MODEL_OLLAMA:-llama3.2}" ;;
+    *)                 echo "" ;;
+  esac
 }
 
 router_load_config() {
@@ -656,41 +748,62 @@ router_call_cline() {
 }
 
 # ============================================================================
-# MAIN DISPATCH: router_chat
+# MAIN DISPATCH: router_chat  [mode: query|plan|code]
 # ============================================================================
 
 router_chat() {
   local query="${1:-}"
+  local mode="${2:-${AGENCE_ROUTER_MODE:-query}}"
   [[ -z "$query" ]] && { echo "[router] ERROR: No query provided" >&2; return 1; }
 
   router_load_config || return 1
 
+  # Apply mode-based model selection (AGENCE_LLM_MODEL explicit override always wins)
+  local _saved_model="${AGENCE_LLM_MODEL:-}"
+  local _mode_model; _mode_model=$(_router_model_for_mode "${AGENCE_LLM_PROVIDER}" "$mode")
+  [[ -z "$_saved_model" && -n "$_mode_model" ]] && export AGENCE_LLM_MODEL="$_mode_model"
+  [[ "${AGENCE_DEBUG:-0}" == "1" ]] && \
+    echo "[router] mode=${mode}  provider=${AGENCE_LLM_PROVIDER}  model=${AGENCE_LLM_MODEL:-default}" >&2
+
   local system_prompt
   system_prompt=$(router_build_system_prompt)
 
+  local _rc
   case "${AGENCE_LLM_PROVIDER}" in
-    anthropic)  router_call_anthropic  "$system_prompt" "$query" ;;
-    openai)     router_call_openai     "$system_prompt" "$query" ;;
-    azure)      router_call_azure      "$system_prompt" "$query" ;;
-    gemini)     router_call_gemini     "$system_prompt" "$query" ;;
-    mistral)    router_call_mistral    "$system_prompt" "$query" ;;
-    groq)       router_call_groq       "$system_prompt" "$query" ;;
-    openrouter) router_call_openrouter "$system_prompt" "$query" ;;
-    grok)       router_call_grok       "$system_prompt" "$query" ;;
-    qwen)       router_call_qwen       "$system_prompt" "$query" ;;
-    copilot)    router_call_copilot    "$system_prompt" "$query" ;;
-    cline)      router_call_cline      "$system_prompt" "$query" ;;
-    ollama)     router_call_ollama     "$system_prompt" "$query" ;;
+    anthropic)  router_call_anthropic  "$system_prompt" "$query" ; _rc=$? ;;
+    openai)     router_call_openai     "$system_prompt" "$query" ; _rc=$? ;;
+    azure)      router_call_azure      "$system_prompt" "$query" ; _rc=$? ;;
+    gemini)     router_call_gemini     "$system_prompt" "$query" ; _rc=$? ;;
+    mistral)    router_call_mistral    "$system_prompt" "$query" ; _rc=$? ;;
+    groq)       router_call_groq       "$system_prompt" "$query" ; _rc=$? ;;
+    openrouter) router_call_openrouter "$system_prompt" "$query" ; _rc=$? ;;
+    grok)       router_call_grok       "$system_prompt" "$query" ; _rc=$? ;;
+    qwen)       router_call_qwen       "$system_prompt" "$query" ; _rc=$? ;;
+    copilot)    router_call_copilot    "$system_prompt" "$query" ; _rc=$? ;;
+    cline)      router_call_cline      "$system_prompt" "$query" ; _rc=$? ;;
+    ollama)     router_call_ollama     "$system_prompt" "$query" ; _rc=$? ;;
     *)
       echo "[router] ERROR: Unknown provider '${AGENCE_LLM_PROVIDER}'" >&2
       echo "[router]        Supported: anthropic openai azure gemini mistral groq openrouter grok qwen copilot cline ollama" >&2
-      return 1
-      ;;
+      _rc=1 ;;
   esac
+
+  # Restore model state if we overrode it
+  [[ -z "$_saved_model" && -n "$_mode_model" ]] && unset AGENCE_LLM_MODEL
+  return $_rc
 }
+
+# Mode-specific convenience wrappers
+# router_query "what is X?"    → T0 free   (general Q&A, status, lookups)
+# router_plan  "how to do X?"  → T1 cheap  (architecture, step planning)
+# router_code  "write X"       → T2/T3     (code gen, editing, execution)
+router_query() { router_chat "$1" "query" ; }
+router_plan()  { router_chat "$1" "plan"  ; }
+router_code()  { router_chat "$1" "code"  ; }
 
 # ============================================================================
 # PLANNING DISPATCH: router_plan_action
+# Uses PLAN mode (T1 cheap) — planning is analysis, not execution.
 # ============================================================================
 
 router_plan_action() {
@@ -698,6 +811,13 @@ router_plan_action() {
   [[ -z "$request" ]] && { echo "[router] ERROR: No request provided" >&2; return 1; }
 
   router_load_config || return 1
+
+  # Use plan mode for cheap model selection; restore after
+  local _saved_model="${AGENCE_LLM_MODEL:-}"
+  local _mode_model; _mode_model=$(_router_model_for_mode "${AGENCE_LLM_PROVIDER}" "plan")
+  [[ -z "$_saved_model" && -n "$_mode_model" ]] && export AGENCE_LLM_MODEL="$_mode_model"
+  [[ "${AGENCE_DEBUG:-0}" == "1" ]] && \
+    echo "[router] plan_action: mode=plan  provider=${AGENCE_LLM_PROVIDER}  model=${AGENCE_LLM_MODEL:-default}" >&2
 
   local system_prompt
   system_prompt=$(router_build_system_prompt)
@@ -742,6 +862,9 @@ Action type definitions:
     printf "ACTION: chat\nCONFIDENCE: 0.50\nSTEPS:\n- %s\nREASON: LLM call failed\n" "$request"
     return 0
   }
+
+  # Restore model state
+  [[ -z "$_saved_model" && -n "$_mode_model" ]] && unset AGENCE_LLM_MODEL
 
   echo "$raw_plan"
 }
@@ -793,7 +916,7 @@ router_list_providers() {
   local model="${AGENCE_LLM_MODEL:-none}"
 
   echo "╔══════════════════════════════════════════════════════════════════╗"
-  echo "║  Agence LLM Providers                           v0.3.0           ║"
+  echo "║  Agence LLM Providers                           v0.4.0           ║"
   echo "╠══════════════════════════════════════════════════════════════════╣"
   printf "║  Active : %-20s  Model : %-20s  ║\n" "$active" "$model"
   echo "╠══════════════════╤══════════════════════════════════════════════╣"
