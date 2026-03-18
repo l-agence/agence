@@ -12,6 +12,34 @@ This document defines the canonical symbols, prefixes, and routing constructs fo
 - Appears in metadata: `agent=@ralph`, `org=@acme.ltd`, `sec=@internal`
 - Supported in all command grammars and EBNF definitions.
 
+### `@provider.tier` — Inline Model Routing Hints  (v0.3.0)
+
+The dotted suffix selects provider + model tier in a single token:
+
+```
+@<provider>.<tier>    → AGENCE_LLM_PROVIDER + mode model for that tier
+@<provider>.<model>   → AGENCE_LLM_PROVIDER + explicit AGENCE_LLM_MODEL
+@<agent>              → named agent persona (see codex/agents/AGENTS.md)
+```
+
+Standard tier suffixes:
+
+| Suffix   | Cost tier | Typical model                          |
+|----------|-----------|----------------------------------------|
+| `.free`  | T0 free   | kwaipilot/kat-coder, groq/llama        |
+| `.plan`  | T1 cheap  | haiku-3-5, gpt-4o-mini, gemini-flash   |
+| `.code`  | T2/T3     | claude-sonnet-4-5, gpt-4o, codestral   |
+| `.query` | T0        | alias for `.free`                      |
+
+Examples:
+- `@cline.free` → cline provider via OpenRouter → `kwaipilot/kat-coder-latest` (free)
+- `@anthropic.code` → anthropic + `claude-sonnet-4-5`
+- `@mistral.code` → mistral + `codestral-latest`
+- `@copilot.auto` → copilot + `auto` (GitHub picks model)
+- `@groq.free` → groq + `llama-3.3-70b-versatile` (free tier)
+
+Full reference: `codex/agents/ROUTING.md`
+
 ## Canonical State Prefix Table
 
 | Prefix | Meaning                        | Who/When                |
@@ -46,4 +74,7 @@ This document defines the canonical symbols, prefixes, and routing constructs fo
 
 ---
 
-All code, docs, and examples must use these symbols and prefixes consistently. For updates, see codex/agents/ROUTING.md.
+All code, docs, and examples must use these symbols and prefixes consistently.
+
+**Routing reference:** `codex/agents/ROUTING.md`  
+**Version:** 0.3.0 — last updated 2026-03-18

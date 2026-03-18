@@ -1194,3 +1194,57 @@ And future tasks reuse past solutions.
 This would effectively give the swarm collective learning.
 
 And interestingly… it can also be implemented with jq + awk + git objects without needing databases.
+
+---
+
+# MODEL ROUTING ALIGNMENT  (v0.3.0)
+
+The SWARM intelligence tier model is now formally unified with `lib/router.sh`.
+
+```
+complexity score (stars + heat + deps + critical_path)
+       ↓
+SWARM tier  (T0 → T5)
+       ↓
+AGENCE_ROUTER_MODE  (query | plan | code)
+       ↓
+AGENCE_BLAST_RADIUS  (small | medium | large | critical)   ← v0.5
+       ↓
+cheapest capable model for active provider
+```
+
+## Tier ↔ Router Mode ↔ Agent ↔ @provider.tier
+
+| SWARM | Router Mode  | blast_radius | Agent           | @provider.tier hint         |
+|-------|--------------|--------------|-----------------|------------------------------|
+| T0    | query        | —            | scripts / bash  | @groq.free / @cline.free     |
+| T1    | plan         | small        | @ralph          | @anthropic.plan              |
+| T2    | code         | medium       | @aiko, @aider   | @anthropic.plan / @openai.mini|
+| T3    | code         | large        | @chad, @copilot | @anthropic.code / @copilot.code|
+| T4    | code         | critical     | @claudia, @peers| @anthropic.opus              |
+| T5    | code (secure)| critical     | @olena          | @ollama.free (local)         |
+
+## @provider.tier Syntax
+
+Inline routing hint — selects provider + model tier in one token:
+
+- `@cline.free`     → cline + kwaipilot/kat-coder (OpenRouter, **free**)
+- `@groq.free`      → groq + llama-3.3-70b-versatile (**free**)
+- `@anthropic.plan` → anthropic + claude-haiku-3-5 (cheap)
+- `@anthropic.code` → anthropic + claude-sonnet-4-5
+- `@mistral.code`   → mistral + codestral-latest (code-specialized)
+- `@copilot.code`   → GitHub Copilot + gpt-4.1
+- `@anthropic.opus` → anthropic + claude-opus-4-5 (max quality)
+
+Full reference: `codex/agents/ROUTING.md`
+
+## Token Economy (Emergent from Math)
+
+```
+80% cheap tasks  → @cline.free / @groq.free   ($0)
+15% normal tasks → @aiko / @openai.mini        (<$0.003)
+ 4% complex tasks→ @chad / @copilot.code       (<$0.006)
+ 1% critical     → @claudia / @anthropic.opus  (<$0.013)
+```
+
+**Token discipline by mathematical constraint — not policy.**
