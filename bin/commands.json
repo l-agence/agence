@@ -28,6 +28,20 @@
     "git-init": true
   },
 
+  "git-shortcut-commands": {
+    "_comment": "Shortcuts handled directly in mode_external via route_git_command (AIPOLICY tier model). Not subject to commands.json whitelist — these bypass the jq check. Listed here for documentation only.",
+    "_tiers": "T0=auto-execute T2=warn+confirm T3=blocked",
+    "_conflicts": "aider also uses /git /commit /diff in its REPL — different tool context, no runtime collision",
+    "git":    { "tier": "router", "desc": "Generic /git <subcmd> [args...] — full AIPOLICY tier routing" },
+    "status": { "tier": "T0",     "desc": "git status — pure read-only (AIPOLICY whitelist)" },
+    "log":    { "tier": "T0",     "desc": "git log [args] — pure read-only (AIPOLICY whitelist)" },
+    "remote": { "tier": "T0",     "desc": "git remote [args] — pure read-only (AIPOLICY whitelist)" },
+    "fetch":  { "tier": "T2",     "desc": "git fetch — mutates .git/refs (AIPOLICY blacklist, warn+confirm)" },
+    "pull":   { "tier": "T2",     "desc": "git pull — merges remote state (AIPOLICY blacklist, warn+confirm)" },
+    "push":   { "tier": "T2",     "desc": "git push — handled by existing /push handler (warn+confirm)" },
+    "commit": { "tier": "T2",     "desc": "git commit — handled by existing /commit handler (message+confirm)" }
+  },
+
   "aws-commands": {
     "aws-list-buckets": true,
     "aws-describe-instances": true,

@@ -125,6 +125,81 @@ Describe 'Agence CLI'
   End
 
   # ===========================================================================
+  # Git shortcuts and generic /git handler (AIPOLICY tier model)
+  # T0 commands auto-execute (no TTY needed) — fully testable
+  # T1/T2 commands require TTY read prompt — Skip
+  # T3 commands block immediately — testable
+  # ===========================================================================
+
+  It '/git status runs git status (T0: auto-execute)'
+    When run bash bin/agence /git status
+    The status should be success
+    The output should include 'branch'
+  End
+
+  It '/git log runs git log (T0: auto-execute)'
+    When run bash bin/agence /git log --oneline -3
+    The status should be success
+    The output should include 'agence'
+  End
+
+  It '/git diff runs git diff (T0: auto-execute)'
+    When run bash bin/agence /git diff --stat HEAD~1
+    The status should be success
+    The output should include 'changed'
+  End
+
+  It '/git with no subcommand prints usage and fails'
+    When run bash bin/agence /git
+    The status should be failure
+    The error should include 'Usage:'
+    The error should include 'agence /git'
+  End
+
+  It '/git filter-branch is T3 blocked'
+    When run bash bin/agence /git filter-branch
+    The status should be failure
+    The error should include 'BLOCKED'
+    The error should include 'T3'
+  End
+
+  It '/git gc is T3 blocked'
+    When run bash bin/agence /git gc
+    The status should be failure
+    The error should include 'BLOCKED'
+  End
+
+  It '/status shortcut runs git status (T0: auto-execute)'
+    When run bash bin/agence /status
+    The status should be success
+    The output should include 'branch'
+  End
+
+  It '/log shortcut runs git log (T0: auto-execute)'
+    When run bash bin/agence /log --oneline -3
+    The status should be success
+    The output should include 'agence'
+  End
+
+  It '/remote shortcut runs git remote (T0: auto-execute)'
+    When run bash bin/agence /remote
+    The status should be success
+    The output should include 'origin'
+  End
+
+  It '/fetch shortcut requires TTY confirmation (T2: Skip in CI)'
+    Skip 'T2: git fetch requires interactive confirm — cannot run headlessly'
+    When run bash bin/agence /fetch
+    The status should be success
+  End
+
+  It '/pull shortcut requires TTY confirmation (T2: Skip in CI)'
+    Skip 'T2: git pull requires interactive confirm — cannot run headlessly'
+    When run bash bin/agence /pull
+    The status should be success
+  End
+
+  # ===========================================================================
   # System commands (!)
   # ===========================================================================
 

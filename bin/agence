@@ -352,6 +352,92 @@ validate_command() {
 # ============================================================================
 # MODE: EXTERNAL COMMAND
 # ============================================================================
+# ==============================================================================
+# GIT COMMAND ROUTER — AIPOLICY Tier Model
+# Classifies git subcommands per codex/AIPOLICY.yaml whitelist/blacklist:
+#   T0  auto-execute : whitelist (read-only, non-mutating)
+#   T1  light-confirm: unclassified/unknown subcommands
+#   T2  warn+confirm : blacklist (local/remote mutation)
+#   T3  blocked      : dangerous/history-rewriting (require manual run)
+# ==============================================================================
+route_git_command() {
+  local subcmd="${1:-}"
+  shift || true
+  local args=("$@")
+  local repo_dir="${GIT_ROOT:-${GIT_REPO:-$(pwd)}}"
+
+  if [[ -z "$subcmd" ]]; then
+    cat >&2 <<'GITUSAGE'
+Usage: agence /git <subcommand> [args...]
+
+Git subcommand tiers (codex/AIPOLICY.yaml):
+  T0 auto     : status log diff show branch tag describe reflog shortlog
+                remote rev-parse symbolic-ref ls-files ls-tree blame grep
+                cat-file ls-remote name-rev show-ref annotate
+  T2 confirm  : commit push pull fetch merge rebase reset add checkout
+                switch stash clean cherry-pick revert clone init
+  T3 blocked  : filter-branch filter-repo gc bisect (run directly)
+
+Examples:
+  agence /git status
+  agence /git log --oneline -10
+  agence /git diff HEAD~1
+  agence /git push --force-with-lease
+GITUSAGE
+    return 1
+  fi
+
+  local tier
+  case "$subcmd" in
+    # T0 — AIPOLICY.yaml whitelist: read-only, auto-execute
+    status|log|diff|show|branch|tag|describe|reflog|shortlog|\
+    remote|rev-parse|symbolic-ref|name-rev|show-ref|\
+    ls-files|ls-tree|blame|grep|cat-file|ls-remote|\
+    annotate|archive|format-patch|diff-tree|diff-index)
+      tier="T0" ;;
+    # T2 — AIPOLICY.yaml blacklist: mutation, warn + confirm
+    commit|push|pull|fetch|merge|rebase|reset|checkout|switch|\
+    add|stash|clean|cherry-pick|revert|clone|init|apply|am)
+      tier="T2" ;;
+    # T3 — Dangerous / history-rewriting: block, require manual run
+    filter-branch|filter-repo|gc|bisect|worktree|submodule|\
+    reflog-expire|prune|fsck|replace|notes)
+      tier="T3" ;;
+    # T1 — Unclassified: light confirm
+    *)
+      tier="T1" ;;
+  esac
+
+  case "$tier" in
+    T0)
+      [[ "${DEBUG:-0}" == "1" ]] && echo "[AIPOLICY T0] git $subcmd${args[*]:+ ${args[*]}}" >&2
+      git -C "$repo_dir" "$subcmd" "${args[@]}"
+      return $?
+      ;;
+    T1)
+      echo "[AIPOLICY T1] Unclassified: git $subcmd${args[*]:+ ${args[*]}}" >&2
+      read -p "Execute in $(basename "$repo_dir")? [y/N] " -r _gc; echo
+      [[ $_gc =~ ^[Yy]$ ]] || { echo "[CANCELLED]" >&2; return 1; }
+      git -C "$repo_dir" "$subcmd" "${args[@]}"
+      return $?
+      ;;
+    T2)
+      echo "[AIPOLICY T2] Mutation: git $subcmd${args[*]:+ ${args[*]}}" >&2
+      echo "[WARN] This operation mutates local/remote state." >&2
+      read -p "Confirm git $subcmd in $(basename "$repo_dir")? [y/N] " -r _gc; echo
+      [[ $_gc =~ ^[Yy]$ ]] || { echo "[CANCELLED]" >&2; return 1; }
+      git -C "$repo_dir" "$subcmd" "${args[@]}"
+      return $?
+      ;;
+    T3)
+      echo "[AIPOLICY T3] BLOCKED: 'git $subcmd' is a privileged operation." >&2
+      echo "[ESCALATION REQUIRED] Run directly if certain:" >&2
+      printf "  git -C %q %s%s\n" "$repo_dir" "$subcmd" "${args[*]:+ ${args[*]}}" >&2
+      return 1
+      ;;
+  esac
+}
+
 # Execute pre-approved external commands
 # Example: agence /terraform-plan
 
@@ -445,6 +531,32 @@ mode_external() {
         return 1
       fi
       git -C "$GIT_REPO" push -u origin
+      return $?
+      ;;
+
+    # -------------------------------------------------------------------------
+    # GIT SHORTCUTS — routed through route_git_command (AIPOLICY tier model)
+    # -------------------------------------------------------------------------
+    # /status  → T0 auto-execute  (AIPOLICY whitelist, pure read-only)
+    # /log     → T0 auto-execute  (AIPOLICY whitelist, pure read-only)
+    # /remote  → T0 auto-execute  (AIPOLICY whitelist, pure read-only)
+    # /fetch   → T2 warn+confirm  (AIPOLICY blacklist, mutates .git/refs)
+    # /pull    → T2 warn+confirm  (AIPOLICY blacklist, merges remote state)
+    # /push    → handled above    (existing handler with interactive prompt)
+    # /commit  → handled above    (existing handler with message prompt)
+    # /git     → generic: /git <subcmd> [args...] with full tier routing
+    # NOTE: aider also uses /git and /commit in its own REPL — different
+    #       tool context, no runtime collision with agence shortcuts.
+    # -------------------------------------------------------------------------
+    git)
+      # Generic: agence /git <subcmd> [args...]
+      # Passes all remaining args to route_git_command for tier-based dispatch
+      route_git_command "${@:2}"
+      return $?
+      ;;
+    status|log|remote|fetch|pull)
+      # Shortcuts: delegate to route_git_command with cmd_request as subcmd
+      route_git_command "$cmd_request" "${@:2}"
       return $?
       ;;
   esac
