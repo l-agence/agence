@@ -10,15 +10,16 @@
 #   4. OPENAI_API_KEY        → openai
 #   5. AZURE_OPENAI_API_KEY  → azure
 #   6. GEMINI_API_KEY        → gemini
-#   7. GROQ_API_KEY          → groq
-#   8. OPENROUTER_API_KEY    → openrouter
-#   9. GROK_API_KEY          → grok
-#  10. DASHSCOPE_API_KEY     → qwen
-#  11. GITHUB_TOKEN          → copilot
-#  12. Ollama running        → ollama
+#   7. MISTRAL_API_KEY       → mistral
+#   8. GROQ_API_KEY          → groq
+#   9. OPENROUTER_API_KEY    → openrouter
+#  10. GROK_API_KEY          → grok
+#  11. DASHSCOPE_API_KEY     → qwen
+#  12. GITHUB_TOKEN          → copilot
+#  13. Ollama running        → ollama
 
 # ── Active provider ──────────────────────────────────────────────────────────
-# Options: anthropic | openai | azure | gemini | copilot | grok | qwen | groq | openrouter | cline | ollama
+# Options: anthropic | openai | azure | gemini | mistral | copilot | grok | qwen | groq | openrouter | cline | ollama
 provider: anthropic
 
 # ── Active model ─────────────────────────────────────────────────────────────
@@ -64,10 +65,20 @@ model: claude-sonnet-4-5
 #
 # gemini_api_key: AIza...            # NOT RECOMMENDED — use env var
 
+# -- Mistral AI / Codestral ---------------------------------------------------
+# API key: set via MISTRAL_API_KEY env var.
+# Default model: codestral-latest  (code-specialized)
+# Models: codestral-latest | mistral-large-latest | mistral-small-latest | open-mistral-nemo
+# Note: Codestral is purpose-built for code generation, completion, and FIM.
+# API docs: https://docs.mistral.ai/api
+# Get key:  https://console.mistral.ai/api-keys
+#
+# mistral_api_key: ...              # NOT RECOMMENDED -- use env var
+
 # ── GitHub Copilot ───────────────────────────────────────────────────────────
 # Uses your GitHub OAuth token (GITHUB_TOKEN).
-# Default model: gpt-4o
-# Models: gpt-4o | gpt-4o-mini | o1-mini | claude-3.5-sonnet
+# Default model: auto  (server auto-selects; override: AGENCE_LLM_MODEL=gpt-4.1)
+# Models: auto | gpt-4.1 | gpt-4o | gpt-4o-mini | o1-mini | claude-3.5-sonnet
 # Note: Requires a GitHub Copilot subscription.
 # Env: GITHUB_TOKEN=ghp_...
 #
@@ -115,8 +126,8 @@ model: claude-sonnet-4-5
 # ── Cline AI (meta-provider) ─────────────────────────────────────────────────
 # Cline is a meta-provider that routes through the Anthropic API using the
 # exact model and API key that Cline (the VS Code AI assistant) uses.
-# Default model: claude-3-7-sonnet-20250219
-# Env: CLINE_API_KEY=<your anthropic key>  (falls back to ANTHROPIC_API_KEY)
+# Default model: kwaipilot/kat-coder-latest  (free via OpenRouter)
+# Route: OPENROUTER_API_KEY (free, kwaipilot/kat-coder) > CLINE_API_KEY > ANTHROPIC_API_KEY
 #
 # This lets Agence shell commands run through the same model as your active
 # Cline coding session, ensuring consistent AI context and behavior.
@@ -183,6 +194,11 @@ model: claude-sonnet-4-5
 #   export GROQ_API_KEY=gsk_...
 #   export AGENCE_LLM_PROVIDER=groq
 #   agence "Summarize these git changes"
+
+# Mistral / Codestral (best code completion + FIM):
+#   export MISTRAL_API_KEY=...
+#   export AGENCE_LLM_PROVIDER=mistral
+#   agence "Complete this function"
 
 # OpenRouter (access any model, one key):
 #   export OPENROUTER_API_KEY=sk-or-...

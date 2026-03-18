@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ################################################################################
-# router.sh: Agence Agent/Model Routing Library  v0.2.0
+# router.sh: Agence Agent/Model Routing Library  v0.3.0
 #
 # Multi-provider LLM backend for bin/agence and other entry points.
 #
@@ -12,8 +12,9 @@
 #     ollama      — Local Ollama (localhost:11434)
 #     azure       — Azure OpenAI (your-resource.openai.azure.com)
 #
-#   OpenAI-compatible (same /v1/chat/completions format, different base URL):
-#     openai      — OpenAI (api.openai.com)
+#   OpenAI-compatible (shared helper, different base URL + key):
+#     openai      — OpenAI GPT (api.openai.com)
+#     mistral     — Mistral AI / Codestral (api.mistral.ai)
 #     copilot     — GitHub Copilot (api.githubcopilot.com)
 #     grok        — xAI Grok (api.x.ai)
 #     qwen        — Alibaba Qwen (dashscope.aliyuncs.com)
@@ -28,32 +29,24 @@
 #   4. OPENAI_API_KEY         → openai
 #   5. AZURE_OPENAI_API_KEY   → azure
 #   6. GEMINI_API_KEY         → gemini
-#   7. GROQ_API_KEY           → groq
-#   8. OPENROUTER_API_KEY     → openrouter
-#   9. GROK_API_KEY           → grok
-#  10. DASHSCOPE_API_KEY      → qwen
-#  11. GITHUB_TOKEN (copilot) → copilot
-#  12. Ollama running         → ollama
-#  13. Error
-#
-# Model auto-detection order:
-#   1. AGENCE_LLM_MODEL env var
-#   2. ~/.agence/config.yaml  model: field
-#   3. Provider-specific default (see DEFAULTS below)
-#
-# Context injection:
-#   ROUTER_INJECT_CODEX=1 (default): system prompt includes
-#   codex/LAWS.md, codex/PRINCIPLES.md, codex/RULES.md
-#   Capped at ROUTER_CODEX_MAX_LINES per file (default 120).
+#   7. MISTRAL_API_KEY        → mistral
+#   8. GROQ_API_KEY           → groq
+#   9. OPENROUTER_API_KEY     → openrouter
+#  10. GROK_API_KEY           → grok
+#  11. DASHSCOPE_API_KEY      → qwen
+#  12. GITHUB_TOKEN           → copilot
+#  13. Ollama running         → ollama
+#  14. Error
 #
 # Key environment variables:
 #   AGENCE_LLM_PROVIDER   — provider name
 #   AGENCE_LLM_MODEL      — model name
-#   ANTHROPIC_API_KEY     — Anthropic
-#   OPENAI_API_KEY        — OpenAI
+#   ANTHROPIC_API_KEY     — Anthropic Claude
+#   OPENAI_API_KEY        — OpenAI GPT
 #   AZURE_OPENAI_API_KEY  — Azure OpenAI
 #   AZURE_OPENAI_ENDPOINT — Azure endpoint URL
 #   GEMINI_API_KEY        — Google Gemini
+#   MISTRAL_API_KEY       — Mistral / Codestral
 #   GROK_API_KEY          — xAI Grok
 #   DASHSCOPE_API_KEY     — Alibaba Qwen
 #   GROQ_API_KEY          — Groq Cloud
@@ -64,9 +57,9 @@
 #
 # Usage (sourced by bin/agence):
 #   router_load_config             → detect + export provider/model
-#   router_chat "query"            → send query, print response
+#   router_chat "query"            → send query, print response on stdout
 #   router_plan_action "request"   → return ACTION/CONFIDENCE/STEPS block
-#   router_list_providers          → show provider availability
+#   router_list_providers          → show provider availability table
 #
 # Config file: ~/.agence/config.yaml (see docs/config.yaml.example)
 # Required external tools: curl, jq
@@ -86,12 +79,13 @@ ROUTER_DEFAULT_MODEL_ANTHROPIC="${ROUTER_DEFAULT_MODEL_ANTHROPIC:-claude-sonnet-
 ROUTER_DEFAULT_MODEL_OPENAI="${ROUTER_DEFAULT_MODEL_OPENAI:-gpt-4o}"
 ROUTER_DEFAULT_MODEL_AZURE="${ROUTER_DEFAULT_MODEL_AZURE:-gpt-4o}"
 ROUTER_DEFAULT_MODEL_GEMINI="${ROUTER_DEFAULT_MODEL_GEMINI:-gemini-2.0-flash}"
+ROUTER_DEFAULT_MODEL_MISTRAL="${ROUTER_DEFAULT_MODEL_MISTRAL:-codestral-latest}"
 ROUTER_DEFAULT_MODEL_GROQ="${ROUTER_DEFAULT_MODEL_GROQ:-llama-3.3-70b-versatile}"
 ROUTER_DEFAULT_MODEL_OPENROUTER="${ROUTER_DEFAULT_MODEL_OPENROUTER:-anthropic/claude-3.5-sonnet}"
 ROUTER_DEFAULT_MODEL_GROK="${ROUTER_DEFAULT_MODEL_GROK:-grok-3-mini-fast}"
 ROUTER_DEFAULT_MODEL_QWEN="${ROUTER_DEFAULT_MODEL_QWEN:-qwen-plus}"
-ROUTER_DEFAULT_MODEL_COPILOT="${ROUTER_DEFAULT_MODEL_COPILOT:-gpt-4o}"
-ROUTER_DEFAULT_MODEL_CLINE="${ROUTER_DEFAULT_MODEL_CLINE:-claude-3-7-sonnet-20250219}"
+ROUTER_DEFAULT_MODEL_COPILOT="${ROUTER_DEFAULT_MODEL_COPILOT:-auto}"
+ROUTER_DEFAULT_MODEL_CLINE="${ROUTER_DEFAULT_MODEL_CLINE:-kwaipilot/kat-coder-latest}"
 ROUTER_DEFAULT_MODEL_OLLAMA="${ROUTER_DEFAULT_MODEL_OLLAMA:-llama3.2}"
 
 # Context injection controls
@@ -122,8 +116,7 @@ _router_check_deps() {
 # CONFIG LOADING
 # ============================================================================
 
-# _yaml_get <key> <file>
-# Reads a top-level scalar from a YAML file (no full parser needed).
+# _yaml_get <key> <file>  — reads a top-level scalar from YAML (no full parser).
 _yaml_get() {
   local key="$1" file="$2"
   [[ -f "$file" ]] || return 1
@@ -141,7 +134,7 @@ router_load_config() {
   local cfg="$ROUTER_CONFIG_PATH"
   [[ "${AGENCE_DEBUG:-0}" == "1" ]] && echo "[router] Loading config: $cfg" >&2
 
-  # ── Provider ──────────────────────────────────────────────────────────────
+  # ── Provider ────────────────────────────────────────────────────────────────
   if [[ -z "${AGENCE_LLM_PROVIDER:-}" ]]; then
     local _p; _p=$(_yaml_get "provider" "$cfg" 2>/dev/null || true)
     if   [[ -n "$_p" ]];                              then export AGENCE_LLM_PROVIDER="$_p"
@@ -149,6 +142,7 @@ router_load_config() {
     elif [[ -n "${OPENAI_API_KEY:-}" ]];               then export AGENCE_LLM_PROVIDER="openai"
     elif [[ -n "${AZURE_OPENAI_API_KEY:-}" ]];         then export AGENCE_LLM_PROVIDER="azure"
     elif [[ -n "${GEMINI_API_KEY:-}" ]];               then export AGENCE_LLM_PROVIDER="gemini"
+    elif [[ -n "${MISTRAL_API_KEY:-}" ]];              then export AGENCE_LLM_PROVIDER="mistral"
     elif [[ -n "${GROQ_API_KEY:-}" ]];                 then export AGENCE_LLM_PROVIDER="groq"
     elif [[ -n "${OPENROUTER_API_KEY:-}" ]];           then export AGENCE_LLM_PROVIDER="openrouter"
     elif [[ -n "${GROK_API_KEY:-}" ]];                 then export AGENCE_LLM_PROVIDER="grok"
@@ -159,7 +153,7 @@ router_load_config() {
       export AGENCE_LLM_PROVIDER="ollama"
     else
       echo "[router] ERROR: No LLM provider available." >&2
-      echo "[router]        Supported: anthropic openai azure gemini groq openrouter grok qwen copilot cline ollama" >&2
+      echo "[router]        Supported: anthropic openai azure gemini mistral groq openrouter grok qwen copilot cline ollama" >&2
       echo "[router]        Set AGENCE_LLM_PROVIDER or configure: $cfg" >&2
       return 1
     fi
@@ -172,22 +166,23 @@ router_load_config() {
       export AGENCE_LLM_MODEL="$_m"
     else
       case "$AGENCE_LLM_PROVIDER" in
-        anthropic)   export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_ANTHROPIC"   ;;
-        openai)      export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_OPENAI"      ;;
-        azure)       export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_AZURE"       ;;
-        gemini)      export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_GEMINI"      ;;
-        groq)        export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_GROQ"        ;;
-        openrouter)  export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_OPENROUTER"  ;;
-        grok)        export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_GROK"        ;;
-        qwen)        export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_QWEN"        ;;
-        copilot)     export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_COPILOT"     ;;
-        cline)       export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_CLINE"       ;;
-        ollama)      export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_OLLAMA"      ;;
+        anthropic)  export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_ANTHROPIC"  ;;
+        openai)     export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_OPENAI"     ;;
+        azure)      export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_AZURE"      ;;
+        gemini)     export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_GEMINI"     ;;
+        mistral)    export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_MISTRAL"    ;;
+        groq)       export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_GROQ"       ;;
+        openrouter) export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_OPENROUTER" ;;
+        grok)       export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_GROK"       ;;
+        qwen)       export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_QWEN"       ;;
+        copilot)    export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_COPILOT"    ;;
+        cline)      export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_CLINE"      ;;
+        ollama)     export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_OLLAMA"     ;;
       esac
     fi
   fi
 
-  # ── Azure-specific ─────────────────────────────────────────────────────────
+  # ── Azure-specific ──────────────────────────────────────────────────────────
   if [[ "$AGENCE_LLM_PROVIDER" == "azure" ]]; then
     [[ -z "${AZURE_OPENAI_ENDPOINT:-}" ]] && {
       local _e; _e=$(_yaml_get "azure_endpoint" "$cfg" 2>/dev/null || true)
@@ -207,19 +202,19 @@ router_load_config() {
     fi
   fi
 
-  # ── Cline: resolve underlying API key ─────────────────────────────────────
+  # ── Cline: resolve underlying key (prefer OpenRouter free tier) ────────────
   if [[ "$AGENCE_LLM_PROVIDER" == "cline" ]]; then
-    # Cline is a meta-provider: use CLINE_API_KEY if set, else fall back to ANTHROPIC_API_KEY
+    # Priority: OPENROUTER_API_KEY (free kwaipilot) > CLINE_API_KEY > ANTHROPIC_API_KEY
     if [[ -z "${CLINE_API_KEY:-}" && -n "${ANTHROPIC_API_KEY:-}" ]]; then
       export CLINE_API_KEY="$ANTHROPIC_API_KEY"
     fi
-    if [[ -z "${CLINE_API_KEY:-}" ]]; then
-      echo "[router] ERROR: Cline provider requires CLINE_API_KEY or ANTHROPIC_API_KEY" >&2
+    if [[ -z "${OPENROUTER_API_KEY:-}" && -z "${CLINE_API_KEY:-}" ]]; then
+      echo "[router] ERROR: cline: set OPENROUTER_API_KEY (free) or CLINE_API_KEY / ANTHROPIC_API_KEY" >&2
       return 1
     fi
   fi
 
-  # ── Ollama host ────────────────────────────────────────────────────────────
+  # ── Ollama host ─────────────────────────────────────────────────────────────
   if [[ "$AGENCE_LLM_PROVIDER" == "ollama" && -z "${OLLAMA_HOST:-}" ]]; then
     local _oh; _oh=$(_yaml_get "ollama_host" "$cfg" 2>/dev/null || true)
     export OLLAMA_HOST="${_oh:-http://localhost:11434}"
@@ -275,17 +270,17 @@ $(head -n "$_lim" "$file")
 
 # ============================================================================
 # INTERNAL HELPER: OpenAI-compatible /v1/chat/completions
-# Used by: openai, copilot, grok, qwen, groq, openrouter, cline
+# Used by: openai, mistral, copilot, grok, qwen, groq, openrouter, cline
 # ============================================================================
 
 _router_call_oai_compat() {
-  local base_url="$1"      # e.g. https://api.openai.com/v1
-  local api_key="$2"       # Bearer token
+  local base_url="$1"          # e.g. https://api.mistral.ai/v1
+  local api_key="$2"           # Bearer token
   local system_prompt="$3"
   local user_message="$4"
   local model="$5"
   local max_tokens="${6:-${ROUTER_MAX_TOKENS:-4096}}"
-  local extra_header="${7:-}"   # optional e.g. "HTTP-Referer: https://l-agence.org"
+  local extra_header="${7:-}"  # optional e.g. "HTTP-Referer: https://l-agence.org"
   local provider_label="${8:-openai-compat}"
 
   if [[ -z "$api_key" ]]; then
@@ -322,9 +317,7 @@ _router_call_oai_compat() {
 
   local response http_code
   response=$(curl "${curl_args[@]}" 2>&1) || {
-    echo "[router] ERROR: ${provider_label}: curl failed" >&2
-    return 1
-  }
+    echo "[router] ERROR: ${provider_label}: curl failed" >&2; return 1; }
 
   http_code=$(echo "$response" | grep -o '__HTTP_CODE__:[0-9]*' | cut -d: -f2)
   response=$(echo "$response" | sed 's/__HTTP_CODE__:[0-9]*$//')
@@ -347,7 +340,7 @@ _router_call_oai_compat() {
 }
 
 # ============================================================================
-# PROVIDER: ANTHROPIC (Claude) — custom API format
+# PROVIDER: ANTHROPIC (Claude) — custom Messages API
 # ============================================================================
 
 router_call_anthropic() {
@@ -356,9 +349,7 @@ router_call_anthropic() {
   local model="${3:-${AGENCE_LLM_MODEL:-$ROUTER_DEFAULT_MODEL_ANTHROPIC}}"
   local max_tokens="${4:-${ROUTER_MAX_TOKENS:-4096}}"
 
-  if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
-    echo "[router] ERROR: ANTHROPIC_API_KEY not set" >&2; return 1
-  fi
+  [[ -z "${ANTHROPIC_API_KEY:-}" ]] && { echo "[router] ERROR: ANTHROPIC_API_KEY not set" >&2; return 1; }
 
   local payload
   payload=$(jq -n \
@@ -370,8 +361,7 @@ router_call_anthropic() {
        messages: [{ role: "user", content: $content }] }') \
     || { echo "[router] ERROR: anthropic: jq error" >&2; return 1; }
 
-  [[ "${AGENCE_DEBUG:-0}" == "1" ]] && \
-    echo "[router] → Anthropic  model=${model}" >&2
+  [[ "${AGENCE_DEBUG:-0}" == "1" ]] && echo "[router] → Anthropic  model=${model}" >&2
 
   local response http_code
   response=$(curl -sf --max-time 120 \
@@ -399,7 +389,7 @@ router_call_anthropic() {
 }
 
 # ============================================================================
-# PROVIDER: GEMINI (Google) — custom REST API
+# PROVIDER: GEMINI (Google) — custom generateContent REST API
 # ============================================================================
 
 router_call_gemini() {
@@ -408,16 +398,14 @@ router_call_gemini() {
   local model="${3:-${AGENCE_LLM_MODEL:-$ROUTER_DEFAULT_MODEL_GEMINI}}"
   local max_tokens="${4:-${ROUTER_MAX_TOKENS:-4096}}"
 
-  if [[ -z "${GEMINI_API_KEY:-}" ]]; then
-    echo "[router] ERROR: GEMINI_API_KEY not set" >&2; return 1
-  fi
+  [[ -z "${GEMINI_API_KEY:-}" ]] && { echo "[router] ERROR: GEMINI_API_KEY not set" >&2; return 1; }
 
   local url="https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}"
 
   local payload
   payload=$(jq -n \
-    --arg system  "$system_prompt" \
-    --arg content "$user_message" \
+    --arg     system     "$system_prompt" \
+    --arg     content    "$user_message" \
     --argjson max_tokens "$max_tokens" \
     '{
       system_instruction: { parts: [{ text: $system }] },
@@ -425,8 +413,7 @@ router_call_gemini() {
       generationConfig: { maxOutputTokens: $max_tokens }
     }') || { echo "[router] ERROR: gemini: jq error" >&2; return 1; }
 
-  [[ "${AGENCE_DEBUG:-0}" == "1" ]] && \
-    echo "[router] → Gemini  model=${model}" >&2
+  [[ "${AGENCE_DEBUG:-0}" == "1" ]] && echo "[router] → Gemini  model=${model}" >&2
 
   local response http_code
   response=$(curl -sf --max-time 120 \
@@ -452,7 +439,7 @@ router_call_gemini() {
 }
 
 # ============================================================================
-# PROVIDER: AZURE OPENAI — custom endpoint format
+# PROVIDER: AZURE OPENAI — custom deployment endpoint
 # ============================================================================
 
 router_call_azure() {
@@ -481,8 +468,7 @@ router_call_azure() {
                   { role: "user",   content: $content }] }') \
     || { echo "[router] ERROR: azure: jq error" >&2; return 1; }
 
-  [[ "${AGENCE_DEBUG:-0}" == "1" ]] && \
-    echo "[router] → Azure  deployment=${deployment}" >&2
+  [[ "${AGENCE_DEBUG:-0}" == "1" ]] && echo "[router] → Azure  deployment=${deployment}" >&2
 
   local response http_code
   response=$(curl -sf --max-time 120 \
@@ -509,7 +495,7 @@ router_call_azure() {
 }
 
 # ============================================================================
-# PROVIDER: OLLAMA (local) — custom streaming API
+# PROVIDER: OLLAMA (local) — non-streaming /api/chat
 # ============================================================================
 
 router_call_ollama() {
@@ -528,8 +514,7 @@ router_call_ollama() {
                   { role: "user",   content: $content }] }') \
     || { echo "[router] ERROR: ollama: jq error" >&2; return 1; }
 
-  [[ "${AGENCE_DEBUG:-0}" == "1" ]] && \
-    echo "[router] → Ollama  host=${host}  model=${model}" >&2
+  [[ "${AGENCE_DEBUG:-0}" == "1" ]] && echo "[router] → Ollama  host=${host}  model=${model}" >&2
 
   local response http_code
   response=$(curl -sf --max-time 300 \
@@ -556,7 +541,7 @@ router_call_ollama() {
 
 # ============================================================================
 # OPENAI-COMPATIBLE PROVIDER WRAPPERS
-# All delegate to _router_call_oai_compat with provider-specific settings
+# All delegate to _router_call_oai_compat
 # ============================================================================
 
 router_call_openai() {
@@ -567,6 +552,19 @@ router_call_openai() {
   _router_call_oai_compat \
     "https://api.openai.com/v1" "${OPENAI_API_KEY}" \
     "$system_prompt" "$user_message" "$model" "$max_tokens" "" "openai"
+}
+
+router_call_mistral() {
+  # Mistral AI — OpenAI-compatible endpoint.
+  # Default model: codestral-latest (code-specialized)
+  # Alternatives: mistral-large-latest | mistral-small-latest | open-mistral-nemo
+  local system_prompt="$1" user_message="$2"
+  local model="${3:-${AGENCE_LLM_MODEL:-$ROUTER_DEFAULT_MODEL_MISTRAL}}"
+  local max_tokens="${4:-${ROUTER_MAX_TOKENS:-4096}}"
+  [[ -z "${MISTRAL_API_KEY:-}" ]] && { echo "[router] ERROR: MISTRAL_API_KEY not set" >&2; return 1; }
+  _router_call_oai_compat \
+    "https://api.mistral.ai/v1" "${MISTRAL_API_KEY}" \
+    "$system_prompt" "$user_message" "$model" "$max_tokens" "" "mistral"
 }
 
 router_call_groq() {
@@ -611,36 +609,47 @@ router_call_qwen() {
 }
 
 router_call_copilot() {
+  # GitHub Copilot — default model is "auto" (server picks best available).
+  # Fallback: set AGENCE_LLM_MODEL=gpt-4.1 for explicit control.
   local system_prompt="$1" user_message="$2"
   local model="${3:-${AGENCE_LLM_MODEL:-$ROUTER_DEFAULT_MODEL_COPILOT}}"
   local max_tokens="${4:-${ROUTER_MAX_TOKENS:-4096}}"
   [[ -z "${GITHUB_TOKEN:-}" ]] && { echo "[router] ERROR: GITHUB_TOKEN not set" >&2; return 1; }
-  # Copilot requires additional headers for API usage
   _router_call_oai_compat \
     "https://api.githubcopilot.com" "${GITHUB_TOKEN}" \
     "$system_prompt" "$user_message" "$model" "$max_tokens" \
-    "Editor-Version: agence/0.2" "copilot"
+    "Editor-Version: agence/0.3" "copilot"
 }
 
 router_call_cline() {
-  # Cline is a meta-provider: routes through CLINE_API_KEY (or ANTHROPIC_API_KEY)
-  # using the Anthropic Messages API format, defaults to the model Cline uses.
+  # Cline meta-provider — prefers free-tier models.
+  # Route priority:
+  #   1. OPENROUTER_API_KEY set → OpenRouter + kwaipilot/kat-coder-latest (free tier)
+  #   2. CLINE_API_KEY / ANTHROPIC_API_KEY set → Anthropic claude-3-7-sonnet
+  # Override model: export AGENCE_LLM_MODEL=<model>
   local system_prompt="$1" user_message="$2"
-  local model="${3:-${AGENCE_LLM_MODEL:-$ROUTER_DEFAULT_MODEL_CLINE}}"
   local max_tokens="${4:-${ROUTER_MAX_TOKENS:-4096}}"
 
-  local key="${CLINE_API_KEY:-${ANTHROPIC_API_KEY:-}}"
-  if [[ -z "$key" ]]; then
-    echo "[router] ERROR: cline: CLINE_API_KEY or ANTHROPIC_API_KEY not set" >&2; return 1
+  # Prefer OpenRouter with free Kwaipilot model
+  if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+    local model="${3:-${AGENCE_LLM_MODEL:-$ROUTER_DEFAULT_MODEL_CLINE}}"
+    [[ "${AGENCE_DEBUG:-0}" == "1" ]] && echo "[router] → Cline via OpenRouter  model=${model}" >&2
+    _router_call_oai_compat \
+      "https://openrouter.ai/api/v1" "${OPENROUTER_API_KEY}" \
+      "$system_prompt" "$user_message" "$model" "$max_tokens" \
+      "HTTP-Referer: https://l-agence.org" "cline/openrouter"
+    return $?
   fi
 
-  [[ "${AGENCE_DEBUG:-0}" == "1" ]] && \
-    echo "[router] → Cline (via Anthropic API)  model=${model}" >&2
+  # Fallback: Anthropic API
+  local model="${3:-${AGENCE_LLM_MODEL:-claude-3-7-sonnet-20250219}}"
+  local key="${CLINE_API_KEY:-${ANTHROPIC_API_KEY:-}}"
+  [[ -z "$key" ]] && { echo "[router] ERROR: cline: set OPENROUTER_API_KEY (free) or CLINE_API_KEY / ANTHROPIC_API_KEY" >&2; return 1; }
 
-  # Temporarily set ANTHROPIC_API_KEY for the call if CLINE_API_KEY differs
+  [[ "${AGENCE_DEBUG:-0}" == "1" ]] && echo "[router] → Cline via Anthropic  model=${model}" >&2
   local saved_key="${ANTHROPIC_API_KEY:-}"
   export ANTHROPIC_API_KEY="$key"
-  AGENCE_LLM_MODEL="$model" router_call_anthropic "$system_prompt" "$user_message" "$model" "$max_tokens"
+  router_call_anthropic "$system_prompt" "$user_message" "$model" "$max_tokens"
   local rc=$?
   export ANTHROPIC_API_KEY="$saved_key"
   return $rc
@@ -664,6 +673,7 @@ router_chat() {
     openai)     router_call_openai     "$system_prompt" "$query" ;;
     azure)      router_call_azure      "$system_prompt" "$query" ;;
     gemini)     router_call_gemini     "$system_prompt" "$query" ;;
+    mistral)    router_call_mistral    "$system_prompt" "$query" ;;
     groq)       router_call_groq       "$system_prompt" "$query" ;;
     openrouter) router_call_openrouter "$system_prompt" "$query" ;;
     grok)       router_call_grok       "$system_prompt" "$query" ;;
@@ -673,7 +683,7 @@ router_chat() {
     ollama)     router_call_ollama     "$system_prompt" "$query" ;;
     *)
       echo "[router] ERROR: Unknown provider '${AGENCE_LLM_PROVIDER}'" >&2
-      echo "[router]        Supported: anthropic openai azure gemini groq openrouter grok qwen copilot cline ollama" >&2
+      echo "[router]        Supported: anthropic openai azure gemini mistral groq openrouter grok qwen copilot cline ollama" >&2
       return 1
       ;;
   esac
@@ -717,6 +727,7 @@ Action type definitions:
     openai)     router_call_openai     "$system_prompt" "$request" ;;
     azure)      router_call_azure      "$system_prompt" "$request" ;;
     gemini)     router_call_gemini     "$system_prompt" "$request" ;;
+    mistral)    router_call_mistral    "$system_prompt" "$request" ;;
     groq)       router_call_groq       "$system_prompt" "$request" ;;
     openrouter) router_call_openrouter "$system_prompt" "$request" ;;
     grok)       router_call_grok       "$system_prompt" "$request" ;;
@@ -736,6 +747,42 @@ Action type definitions:
 }
 
 # ============================================================================
+# AUTO-ROUTING: router_auto_route  (v0.4.0 — planned)
+# ============================================================================
+#
+# When AGENCE_LLM_PROVIDER=auto, select provider+model based on:
+#   1. Task ACTION type + CONFIDENCE  (from router_plan_action output)
+#   2. Cost tier of available providers  (cheapest capable model wins)
+#   3. Configured keys  (only route to providers that have a key set)
+#
+# Cost tiers (approx $/1M input tokens, as of 2025-03):
+#   T0 free  : ollama, groq/llama-3.3-70b, kwaipilot/kat-coder (openrouter)
+#   T1 cheap : gemini-2.0-flash, mistral-small-latest, qwen-turbo, grok-3-mini-fast
+#   T2 mid   : gpt-4o-mini, claude-haiku-3-5, codestral-latest, mistral-large-latest
+#   T3 smart : gpt-4o, gpt-4.1, claude-sonnet-4-5, gemini-1.5-pro
+#   T4 best  : claude-opus-4-5, gpt-o1, gpt-o3  (expensive — use sparingly)
+#
+# Complexity → tier:
+#   chat  + confidence > 0.90  → T0   trivial Q&A
+#   code  + confidence > 0.80  → T1   standard coding
+#   git   + any                → T0   git ops are mechanical
+#   cloud + any                → T2   cloud ops need accuracy
+#   *     + confidence < 0.60  → T3   low confidence = hard problem
+#   *     + confidence < 0.40  → T4   very hard / architectural
+#
+# Swarm integration:
+#   bin/swarm already routes tasks by complexity at the swarm level.
+#   router_auto_route() extends this to per-call granularity within a task.
+#   Both use the same cost-tier table for consistency.
+#
+# TODO(v0.4): implement router_auto_route()
+#   - parse ACTION/CONFIDENCE from router_plan_action()
+#   - walk cost tiers lowest→highest
+#   - call first provider that has a configured key at that tier
+#   - export AGENCE_LLM_PROVIDER + AGENCE_LLM_MODEL for the selected backend
+#   - log selection to nexus/.airuns/ for cost tracking
+
+# ============================================================================
 # UTILITY: router_list_providers
 # ============================================================================
 
@@ -746,50 +793,55 @@ router_list_providers() {
   local model="${AGENCE_LLM_MODEL:-none}"
 
   echo "╔══════════════════════════════════════════════════════════════════╗"
-  echo "║  Agence LLM Providers                                            ║"
+  echo "║  Agence LLM Providers                           v0.3.0           ║"
   echo "╠══════════════════════════════════════════════════════════════════╣"
   printf "║  Active : %-20s  Model : %-20s  ║\n" "$active" "$model"
-  echo "╠══════════════════════════════════════════════════════════════════╣"
+  echo "╠══════════════════╤══════════════════════════════════════════════╣"
+  printf "║  %-16s │ %-44s  ║\n" "Provider" "Status"
+  echo "╠══════════════════╪══════════════════════════════════════════════╣"
 
   _prov_row() {
-    local name="$1" key_var="$2" default_model="$3" note="${4:-}"
+    local name="$1" key_var="$2"
     local key_val="${!key_var:-}"
-    local status icon
+    local icon status
     if [[ -n "$key_val" ]]; then
       icon="✅"; status="${key_var} set"
     else
       icon="❌"; status="${key_var} not set"
     fi
-    [[ "$name" == "$active" ]] && icon="→ ${icon}"
-    printf "║  %-12s %s %-38s  ║\n" "$name" "${icon:0:4}" "$status"
+    local marker="  "; [[ "$name" == "$active" ]] && marker="→ "
+    printf "║  %-16s │ %s%s %-40s  ║\n" "$name" "$marker" "$icon" "$status"
   }
 
-  _prov_row "anthropic"  "ANTHROPIC_API_KEY"  "$ROUTER_DEFAULT_MODEL_ANTHROPIC"
-  _prov_row "openai"     "OPENAI_API_KEY"     "$ROUTER_DEFAULT_MODEL_OPENAI"
-  _prov_row "azure"      "AZURE_OPENAI_API_KEY" "$ROUTER_DEFAULT_MODEL_AZURE"
-  _prov_row "gemini"     "GEMINI_API_KEY"     "$ROUTER_DEFAULT_MODEL_GEMINI"
-  _prov_row "copilot"    "GITHUB_TOKEN"       "$ROUTER_DEFAULT_MODEL_COPILOT"
-  _prov_row "grok"       "GROK_API_KEY"       "$ROUTER_DEFAULT_MODEL_GROK"
-  _prov_row "qwen"       "DASHSCOPE_API_KEY"  "$ROUTER_DEFAULT_MODEL_QWEN"
-  _prov_row "groq"       "GROQ_API_KEY"       "$ROUTER_DEFAULT_MODEL_GROQ"
-  _prov_row "openrouter" "OPENROUTER_API_KEY" "$ROUTER_DEFAULT_MODEL_OPENROUTER"
-  _prov_row "cline"      "CLINE_API_KEY"      "$ROUTER_DEFAULT_MODEL_CLINE"
+  _prov_row "anthropic"  "ANTHROPIC_API_KEY"
+  _prov_row "openai"     "OPENAI_API_KEY"
+  _prov_row "azure"      "AZURE_OPENAI_API_KEY"
+  _prov_row "gemini"     "GEMINI_API_KEY"
+  _prov_row "mistral"    "MISTRAL_API_KEY"
+  _prov_row "copilot"    "GITHUB_TOKEN"
+  _prov_row "grok"       "GROK_API_KEY"
+  _prov_row "qwen"       "DASHSCOPE_API_KEY"
+  _prov_row "groq"       "GROQ_API_KEY"
+  _prov_row "openrouter" "OPENROUTER_API_KEY"
+  _prov_row "cline"      "CLINE_API_KEY"
 
-  # Ollama needs a live check
+  # Ollama: live check required
+  local ollama_icon ollama_status ollama_marker="  "
+  [[ "ollama" == "$active" ]] && ollama_marker="→ "
   if curl -sf --max-time 1 "${OLLAMA_HOST:-http://localhost:11434}/api/tags" &>/dev/null; then
     local _models
     _models=$(curl -sf --max-time 2 "${OLLAMA_HOST:-http://localhost:11434}/api/tags" \
       | jq -r '[.models[].name] | join(", ")' 2>/dev/null || echo "?")
-    local icon="✅"; [[ "ollama" == "$active" ]] && icon="→ ✅"
-    printf "║  %-12s %s %-38s  ║\n" "ollama" "${icon:0:4}" "running — models: ${_models:0:30}"
+    ollama_icon="✅"; ollama_status="running — ${_models:0:35}"
   else
-    local icon="❌"; [[ "ollama" == "$active" ]] && icon="→ ❌"
-    printf "║  %-12s %s %-38s  ║\n" "ollama" "${icon:0:4}" "not running at ${OLLAMA_HOST:-http://localhost:11434}"
+    ollama_icon="❌"; ollama_status="not running at ${OLLAMA_HOST:-http://localhost:11434}"
   fi
+  printf "║  %-16s │ %s%s %-40s  ║\n" "ollama" "$ollama_marker" "$ollama_icon" "$ollama_status"
 
-  echo "╠══════════════════════════════════════════════════════════════════╣"
-  echo "║  Set provider:  export AGENCE_LLM_PROVIDER=<name>               ║"
-  echo "║  Set model  :  export AGENCE_LLM_MODEL=<model>                  ║"
-  echo "║  Config file:  ~/.agence/config.yaml  (see docs/config.yaml.example) ║"
+  echo "╠══════════════════╧══════════════════════════════════════════════╣"
+  echo "║  Set provider : export AGENCE_LLM_PROVIDER=<name>               ║"
+  echo "║  Set model    : export AGENCE_LLM_MODEL=<model>                 ║"
+  echo "║  Config file  : ~/.agence/config.yaml                           ║"
+  echo "║  Example      : docs/config.yaml.example                        ║"
   echo "╚══════════════════════════════════════════════════════════════════╝"
 }
