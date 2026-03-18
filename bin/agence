@@ -438,6 +438,118 @@ GITUSAGE
   esac
 }
 
+# ==============================================================================
+# GITHUB CLI COMMAND ROUTER — AIPOLICY Tier Model
+# Classifies gh subcommands per codex/AIPOLICY.yaml whitelist/blacklist.
+# All args passed intact to 'gh', including --help (always bypasses tier).
+#   T0  auto-execute : whitelist (read-only, non-mutating)
+#   T1  light-confirm: unclassified/unknown subcommands
+#   T2  warn+confirm : blacklist (remote GitHub state mutation)
+# ==============================================================================
+route_gh_command() {
+  # route_gh_command <gh-subcmd> [<action>] [<args...>]
+  # $@ is passed intact to 'gh' for the final call.
+  local subcmd="${1:-}"
+  local action="${2:-}"   # peek for tier; not shifted — $@ stays intact
+
+  if [[ -z "$subcmd" ]]; then
+    gh --help
+    return $?
+  fi
+
+  # --help / -h always passes through regardless of tier
+  local _arg
+  for _arg in "$@"; do
+    if [[ "$_arg" == "--help" || "$_arg" == "-h" ]]; then
+      gh "$@"; return $?
+    fi
+  done
+
+  local tier
+  case "$subcmd" in
+    repo)
+      case "$action" in
+        view|list|search|clone|sync|"")              tier="T0" ;;
+        create|delete|rename|edit|archive|fork)      tier="T2" ;;
+        *)                                           tier="T1" ;;
+      esac ;;
+    pr)
+      case "$action" in
+        list|view|status|checks|diff|comment|"")     tier="T0" ;;
+        merge|close|edit|ready|reopen|review|create) tier="T2" ;;
+        *)                                           tier="T1" ;;
+      esac ;;
+    issue)
+      case "$action" in
+        list|view|comment|"")                        tier="T0" ;;
+        close|create|edit|delete|reopen|pin|lock)    tier="T2" ;;
+        *)                                           tier="T1" ;;
+      esac ;;
+    run)
+      case "$action" in
+        list|view|download|watch|"")                 tier="T0" ;;
+        cancel|rerun|delete)                         tier="T2" ;;
+        *)                                           tier="T1" ;;
+      esac ;;
+    workflow)
+      case "$action" in
+        list|view|"")                                tier="T0" ;;
+        run|enable|disable)                          tier="T2" ;;
+        *)                                           tier="T1" ;;
+      esac ;;
+    auth)
+      case "$action" in
+        status|token|"")                             tier="T0" ;;
+        login|logout|refresh|setup-git)              tier="T2" ;;
+        *)                                           tier="T1" ;;
+      esac ;;
+    api)
+      # Default HTTP method is GET (T0); --method POST/PUT/PATCH/DELETE → T2
+      local _meth="GET" _want_meth=false
+      for _arg in "$@"; do
+        if [[ "$_want_meth" == true ]]; then _meth="$_arg"; break; fi
+        [[ "$_arg" == "--method" ]] && _want_meth=true
+      done
+      case "$_meth" in
+        GET)                   tier="T0" ;;
+        POST|PUT|PATCH|DELETE) tier="T2" ;;
+        *)                     tier="T1" ;;
+      esac ;;
+    release)
+      case "$action" in
+        list|view|download|"")                       tier="T0" ;;
+        create|delete|edit|upload)                   tier="T2" ;;
+        *)                                           tier="T1" ;;
+      esac ;;
+    org|gist|browse|search|codespace)                tier="T0" ;;
+    secret|variable)                                 tier="T2" ;;  # always — CI/CD secrets
+    *)                                               tier="T1" ;;
+  esac
+
+  case "$tier" in
+    T0)
+      [[ "${DEBUG:-0}" == "1" ]] && echo "[AIPOLICY T0] gh $*" >&2
+      gh "$@"
+      return $?
+      ;;
+    T1)
+      echo "[AIPOLICY T1] Unclassified: gh $subcmd ${action:+$action ...}" >&2
+      read -p "Execute gh $subcmd? [y/N] " -r _gc; echo
+      [[ $_gc =~ ^[Yy]$ ]] || { echo "[CANCELLED]" >&2; return 1; }
+      gh "$@"
+      return $?
+      ;;
+    T2)
+      echo "[AIPOLICY T2] Mutation: gh $subcmd ${action:+$action ...}" >&2
+      echo "[WARN] This operation mutates remote GitHub state." >&2
+      read -p "Confirm gh $subcmd ${action:+$action}? [y/N] " -r _gc; echo
+      [[ $_gc =~ ^[Yy]$ ]] || { echo "[CANCELLED]" >&2; return 1; }
+      gh "$@"
+      return $?
+      ;;
+  esac
+}
+
 # Execute pre-approved external commands
 # Example: agence /terraform-plan
 
@@ -531,6 +643,92 @@ mode_external() {
         return 1
       fi
       git -C "$GIT_REPO" push -u origin
+      return $?
+      ;;
+
+    # -------------------------------------------------------------------------
+    # GITHUB CLI SHORTCUTS — routed through route_gh_command (AIPOLICY tiers)
+    # -------------------------------------------------------------------------
+    # /gh          → generic /gh <subcmd> [args...] with full tier routing
+    # /ghremote    → T0  gh repo view (show current repo info)
+    # /ghrepo      → T0/T2 gh repo <subcmd> [args...]
+    # /ghpull      → T0  gh pr list (default) | T2 gh pr <subcmd> [args...]
+    # /ghlog       → T0  gh run list (GitOps run history)
+    # /ghmerge     → T2  gh pr merge [args...] (confirmation required)
+    # /ghrun       → T0  gh run list (default) | T0/T2 gh run <subcmd> [args...]
+    # /ghflow      → T0  gh workflow list (default) | T0/T2 gh workflow <subcmd>
+    # /ghissue     → T0  gh issue list (default) | T0/T2 gh issue <subcmd> [args...]
+    # /ghorg       → T0  gh org list
+    # All pass args intact to 'gh', including --help.
+    # NOTE: ghauth/ghlogin/ghstatus/ghcommit/ghpush handled above (legacy).
+    # -------------------------------------------------------------------------
+    gh)
+      # Generic: agence /gh <subcmd> [args...]
+      route_gh_command "${@:2}"
+      return $?
+      ;;
+    ghremote)
+      # gh repo view — show current/named repo info (T0)
+      route_gh_command "repo" "view" "${@:2}"
+      return $?
+      ;;
+    ghrepo)
+      # gh repo <subcmd> [args...] — full repo management
+      route_gh_command "repo" "${@:2}"
+      return $?
+      ;;
+    ghpull)
+      # gh pr list (default) or gh pr <action> [args...]
+      # /ghpull           → T0 gh pr list
+      # /ghpull view 42   → T0 gh pr view 42
+      # /ghpull merge 42  → T2 gh pr merge 42 (warn+confirm)
+      if [[ -z "${2:-}" ]]; then
+        route_gh_command "pr" "list"
+      else
+        route_gh_command "pr" "${@:2}"
+      fi
+      return $?
+      ;;
+    ghlog)
+      # gh run list — GitOps actions run history (T0)
+      route_gh_command "run" "list" "${@:2}"
+      return $?
+      ;;
+    ghmerge)
+      # gh pr merge [args...] — T2 confirmation required
+      route_gh_command "pr" "merge" "${@:2}"
+      return $?
+      ;;
+    ghrun)
+      # gh run list (default) or gh run <subcmd> [args...]
+      if [[ -z "${2:-}" ]]; then
+        route_gh_command "run" "list"
+      else
+        route_gh_command "run" "${@:2}"
+      fi
+      return $?
+      ;;
+    ghflow)
+      # gh workflow list (default) or gh workflow <subcmd> [args...]
+      if [[ -z "${2:-}" ]]; then
+        route_gh_command "workflow" "list"
+      else
+        route_gh_command "workflow" "${@:2}"
+      fi
+      return $?
+      ;;
+    ghissue)
+      # gh issue list (default) or gh issue <subcmd> [args...]
+      if [[ -z "${2:-}" ]]; then
+        route_gh_command "issue" "list"
+      else
+        route_gh_command "issue" "${@:2}"
+      fi
+      return $?
+      ;;
+    ghorg)
+      # gh org list — T0 read-only
+      route_gh_command "org" "list" "${@:2}"
       return $?
       ;;
 

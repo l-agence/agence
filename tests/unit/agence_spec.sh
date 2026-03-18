@@ -200,6 +200,85 @@ Describe 'Agence CLI'
   End
 
   # ===========================================================================
+  # GitHub CLI shortcuts and generic /gh handler (AIPOLICY tier model)
+  # T0 auto-execute (no TTY) — fully testable with real authenticated gh
+  # T2 mutation commands — Skip (require interactive TTY confirm)
+  # ===========================================================================
+
+  It '/gh with no subcommand shows gh help'
+    When run bash bin/agence /gh
+    The status should be success
+    The output should include 'USAGE'
+  End
+
+  It '/gh --help passes through to gh help'
+    When run bash bin/agence /gh --help
+    The status should be success
+    The output should include 'USAGE'
+  End
+
+  It '/gh auth status runs gh auth status (T0: auto-execute)'
+    When run bash bin/agence /gh auth status
+    The status should be success
+    The output should include 'github.com'
+  End
+
+  It '/gh repo view runs gh repo view (T0: auto-execute)'
+    When run bash bin/agence /gh repo view
+    The status should be success
+    The output should include 'agence'
+  End
+
+  It '/ghremote shortcut runs gh repo view (T0: auto-execute)'
+    When run bash bin/agence /ghremote
+    The status should be success
+    The output should include 'agence'
+  End
+
+  It '/ghpull shortcut lists PRs by default (T0: auto-execute)'
+    When run bash bin/agence /ghpull
+    The status should be success
+  End
+
+  It '/ghlog shortcut lists run history (T0: auto-execute)'
+    When run bash bin/agence /ghlog
+    The status should be success
+  End
+
+  It '/ghrun lists runs by default (T0: auto-execute)'
+    When run bash bin/agence /ghrun
+    The status should be success
+  End
+
+  It '/ghflow lists workflows by default (T0: auto-execute)'
+    When run bash bin/agence /ghflow
+    The status should be success
+  End
+
+  It '/ghissue lists issues by default (T0: auto-execute)'
+    When run bash bin/agence /ghissue
+    The status should be success
+  End
+
+  It '/gh pr merge requires TTY confirmation (T2: Skip in CI)'
+    Skip 'T2: gh pr merge requires interactive confirm — cannot run headlessly'
+    When run bash bin/agence /gh pr merge
+    The status should be success
+  End
+
+  It '/ghmerge requires TTY confirmation (T2: Skip in CI)'
+    Skip 'T2: gh pr merge requires interactive confirm — cannot run headlessly'
+    When run bash bin/agence /ghmerge
+    The status should be success
+  End
+
+  It '/gh secret set is T2 (Skip in CI)'
+    Skip 'T2: gh secret set requires interactive confirm — CI/CD secret mutation'
+    When run bash bin/agence /gh secret set
+    The status should be success
+  End
+
+  # ===========================================================================
   # System commands (!)
   # ===========================================================================
 
