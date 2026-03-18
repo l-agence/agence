@@ -28,6 +28,27 @@
     "git-init": true
   },
 
+  "gh-shortcut-commands": {
+    "_comment": "Shortcuts handled directly in mode_external via route_gh_command (AIPOLICY tier model). All pass args intact to 'gh', including --help. Not subject to commands.json whitelist — bypass the jq check.",
+    "_tiers": "T0=auto-execute T2=warn+confirm (remote GitHub state mutation)",
+    "_policy": "See codex/AIPOLICY.yaml github_cli section for canonical whitelist/blacklist",
+    "gh":       { "tier": "router", "desc": "Generic /gh <subcmd> [args...] — full AIPOLICY tier routing" },
+    "ghremote": { "tier": "T0",     "desc": "gh repo view — show current repo info (AIPOLICY whitelist)" },
+    "ghrepo":   { "tier": "T0/T2",  "desc": "gh repo <subcmd> — view/list=T0, create/delete/fork=T2" },
+    "ghpull":   { "tier": "T0/T2",  "desc": "gh pr list (default T0) | gh pr <subcmd> — merge/close=T2" },
+    "ghlog":    { "tier": "T0",     "desc": "gh run list — GitOps actions run history (AIPOLICY whitelist)" },
+    "ghmerge":  { "tier": "T2",     "desc": "gh pr merge — T2 confirmation required (AIPOLICY blacklist)" },
+    "ghrun":    { "tier": "T0/T2",  "desc": "gh run list (default T0) | gh run <subcmd> — cancel/rerun=T2" },
+    "ghflow":   { "tier": "T0/T2",  "desc": "gh workflow list (default T0) | gh workflow <subcmd> — run/enable=T2" },
+    "ghissue":  { "tier": "T0/T2",  "desc": "gh issue list (default T0) | gh issue <subcmd> — close/create=T2" },
+    "ghorg":    { "tier": "T0",     "desc": "gh org list — read-only (AIPOLICY whitelist)" },
+    "ghauth":   { "tier": "legacy", "desc": "gh auth status — legacy handler (uses aido), kept for compat" },
+    "ghlogin":  { "tier": "T2",     "desc": "gh auth login — interactive login (legacy handler)" },
+    "ghstatus": { "tier": "legacy", "desc": "gh repo view + gh pr list — legacy combined handler" },
+    "ghcommit": { "tier": "T2",     "desc": "git commit via gh auth — legacy handler" },
+    "ghpush":   { "tier": "T2",     "desc": "git push via gh auth — legacy handler" }
+  },
+
   "git-shortcut-commands": {
     "_comment": "Shortcuts handled directly in mode_external via route_git_command (AIPOLICY tier model). Not subject to commands.json whitelist — these bypass the jq check. Listed here for documentation only.",
     "_tiers": "T0=auto-execute T2=warn+confirm T3=blocked",
