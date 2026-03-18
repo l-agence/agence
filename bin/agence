@@ -314,34 +314,10 @@ mode_ai_routed() {
   return $?
 }
 
-# ============================================================================
-# STUB: router_chat (for testing)
-# ============================================================================
-router_chat() {
-  echo "router_chat: $1"
-  return 0
-}
+# NOTE: router_chat / router_load_config / router_plan_action / router_list_providers
+# are implemented in lib/router.sh (sourced above via source_if_exists).
+# Do NOT add stubs here - they would shadow the real implementations.
 
-# ============================================================================
-# STUB: router_load_config (for testing)
-# ============================================================================
-router_load_config() {
-  echo "router_load_config: $1"
-  return 0
-}
-
-# ============================================================================
-# STUB: router_plan_action (for testing)
-# Returns a minimal plan structure so mode_ai_routed can parse without hanging
-# ============================================================================
-router_plan_action() {
-  echo "router_plan_action: $1"
-  echo "ACTION: chat"
-  echo "CONFIDENCE: 0.90"
-  return 0
-}
-
-# ============================================================================
 # STUB: validate_command (placeholder — real validation in lib/safeguards.sh)
 # ============================================================================
 validate_command() {
@@ -959,6 +935,14 @@ mode_external() {
           return 1
         fi
       fi
+      return $?
+      ;;
+    # -------------------------------------------------------------------------
+    # LLM ROUTER SHORTCUTS
+    # -------------------------------------------------------------------------
+    providers)
+      # List all configured/available LLM providers and active model
+      router_list_providers
       return $?
       ;;
   esac

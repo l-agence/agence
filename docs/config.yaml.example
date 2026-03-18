@@ -1,0 +1,74 @@
+# ~/.agence/config.yaml
+# Agence LLM Router Configuration — copy to ~/.agence/config.yaml and edit.
+#
+# Provider auto-detection order (if 'provider' key not set):
+#   1. AGENCE_LLM_PROVIDER env var
+#   2. This file's 'provider' field
+#   3. ANTHROPIC_API_KEY present → anthropic
+#   4. OPENAI_API_KEY present    → openai
+#   5. AZURE_OPENAI_API_KEY present → azure
+#   6. Ollama reachable at localhost:11434 → ollama
+#
+# All values can be overridden by environment variables (env vars win).
+
+# ── Active provider ──────────────────────────────────────────────────────────
+# Options: anthropic | openai | azure | ollama
+provider: anthropic
+
+# ── Active model ────────────────────────────────────────────────────────────
+# Leave blank to use provider default (see defaults below).
+# Anthropic defaults : claude-sonnet-4-5
+# OpenAI defaults    : gpt-4o
+# Azure defaults     : gpt-4o
+# Ollama defaults    : llama3.2
+model: claude-sonnet-4-5
+
+# ── Anthropic ────────────────────────────────────────────────────────────────
+# API key: set via ANTHROPIC_API_KEY env var (preferred) or here.
+# anthropic_api_key: sk-ant-...
+
+# ── OpenAI ───────────────────────────────────────────────────────────────────
+# API key: set via OPENAI_API_KEY env var (preferred) or here.
+# openai_api_key: sk-...
+
+# ── Azure OpenAI ─────────────────────────────────────────────────────────────
+# Required when provider: azure
+# azure_endpoint:    https://YOUR-RESOURCE.openai.azure.com
+# azure_deployment:  gpt-4o                    # deployment name in Azure portal
+# azure_api_version: 2024-02-01                # API version
+# API key: set via AZURE_OPENAI_API_KEY env var (preferred) or here.
+
+# ── Ollama (local) ───────────────────────────────────────────────────────────
+# Default host: http://localhost:11434
+# ollama_host: http://localhost:11434
+
+# ── Context injection ────────────────────────────────────────────────────────
+# Inject codex/ files (LAWS.md, PRINCIPLES.md, RULES.md) into system prompt.
+# router_inject_codex: 1          # 1=enabled (default), 0=disabled
+# router_codex_max_lines: 120     # max lines per codex file in system prompt
+# router_max_tokens: 4096         # max response tokens
+
+# ── Quick-start examples ─────────────────────────────────────────────────────
+#
+# Claude (default):
+#   export ANTHROPIC_API_KEY=sk-ant-...
+#   agence "What does this function do?"
+#
+# OpenAI:
+#   export OPENAI_API_KEY=sk-...
+#   export AGENCE_LLM_PROVIDER=openai
+#   agence "Refactor this module"
+#
+# Azure OpenAI:
+#   export AZURE_OPENAI_API_KEY=...
+#   export AZURE_OPENAI_ENDPOINT=https://myresource.openai.azure.com
+#   export AGENCE_LLM_PROVIDER=azure
+#   agence "Plan a terraform module for VPC"
+#
+# Ollama (local, no key needed):
+#   ollama pull llama3.2
+#   export AGENCE_LLM_PROVIDER=ollama
+#   agence "Explain this bash function"
+#
+# Debug mode:
+#   AGENCE_DEBUG=1 agence "test query"
