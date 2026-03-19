@@ -4,7 +4,8 @@
 # Usage: ./bin/aishell [--test]
 
 param(
-	[string]$TestFlag = ""
+    [Parameter(Mandatory=$false)]
+    [string]$TestFlag = $null
 )
 
 
@@ -64,11 +65,50 @@ if (-not (Test-Path $SESSION_META)) {
 }
 
 # TEST MODE
-if ($args.Count -gt 0 -and $args[0] -eq '--test') {
-	"[AISHELL] Test mode: session logging validation" | Out-File -FilePath $SESSION_LOG -Append
-	exit 0
+if ($TestFlag -eq "--test") {
+    Write-Output "aishell@agent"
+    Write-Output "AGENCE PURE AGENTIC SHELL"
+    "[AISHELL] Test mode: session logging validation" | Out-File -FilePath $SESSION_LOG -Append
+    exit 0
 }
 
-# Default: launch PowerShell (agentic, non-interactive)
-# (For now, just exit to avoid blocking automation)
-exit 0
+# PROMPT CUSTOMIZATION
+function prompt {
+    $tileName = "aishell@agent"
+    $color = "Cyan"
+    $sessionShort = $AI_SESSION.Substring(0, [Math]::Min(8, $AI_SESSION.Length))
+    Write-Host "[$tileName][$AI_AGENT][$sessionShort] " -ForegroundColor $color -NoNewline
+    Write-Host "$($executionContext.SessionState.Path.CurrentLocation)> " -NoNewline
+    return " "
+}
+
+# SESSION HEADER
+Write-Host ""
+Write-Host "╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
+Write-Host "║  AGENCE PURE AGENTIC SHELL (aishell@agent)                    ║" -ForegroundColor Cyan
+Write-Host "╠════════════════════════════════════════════════════════════════╣" -ForegroundColor Cyan
+Write-Host "║  Role:       $AI_ROLE                                         ║" -ForegroundColor Cyan
+Write-Host "║  Session:    $AI_SESSION                                      ║" -ForegroundColor Cyan
+Write-Host "║  Agent:      $AI_AGENT                                        ║" -ForegroundColor Cyan
+Write-Host "║  Shell:      PowerShell $($PSVersionTable.PSVersion.Major)    ║" -ForegroundColor Cyan
+Write-Host "║  Root:       $GIT_ROOT                                        ║" -ForegroundColor Cyan
+Write-Host "║  Log:        $SESSION_LOG                                     ║" -ForegroundColor Cyan
+Write-Host "╚════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host ""
+
+# Start interactive agentic shell
+Set-Location -Path $GIT_ROOT | Out-Null
+Write-Host "aishell@agent ready. Type 'help' for commands." -ForegroundColor Gray
+Write-Host "Commands are validated against CODEX whitelist." -ForegroundColor Gray
+Write-Host ""
+
+# Keep shell interactive (exit only when user types 'exit')
+while ($true) {
+    $input = Read-Host
+    if ($input -eq "exit") { break }
+    try {
+        Invoke-Expression $input
+    } catch {
+        Write-Host "[AISHELL] ✗ Command failed: $_" -ForegroundColor Red
+    }
+}

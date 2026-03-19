@@ -1,22 +1,25 @@
 ################################################################################
-# ai-shell.ps1: PowerShell wrapper for multi-session VS Code terminals
+# ishell: Interactive hybrid PowerShell for agent + human collaboration
 #
-# Handles PowerShell execution, enforces CODEX validation, captures session
-# logs, and maintains chroot-like $GIT_ROOT isolation.
+# hybrid interactive shell combining human control (planning, debugging) with
+# agentic capabilities. Enforces CODEX validation, captures session logs, and
+# maintains chroot-like $GIT_ROOT isolation.
 #
-# Usage: powershell -NoProfile -NoExit -File ai-shell.ps1
-# Environment variables (set by VS Code extension):
-#   AI_ROLE       - Terminal role: "shared", "planner", "coder", "anchor"
+# Usage: pwsh -NoProfile -NoExit -File ishell
+# Environment variables (set by VS Code or caller):
+#   AI_ROLE       - Terminal role: "interactive" (default), or "planner", "human"
 #   AI_SESSION    - Session ID (e.g., "abc123-2026-03-06")
-#   AI_AGENT      - Agent ID (e.g., "copilot", "chad", "claudia")
+#   AI_AGENT      - Agent ID (e.g., "user", "haiku", "gpt4", etc.)
 #   GIT_ROOT      - Repository root (set by wrapper, enforced chroot)
 #
 # Features:
+#   - Hybrid human + agent mode (both can interact in same session)
 #   - Session logging via transcript → nexus/.aisessions/
 #   - CODEX validation on every command
 #   - Path sandbox enforcement (no escape from GIT_ROOT)
 #   - Format control (text/md/json)
-#   - Cross-platform (bash + pwsh support)
+#   - Color-coded prompt showing role/session/agent
+#   - Sticky session (visible to both human and agent)
 ################################################################################
 
 # ============================================================================
@@ -29,15 +32,15 @@ if ([string]::IsNullOrEmpty($env:GIT_ROOT)) {
     $env:GIT_ROOT = Split-Path -Parent $scriptDir
 }
 
-# Session metadata (provided by VS Code extension)
-$AIRole = $env:AI_ROLE ?? "shared"
+# Session metadata (provided by VS Code extension or caller)
+$AIRole = $env:AI_ROLE ?? "interactive"
 $AISession = $env:AI_SESSION ?? "unknown"
-$AIAgent = $env:AI_AGENT ?? "default"
+$AIAgent = $env:AI_AGENT ?? "user"
 $GITRoot = $env:GIT_ROOT
 
 # Session logging paths
 $sessionDir = Join-Path $GITRoot "nexus" ".aisessions"
-$sessionLog = Join-Path $sessionDir "$($AISession)_$($AIRole).log"
+$sessionLog = Join-Path $sessionDir "$($AISession)_$($AIRole).typescript"
 $sessionMeta = Join-Path $sessionDir "$($AISession)_$($AIRole).meta.json"
 
 # Ensure session directory exists
@@ -56,9 +59,10 @@ function Initialize-SessionLogging {
             role              = $AIRole
             agent             = $AIAgent
             shell             = "powershell"
+            mode              = "hybrid"
             timestamp_start   = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
             git_root          = $GITRoot
-            log_file          = $sessionLog
+            typescript_file   = $sessionLog
             commands_executed = 0
             exit_code         = $null
         }
@@ -71,7 +75,7 @@ function Initialize-SessionLogging {
 }
 
 # ============================================================================
-# CODEX + FORMAT LIBRARY LOADING
+# CODEX + FORMAT LIBRARY + POLICY LOADING
 # ============================================================================
 
 function Load-CodexAndFormat {
@@ -81,11 +85,17 @@ function Load-CodexAndFormat {
         . $codexPath
     }
     
-    # Load format library for output control (bash source → PS dot-source)
+    # Load format library for output control
     $formatPath = Join-Path $GITRoot "lib" "format.ps1"
     if (Test-Path $formatPath) {
         . $formatPath
         $env:_AGENCE_FMT = if ($env:_AGENCE_FMT) { $env:_AGENCE_FMT } else { "text" }
+    }
+    
+    # Load agentic policy (if exists)
+    $policyPath = Join-Path $GITRoot "bin" "aipolicy"
+    if (Test-Path $policyPath) {
+        . $policyPath
     }
 }
 
@@ -106,7 +116,7 @@ function Test-PathInSandbox {
     }
     
     # Check if within GIT_ROOT
-    if ($absPath.StartsWith($GITRoot) -or $absPath -eq "C:\") {
+    if ($absPath.StartsWith($GITRoot)) {
         return $true
     }
     else {
@@ -125,77 +135,44 @@ function Set-LocationSafe {
         Set-Location -Path $Path
     }
     else {
-        throw "Path access denied by sandbox"
+        Write-Host "[SANDBOX] ✗ Path access denied by sandbox" -ForegroundColor Red
+        return 1
     }
 }
 
-# Alias for convenience
+# Alias for convenience (allows 'cd' to work safely)
 Set-Alias -Name cd -Value Set-LocationSafe -Force
-
-# ============================================================================
-# COMMAND VALIDATION (using aido whitelists)
-# ============================================================================
-
-function Invoke-SafeCommand {
-    param(
-        [Parameter(Mandatory=$true)]
-        [string]$Tool,
-        
-        [Parameter(ValueFromRemainingArguments=$true)]
-        [string[]]$Args
-    )
-    
-    # Load whitelists from aido
-    $whitelistPath = Join-Path $GITRoot "bin" "aido"
-    if (Test-Path $whitelistPath) {
-        # For now, we permit common safe tools
-        # This should be expanded to load actual whitelists from bin/aido
-        $safePowerShellCommands = @(
-            "Get-ChildItem", "ls", "dir",
-            "Get-Content", "cat", "type",
-            "Get-Location", "pwd",
-            "Test-Path",
-            "Write-Host", "echo",
-            "git", "gh", "az", "terraform"
-        )
-        
-        if ($tool -in $safePowerShellCommands) {
-            & $Tool @Args
-        }
-        else {
-            Write-Host "[SANDBOX] ⚠ Command requires CODEX validation: $Tool" -ForegroundColor Yellow
-            Write-Host "[SANDBOX]   Run via: aido run $Tool $($Args -join ' ')" -ForegroundColor Yellow
-        }
-    }
-}
 
 # ============================================================================
 # SESSION HEADER
 # ============================================================================
 
 function Show-SessionHeader {
+    $headerColor = "Cyan"
     Write-Host ""
-    Write-Host "╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║  AGENCE SESSION SHELL (PowerShell)                             ║" -ForegroundColor Cyan
-    Write-Host "╠════════════════════════════════════════════════════════════════╣" -ForegroundColor Cyan
-    Write-Host "║  Role:       $AIRole" -ForegroundColor Cyan
-    Write-Host "║  Session:    $AISession" -ForegroundColor Cyan
-    Write-Host "║  Agent:      $AIAgent" -ForegroundColor Cyan
-    Write-Host "║  Shell:      PowerShell $($PSVersionTable.PSVersion.Major)" -ForegroundColor Cyan
-    Write-Host "║  Root:       $GITRoot" -ForegroundColor Cyan
-    Write-Host "║  Log:        $sessionLog" -ForegroundColor Cyan
-    Write-Host "╚════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host "╔════════════════════════════════════════════════════════════════╗" -ForegroundColor $headerColor
+    Write-Host "║  AGENCE HYBRID INTERACTIVE SHELL (ishell@human)               ║" -ForegroundColor $headerColor
+    Write-Host "╠════════════════════════════════════════════════════════════════╣" -ForegroundColor $headerColor
+    Write-Host "║  Mode:       Hybrid (agent + human collaborative)             ║" -ForegroundColor $headerColor
+    Write-Host "║  Role:       $AIRole" -ForegroundColor $headerColor
+    Write-Host "║  Session:    $AISession" -ForegroundColor $headerColor
+    Write-Host "║  Agent:      $AIAgent" -ForegroundColor $headerColor
+    Write-Host "║  Shell:      PowerShell $($PSVersionTable.PSVersion.Major)" -ForegroundColor $headerColor
+    Write-Host "║  Root:       $GITRoot" -ForegroundColor $headerColor
+    Write-Host "║  Log:        $sessionLog" -ForegroundColor $headerColor
+    Write-Host "╚════════════════════════════════════════════════════════════════╝" -ForegroundColor $headerColor
     Write-Host ""
 }
 
 # ============================================================================
-# PROMPT CUSTOMIZATION
+# PROMPT CUSTOMIZATION (Color-coded for hybrid mode)
 # ============================================================================
 
 function prompt {
     $sessionShort = $AISession.Substring(0, [Math]::Min(8, $AISession.Length))
-    Write-Host "[$AIRole@$sessionShort] " -ForegroundColor Green -NoNewline
-    Write-Host "$($executionContext.SessionState.Path.CurrentLocation)> " -NoNewline
+    $promptColor = "Green"  # Human interactive color
+    Write-Host "[$AIRole@$sessionShort] " -ForegroundColor $promptColor -NoNewline
+    Write-Host "$($executionContext.SessionState.Path.CurrentLocation)> " -ForegroundColor Gray -NoNewline
     return " "
 }
 
@@ -208,7 +185,7 @@ function Main {
         # Initialize session logging
         Initialize-SessionLogging
         
-        # Load CODEX + format library
+        # Load CODEX + format library + policy
         Load-CodexAndFormat
         
         # Show session header
@@ -217,12 +194,13 @@ function Main {
         # Change to repo root (chroot-like)
         Set-Location -Path $GITRoot | Out-Null
         
-        Write-Host "PowerShell session ready. Type 'help' for commands." -ForegroundColor Gray
-        Write-Host "Commands are validated against CODEX whitelist." -ForegroundColor Gray
+        Write-Host "Hybrid interactive shell ready." -ForegroundColor Gray
+        Write-Host "Both human and agent can interact in this session." -ForegroundColor Gray
+        Write-Host "Commands are logged to: $sessionLog" -ForegroundColor Gray
         Write-Host ""
     }
     catch {
-        Write-Host "[AI-SHELL] ✗ Initialization failed: $_" -ForegroundColor Red
+        Write-Host "[ISHELL] ✗ Initialization failed: $_" -ForegroundColor Red
         Write-Host $_.ScriptStackTrace -ForegroundColor Red
         exit 1
     }
@@ -231,4 +209,4 @@ function Main {
 # Execute main initialization
 Main
 
-# Keep shell interactive (this script exits when user types 'exit')
+# Keep shell interactive (exits when user types 'exit' or closes terminal)

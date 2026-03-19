@@ -1,0 +1,6 @@
+# .agencrc - Agence shell config
+# Source user-level .agencrc if it exists
+[ -r ~/.agence/.agencrc ] && source ~/.agence/.agencrc
+
+# Add other environment variables below as needed
+# export OPENROUTER_API_KEY="your-key-here"

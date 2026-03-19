@@ -64,10 +64,27 @@ run_with_session() {
     
     [[ "${AIDO_DEBUG}" == "1" ]] && echo "[AIDO] Session: $session_id" >&2
     [[ "${AIDO_DEBUG}" == "1" ]] && echo "[AIDO] Typescript: $typescript_file" >&2
-    
+
+    # Write initial metadata with exit_code=254 (verification pending — CODEX default)
+    cat > "$meta_file" <<INIT_META
+{
+  "session_id": "$session_id",
+  "agent": "$AIDO_AGENT",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "command": "$full_command",
+  "exit_code": 254,
+  "actual_exit_code": null,
+  "verification_status": "pending",
+  "typescript_file": "$typescript_file"
+}
+INIT_META
+
     # Run command inside PTY with 'script' capturing output
     script --quiet --return --command "$full_command" "$typescript_file" 2>&1
     local exit_code=$?
+
+    # Append AI_EXIT_CODE marker to typescript so aisession can parse it
+    printf '\n=== AI_EXIT_CODE: %d ===\n' "$exit_code" >> "$typescript_file"
     
     # Extract tail of stdout and head of stderr for metadata
     local stdout_tail=$(tail -c 500 "$typescript_file" 2>/dev/null | strings || echo "")
@@ -81,14 +98,16 @@ run_with_session() {
         sha256=$(shasum -a 256 "$typescript_file" 2>/dev/null | awk '{print $1}')
     fi
     
-    # Generate metadata JSON
+    # Update metadata — keep exit_code=254 until aisession verifies
     cat > "$meta_file" <<EOF
 {
   "session_id": "$session_id",
   "agent": "$AIDO_AGENT",
   "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "command": "$full_command",
-  "exit_code": $exit_code,
+  "exit_code": 254,
+  "actual_exit_code": $exit_code,
+  "verification_status": "pending",
   "typescript_file": "$typescript_file",
   "sha256": "$sha256",
   "stdout_tail": "$(echo "$stdout_tail" | jq -Rs .)",
@@ -96,8 +115,8 @@ run_with_session() {
 }
 EOF
 
-    # Call mandatory verification via session management tool
-    session_script="$AI_BIN/session"
+    # Call mandatory verification via session management tool (aisession)
+    session_script="$AI_BIN/aisession"
     if [[ -x "$session_script" ]]; then
         "$session_script" "$session_id"
         verify_exit=$?

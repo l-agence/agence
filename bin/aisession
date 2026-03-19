@@ -29,6 +29,60 @@ if [[ -z "$AI_ROOT" || -z "$AI_BIN" ]]; then
 fi
 
 SESSION_DIR="$AI_ROOT/nexus/.aisessions"
+LEDGER_DIR="$AI_ROOT/nexus/.ailedger"
+
+# ============================================================================
+# HELPERS: Exit code parsing, metadata update, ailedger
+# ============================================================================
+
+# Parse the actual exit code embedded in a typescript file
+# Looks for last: === AI_EXIT_CODE: N === line
+parse_exit_code_from_typescript() {
+    local typescript_file="$1"
+    local parsed_exit
+    parsed_exit=$(grep -oP '=== AI_EXIT_CODE: \K[0-9]+' "$typescript_file" 2>/dev/null | tail -1)
+    echo "${parsed_exit:-254}"
+}
+
+# Update session metadata with verified exit code
+update_metadata_verified() {
+    local meta_file="$1"
+    local actual_exit="$2"
+    local verified_at
+    verified_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+    if command -v jq &>/dev/null; then
+        local tmp
+        tmp=$(mktemp)
+        jq --argjson code "$actual_exit" \
+           --arg ts "$verified_at" \
+           '.exit_code = $code | .actual_exit_code = $code | .verification_status = "verified" | .verified_at = $ts' \
+           "$meta_file" > "$tmp" && mv "$tmp" "$meta_file"
+    else
+        # Fallback: sed-based update (best-effort)
+        sed -i "s/\"exit_code\": [0-9]*/\"exit_code\": $actual_exit/" "$meta_file"
+        sed -i "s/\"verification_status\": \"pending\"/\"verification_status\": \"verified\"/" "$meta_file"
+    fi
+}
+
+# Append verified entry to .ailedger (stub — full ledger TBD)
+create_ailedger_entry() {
+    local sid="$1"
+    local exit_code="$2"
+    local command_str="$3"
+
+    mkdir -p "$LEDGER_DIR" 2>/dev/null || return 0
+
+    local ledger_file="$LEDGER_DIR/$(date +%Y-%m).jsonl"
+    local ts
+    ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    # Escape command string for JSON
+    local cmd_escaped
+    cmd_escaped="$(printf '%s' "$command_str" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+
+    printf '{"session_id":"%s","timestamp":"%s","exit_code":%d,"command":"%s","status":"verified"}\n' \
+        "$sid" "$ts" "$exit_code" "$cmd_escaped" >> "$ledger_file" 2>/dev/null || true
+}
 
 # ============================================================================
 # SESSION STATUS / VERIFICATION (default mode)
@@ -133,6 +187,12 @@ session_status() {
         yes|YES|y|Y)
             echo ""
             echo "✓ Session verified. Proceeding..."
+            # Parse actual exit code from typescript and update metadata
+            local actual_exit
+            actual_exit=$(parse_exit_code_from_typescript "$typescript_file")
+            update_metadata_verified "$meta_file" "$actual_exit"
+            create_ailedger_entry "$sid" "$actual_exit" "$command"
+            echo "  [session] exit_code updated → $actual_exit | ledger entry written"
             return 0
             ;;
         no|NO|n|N)
@@ -287,25 +347,34 @@ session_list() {
 }
 
 # ============================================================================
-# SESSION HANDOFF (TBD)
+# SESSION HANDOFF
 # ============================================================================
 
 session_handoff() {
     local sid="${1:-}"
     local agent="${2:-}"
-    
+
     if [[ -z "$sid" || -z "$agent" ]]; then
-        echo "HANDOFF: Not yet implemented" >&2
-        echo "" >&2
         echo "Usage: session handoff <sessionid> @<agent>/@<user>" >&2
-        echo "" >&2
-        echo "This feature will copy session metadata to another agent's context." >&2
-        echo "Currently under development." >&2
+        echo "This feature copies session metadata to another agent's context." >&2
         return 1
     fi
-    
-    echo "[SESSION] ⏳ Handoff feature coming soon: $sid → $agent" >&2
-    return 1
+
+    local meta_file="$SESSION_DIR/${sid}.meta.json"
+    local typescript_file="$SESSION_DIR/${sid}.typescript"
+    local target_dir="$SESSION_DIR/$agent"
+    mkdir -p "$target_dir"
+
+    if [[ ! -f "$meta_file" || ! -f "$typescript_file" ]]; then
+        echo "[SESSION] ✗ Session or metadata not found: $sid" >&2
+        return 1
+    fi
+
+    cp "$meta_file" "$target_dir/"
+    cp "$typescript_file" "$target_dir/"
+    echo "[SESSION] ✓ Handoff complete: $sid → $agent"
+    echo "  Metadata and transcript copied to $target_dir/"
+    return 0
 }
 
 # ============================================================================

@@ -1,4 +1,4 @@
-# Logs Index
+ Index
 
 **Human-readable master index of all activity logs.**
 

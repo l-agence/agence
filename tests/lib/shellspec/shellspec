@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #shellcheck disable=SC2004,SC2016
 
 [ "$PPID" ] || { echo "Unsupported shell. (Bourne shell?)" >&2; exit 1; }

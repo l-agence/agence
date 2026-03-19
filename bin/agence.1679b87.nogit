@@ -1,3 +1,4 @@
+
 #!/usr/bin/env bash
 
 ################################################################################
@@ -6,77 +7,27 @@
 #
 # Author: Stephane Korning 2026
 # License: MIT License with Commons Clause
-# 
-# Modes:
-#   agence help                    → Show help
-#   agence <query>                 → Chat mode (query to LLM)
-#   agence +<routing_request>      → AI-routed mode (LLM determines action)
-#   agence /<command>              → External command (validated)
-#   agence !<system_cmd>           → System command
-################################################################################
+#
+# NOTE: This script is also copied as '^' for a quick shortcut and unified interface.
+#       Any modifications to this file should be mirrored to '^' to ensure consistency.
+  
+detect_shell_environment
 
-set -u  # Exit on undefined variable
-
-# ============================================================================
-# SHELL ENVIRONMENT DETECTION
-# ============================================================================
-# Detect which shell environment we're running in (git-bash, cygwin, WSL, etc)
-# Set environment variables so everything works universally
-# This must happen FIRST before any path operations
-
+# Shell environment detection function
 detect_shell_environment() {
-  # Default values
-  export AGENCE_SHELL_ENV="unknown"
-  export AGENCE_PATH_STYLE="posix"  # Default: posix paths
-  export AGENCE_OS_WINDOWS=0
-  export AGENCE_OS_LINUX=0
-  export AGENCE_OS_MACOS=0
-  
-  # Detect OS layer
-  case "${OSTYPE:-}" in
-    msys|mingw*)
-      # Git-bash (MinGW/MSYS2)
-      export AGENCE_SHELL_ENV="git-bash"
-      export AGENCE_OS_WINDOWS=1
-      export AGENCE_PATH_STYLE="mingw"
-      ;;
-    cygwin*)
-      # Cygwin
-      export AGENCE_SHELL_ENV="cygwin"
-      export AGENCE_OS_WINDOWS=1
-      export AGENCE_PATH_STYLE="cygwin"
-      ;;
-    linux*)
-      # Check if WSL
-      if [[ -f /proc/version ]] && grep -qi microsoft /proc/version 2>/dev/null; then
-        export AGENCE_SHELL_ENV="wsl"
-        export AGENCE_PATH_STYLE="posix"
-      else
-        export AGENCE_SHELL_ENV="linux"
-        export AGENCE_PATH_STYLE="posix"
-      fi
-      export AGENCE_OS_LINUX=1
-      ;;
-    darwin*)
-      export AGENCE_SHELL_ENV="macos"
-      export AGENCE_OS_MACOS=1
-      export AGENCE_PATH_STYLE="posix"
-      ;;
-  esac
-  
   # Additional detection for git-bash (MSYSTEM variable)
   if [[ -n "${MSYSTEM:-}" ]]; then
     export AGENCE_SHELL_ENV="git-bash"
     export AGENCE_OS_WINDOWS=1
     export AGENCE_PATH_STYLE="mingw"
   fi
-  
+
   # Additional detection for PowerShell
   if [[ -n "${PSVersionTable+x}" ]] || [[ "$SHELL" == *"powershell"* ]]; then
     export AGENCE_SHELL_ENV="powershell"
     export AGENCE_PATH_STYLE="windows"
   fi
-  
+
   [[ "${AGENCE_DEBUG:-0}" == "1" ]] && \
     echo "[DEBUG] Shell: $AGENCE_SHELL_ENV, Path style: $AGENCE_PATH_STYLE, OS: W=$AGENCE_OS_WINDOWS L=$AGENCE_OS_LINUX" >&2
 }
@@ -145,11 +96,11 @@ init_execution_context() {
   export AGENCE_REPO="${AGENCE_REPO:-$(normalize_path "$AGENCE_ROOT")}"
   export GIT_REPO="${GIT_REPO:-}"
   
+
   # Try to detect GIT_REPO by walking up directory tree from current pwd
   if [[ -z "$GIT_REPO" ]]; then
     local current_dir="$(normalize_path "$(pwd)")"
     local check_dir="$current_dir"
-    
     while [[ "$check_dir" != "/" ]]; do
       if [[ -d "$check_dir/.git" ]]; then
         export GIT_REPO="$check_dir"
@@ -161,14 +112,14 @@ init_execution_context() {
     # Normalize GIT_REPO if it was manually set
     export GIT_REPO="$(normalize_path "$GIT_REPO")"
   fi
-  
+
   # Special case: If both are same, we're in standalone mode (not yet a submodule)
   if [[ "$GIT_REPO" == "$AGENCE_REPO" ]]; then
     if [[ "$DEBUG" == "1" ]]; then
       echo "[DEBUG] Standalone mode (GIT_REPO == AGENCE_REPO)" >&2
     fi
   fi
-  
+
   if [[ "$DEBUG" == "1" ]]; then
     echo "[DEBUG] AGENCE_REPO=$AGENCE_REPO" >&2
     echo "[DEBUG] GIT_REPO=$GIT_REPO" >&2
@@ -269,83 +220,107 @@ COMMAND MODES:
 EXAMPLES:
   agence "How do I deploy this to AWS?"
   agence +plan-vpc-infrastructure
-  agence /terraform-plan
-  agence !help
-  agence ^init
-  agence ^install
-  agence ^learn
-  agence ^status
-  agence ^stash
-  agence ^fetch
-  agence ^rebase
-  agence ^push
-  agence ^sync
+    AGENCE_QUIET=1               Suppress non-essential output
+    AGENCE_LLM_PROVIDER=claude   LLM provider (anthropic, openai, ollama)
+    ANTHROPIC_API_KEY            API key for Claude
 
-ENVIRONMENT VARIABLES:
-  GIT_REPO=/path/to/repo       Parent repository (auto-detected if not set)
-  AGENCE_REPO                  Agence submodule root (auto-set to ~/.agence)
-  AGENCE_DEBUG=1               Enable debug output (shows GIT_REPO, AGENCE_REPO)
-  AGENCE_QUIET=1               Suppress non-essential output
-  AGENCE_LLM_PROVIDER=claude   LLM provider (anthropic, openai, ollama)
-  ANTHROPIC_API_KEY            API key for Claude
 
-CONFIG:
-  ~/.agence/config.yaml        Global Agence configuration
-  .agence/config.yaml          Project-specific configuration (if in repo)
-
-SEE ALSO:
-  agence config                Show current configuration
-  agence status                Show Agence status
-  agence logs                  Show recent logs
-
-For more info: https://github.com/l-agence/agence
-EOF
-}
-
-show_version() {
-  echo "Agence version 0.1.0 (alpha)"
-  echo "[VERSION]: 0.1.0 (alpha)"
-  echo "[RELEASE]: main"
-}
-
-# ============================================================================
-# MAIN ENTRY POINT
-# ============================================================================
-
-main() {
-  local input="$*"
-
-  # Argument validation
-  if [[ -z "$input" ]]; then
-    show_help
-    exit 0
+# Shell environment detection function
+detect_shell_environment() {
+  # Additional detection for git-bash (MSYSTEM variable)
+  if [[ -n "${MSYSTEM:-}" ]]; then
+    export AGENCE_SHELL_ENV="git-bash"
+    export AGENCE_OS_WINDOWS=1
+    export AGENCE_PATH_STYLE="mingw"
   fi
 
-  local first_char="${input:0:1}"
+  # Additional detection for PowerShell
+  if [[ -n "${PSVersionTable+x}" ]] || [[ "$SHELL" == *"powershell"* ]]; then
+    export AGENCE_SHELL_ENV="powershell"
+    export AGENCE_PATH_STYLE="windows"
+  fi
 
-  # Mode detection and routing
-  case "$first_char" in
-    "")
-      # Empty input
-      show_help
-      exit 0
-      ;;
-    "+")
-      # AI-routed mode: LLM decides what to do
-      mode_ai_routed "${input:1}"
-      ;;
-    "/")
-      # External command: validated execution
-      mode_external "${input:1}"
-      ;;
-    "!")
-      # System command: shell utilities
-      mode_system "${input:1}"
-      ;;
-    "^")
-      # Special initialization commands
-      mode_init "${input:1}"
-      ;;
+  [[ "${AGENCE_DEBUG:-0}" == "1" ]] && \
+    echo "[DEBUG] Shell: $AGENCE_SHELL_ENV, Path style: $AGENCE_PATH_STYLE, OS: W=$AGENCE_OS_WINDOWS L=$AGENCE_OS_LINUX" >&2
+}
+
+          "reload")
+            reload_agence_context
+            ;;
+          "install")
+            install_agence_packages
+            ;;
+          "reindex")
+            reindex_knowledge_bases
+            ;;
+          "learn")
+            learn_from_sessions
+            ;;
+          "commit")
+            commit_knowledge_changes
+            ;;
+          "push")
+            push_knowledge_upstream
+            ;;
+          "save")
+            save_session_context
+            ;;
+          "handoff")
+            handoff_to_agent $init_args
+            ;;
+          "pickup")
+            pickup_handoff $init_args
+            ;;
+          "pause")
+            pause_session $init_args
+            ;;
+          "resume")
+            resume_session $init_args
+            ;;
+          "version")
+            show_version
+            ;;
+          *)
+            echo "Error: Unknown init command: $init_cmd" >&2
+            return 1
+            ;;
+        esac
+        return 0
+      }
+            echo "Session $args not found."
+          fi
+          ;;
+        replay)
+          echo "[SESSION REPLAY] Not yet implemented."
+          ;;
+        kill)
+          echo "[SESSION KILL] Not yet implemented."
+          ;;
+        delete)
+          if [[ -z "$args" ]]; then
+            echo "Usage: ^session delete <session_id>"
+            return 1
+          fi
+          local meta="$sessions_dir/$args.meta.json"
+          if [[ -f "$meta" ]]; then
+            rm "$meta"
+            echo "Session $args deleted."
+          else
+            echo "Session $args not found."
+          fi
+          ;;
+        prune)
+          echo "[SESSION PRUNE] Cleaning up old sessions..."
+          find "$sessions_dir" -name '*.meta.json' -mtime +30 -exec rm {} \;
+          echo "Prune complete."
+          ;;
+        *)
+          echo "Unknown ^session command: $subcmd"
+          return 1
+          ;;
+      esac
+      return 0
+    }
     *)
       # Default: chat mode
       mode_chat "$input"

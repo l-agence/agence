@@ -537,6 +537,10 @@ aws_count=$(aido aws list-instances | jq '.Reservations | length')
 
 ---
 
+## Rule 15: Additive Tracking Principle
+
+All knowledge items—todos, issues, tasks, logs, lessons, faults—are quantized and tracked as individual, additive entries. Never squash, overwrite, or delete entries unless explicitly requested. History and state must always be preserved. You may append new entries or update existing ones if requested, but never remove or merge away prior records. This ensures full auditability, traceability, and knowledge integrity.
+
 ## Summary: The 14 Rules of CODEX
 
 | Rule | Practice | Benefit |

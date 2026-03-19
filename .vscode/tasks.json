@@ -184,6 +184,60 @@
 				"clear": false
 			},
 			"problemMatcher": []
+		},
+		{
+			"label": "!shell (Hybrid Interactive PowerShell)",
+			"type": "shell",
+			"command": "powershell.exe",
+			"args": [
+				"-NoProfile",
+				"-NoExit",
+				"-File",
+				"${workspaceFolder}/bin/ishell"
+			],
+			"isBackground": false,
+			"presentation": {
+				"reveal": "always",
+				"panel": "new",
+				"focus": true,
+				"clear": false,
+				"showReuseMessage": false
+			},
+			"problemMatcher": [],
+			"group": "build",
+			"options": {
+				"shell": {
+					"executable": "powershell.exe",
+					"args": ["-NoProfile", "-Command"]
+				}
+			}
+		},
+		{
+			"label": "&shell (Agentic PowerShell - Right Tile)",
+			"type": "shell",
+			"command": "powershell.exe",
+			"args": [
+				"-NoProfile",
+				"-NoExit",
+				"-File",
+				"${workspaceFolder}/bin/aishell.ps1"
+			],
+			"isBackground": false,
+			"presentation": {
+				"reveal": "always",
+				"panel": "new",
+				"focus": true,
+				"clear": false,
+				"showReuseMessage": false
+			},
+			"problemMatcher": [],
+			"group": "build",
+			"options": {
+				"shell": {
+					"executable": "powershell.exe",
+					"args": ["-NoProfile", "-Command"]
+				}
+			}
 		}
 	]
 }

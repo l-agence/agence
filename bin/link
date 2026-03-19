@@ -1,0 +1,9 @@
+#!/bin/bash
+# Usage: link <source_dir> <link_dir>
+if [ "$#" -ne 2 ]; then
+  echo "Usage: link <source_dir> <link_dir>"
+  exit 1
+fi
+SOURCE="$1"
+LINK="$2"
+powershell.exe -Command "mklink -j '$LINK' '$SOURCE'"

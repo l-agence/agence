@@ -1,3 +1,60 @@
+export)
+          # ^session export <id> <@user>
+          local sid=$(echo "$args" | awk '{print $1}')
+          local target=$(echo "$args" | awk '{print $2}')
+          if [[ -z "$sid" || -z "$target" ]]; then
+            echo "Usage: ^session export <session_id> <@user>"
+            return 1
+          fi
+          local meta="$sessions_dir/$sid.meta.json"
+          local export_dir="$GIT_REPO/.agence-sessions"
+          mkdir -p "$export_dir"
+          if [[ -f "$meta" ]]; then
+            # Only export safe fields
+            jq '{session_id, agent_id, role, timestamp, owner, assigned, summary: .summary // "", exported_by: "$USER", exported_to: $target, exported_at: "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' --arg target "$target" "$meta" > "$export_dir/$sid.export.json"
+            echo "Session $sid exported for $target: $export_dir/$sid.export.json"
+          else
+            echo "Session $sid not found."
+          fi
+          ;;
+        import)
+          # ^session import <file>
+          local file="$args"
+          if [[ -z "$file" || ! -f "$file" ]]; then
+            echo "Usage: ^session import <exported_file.json>"
+            return 1
+          fi
+          local sid=$(jq -r '.session_id' "$file")
+          local meta="$sessions_dir/$sid.meta.json"
+          cp "$file" "$meta"
+          echo "Imported session $sid from $file."
+          ;;
+        push)
+          # ^session push <id>
+          local sid="$args"
+          local export_dir="$GIT_REPO/.agence-sessions"
+          if [[ -z "$sid" || ! -f "$export_dir/$sid.export.json" ]]; then
+            echo "Usage: ^session push <session_id> (must export first)"
+            return 1
+          fi
+          git -C "$GIT_REPO" add ".agence-sessions/$sid.export.json"
+          git -C "$GIT_REPO" commit -m "[session] Exported session $sid for handoff" || echo "No changes to commit."
+          git -C "$GIT_REPO" push
+          echo "Pushed session $sid export to origin."
+          ;;
+        pull)
+          # ^session pull <id>
+          local sid="$args"
+          local export_dir="$GIT_REPO/.agence-sessions"
+          git -C "$GIT_REPO" pull
+          if [[ -f "$export_dir/$sid.export.json" ]]; then
+            cp "$export_dir/$sid.export.json" "$sessions_dir/$sid.meta.json"
+            echo "Pulled and imported session $sid from origin."
+          else
+            echo "Session $sid export not found after pull."
+          fi
+          ;;
+
 #!/usr/bin/env bash
 
 ################################################################################
@@ -6,80 +63,31 @@
 #
 # Author: Stephane Korning 2026
 # License: MIT License with Commons Clause
-# 
-# Modes:
-#   agence help                    → Show help
-#   agence <query>                 → Chat mode (query to LLM)
-#   agence +<routing_request>      → AI-routed mode (LLM determines action)
-#   agence /<command>              → External command (validated)
-#   agence !<system_cmd>           → System command
-################################################################################
+#
 
-set -u  # Exit on undefined variable
-
-# ============================================================================
-# SHELL ENVIRONMENT DETECTION
-# ============================================================================
-# Detect which shell environment we're running in (git-bash, cygwin, WSL, etc)
-# Set environment variables so everything works universally
-# This must happen FIRST before any path operations
-
+# Shell environment detection function
 detect_shell_environment() {
-  # Default values
-  export AGENCE_SHELL_ENV="unknown"
-  export AGENCE_PATH_STYLE="posix"  # Default: posix paths
-  export AGENCE_OS_WINDOWS=0
-  export AGENCE_OS_LINUX=0
-  export AGENCE_OS_MACOS=0
-  
-  # Detect OS layer
-  case "${OSTYPE:-}" in
-    msys|mingw*)
-      # Git-bash (MinGW/MSYS2)
-      export AGENCE_SHELL_ENV="git-bash"
-      export AGENCE_OS_WINDOWS=1
-      export AGENCE_PATH_STYLE="mingw"
-      ;;
-    cygwin*)
-      # Cygwin
-      export AGENCE_SHELL_ENV="cygwin"
-      export AGENCE_OS_WINDOWS=1
-      export AGENCE_PATH_STYLE="cygwin"
-      ;;
-    linux*)
-      # Check if WSL
-      if [[ -f /proc/version ]] && grep -qi microsoft /proc/version 2>/dev/null; then
-        export AGENCE_SHELL_ENV="wsl"
-        export AGENCE_PATH_STYLE="posix"
-      else
-        export AGENCE_SHELL_ENV="linux"
-        export AGENCE_PATH_STYLE="posix"
-      fi
-      export AGENCE_OS_LINUX=1
-      ;;
-    darwin*)
-      export AGENCE_SHELL_ENV="macos"
-      export AGENCE_OS_MACOS=1
-      export AGENCE_PATH_STYLE="posix"
-      ;;
-  esac
-  
   # Additional detection for git-bash (MSYSTEM variable)
   if [[ -n "${MSYSTEM:-}" ]]; then
     export AGENCE_SHELL_ENV="git-bash"
     export AGENCE_OS_WINDOWS=1
     export AGENCE_PATH_STYLE="mingw"
   fi
-  
+
   # Additional detection for PowerShell
   if [[ -n "${PSVersionTable+x}" ]] || [[ "$SHELL" == *"powershell"* ]]; then
     export AGENCE_SHELL_ENV="powershell"
     export AGENCE_PATH_STYLE="windows"
   fi
-  
+
   [[ "${AGENCE_DEBUG:-0}" == "1" ]] && \
     echo "[DEBUG] Shell: $AGENCE_SHELL_ENV, Path style: $AGENCE_PATH_STYLE, OS: W=$AGENCE_OS_WINDOWS L=$AGENCE_OS_LINUX" >&2
 }
+
+# NOTE: This script is also copied as '^' for a quick shortcut and unified interface.
+#       Any modifications to this file should be mirrored to '^' to ensure consistency.
+
+detect_shell_environment
 
 detect_shell_environment
 
@@ -145,11 +153,11 @@ init_execution_context() {
   export AGENCE_REPO="${AGENCE_REPO:-$(normalize_path "$AGENCE_ROOT")}"
   export GIT_REPO="${GIT_REPO:-}"
   
+
   # Try to detect GIT_REPO by walking up directory tree from current pwd
   if [[ -z "$GIT_REPO" ]]; then
     local current_dir="$(normalize_path "$(pwd)")"
     local check_dir="$current_dir"
-    
     while [[ "$check_dir" != "/" ]]; do
       if [[ -d "$check_dir/.git" ]]; then
         export GIT_REPO="$check_dir"
@@ -161,14 +169,14 @@ init_execution_context() {
     # Normalize GIT_REPO if it was manually set
     export GIT_REPO="$(normalize_path "$GIT_REPO")"
   fi
-  
+
   # Special case: If both are same, we're in standalone mode (not yet a submodule)
   if [[ "$GIT_REPO" == "$AGENCE_REPO" ]]; then
     if [[ "$DEBUG" == "1" ]]; then
       echo "[DEBUG] Standalone mode (GIT_REPO == AGENCE_REPO)" >&2
     fi
   fi
-  
+
   if [[ "$DEBUG" == "1" ]]; then
     echo "[DEBUG] AGENCE_REPO=$AGENCE_REPO" >&2
     echo "[DEBUG] GIT_REPO=$GIT_REPO" >&2
@@ -237,6 +245,34 @@ fi
 # HELP / VERSION
 # ============================================================================
 
+usage() {
+  cat <<EOF
+Usage: agence <command> [args]
+
+Agence supports robust, extensible command and routing syntax:
+
+EBNF Grammar:
+  <command>      ::= <task_expr> { ";" <task_expr> }
+  <task_expr>    ::= [<priority>] <repo> ":" <task> { ":" <metadata> } [<dependency>]
+  <priority>     ::= "*" | "**" | "***"
+  <repo>         ::= <identifier>
+  <task>         ::= <identifier>
+  <metadata>     ::= <key> "=" <value>
+  <key>          ::= "agent" | "sec" | "org" | "shard" | "team" | ...
+  <value>        ::= <identifier> | <string>
+  <dependency>   ::= "^" <task_expr> | ";" <task_expr>
+  <identifier>   ::= (letter | digit | "_" | "-")+ 
+  <string>       ::= '"' { any character except '"' } '"'
+
+Routing: '@' can be used for agent, org, repo, security-level, etc.
+Prefixes: '*', '$', '~', '%', '&', '_', '#', '+', '-', '!', '?' for state/priority.
+
+Examples:
+  agence *repo:task:agent=@ralph:sec=internal ; repo2:task2
+  agence @org:team:sec=secret repo:task
+EOF
+}
+
 show_help() {
   cat << 'EOF'
 Agence: Agentic Engineering Collaboration Environment
@@ -269,83 +305,174 @@ COMMAND MODES:
 EXAMPLES:
   agence "How do I deploy this to AWS?"
   agence +plan-vpc-infrastructure
-  agence /terraform-plan
-  agence !help
-  agence ^init
-  agence ^install
-  agence ^learn
-  agence ^status
-  agence ^stash
-  agence ^fetch
-  agence ^rebase
-  agence ^push
-  agence ^sync
-
-ENVIRONMENT VARIABLES:
-  GIT_REPO=/path/to/repo       Parent repository (auto-detected if not set)
-  AGENCE_REPO                  Agence submodule root (auto-set to ~/.agence)
-  AGENCE_DEBUG=1               Enable debug output (shows GIT_REPO, AGENCE_REPO)
-  AGENCE_QUIET=1               Suppress non-essential output
-  AGENCE_LLM_PROVIDER=claude   LLM provider (anthropic, openai, ollama)
-  ANTHROPIC_API_KEY            API key for Claude
-
-CONFIG:
-  ~/.agence/config.yaml        Global Agence configuration
-  .agence/config.yaml          Project-specific configuration (if in repo)
-
-SEE ALSO:
-  agence config                Show current configuration
-  agence status                Show Agence status
-  agence logs                  Show recent logs
-
-For more info: https://github.com/l-agence/agence
+    AGENCE_QUIET=1               Suppress non-essential output
+    AGENCE_LLM_PROVIDER=claude   LLM provider (anthropic, openai, ollama)
+    ANTHROPIC_API_KEY            API key for Claude
 EOF
 }
-
-show_version() {
-  echo "Agence version 0.1.0 (alpha)"
-  echo "[VERSION]: 0.1.0 (alpha)"
-  echo "[RELEASE]: main"
-}
-
-# ============================================================================
-# MAIN ENTRY POINT
-# ============================================================================
-
-main() {
-  local input="$*"
-
-  # Argument validation
-  if [[ -z "$input" ]]; then
-    show_help
-    exit 0
-  fi
-
-  local first_char="${input:0:1}"
-
-  # Mode detection and routing
-  case "$first_char" in
-    "")
-      # Empty input
-      show_help
-      exit 0
-      ;;
-    "+")
-      # AI-routed mode: LLM decides what to do
-      mode_ai_routed "${input:1}"
-      ;;
-    "/")
-      # External command: validated execution
-      mode_external "${input:1}"
-      ;;
-    "!")
-      # System command: shell utilities
-      mode_system "${input:1}"
-      ;;
-    "^")
-      # Special initialization commands
-      mode_init "${input:1}"
-      ;;
+        list)
+          echo "[SESSION LIST] Active sessions:"
+          local count=0
+          for meta in "$sessions_dir"/*.meta.json; do
+            [[ ! -f "$meta" ]] && continue
+            local sid=$(jq -r '.session_id // .sessionID' "$meta" 2>/dev/null)
+            local agent=$(jq -r '.agent_id // .agentID' "$meta" 2>/dev/null)
+            local role=$(jq -r '.role' "$meta" 2>/dev/null)
+            local ts=$(jq -r '.timestamp' "$meta" 2>/dev/null)
+            local owner=$(jq -r '.owner // empty' "$meta" 2>/dev/null)
+            local assigned=$(jq -r '.assigned // empty' "$meta" 2>/dev/null)
+            echo "  - $sid  agent=$agent  role=$role  started=$ts  owner=${owner:-n/a}  assigned=${assigned:-n/a}"
+            ((count++))
+          done
+          [[ $count -eq 0 ]] && echo "  (no sessions found)"
+          ;;
+        view)
+          if [[ -z "$args" ]]; then
+            echo "Usage: ^session view <session_id>"
+            return 1
+          fi
+          local meta="$sessions_dir/$args.meta.json"
+          if [[ -f "$meta" ]]; then
+            jq '.' "$meta"
+          else
+            echo "Session $args not found."
+          fi
+          ;;
+                handoff)
+                  # ^session handoff <id> <@agent>
+                  local sid=$(echo "$args" | awk '{print $1}')
+                  local target=$(echo "$args" | awk '{print $2}')
+                  if [[ -z "$sid" || -z "$target" || "$target" != @* ]]; then
+                    echo "Usage: ^session handoff <session_id> <@agent>"
+                    echo "  (handoff is for local agent assignment only)"
+                    return 1
+                  fi
+                  local meta="$sessions_dir/$sid.meta.json"
+                  if [[ -f "$meta" ]]; then
+                    jq --arg a "$target" '.assigned = $a' "$meta" > "$meta.tmp" && mv "$meta.tmp" "$meta"
+                    echo "Session $sid handed off to local agent $target."
+                  else
+                    echo "Session $sid not found."
+                  fi
+                  ;;
+                assign)
+                  # ^session assign <id> <@user>
+                  local sid=$(echo "$args" | awk '{print $1}')
+                  local target=$(echo "$args" | awk '{print $2}')
+                  if [[ -z "$sid" || -z "$target" || "$target" != @* ]]; then
+                    echo "Usage: ^session assign <session_id> <@user>"
+                    echo "  (assign is for remote human assignment only; triggers safe export)"
+                    return 1
+                  fi
+                  # Export sanitized metadata for remote human assignment
+                  local meta="$sessions_dir/$sid.meta.json"
+                  local export_dir="$GIT_REPO/.agence-sessions"
+                  mkdir -p "$export_dir"
+                  if [[ -f "$meta" ]]; then
+                    jq '{session_id, agent_id, role, timestamp, owner, assigned: $target, summary: .summary // "", exported_by: "$USER", exported_to: $target, exported_at: "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' --arg target "$target" "$meta" > "$export_dir/$sid.export.json"
+                    echo "Session $sid assigned to remote user $target (exported: $export_dir/$sid.export.json)"
+                  else
+                    echo "Session $sid not found."
+                  fi
+                  ;;
+        attach)
+          if [[ -z "$args" ]]; then
+            echo "Usage: ^session attach <session_id>"
+            return 1
+          fi
+          local meta="$sessions_dir/$args.meta.json"
+          if [[ -f "$meta" ]]; then
+            echo "Attaching to session $args..."
+            export AGENCE_SESSION_ID="$args"
+            export AGENCE_AGENT_ID=$(jq -r '.agent_id // .agentID' "$meta" 2>/dev/null)
+            export AGENCE_SESSION_TYPE=$(jq -r '.role' "$meta" 2>/dev/null)
+            # Optionally launch a shell or agent context here
+            echo "[INFO] Environment variables set for session $args."
+          else
+            echo "Session $args not found."
+          fi
+          ;;
+        detach)
+          echo "Detaching from current session..."
+          unset AGENCE_SESSION_ID AGENCE_AGENT_ID AGENCE_SESSION_TYPE
+          echo "[INFO] Detached."
+          ;;
+        pause)
+          if [[ -z "$args" ]]; then
+            echo "Usage: ^session pause <session_id>"
+            return 1
+          fi
+          local meta="$sessions_dir/$args.meta.json"
+          if [[ -f "$meta" ]]; then
+            jq '. + {status: "paused", paused_at: "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' "$meta" > "$meta.tmp" && mv "$meta.tmp" "$meta"
+            echo "Session $args paused."
+          else
+            echo "Session $args not found."
+          fi
+          ;;
+        resume)
+          if [[ -z "$args" ]]; then
+            echo "Usage: ^session resume <session_id>"
+            return 1
+          fi
+          local meta="$sessions_dir/$args.meta.json"
+          if [[ -f "$meta" ]]; then
+            jq 'del(.status, .paused_at)' "$meta" > "$meta.tmp" && mv "$meta.tmp" "$meta"
+            echo "Session $args resumed."
+          else
+            echo "Session $args not found."
+          fi
+          ;;
+        replay)
+          if [[ -z "$args" ]]; then
+            echo "Usage: ^session replay <session_id>"
+            return 1
+          fi
+          local meta="$sessions_dir/$args.meta.json"
+          if [[ -f "$meta" ]]; then
+            echo "[SESSION REPLAY] Not yet implemented. (Would replay commands for $args)"
+          else
+            echo "Session $args not found."
+          fi
+          ;;
+        kill)
+          if [[ -z "$args" ]]; then
+            echo "Usage: ^session kill <session_id>"
+            return 1
+          fi
+          local meta="$sessions_dir/$args.meta.json"
+          if [[ -f "$meta" ]]; then
+            jq '. + {status: "killed", killed_at: "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' "$meta" > "$meta.tmp" && mv "$meta.tmp" "$meta"
+            echo "Session $args killed."
+          else
+            echo "Session $args not found."
+          fi
+          ;;
+        delete)
+          if [[ -z "$args" ]]; then
+            echo "Usage: ^session delete <session_id>"
+            return 1
+          fi
+          local meta="$sessions_dir/$args.meta.json"
+          if [[ -f "$meta" ]]; then
+            rm "$meta"
+            echo "Session $args deleted."
+          else
+            echo "Session $args not found."
+          fi
+          ;;
+        prune)
+          echo "[SESSION PRUNE] Cleaning up old sessions..."
+          find "$sessions_dir" -name '*.meta.json' -mtime +30 -exec rm {} \;
+          echo "Prune complete."
+          ;;
+        *)
+          echo "Unknown ^session command: $subcmd"
+          return 1
+          ;;
+      esac
+      return 0
+    }
     *)
       # Default: chat mode
       mode_chat "$input"

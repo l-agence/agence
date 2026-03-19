@@ -1,0 +1,1129 @@
+#!/usr/bin/env bash
+
+################################################################################
+# Agence: Agentic Engineering Collaboration Environment
+# Entry point for all command routing
+#
+# Author: Stephane Korning 2026
+# License: MIT License with Commons Clause
+#
+
+# Shell environment detection function
+detect_shell_environment() {
+  # Additional detection for git-bash (MSYSTEM variable)
+  if [[ -n "${MSYSTEM:-}" ]]; then
+    export AGENCE_SHELL_ENV="git-bash"
+    export AGENCE_OS_WINDOWS=1
+    export AGENCE_PATH_STYLE="mingw"
+  fi
+
+  # Additional detection for PowerShell
+  if [[ -n "${PSVersionTable+x}" ]] || [[ "$SHELL" == *"powershell"* ]]; then
+    export AGENCE_SHELL_ENV="powershell"
+    export AGENCE_PATH_STYLE="windows"
+  fi
+
+  [[ "${AGENCE_DEBUG:-0}" == "1" ]] && \
+    echo "[DEBUG] Shell: $AGENCE_SHELL_ENV, Path style: $AGENCE_PATH_STYLE, OS: W=$AGENCE_OS_WINDOWS L=$AGENCE_OS_LINUX" >&2
+}
+
+# NOTE: This script is also copied as '^' for a quick shortcut and unified interface.
+#       Any modifications to this file should be mirrored to '^' to ensure consistency.
+
+detect_shell_environment
+
+detect_shell_environment
+
+# ============================================================================
+# CONFIGURATION & PATHS
+# ============================================================================
+
+# Normalize paths to current shell environment
+# Handles conversion between path styles based on detected environment
+normalize_path() {
+  local path="$1"
+  
+  # If cygwin, convert /cygdrive/c/ to /c/ (mingw style)
+  if [[ "$AGENCE_PATH_STYLE" == "mingw" ]] && [[ "$path" == /cygdrive/* ]]; then
+    path="${path/\/cygdrive\//\/}"
+  fi
+  
+  # If Windows (for PowerShell), convert to Windows style (C:\...)
+  if [[ "$AGENCE_PATH_STYLE" == "windows" ]]; then
+    # Convert unix paths to Windows paths
+    if [[ "$path" == /* ]]; then
+      # /c/users/... → C:\Users\...
+      local drive="${path:1:1}"
+      local rest="${path:2}"
+      path="${drive}:${rest//\//\\}"
+    fi
+  fi
+  
+  echo "$path"
+}
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(normalize_path "$SCRIPT_DIR")"
+
+AGENCE_ROOT="$(dirname "$SCRIPT_DIR")"
+AGENCE_ROOT="$(normalize_path "$AGENCE_ROOT")"
+
+AGENCE_BIN="$SCRIPT_DIR"
+AGENCE_LIB="$AGENCE_ROOT/lib"
+AGENCE_MODULES="$AGENCE_ROOT/modules"
+AGENCE_CONFIG="${HOME}/.agence/config.yaml"
+
+# Source utility functions (to be created)
+source_if_exists() {
+  [[ -f "$1" ]] && source "$1"
+}
+
+source_if_exists "$AGENCE_LIB/utils.sh"
+source_if_exists "$AGENCE_LIB/logging.sh"
+source_if_exists "$AGENCE_LIB/safeguards.sh"
+source_if_exists "$AGENCE_LIB/router.sh"
+
+# ============================================================================
+# EXECUTION CONTEXT: Git Repo vs Agence Repo
+# ============================================================================
+# Critical: Prevent collisions when user and LLM share a shell window
+# Both must be set and validated before any command execution
+
+init_execution_context() {
+  # Initialize GIT_REPO and AGENCE_REPO environment variables
+  # These track which repos we're working in and prevent context collisions
+  
+  export AGENCE_REPO="${AGENCE_REPO:-$(normalize_path "$AGENCE_ROOT")}"
+  export GIT_REPO="${GIT_REPO:-}"
+  
+
+  # Try to detect GIT_REPO by walking up directory tree from current pwd
+  if [[ -z "$GIT_REPO" ]]; then
+    local current_dir="$(normalize_path "$(pwd)")"
+    local check_dir="$current_dir"
+    while [[ "$check_dir" != "/" ]]; do
+      if [[ -d "$check_dir/.git" ]]; then
+        export GIT_REPO="$check_dir"
+        break
+      fi
+      check_dir="$(dirname "$check_dir")"
+    done
+  else
+    # Normalize GIT_REPO if it was manually set
+    export GIT_REPO="$(normalize_path "$GIT_REPO")"
+  fi
+
+  # Special case: If both are same, we're in standalone mode (not yet a submodule)
+  if [[ "$GIT_REPO" == "$AGENCE_REPO" ]]; then
+    if [[ "$DEBUG" == "1" ]]; then
+      echo "[DEBUG] Standalone mode (GIT_REPO == AGENCE_REPO)" >&2
+    fi
+  fi
+
+  if [[ "$DEBUG" == "1" ]]; then
+    echo "[DEBUG] AGENCE_REPO=$AGENCE_REPO" >&2
+    echo "[DEBUG] GIT_REPO=$GIT_REPO" >&2
+  fi
+}
+
+validate_execution_context() {
+  # Pre-flight check: Ensure pwd matches expected repo context (CODEX LAW 2)
+  # Handles both normal case (submodule in parent repo) and standalone case (same repo)
+  
+  local current_pwd="$(normalize_path "$(pwd)")"
+  local in_agence=0
+  local in_git=0
+  
+  # Check if we're in AGENCE_REPO
+  if [[ "$current_pwd" == "$AGENCE_REPO"* ]]; then
+    in_agence=1
+  fi
+  
+  # Check if we're in GIT_REPO (if set and different from AGENCE_REPO)
+  if [[ -n "$GIT_REPO" ]] && [[ "$GIT_REPO" != "$AGENCE_REPO" ]] && [[ "$current_pwd" == "$GIT_REPO"* ]]; then
+    in_git=1
+  fi
+  
+  # Special case: if they're the same, being in one is sufficient
+  if [[ "$GIT_REPO" == "$AGENCE_REPO" ]] && [[ $in_agence -eq 1 ]]; then
+    in_git=1
+  fi
+  
+  # Validation: Must be in either GIT_REPO or AGENCE_REPO
+  if [[ $in_agence -eq 0 && $in_git -eq 0 ]]; then
+    echo "[ERROR] Execution context mismatch (CODEX LAW 2 violation)!" >&2
+    echo "  pwd: $current_pwd" >&2
+    echo "  AGENCE_REPO: $AGENCE_REPO" >&2
+    if [[ -n "$GIT_REPO" ]] && [[ "$GIT_REPO" != "$AGENCE_REPO" ]]; then
+      echo "  GIT_REPO: $GIT_REPO" >&2
+    fi
+    echo "" >&2
+    echo "  You must be in one of:" >&2
+    echo "    - $AGENCE_REPO/* (Agence system)" >&2
+    if [[ -n "$GIT_REPO" ]] && [[ "$GIT_REPO" != "$AGENCE_REPO" ]]; then
+      echo "    - $GIT_REPO/* (Parent project)" >&2
+    fi
+    echo "" >&2
+    echo "  Recovery: cd to $AGENCE_REPO or your project root" >&2
+    return 1
+  fi
+  
+  return 0
+}
+
+# ============================================================================
+# DEFAULTS
+# ============================================================================
+
+DEBUG="${AGENCE_DEBUG:-0}"
+QUIET="${AGENCE_QUIET:-0}"
+
+# Initialize and validate execution context before anything else
+init_execution_context
+if ! validate_execution_context; then
+  exit 1
+fi
+
+# ============================================================================
+# HELP / VERSION
+# ============================================================================
+
+show_help() {
+  cat << 'EOF'
+Agence: Agentic Engineering Collaboration Environment
+
+USAGE:
+  agence [COMMAND] [OPTIONS]
+
+EXECUTION CONTEXT:
+  Agence enforces strict execution context to prevent collisions when user 
+  and LLM share a shell window. The following must be true:
+  
+  - GIT_REPO (parent repo, auto-detected or set manually)
+  - AGENCE_REPO (always ~/.agence submodule)
+  - pwd must be within one of these repos
+  
+  If context mismatch detected: Agence aborts with error.
+  Set manually if needed: export GIT_REPO=/path/to/repo
+
+MODES:
+  help                         Show this help message
+  version                      Show Agence version
+
+COMMAND MODES:
+  agence "<query>"             Chat with the LLM about your task
+  agence +<request>            Ask LLM to route/plan action (autonomous mode)
+  agence /<cmd>                Execute validated external command
+  agence !<sys_cmd>            System command (bash/powershell utilities)
+  agence ^<init_cmd>           Special initialization commands
+
+EXAMPLES:
+  agence "How do I deploy this to AWS?"
+  agenc        replay)
+          echo "[SESSION REPLAY] Not yet implemented."
+          ;;
+        kill)
+          echo "[SESSION KILL] Not yet implemented."
+          ;;
+        delete)
+          if [[ -z "$args" ]]; then
+            echo "Usage: ^session delete <session_id>"
+            return 1
+          fi
+          local meta="$sessions_dir/$args.meta.json"
+          if [[ -f "$meta" ]]; then
+            rm "$meta"
+            echo "Session $args deleted."
+          else
+            echo "Session $args not found."
+          fi
+          ;;
+        prune)
+          echo "[SESSION PRUNE] Cleaning up old sessions..."
+          find "$sessions_dir" -name '*.meta.json' -mtime +30 -exec rm {} \;
+          echo "Prune complete."
+          ;;
+        *)
+          echo "Unknown ^session command: $subcmd"
+          return 1
+          ;;
+      esac
+      return 0
+    }
+    *)
+e +plan-vpc-infrastructure
+    AGENCE_QUIET=1               Suppress non-essential output
+    AGENCE_LLM_PROVIDER=claude   LLM provider (anthropic, openai, ollama)
+    ANTHROPIC_API_KEY            API key for Claude
+EOF
+}
+        replay)
+          echo "[SESSION REPLAY] Not yet implemented."
+          ;;
+        kill)
+          echo "[SESSION KILL] Not yet implemented."
+          ;;
+        delete)
+          if [[ -z "$args" ]]; then
+            echo "Usage: ^session delete <session_id>"
+            return 1
+          fi
+          local meta="$sessions_dir/$args.meta.json"
+          if [[ -f "$meta" ]]; then
+            rm "$meta"
+            echo "Session $args deleted."
+          else
+            echo "Session $args not found."
+          fi
+          ;;
+        prune)
+          echo "[SESSION PRUNE] Cleaning up old sessions..."
+          find "$sessions_dir" -name '*.meta.json' -mtime +30 -exec rm {} \;
+          echo "Prune complete."
+          ;;
+        *)
+          echo "Unknown ^session command: $subcmd"
+          return 1
+          ;;
+      esac
+      return 0
+    }
+    *)
+      # Default: chat mode
+      mode_chat "$input"
+      ;;
+  esac
+
+  exit $?
+}
+
+# ============================================================================
+# MODE: CHAT
+# ============================================================================
+# Normal conversation with LLM
+# Example: agence "How do I create a VPC in Terraform?"
+
+mode_chat() {
+  local query="$1"
+
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Chat mode: $query" >&2
+
+  # Load router
+  router_load_config
+
+  # Call LLM with context
+  local response
+  response=$(router_chat "$query") || {
+    echo "Error: Failed to contact LLM" >&2
+    return 1
+  }
+
+  echo "$response"
+  return 0
+}
+
+# ============================================================================
+# MODE: AI-ROUTED
+# ============================================================================
+# LLM analyzes request and decides action (autonomous)
+# Example: agence +plan-terraform-module-for-vpc
+
+mode_ai_routed() {
+  local request="$1"
+
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] AI-routed mode: $request" >&2
+
+  # Validate request for dangerous operators
+  if ! validate_command "$request"; then
+    return 1
+  fi
+
+  # Load router
+  router_load_config
+
+  # Call LLM in planning mode
+  local plan
+  plan=$(router_plan_action "$request") || {
+    echo "Error: Failed to plan action" >&2
+    return 1
+  }
+
+  # Parse plan (should contain: ACTION, CONFIDENCE, STEPS)
+  local action confidence
+  action=$(echo "$plan" | grep '^ACTION:' | awk '{print $2}')
+  confidence=$(echo "$plan" | grep '^CONFIDENCE:' | awk '{print $2}')
+
+  # Safety check: require human confirmation if confidence low
+  if (( $(echo "$confidence < 0.65" | bc -l 2>/dev/null || echo 1) )); then
+    echo "[WARN] Low confidence ($confidence). Showing plan:"
+    echo "$plan"
+    echo ""
+    read -p "Proceed? [y/n] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+      return 1
+    fi
+  fi
+
+  # Route and execute
+  case "$action" in
+    git)
+      router_execute git "$plan"
+      ;;
+    terraform)
+      router_execute terraform "$plan"
+      ;;
+    cloud)
+      router_execute cloud "$plan"
+      ;;
+    *)
+      echo "Error: Unknown action type: $action" >&2
+      return 1
+      ;;
+  esac
+
+  return $?
+}
+
+# ============================================================================
+# STUB: router_chat (for testing)
+# ============================================================================
+router_chat() {
+  echo "router_chat: $1"
+  return 0
+}
+
+# ============================================================================
+# STUB: router_load_config (for testing)
+# ============================================================================
+router_load_config() {
+  echo "router_load_config: $1"
+  return 0
+}
+
+# ============================================================================
+# MODE: EXTERNAL COMMAND
+# ============================================================================
+# Execute pre-approved external commands
+# Example: agence /terraform-plan
+
+mode_external() {
+  local cmd_request="$1"
+
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] External mode: $cmd_request" >&2
+
+  # Validate command for dangerous operators
+  if ! validate_command "$cmd_request"; then
+    return 1
+  fi
+
+  # =========================================================================
+  # REPO COMMANDS (act on $GIT_REPO)
+  # =========================================================================
+  case "$cmd_request" in
+    ghauth)
+      # GitHub CLI auth status
+      bash "$AGENCE_ROOT/bin/aido" gh auth status
+      return $?
+      ;;
+    ghlogin)
+      # GitHub CLI login (interactive)
+      echo "[INFO] Starting GitHub CLI login..." >&2
+      gh auth login
+      return $?
+      ;;
+    gitstatus)
+      # Git status in $GIT_REPO (read-only, safe)
+      bash "$AGENCE_ROOT/bin/aido" git status
+      return $?
+      ;;
+    commit)
+      # Commit all tracked changes in $GIT_REPO
+      echo "[WARN] This will commit all staged changes to $GIT_REPO" >&2
+      read -p "Enter commit message: " commit_msg
+      if [[ -z "$commit_msg" ]]; then
+        echo "Error: Commit message required" >&2
+        return 1
+      fi
+      git -C "$GIT_REPO" commit -m "$commit_msg"
+      return $?
+      ;;
+    push)
+      # Push changes to origin (sets upstream on first push)
+      echo "[WARN] This will push changes from $GIT_REPO to origin" >&2
+      read -p "Confirm push to origin? [y/N] " confirm
+      if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+        echo "[CANCELLED] Push aborted" >&2
+        return 1
+      fi
+      git -C "$GIT_REPO" push -u origin
+      return $?
+      ;;
+    ghstatus)
+      # GitHub CLI: show repo and PR status
+      echo "[INFO] Repository status:" >&2
+      bash "$AGENCE_ROOT/bin/aido" gh repo view
+      echo && echo "[INFO] Pull requests:" >&2
+      bash "$AGENCE_ROOT/bin/aido" gh pr list --limit 5
+      return $?
+      ;;
+    ghcommit)
+      # GitHub CLI: Commit changes (similar to /commit but with gh auth)
+      echo "[WARN] This will commit all staged changes using gh auth" >&2
+      read -p "Enter commit message: " commit_msg
+      if [[ -z "$commit_msg" ]]; then
+        echo "Error: Commit message required" >&2
+        return 1
+      fi
+      # Verify gh is authenticated
+      if ! bash "$AGENCE_ROOT/bin/aido" gh auth status &>/dev/null; then
+        echo "Error: Not authenticated with gh. Run: agence /ghlogin" >&2
+        return 1
+      fi
+      git -C "$GIT_REPO" commit -m "$commit_msg"
+      return $?
+      ;;
+    ghpush)
+      # GitHub CLI: Push changes (uses gh's authentication)
+      echo "[WARN] This will push changes using GitHub CLI auth" >&2
+      read -p "Confirm push to origin? [y/N] " confirm
+      if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+        echo "[CANCELLED] Push aborted" >&2
+        return 1
+      fi
+      # Verify gh is authenticated
+      if ! bash "$AGENCE_ROOT/bin/aido" gh auth status &>/dev/null; then
+        echo "Error: Not authenticated with gh. Run: agence /ghlogin" >&2
+        return 1
+      fi
+      git -C "$GIT_REPO" push -u origin
+      return $?
+      ;;
+  esac
+
+  # Load permitted commands from config/commands.json
+  local commands_file="$AGENCE_ROOT/bin/commands.json"
+  
+  if [[ ! -f "$commands_file" ]]; then
+    echo "Error: No commands.json found" >&2
+    return 1
+  fi
+
+  # Check if command is allowed
+  local command_allowed
+  if command -v jq &>/dev/null; then
+    command_allowed=$(jq -r ".\"$cmd_request\" // false" "$commands_file")
+  else
+    # Fallback if jq not available: simple grep
+    command_allowed=$(grep -q "\"$cmd_request\"" "$commands_file" && echo "true" || echo "false")
+  fi
+
+  if [[ "$command_allowed" != "true" ]]; then
+    echo "Error: Command not allowed: $cmd_request" >&2
+    return 1
+  fi
+
+  # Log the execution
+  echo "[INFO] Executing: $cmd_request" >&2
+
+  # Route to appropriate module
+  case "$cmd_request" in
+    terraform-*)
+      "$AGENCE_MODULES/iac/iac.sh" terraform "${cmd_request#terraform-}"
+      ;;
+    git-*)
+      "$AGENCE_MODULES/git/git.sh" "${cmd_request#git-}"
+      ;;
+    aws-*)
+      "$AGENCE_MODULES/cloud/aws.sh" "${cmd_request#aws-}"
+      ;;
+    *)
+      echo "Error: Unknown command category: $cmd_request" >&2
+      return 1
+      ;;
+  esac
+
+  return $?
+}
+
+# ============================================================================
+# MODE: SPECIAL INITIALIZATION
+# ============================================================================
+# Initialize Agence environment and create required symlinks
+# Example: agence ^init
+
+mode_init() {
+  local init_cmd="$1"
+
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Init mode: $init_cmd" >&2
+
+  case "$init_cmd" in
+    "init"|"")
+      init_agence_environment
+      ;;
+    "reload")
+      reload_agence_context
+      ;;
+    "install")
+      install_agence_packages
+      ;;
+    *)
+      echo "Error: Unknown init command: $init_cmd" >&2
+      return 1
+      ;;
+  esac
+
+  return $?
+}
+
+init_agence_environment() {
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Initializing Agence environment..." >&2
+  
+  echo ""
+  echo "=============================================="
+  echo "  AGENCE INITIALIZATION (^init)"
+  echo "=============================================="
+  echo ""
+  
+  # ========================================================================
+  # Step 1: Source .agencerc to set up environment
+  # ========================================================================
+  echo "Step 1/3: Loading Agence profile (.agencerc)..."
+  
+  local agencerc_path="$AGENCE_REPO/bin/.agencerc"
+  if [[ -f "$agencerc_path" ]]; then
+    source "$agencerc_path" 2>/dev/null
+    if [[ $? -eq 0 ]]; then
+      echo "✓ Profile loaded (Shell: $CURRENT_SHELL, REPO_ROOT: $REPO_ROOT)"
+    else
+      echo "⚠ Profile loaded but with warnings"
+    fi
+  else
+    echo "[WARN] .agencerc not found at $agencerc_path"
+  fi
+  echo ""
+  
+  # ========================================================================
+  # Step 2: Create directory symlinks (globalcache/@, objectcode/@, synthesis/@)
+  # ========================================================================
+  echo "Step 2/3: Creating organization symlinks..."
+  
+  local org_dirs=("globalcache" "objectcode" "synthesis")
+  local org_created=0
+  
+  for dir in "${org_dirs[@]}"; do
+    local org_link="$REPO_ROOT/$dir/@"
+    local org_target="l-agence.org"
+    
+    # Only create if doesn't exist
+    if [[ ! -e "$org_link" ]]; then
+      mkdir -p "$(dirname "$org_link")" 2>/dev/null
+      ln -sf "$org_target" "$org_link" 2>/dev/null
+      
+      if [[ -L "$org_link" || -d "$org_link" ]]; then
+        echo "  ✓ $dir/@ → $org_target"
+        ((org_created++))
+      else
+        echo "  ⚠ $dir/@: symlink creation failed (may try mklink on next checkout)"
+      fi
+    else
+      echo "  ⏭ $dir/@: already exists (user customization preserved)"
+    fi
+  done
+  
+  if [[ $org_created -gt 0 ]]; then
+    echo ""
+    echo "✓ Created $org_created organization symlink(s)"
+  fi
+  echo ""
+  
+  # ========================================================================
+  # Step 3: Create skeleton symlinks (.github/*, CLAUDE.md, etc)
+  # ========================================================================
+  echo "Step 3/3: Creating skeleton symlinks..."
+  
+  local AGENCE_GITHUB="$AGENCE_REPO/.github"
+  local TARGET_GITHUB="$REPO_ROOT/.github"
+  
+  # Ensure .github directory exists
+  mkdir -p "$TARGET_GITHUB" 2>/dev/null
+  
+  # Symlink 3a: copilot-instructions.md
+  local source_copilot="$AGENCE_GITHUB/copilot.md"
+  local target_copilot="$TARGET_GITHUB/copilot-instructions.md"
+  
+  if [[ ! -e "$target_copilot" ]]; then
+    if [[ -f "$source_copilot" ]]; then
+      ln -sf "../.agence/.github/copilot.md" "$target_copilot" 2>/dev/null || \
+      ln -sf "$source_copilot" "$target_copilot" 2>/dev/null
+      if [[ -L "$target_copilot" ]]; then
+        echo "  ✓ .github/copilot-instructions.md → copilot.md"
+      else
+        echo "  ⚠ .github/copilot-instructions.md: creation deferred (post-checkout hook will create)"
+      fi
+    fi
+  else
+    echo "  ⏭ .github/copilot-instructions.md: already exists"
+  fi
+  
+  # Symlink 3b: CLAUDE.md (in repo root)
+  local source_claude="$AGENCE_GITHUB/CLAUDE.md"
+  local target_claude="$REPO_ROOT/CLAUDE.md"
+  
+  if [[ ! -e "$target_claude" ]]; then
+    if [[ -f "$source_claude" ]]; then
+      ln -sf ".github/CLAUDE.md" "$target_claude" 2>/dev/null
+      if [[ -L "$target_claude" ]]; then
+        echo "  ✓ CLAUDE.md → .github/CLAUDE.md"
+      else
+        echo "  ⚠ CLAUDE.md: creation deferred (post-checkout hook will create)"
+      fi
+    fi
+  else
+    echo "  ⏭ CLAUDE.md: already exists"
+  fi
+  
+  echo ""
+  echo "=============================================="
+  echo "✓ Agence initialization complete!"
+  echo "  Environment: $CURRENT_SHELL"
+  echo "  AGENCE_ROOT=$AGENCE_REPO"
+  echo "  REPO_ROOT=$REPO_ROOT"
+  echo "=============================================="
+  echo ""
+  
+  return 0
+}
+
+reload_agence_context() {
+  # Load and acknowledge the entire Agence knowledge hierarchy
+  # This reloads all context files in proper order and summarizes what was loaded
+  
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Reloading Agence context..." >&2
+  
+  local AGENCE_GITHUB="$AGENCE_REPO/.github"
+  local context_files=(
+    "$AGENCE_GITHUB/CLAUDE.md:Claude Integration"
+    "$GIT_REPO/.github/copilot-instructions.md:Copilot Instructions"
+    "$AGENCE_ROOT/codex/PRINCIPLES.md:Principles (Maxims)"
+    "$AGENCE_ROOT/codex/LAWS.md:Laws (Hard Constraints)"
+    "$AGENCE_ROOT/codex/RULES.md:Rules (Best Practices)"
+    "$AGENCE_BIN/COMMANDS.md:Commands Reference"
+    "$AGENCE_ROOT/nexus/faults/INDEX.md:Faults Index"
+    "$AGENCE_ROOT/shared/lessons/INDEX.md:Lessons Learned"
+  )
+  
+  echo "[RELOAD] Agence Context Loading"
+  echo "=========================================="
+  echo ""
+  
+  local loaded_count=0
+  local failed_files=""
+  
+  for file_info in "${context_files[@]}"; do
+    local file="${file_info%%:*}"
+    local label="${file_info##*:}"
+    
+    if [[ -f "$file" ]]; then
+      # Get file size and line count
+      local size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "?")
+      local lines=$(wc -l < "$file" 2>/dev/null || echo "?")
+      
+      printf "✓ %-35s | %6s bytes | %4s lines\n" "$label" "$size" "$lines"
+      ((loaded_count++))
+    else
+      printf "✗ %-35s | [NOT FOUND]\n" "$label"
+      failed_files="$failed_files\n  - $file"
+    fi
+  done
+  
+  echo ""
+  echo "=========================================="
+  echo ""
+  echo "Context Summary:"
+  echo "  Total files loaded: $loaded_count / ${#context_files[@]}"
+  
+  if [[ -n "$failed_files" ]]; then
+    echo ""
+    echo "⚠ Missing files:$failed_files"
+  fi
+  
+  # Load and count some key metrics
+  local principles_count=$(grep -c "^## Maxim" "$AGENCE_ROOT/codex/PRINCIPLES.md" 2>/dev/null || echo 0)
+  local laws_count=$(grep -c "^## Law" "$AGENCE_ROOT/codex/LAWS.md" 2>/dev/null || echo 0)
+  local rules_count=$(grep -c "^## Rule" "$AGENCE_ROOT/codex/RULES.md" 2>/dev/null || echo 0)
+  local lessons_count=$(jq -r '.total_lessons' "$AGENCE_ROOT/shared/lessons/INDEX.json" 2>/dev/null || echo 0)
+  
+  echo ""
+  echo "Active Knowledge:"
+  echo "  Principles/Maxims: $principles_count"
+  echo "  Laws (Constraints): $laws_count"
+  echo "  Rules (Practices): $rules_count"
+  echo "  Lessons Learned: $lessons_count"
+  
+  echo ""
+  echo "Status: ✓ Agence context fully loaded and acknowledged"
+  echo ""
+  
+  return 0
+}
+
+create_windows_symlink() {
+  local source="$1"
+  local target="$2"
+  
+  # Determine if source is a file or directory
+  local link_type="file"
+  if [[ -d "$source" ]]; then
+    link_type="dir"
+  fi
+  
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Creating symlink: $target → $source ($link_type)" >&2
+  
+  if [[ "$AGENCE_OS_WINDOWS" == "1" ]]; then
+    # Windows: Use mklink command (requires admin on some systems)
+    # Type 12019 is for file symlinks, type 12000 is for directory symlinks
+    if [[ "$link_type" == "dir" ]]; then
+      cmd /c mklink /D "$(cygpath -w "$target")" "$(cygpath -w "$source")" 2>/dev/null
+    else
+      cmd /c mklink /H "$(cygpath -w "$target")" "$(cygpath -w "$source")" 2>/dev/null || \
+      cmd /c mklink "$(cygpath -w "$target")" "$(cygpath -w "$source")" 2>/dev/null
+    fi
+    
+    if [[ $? -eq 0 ]]; then
+      return 0
+    else
+      echo "[ERROR] mklink failed. Trying PowerShell method..." >&2
+      # Fallback to PowerShell
+      powershell -Command "New-Item -ItemType SymbolicLink -Path '$(cygpath -w "$target")' -Target '$(cygpath -w "$source")' -Force" 2>/dev/null
+      return $?
+    fi
+  else
+    # Unix/Linux/macOS: Use ln -s
+    ln -s "$source" "$target" 2>/dev/null
+    return $?
+  fi
+}
+
+# ============================================================================
+# MODE: SYSTEM COMMAND
+# ============================================================================
+# Built-in system utilities
+# Example: agence !help
+# Example: agence !bash (open new shell)
+
+mode_system() {
+  local sys_cmd="$1"
+
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] System mode: $sys_cmd" >&2
+
+  case "$sys_cmd" in
+    help)
+      show_help
+      return 0
+      ;;
+    version)
+      show_version
+      return 0
+      ;;
+    config)
+      cat "$AGENCE_CONFIG" 2>/dev/null || echo "No config found: $AGENCE_CONFIG"
+      return 0
+      ;;
+    status)
+      echo "Agence Status:"
+      echo "  Root: $AGENCE_ROOT"
+      echo "  Config: $AGENCE_CONFIG"
+      echo "  LLM Provider: $(grep 'provider:' "$AGENCE_CONFIG" 2>/dev/null | awk '{print $2}')"
+      return 0
+      ;;
+    bash)
+      echo "Launching Git Bash..."
+      exec bash --login
+      ;;
+    shell)
+      echo "Launching PowerShell..."
+      exec powershell -NoExit
+      ;;
+    *)
+      echo "Unknown system command: $sys_cmd" >&2
+      return 1
+      ;;
+  esac
+}
+
+# ============================================================================
+# SYMLINK REPAIR (Windows git-bash compatibility)
+# ============================================================================
+
+repair_agence_symlinks() {
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Checking for broken symlinks..." >&2
+  
+  # Get list of symlinks from git
+  local symlinks=$(git -C "$AGENCE_ROOT" ls-files -s 2>/dev/null | grep "^120000" | awk '{print $NF}')
+  
+  if [[ -z "$symlinks" ]]; then
+    [[ "$DEBUG" == "1" ]] && echo "[DEBUG] No symlinks tracked in git" >&2
+    return 0
+  fi
+  
+  local count=0
+  while IFS= read -r filepath; do
+    [[ -z "$filepath" ]] && continue
+    
+    if [[ -L "$AGENCE_ROOT/$filepath" ]]; then
+      # Already a symlink, skip
+      continue
+    fi
+    
+    if [[ ! -e "$AGENCE_ROOT/$filepath" ]]; then
+      # Symlink doesn't exist, try to recreate it
+      # Git stores symlinks as: "<path to target>"
+      local target=$(git -C "$AGENCE_ROOT" ls-files -s 2>/dev/null | grep "^120000.*$filepath" | awk '{for(i=1;i<=NF;i++) printf "%s ", $i}' | sed 's/.*\s//')
+      
+      if [[ -n "$target" ]]; then
+        mkdir -p "$(dirname "$AGENCE_ROOT/$filepath")" 2>/dev/null
+        ln -sf "$target" "$AGENCE_ROOT/$filepath" 2>/dev/null
+        if [[ $? -eq 0 ]]; then
+          echo "[REPAIR] Created symlink: $filepath -> $target"
+          ((count++))
+        fi
+      fi
+    fi
+  done <<< "$symlinks"
+  
+  if [[ $count -gt 0 ]]; then
+    echo ""
+    echo "✓ Repaired $count broken symlink(s)"
+  fi
+  
+  return 0
+}
+
+# ============================================================================
+# INSTALL: Package Manager Integration
+# ============================================================================
+
+install_agence_packages() {
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Installing Agence packages..." >&2
+  
+  echo ""
+  echo "=============================================="
+  echo "  AGENCE PACKAGE INSTALLATION (^install)"
+  echo "=============================================="
+  echo ""
+  
+  # Detect OS
+  local os_type="unknown"
+  if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "mingw"* ]]; then
+    os_type="windows"
+  elif [[ "$OSTYPE" == "darwin"* ]]; then
+    os_type="macos"
+  elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    os_type="linux"
+  fi
+  
+  echo "Detected OS: $os_type"
+  echo ""
+  
+  case "$os_type" in
+    windows)
+      install_windows_packages
+      ;;
+    macos)
+      install_macos_packages
+      ;;
+    linux)
+      install_linux_packages
+      ;;
+    *)
+      echo "[ERROR] Unsupported OS: $OSTYPE" >&2
+      return 1
+      ;;
+  esac
+  
+  return $?
+}
+
+install_windows_packages() {
+  echo "Installing packages via winget..."
+  echo ""
+  
+  # Define Windows packages (winget IDs)
+  local -a windows_packages=(
+    "GitHub.cli"
+    "aider"
+    "jfrog"
+    "Hashicorp.Terraform"
+    "terrafromLinters.tflint"
+    "Amazon.AWSCli"
+    "Microsoft.AzureCLI"
+    "Google.CloudSDK"
+  )
+  
+  local installed=0
+  local skipped=0
+  local failed=0
+  
+  for pkg in "${windows_packages[@]}"; do
+    echo -n "[$pkg] "
+    
+    # Check if installed || install
+    # winget list returns 0 if found, 1 if not found
+    if winget list --id "$pkg" &>/dev/null 2>&1; then
+      echo "✓ (already installed)"
+      ((skipped++))
+    elif winget install -e --id "$pkg" --accept-package-agreements --accept-source-agreements &>/dev/null 2>&1; then
+      echo "✓ (installed)"
+      ((installed++))
+    else
+      echo "✗ (failed)"
+      ((failed++))
+    fi
+  done
+  
+  echo ""
+  echo "=============================================="
+  echo "Installation summary:"
+  echo "  ✓ Installed: $installed"
+  echo "  ⏭ Already present: $skipped"
+  echo "  ✗ Failed: $failed"
+  echo "=============================================="
+  
+  if [[ $failed -gt 0 ]]; then
+    echo ""
+    echo "Note: Some packages failed. This may be expected if:"
+    echo "  - Package requires manual user interaction"
+    echo "  - Package requires admin elevation"
+    echo "  - Package name/ID changed in winget registry"
+    return 1
+  fi
+  return 0
+}
+
+install_macos_packages() {
+  echo "Installing packages via Homebrew..."
+  echo ""
+  
+  # Check if Homebrew is installed
+  if ! command -v brew &>/dev/null; then
+    echo "[ERROR] Homebrew not found. Install from: https://brew.sh"
+    return 1
+  fi
+  
+  # Define macOS packages (Homebrew formulae)
+  local -a macos_packages=(
+    "gh"
+    "aider"
+    "jfrog-cli"
+    "terraform"
+    "tflint"
+    "awscli"
+    "azure-cli"
+    "google-cloud-sdk"
+  )
+  
+  local installed=0
+  local skipped=0
+  local failed=0
+  
+  for pkg in "${macos_packages[@]}"; do
+    echo -n "[$pkg] "
+    
+    # Check if installed || install
+    if brew list "$pkg" &>/dev/null 2>&1; then
+      echo "✓ (already installed)"
+      ((skipped++))
+    elif brew install "$pkg" &>/dev/null 2>&1; then
+      echo "✓ (installed)"
+      ((installed++))
+    else
+      echo "✗ (failed)"
+      ((failed++))
+    fi
+  done
+  
+  echo ""
+  echo "=============================================="
+  echo "Installation summary:"
+  echo "  ✓ Installed: $installed"
+  echo "  ⏭ Already present: $skipped"
+  echo "  ✗ Failed: $failed"
+  echo "=============================================="
+  
+  if [[ $failed -gt 0 ]]; then
+    return 1
+  fi
+  return 0
+}
+
+install_linux_packages() {
+  echo "Installing packages via system package manager..."
+  echo ""
+  
+  # Detect package manager
+  local pkg_manager="apt-get"
+  local pkg_check_cmd="dpkg -l"
+  
+  if command -v dnf &>/dev/null; then
+    pkg_manager="dnf"
+    pkg_check_cmd="dnf list installed"
+  elif command -v pacman &>/dev/null; then
+    pkg_manager="pacman"
+    pkg_check_cmd="pacman -Q"
+  fi
+  
+  echo "Using package manager: $pkg_manager"
+  echo ""
+  
+  # Define Linux packages
+  local -a linux_packages=(
+    "gh"
+    "aider"
+    "jfrog-cli"
+    "terraform"
+    "tflint"
+    "awscli"
+    "azure-cli"
+    "google-cloud-sdk"
+  )
+  
+  local installed=0
+  local skipped=0
+  local failed=0
+  
+  for pkg in "${linux_packages[@]}"; do
+    echo -n "[$pkg] "
+    
+    # Check if installed || install
+    if $pkg_check_cmd | grep -q "$pkg" &>/dev/null 2>&1; then
+      echo "✓ (already installed)"
+      ((skipped++))
+    elif sudo $pkg_manager install -y "$pkg" &>/dev/null 2>&1; then
+      echo "✓ (installed)"
+      ((installed++))
+    else
+      echo "✗ (failed)"
+      ((failed++))
+    fi
+  done
+  
+  echo ""
+  echo "=============================================="
+  echo "Installation summary:"
+  echo "  ✓ Installed: $installed"
+  echo "  ⏭ Already present: $skipped"
+  echo "  ✗ Failed: $failed"
+  echo "=============================================="
+  
+  if [[ $failed -gt 0 ]]; then
+    return 1
+  fi
+  return 0
+}
+
+# ============================================================================
+# ENTRY POINT
+# ============================================================================
+
+main "$@"

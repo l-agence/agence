@@ -18,7 +18,7 @@ Agence is a **distributed agent collaboration system** that solves persistent me
              [CODEX]        : Governance
              [OBJECTCODE]   : CODE-base
              [GLOBALCACHE]  : RAG-base
-             [ORCHESTRATOR] : Workflows
+             [ORGANIC]      : Swarm Orchestration  (Workflows, tasks etc)
              [SYNTHETIC]    : DWM-Base 
                    │
     ┌──────────────┼────────────┐
@@ -225,9 +225,10 @@ agence <input>
     │
     ├─ "..."          → mode_chat (natural language)
     ├─ "+..."         → mode_ai_routed (autonomous planning)
-    ├─ "/..."         → mode_external (validated commands)
-    ├─ "!..."         → mode_system (utilities) [reserved]
-    └─ "^..."         → mode_init (special commands)
+    ├─ "/..."         → mode_external (validated commands) [/commit /pull]
+    ├─ "!..."         → mode_system (shells & sessions) [!bash, !aider]
+    ├─ "~..."         → mode_private (agence hermetic commands) [~learn]
+    └─ "^..."         → mode_shared (agence synthetic commands) [^learn]
                          ├─ ^init (initialize environment)
                          ├─ ^reload (load all context)
                          └─ ^save (persist session)

@@ -146,7 +146,8 @@ agence !help
 | **Autonomous** | `agence +deploy-feature` | Want agent to plan & execute |
 | **Command** | `agence /git-status` | Running pre-approved commands |
 | **System** | `agence !help` | Using utilities or agent info |
-| **Special** | `agence ^save` | Save/reload context, init |
+| **hermetic** | `agence ~save` | Save/reload private context  |
+| **Synthetic** | `agence ^save` | Save/reload shared context, init |
 
 ---
 
