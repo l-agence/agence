@@ -321,6 +321,18 @@ main() {
     exit 0
   fi
 
+  # Early exits: help and version never need the LLM router
+  case "$1" in
+    --help|-h|help)
+      show_help
+      exit 0
+      ;;
+    --version|-v|version)
+      show_version
+      exit 0
+      ;;
+  esac
+
   local first_char="${input:0:1}"
 
   # Mode detection and routing
