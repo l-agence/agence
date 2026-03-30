@@ -1,3 +1,44 @@
+# ^Todo: Backport remaining functions from ^.73aad08.nogit
+
+## Context
+
+Session 2026-03-29 recovered 4 missing functions and restored mode_session. The
+larger caret file (^.73aad08.nogit, 2407L) still has functions not yet backported
+into the current bin/agence (1569L). Ordered by priority:
+
+## Action Items
+
+- [ ] Backport `shell_bash_session()` + `shell_powershell_session()` — launch tracked shells, write meta JSON to nexus/.aisessions/
+- [ ] Backport `generate_shell_session_id()` — format: `bash-YYYYMMDD_HHMMSS-PID-HEXID`
+- [ ] Backport `set_vscode_terminal_title()` — `printf '\033]0;%s\007' "$title"`
+- [ ] Backport `get_agent_id()` — `echo "${AIDO_AGENT:-ai-agent}"`
+- [ ] Backport `parse_agent_prefix()` — parses `@agentname command` syntax, exports `AGENCE_AGENT_PARAM`
+- [ ] Backport `stash_agence_changes()` + `sync_agence_changes()` from agence.stash.nogit — `^stash`, `^sync`
+- [ ] Backport `fetch_agence_changes()` + `rebase_agence_changes()` from agence.stash.nogit
+- [ ] Replace current `learn_agence_changes` with `learn_from_sessions()` — richer, scans sessions+faults+lessons
+- [ ] Replace `commit_agence_changes` with `commit_knowledge_changes()` — targets globalcache+synthetic+nexus/faults
+- [ ] Replace `save_session` with `save_session_context()` — captures full git state, uses format helpers
+- [ ] Add `reindex_knowledge_bases()` — calls `bin/indexer`, `^reindex` command
+- [ ] Add stub commands: `^handoff`, `^pickup`, `^pause` (stubs OK for now)
+- [ ] Add `-j` JSON format flag support to `mode_init` (`agence_detect_format`)
+- [ ] Fix `bin/aibash` — duplicate help block (copy-paste LLM artifact), missing execution body
+- [ ] Integrate `lib/format.sh` into `bin/aisession` (replace inline banners with agence_format_*)
+
+## Completed This Session (2026-03-29)
+
+- [x] `.gitattributes` — LF policy enforced globally
+- [x] CRLF fix — all scripts/text converted (dos2unix)
+- [x] `bin/agence --help/version` dispatch fix (no router on non-LLM commands)
+- [x] Restored `save_session`, `learn_agence_changes`, `commit_agence_changes`, `push_agence_changes`
+- [x] Fixed `mode_init` arg parsing (`init_cmd` + `init_args`)
+- [x] Added `mode_session()` — 9 subcommands
+- [x] jq installed (WSL + Windows)
+- [x] `lib/format.sh` implemented — 8 `agence_format_*` helpers (text/plain/json modes)
+- [x] Smoke tests passing: `agence --help`, `agence version`, `lib/format.sh`, `bin/aisession list`
+- [x] Commits: 21f31bc, 4398618, 9a389c9, 0667f3e
+
+---
+
 # ^Todo: ShellSpec Test Coverage for bin/agence
 
 ## Test Plan for bin/agence
