@@ -1,0 +1,81 @@
+{
+  "lesson_id": "e1c4a9f2",
+  "date_extracted": "2026-03-29",
+  "agent": "all-agents",
+  "category": "competitive-intelligence",
+  "title": "Agence competitive positioning vs. AutoGen, CrewAI, MetaGPT, LangGraph, OpenHands, Cursor, Copilot",
+  "description": "Honest evaluation of Agence against the multi-agent framework landscape as of March 2026. Agence has genuine architectural leads but is 12-18 months behind in execution maturity.",
+  "root_cause": "No formal competitive analysis existed. Design decisions were made without reference to what others have shipped.",
+  "solution": "Revisit this analysis each quarter. Prioritise the gaps that matter most: test suite, container isolation (v0.4), public documentation.",
+  "severity": "high",
+  "status": "active",
+  "applies_to": "roadmap, architecture, prioritisation",
+
+  "competitive_summary": {
+    "categories": {
+      "multi_agent_frameworks": ["AutoGen", "CrewAI", "MetaGPT", "LangGraph", "OpenHands"],
+      "ide_assistants": ["Cursor", "Copilot Chat", "Cline", "Aider"],
+      "llm_sdks": ["LangChain", "Semantic Kernel"],
+      "autonomous_coding": ["Devin", "Claude Code", "Goose", "Plandex"]
+    },
+    "agence_unique_strengths": [
+      "Git as the only coordination layer — no message queue, broker, or database. Unique in the space.",
+      "CODEX governance — hard constraints (LAWS) agents cannot override. No competitor has constitutional governance.",
+      "Blast-radius-aware model routing — cheapest capable model by task danger level. Novel cost/risk discipline.",
+      "Shell-first portability — bash + jq only. AutoGen/CrewAI require Python venv just to start.",
+      "Command prefix taxonomy (^ ~ ! + /) — typed instruction protocol between human and agents. Original design.",
+      "Structural security post-incident — guardrails designed at OS boundary, not advisory bash functions. Most frameworks don't consider this."
+    ],
+    "agence_current_gaps": [
+      "Maturity: pre-alpha, single developer, recovered from AI incident that wiped v0.3",
+      "No GUI: AutoGen Studio, Cursor, Copilot all have UI. Agence is terminal-only.",
+      "No test suite: ShellSpec all pending. Most dangerous gap.",
+      "No Python/TS SDK: hard to integrate with the Python-heavy ML/LLM ecosystem.",
+      "Documentation is internal: no public onboarding story.",
+      "Container isolation planned (v0.4) but not built: security still advisory in practice until then."
+    ],
+    "closest_competitor": "OpenHands (formerly OpenDevin) — closest to Agence v0.4 vision with Docker sandbox per agent",
+    "benchmark_to_chase": "Devin (Cognition) — commercial, $500/mo, the industry benchmark"
+  },
+
+  "feature_matrix": {
+    "multi_agent_orchestration":     { "agence": "yes-swarm-heat", "autogen": "yes-mature", "crewai": "yes-mature", "metagpt": "yes-narrow", "langgraph": "yes-mature", "openHands": "yes-single-task", "cursor": "no", "copilot": "no" },
+    "git_native_coordination":       { "agence": "yes-unique",     "autogen": "no",          "crewai": "no",          "metagpt": "no",          "langgraph": "no",          "openHands": "no",              "cursor": "no", "copilot": "no" },
+    "governance_layer":              { "agence": "yes-codex-laws", "autogen": "no",          "crewai": "no",          "metagpt": "partial",     "langgraph": "no",          "openHands": "no",              "cursor": "no", "copilot": "no" },
+    "blast_radius_routing":          { "agence": "yes-designed",   "autogen": "no",          "crewai": "no",          "metagpt": "no",          "langgraph": "no",          "openHands": "no",              "cursor": "no", "copilot": "no" },
+    "append_only_audit_ledger":      { "agence": "partial-stub",   "autogen": "no",          "crewai": "no",          "metagpt": "no",          "langgraph": "no",          "openHands": "no",              "cursor": "no", "copilot": "no" },
+    "os_boundary_security":          { "agence": "planned-v0.4",   "autogen": "no",          "crewai": "no",          "metagpt": "no",          "langgraph": "no",          "openHands": "partial",         "cursor": "no", "copilot": "no" },
+    "shell_first_no_python":         { "agence": "yes",            "autogen": "no-python",   "crewai": "no-python",   "metagpt": "no-python",   "langgraph": "no-python",   "openHands": "no-python",       "cursor": "no", "copilot": "no" },
+    "multi_provider_llm_router":     { "agence": "yes-12",         "autogen": "yes",         "crewai": "partial",     "metagpt": "partial",     "langgraph": "yes",         "openHands": "partial",         "cursor": "single", "copilot": "single" },
+    "agent_persona_files":           { "agence": "yes-agent.md",   "autogen": "yes",         "crewai": "yes",         "metagpt": "yes",         "langgraph": "partial",     "openHands": "yes",             "cursor": "no", "copilot": "no" },
+    "session_capture_verification":  { "agence": "yes-aisession",  "autogen": "no",          "crewai": "no",          "metagpt": "no",          "langgraph": "no",          "openHands": "no",              "cursor": "no", "copilot": "no" },
+    "command_prefix_taxonomy":       { "agence": "yes-unique",     "autogen": "no",          "crewai": "no",          "metagpt": "no",          "langgraph": "no",          "openHands": "no",              "cursor": "partial", "copilot": "partial" },
+    "container_per_agent":           { "agence": "planned-v0.4",   "autogen": "no",          "crewai": "no",          "metagpt": "no",          "langgraph": "no",          "openHands": "yes-sandbox",     "cursor": "no", "copilot": "no" },
+    "multi_cloud_swarm":             { "agence": "planned-v0.6",   "autogen": "no",          "crewai": "no",          "metagpt": "no",          "langgraph": "no",          "openHands": "no",              "cursor": "no", "copilot": "no" },
+    "test_suite":                    { "agence": "no-pending",      "autogen": "yes",         "crewai": "yes",         "metagpt": "yes",         "langgraph": "yes",         "openHands": "yes",             "cursor": "na", "copilot": "na" },
+    "public_docs_community":         { "agence": "no-private",      "autogen": "yes-large",  "crewai": "yes-large",   "metagpt": "yes-medium",  "langgraph": "yes-large",   "openHands": "yes-growing",     "cursor": "yes", "copilot": "yes" },
+    "production_ready":              { "agence": "no-prealpha",     "autogen": "yes",         "crewai": "yes",         "metagpt": "partial",     "langgraph": "yes",         "openHands": "yes-beta",        "cursor": "yes", "copilot": "yes" }
+  },
+
+  "name_clarifications": {
+    "openclaw": "unknown — possibly Cline (open-source Claude Dev, already in Agence router) or a typo",
+    "openfang": "likely OpenHands (formerly OpenDevin) — autonomous software dev agent, Python, sandboxed Docker execution, closest competitor to Agence v0.4"
+  },
+
+  "other_competitors_to_watch": [
+    { "name": "Devin", "org": "Cognition", "notes": "$500/mo commercial, industry benchmark everyone chases" },
+    { "name": "Claude Code", "org": "Anthropic", "notes": "Terminal-based autonomous agent, being integrated as !claude" },
+    { "name": "Goose", "org": "Block/Square", "notes": "Open-source developer agent, terminal-first like Agence" },
+    { "name": "Plandex", "org": "plandex.ai", "notes": "AI coding engine for long-horizon tasks, terminal-based" },
+    { "name": "Aider", "org": "Paul Gauthier", "notes": "Already integrated into Agence via @aider" }
+  ],
+
+  "verdict": "Agence is a research-grade architecture project with genuinely novel ideas. The git-native coordination, CODEX governance, and blast_radius routing are intellectual leads on anything in the space. But it is 12-18 months behind in execution maturity relative to AutoGen/CrewAI. The v0.4 container-per-agent architecture — if built cleanly — would be meaningfully more secure than anything currently available in open source. That is the moment Agence becomes a credible alternative rather than an interesting prototype.",
+
+  "references": [
+    "synthetic/l-agence.org/docs/ROADMAP.md",
+    "synthetic/l-agence.org/docs/AGENCE.md",
+    "codex/LAWS.md",
+    "codex/PRINCIPLES.md"
+  ]
+}
