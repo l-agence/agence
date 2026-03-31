@@ -316,8 +316,8 @@ EOF
 }
 
 show_version() {
-  echo "Agence version 0.2.3.1"
-  echo "[VERSION]: 0.2.3.1"
+  echo "Agence version 0.2.3.2"
+  echo "[VERSION]: 0.2.3.2"
   echo "[RELEASE]: rel_0.2.2_agence_swarm_sessions"
 }
 
@@ -662,6 +662,11 @@ mode_init() {
       mode_help
       return $?
       ;;
+    "symbols")
+      # Show symbols reference table: agence ^symbols
+      mode_symbols
+      return $?
+      ;;
     "session")
       # Session management: agence ^session <subcommand> [args]
       mode_session "$init_args"
@@ -767,8 +772,75 @@ resolve_org_path() {
 # Structured command help with scope context
 # Example: agence ^help
 
+mode_symbols() {
+  cat << 'EOF'
+╔══════════════════════════════════════════════════════╗
+║  Agence Symbol Reference  (^symbols)                 ║
+╚══════════════════════════════════════════════════════╝
+
+TASK STATE  (agent-level, matrix-signed)
+  +task          pending / todo            (positive, unstarted)
+  &task@agent    assigned to agent         (positive, queued)
+  %task@agent    in-progress — agent       (positive, running)
+  %task@user     in-progress — human       (positive, running)
+  -task          completed                 (negative, done)
+  _task          paused / deferred         (neutral)
+  #task          held by human             (neutral, locked)
+
+  RESERVED (swarm, v0.3.2+)
+  ~task          swarm-queued              (not yet delegated)
+  $task          swarm-coordinating        (merging across agents)
+
+PRIORITY  (independent of state)
+  *task          low priority
+  **task         medium priority
+  ***task        high priority
+
+  Compose:  ***&task@ralph  (urgent + agent-assigned)
+
+ROUTING
+  @agent         Route to agent            @ralph, @aider, @copilot
+  @org           Route to org context      @acme.tld, @l-agence.org
+  @user          Route to human            @steff
+  --org ORG      CLI override for org      agence ^plan list --org acme.tld
+
+COMMAND MODES  (first character of argument)
+  ^cmd           Init / lifecycle          ^init, ^save, ^commit, ^push
+  !cmd           System command            !git status, !bash
+  /cmd           External command          /deploy, /build
+  ~cmd           (reserved, swarm)
+  query          Plain text → LLM chat     agence "what is the status?"
+  +query         AI-routed action          +refactor this module
+
+WORKFLOW NOTATION
+  WF = [task1, task2; task3]
+        ↑ parallel  ↑ pause/sequential
+  WF = [(repo1:+task1@ralph) + (repo2:%task2@aider)]
+  
+  ,   parallel execution (no ordering)
+  ;   sequential pause (must complete before next)
+  ^   hard dependency (blocks downstream)
+  <   precedes (task1 < task2 = task1 before task2)
+
+COMPLETION MATH  (signed addition)
+  net_work   = sum(all signed tasks)
+  remaining  = sum(positive tasks only)
+  done       = |sum(negative tasks)|
+  %done      = done / (done + remaining)
+
+SCOPES
+  hermetic/   personal, never committed    ^todo, ^notes
+  nexus/      local-only, sensitive        ^fault, ^log, ^session
+  synthetic/  team-shared, git-committed   ^plan, ^lesson, ^issue
+  organic/    team work, agent-routable    ^task, ^job
+
+See also: codex/TAXONOMY.md · synthetic/@/docs/SYMBOLS.md · MATRICES.md
+EOF
+  return 0
+}
+
 mode_help() {
-  local version; version="0.2.3.1"
+  local version; version="0.2.3.2"
 
   cat << EOF
 ╔══════════════════════════════════════════════════════════════════╗
@@ -842,7 +914,7 @@ _agence_completion() {
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  local caret_commands="help init reload install save learn commit push stash sync session lesson log plan todo fault issue task job"
+  local caret_commands="help symbols init reload install save learn commit push stash sync session lesson log plan todo fault issue task job"
   local knowledge_subcmds="list show add"
 
   case "${COMP_WORDS[1]}" in
