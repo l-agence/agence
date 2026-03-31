@@ -1,0 +1,73 @@
+{
+  "index": "Jobs Index",
+  "version": "1.0",
+  "description": "Robot-only execution queue and history. Agent assignments and session tracking.",
+  "schema": {
+    "job_id": "Unique identifier (e.g., J001, matrix-math-phase1)",
+    "date_created": "ISO 8601 when job was created",
+    "date_started": "ISO 8601 when agent started execution",
+    "date_completed": "ISO 8601 when agent finished",
+    "assigned_agent": "@agent-name (e.g., @ralph)",
+    "category": "Job category (code-gen, testing, analysis, documentation, etc.)",
+    "title": "Job title",
+    "description": "What the agent should do",
+    "task_link": "Parent task ID (e.g., T001)",
+    "input": "Input data or context for agent",
+    "output": "What agent produced",
+    "status": "assigned|started|in-progress|complete|failed|abandoned|on-hold",
+    "progress": "Percentage complete (0-100)",
+    "session_id": "Link to agent session (nexus/sessions/)",
+    "execution_time_seconds": "Wall-clock time to completion",
+    "tokens_used": "Token consumption (for cost tracking)",
+    "cost_actual": "Actual cost in dollars",
+    "error_message": "If failed, error details",
+    "retry_count": "How many times agent retried",
+    "max_retries": "Maximum retries allowed",
+    "orchestrator_note": "Coordination notes from orchestrator",
+    "human_override": "If human intervened (Ctrl+K, etc.)",
+    "human_override_reason": "Why human stopped/paused agent",
+    "created_by": "Who created this job",
+    "references": "Links to related code, tickets, documentation",
+    "notes": "Additional context"
+  },
+  "lookup_fields": ["assigned_agent", "status", "category", "date_created", "task_link"],
+  "categories": [
+    "code-generation",
+    "testing",
+    "analysis",
+    "documentation",
+    "refactoring",
+    "review",
+    "research",
+    "troubleshooting",
+    "optimization",
+    "integration"
+  ],
+  "statuses": [
+    "assigned",
+    "started",
+    "in-progress",
+    "complete",
+    "failed",
+    "abandoned",
+    "on-hold"
+  ],
+  "agent_lifecycle": {
+    "assigned": "Job created, agent hasn't read yet",
+    "started": "Agent claims the job",
+    "in-progress": "Agent is executing (observable in right tile)",
+    "complete": "Agent finished successfully",
+    "failed": "Agent encountered unrecoverable error",
+    "abandoned": "Human sent Ctrl+K (SIGKILL)",
+    "on-hold": "Orchestrator paused (e.g., resource contention)"
+  },
+  "human_intervention_signals": {
+    "ctrl_k": "SIGKILL—hard stop agent execution",
+    "ctrl_z": "SIGSTOP—pause agent (can resume with fg)",
+    "override": "Human types in left tile → agent sees and reacts"
+  },
+  "distinction_from_tasks": {
+    "tasks": "Human-created work items, may be assigned to humans or agents",
+    "jobs": "Robot-only routable work, generated from tasks, executable by agents"
+  }
+}

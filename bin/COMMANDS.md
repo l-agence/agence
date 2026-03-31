@@ -1179,3 +1179,283 @@ A robust, extensible grammar for all Agence task, routing, and metadata construc
 - Dependencies: `^` for hard, `;` for soft.
 
 This grammar ensures all Agence commands and task expressions are robust, extensible, and easy to parse. All routing and state prefixes must match the canonical definitions in codex/agents/ROUTING.md.
+
+---
+
+## Knowledge Management Commands (v0.2.3.2+)
+
+**Unified command family for managing team and personal knowledge across scopes.**
+
+These commands provide access to knowledge stored in different scopes (HERMETIC, NEXUS, SYNTHETIC, ORGANIC), with implicit routing and consistent interfaces.
+
+### Scope Model
+
+| Scope | Command | Visibility | Git | Use Case |
+|-------|---------|-----------|-----|----------|
+| **HERMETIC** | `^todo` | Personal | ❌ | Personal task lists |
+| **NEXUS** | `^log`, `^fault` | Local | ❌ | Operational logs, incidents |
+| **SYNTHETIC** | `^lesson`, `^plan`, `^issue` | Team | ✅ | Shared knowledge, strategy |
+| **ORGANIC** | `^task`, `^job` | Team | ✅ | Assigned work (human/agent) |
+
+### `agence ^lesson [list|show|add]`
+
+**Scope**: SYNTHETIC (team-shared)  
+**Storage**: `synthetic/@ORG/lessons/`
+
+Manage lessons learned (extracted from faults, best practices).
+
+**Usage**:
+```bash
+agence ^lesson list                          # List all lessons
+agence ^lesson list --org acme.tld           # List org-specific lessons
+agence ^lesson show "Never auto-heal paths"  # Show specific lesson
+agence ^lesson add "New learning title"      # Create lesson entry
+```
+
+**Entry format** (Markdown):
+```markdown
+# Lesson Title
+
+**Created**: 2026-03-31T14:30:00Z  
+**ID**: 1743595200_never  
+**Extracted from**: fault-catastrophic-failure.md
+
+## Problem
+
+Brief description of what we learned.
+
+## Impact
+
+How this affects future decisions.
+```
+
+---
+
+### `agence ^log [list|show|add]`
+
+**Scope**: NEXUS (local operational)  
+**Storage**: `nexus/logs/`
+
+Operational logs, timeline records, system events.
+
+**Usage**:
+```bash
+agence ^log list                      # List all logs
+agence ^log show session-001          # Show specific log
+agence ^log add "Manual event entry"  # Record event
+agence ^log list --filter=agent       # Filter by agent
+agence ^log list --filter=timeline    # Sort by timeline
+```
+
+---
+
+### `agence ^plan [list|show|add]`
+
+**Scope**: SYNTHETIC (team-shared)  
+**Storage**: `synthetic/@ORG/plans/`
+
+Strategic plans, roadmaps, phase definitions.
+
+**Usage**:
+```bash
+agence ^plan list                     # List all plans
+agence ^plan list --org l-agence.org  # List for specific org
+agence ^plan show "v0.3.0 roadmap"    # Show plan details
+agence ^plan add "Phase 4: Orchestrator"  # Create plan
+```
+
+---
+
+### `agence ^todo [list|show|add]`
+
+**Scope**: HERMETIC (local personal)  
+**Storage**: `hermetic/@/todos/`
+
+Personal task lists (NEVER committed to git).
+
+**Usage**:
+```bash
+agence ^todo list              # My personal todos
+agence ^todo show "path-validation"  # Show todo
+agence ^todo add "Document LAWS.md"  # Create todo
+```
+
+**Notes**:
+- Always local (not shared, never upstream)
+- User-specific, not org-routed
+- Ideal for daily work tracking
+
+---
+
+### `agence ^fault [list|show]`
+
+**Scope**: NEXUS (local, sensitive)  
+**Storage**: `nexus/faults/`
+
+Incident records and failure analysis (NEVER shared raw—sanitize first).
+
+**Usage**:
+```bash
+agence ^fault list                # Show all faults
+agence ^fault show "2026-03-06-catastrophic-failure"  # Examine fault
+agence ^fault list --sanitize     # Flags: extract as lesson first
+```
+
+**Important**: 
+- Faults contain sensitive data (secrets, stack traces, user context)
+- Do NOT commit to synthetic unless sanitized as ^lesson
+- Use `^fault ... --sanitize` to extract learnings safely
+
+---
+
+### `agence ^issue [list|show|add]`
+
+**Scope**: SYNTHETIC (team-shared)  
+**Storage**: `synthetic/@ORG/issues/`
+
+Team discoveries, bugs, design questions (discoverable by team).
+
+**Usage**:
+```bash
+agence ^issue list              # List all issues
+agence ^issue show "path-normalization-gotchas"  # Show issue
+agence ^issue add "Git Bash symlink behavior"    # File issue
+```
+
+**Difference from task**:
+- Issues = discoveries, problems, questions (start of workflow)
+- Tasks = assignments, work items (explicit allocation to human/agent)
+
+---
+
+### `agence ^task [list|show|add]`
+
+**Scope**: ORGANIC (team-assigned)  
+**Storage**: `organic/tasks/`
+
+Team task assignments (human or agent executable).
+
+**Usage**:
+```bash
+agence ^task list                      # List all tasks
+agence ^task list --org acme.tld       # Org-specific tasks
+agence ^task show "implement-matrix-math"  # Show task details
+agence ^task add "New feature" --assign @ralph  # Assign to agent ralph
+agence ^task add "Review PR" --assign @steff    # Assign to human steff
+```
+
+**Task format**:
+```json
+{
+  "id": "task-001",
+  "title": "Implement matrix-math.ts",
+  "priority": "***",
+  "complexity": "large",
+  "assigned_to": "@ralph",
+  "assigned_type": "agent",
+  "status": "+",
+  "created": "2026-03-31T14:30:00Z"
+}
+```
+
+---
+
+### `agence ^job [list|show|add]`
+
+**Scope**: ORGANIC (team-assigned)  
+**Storage**: `organic/jobs/`
+
+Robot/agent job assignments (automated execution only).
+
+**Usage**:
+```bash
+agence ^job list                # List all jobs
+agence ^job show ralph          # Jobs assigned to ralph agent
+agence ^job add "Refactor lib" --agent @ralph  # Create agent job
+```
+
+**Difference from task**:
+- Jobs = executable only by agents (robot work)
+- Tasks = can be human or agent (flexible assignment)
+
+---
+
+## Command Router Routing (Implicit Via @org)
+
+All knowledge commands support optional `--org ORG` flag:
+
+```bash
+agence ^lesson list                    # Default: l-agence.org
+agence ^lesson list --org acme.tld     # Specific org subdirectory
+agence ^plan add "Roadmap" --org ops   # Creates: synthetic/@ops/plans/
+```
+
+If `--org` is omitted:
+- Defaults to `l-agence.org` (SYNTHETIC/ORGANIC)
+- For HERMETIC/NEXUS, org flag is ignored (scope-based only)
+
+---
+
+## Knowledge Entry Format
+
+All entries follow a unified pattern:
+
+**Markdown** (default):
+```
+# Entry Title
+
+**Created**: YYYY-MM-DDTHH:MM:SSZ  
+**ID**: {timestamp}_{short_title}  
+**Metadata**: key=value pairs
+
+## Summary
+
+Content here.
+```
+
+**JSON** (optional, for structured data):
+```json
+{
+  "id": "entry-001",
+  "title": "Entry Title",
+  "scope": "SYNTHETIC",
+  "org": "l-agence.org",
+  "created": "2026-03-31T14:30:00Z",
+  "content": "..."
+}
+```
+
+---
+
+## Workflow Example
+
+**Scenario**: Extract learning from a faults, publish to team
+
+```bash
+# 1. Review fault (stays local)
+agence ^fault show "catastrophic-failure"
+
+# 2. Extract lesson (publish to team)
+agence ^lesson add "Never auto-heal paths" --org l-agence.org
+
+# 3. Plan fix (add to roadmap)
+agence ^plan add "Path validation hardening (v0.2.3.1)"
+
+# 4. Assign work (create tasks)
+agence ^task add "Implement realpath() validation" --assign @ralph
+agence ^task add "Update LAWS.md" --assign @steff
+
+# 5. Verify (all published, team can see)
+agence ^lesson list
+agence ^plan list
+agence ^task list
+```
+
+---
+
+## See Also
+
+- [TAXONOMY.md](../codex/TAXONOMY.md) - Scope definitions (HERMETIC, NEXUS, SYNTHETIC, ORGANIC)
+- [SYMBOLS.md](../synthetic/l-agence.org/docs/SYMBOLS.md) - State prefixes (+, &, %, -, ~, $)
+- [LAWS.md](../codex/LAWS.md) - Scope & privacy constraints (Law 7: Scope Boundaries)
+- [bin/agence ^session](./agence) - Session management (complementary)

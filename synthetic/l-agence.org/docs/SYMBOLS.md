@@ -40,41 +40,99 @@ Examples:
 
 Full reference: `codex/agents/ROUTING.md`
 
-## Canonical State Prefix Table
+## Canonical State Prefix Table (Hierarchical)
 
-| Prefix | Meaning                        | Who/When                |
-|--------|-------------------------------|-------------------------|
-| ~      | Human assigned                | Human, ready to start   |
-| $      | Human in progress             | Human, actively working |
-| %      | Agent assigned                | Agent, queued           |
-| &      | Agent executing               | Agent, running          |
-| _      | Paused/deferred               | Either                  |
-| #      | Held by human                 | Human, locked           |
-| +      | Pending addition              | Either                  |
-| -      | Completed                     | Either                  |
-| ^      | Hard dependency               | N/A                     |
-| ;      | Soft dependency               | N/A                     |
-| >/<    | Child/parent task             | N/A                     |
-| @      | Routing (agent/org/etc.)      | N/A                     |
+### Agent-Level Scope (v0.2.3–v0.3.1, Currently Active)
 
-## Additional Symbols
+| Prefix | Sign | Meaning                   | Who/When                    | Example |
+|--------|------|---------------------------|-----------------------------|----------|
+| +      | +1   | Pending/todo              | In queue, not assigned      | +task |
+| &      | +1   | Agent assigned            | Agent queued, not executing | &task@ralph |
+| %      | +1   | In-progress (agent/human) | Actively working            | %task@ralph |
+| -      | -1   | Completed                 | Work done (terminal state)  | -task |
+| _      | 0    | Paused/deferred           | Either human or agent       | _task@ralph |
+| #      | 0    | Held by human             | Human lock (blocked)        | #task@user |
+
+### Swarm-Level Scope (v0.3.2+, Skupper Integration, RESERVED)
+
+| Prefix | Sign | Meaning                   | Use Case | Example | Note |
+|--------|------|---------------------------|----|---------|-------|
+| ~      | +1   | Swarm accepted/queued     | Multi-agent coordination | ~task | Swarm has it, not yet delegated to agent |
+| $      | +1   | Swarm coordinating        | Merge + sync across agents | $task | Swarm consolidating results |
+
+**Note**: Swarm-level prefixes `~` and `$` are reserved for future use. Do NOT use them in v0.2.3–v0.3.1 code. They will be activated with Skupper integration (v0.3.2+).
+
+### Dependency & Routing Operators
+
+| Operator | Meaning                     | Who/When |
+|----------|-----------------------------|-----------|
+| ^        | Hard dependency             | N/A      |
+| ;        | Soft dependency / pause     | N/A      |
+| >/<      | Child/parent task           | N/A      |
+| @        | Routing (agent/org/sec)     | N/A      |
+
+## Priority & Metrics Symbols
 
 | Symbol | Meaning / Use Case                | Notes / Examples                       |
 |--------|-----------------------------------|----------------------------------------|
-| *      | Priority                         | Numeric or star-based priority         |
-| token_cost | Cost in tokens / resource     | Used for heatmap routing               |
-| :      | Metadata separator               | repo:task:agent format                 |
+| *      | Low priority                     | One star = low urgency                 |
+| **     | Medium priority                  | Two stars = medium urgency             |
+| ***    | High priority                    | Three stars = high urgency             |
+| %completion | Completion/progress calc     | Sum of negative tasks / total tasks    |
+
+**Usage**: `***&task@ralph` (urgent assignment), `*+task` (low-priority pending)
+
+## Matrix Mathematics Symbols
+
+| Symbol | Meaning / Use Case                | Notes / Examples                       |
+|--------|-----------------------------------|----------------------------------------|
+| :      | Metadata separator               | repo:task:index@agent format           |
 | F(x)   | Function notation                | Standard linear algebra reference      |
 | M(x)   | Matrix notation                  | Generic matrix assignment (A=M(x))     |
-| [ , ]  | Reserved for arrays/lists/matrix | Not used for task states               |
-| !task  | Task failed or warning           | Triggered when task errors             |
-| ?task  | Task waiting on input            | Suspended until resolved               |
-| ~=     | Human-assigned (alt. notation)   | Optional shorthand                     |
-| %completion | Completion/progress calc     | Used in workflows/projects             |
+| [ , ]  | Arrays/lists/matrix containers   | Workflow notation: [task1, task2; task3] |
+
+## Special States (Error/Waiting Conditions)
+
+| Symbol | Meaning / Use Case                | Notes / Examples                       |
+|--------|-----------------------------------|----------------------------------------|
+| !task  | Task failed or warning           | Error state (recoverable)              |
+| ?task  | Task waiting on input            | Suspended until human resolves         |
+
+---
+
+## Composition Examples
+
+### Agent-Level Workflow (Current)
+
+```
+WF1 = [ +task1, +task2; +task3 ]
+  ↓ (assign)
+WF1 = [ &task1@ralph, &task2@aider; &task3@ralph ]
+  ↓ (execute)
+WF1 = [ %task1@ralph, %task2@aider; %task3@ralph ]
+  ↓ (complete)
+WF1 = [ -task1, -task2, -task3 ]
+```
+
+### Swarm-Level Workflow (Future, v0.3.2+)
+
+```
+WF1 = [ ~task1, ~task2; ~task3 ]                (swarm queued)
+  ↓ (assign)
+WF1 = [ &task1@ralph, &task2@aider; &task3@ralph ] (agent assigned)
+  ↓ (execute)
+WF1 = [ %task1@ralph, %task2@aider; %task3@ralph ] (agent working)
+  ↓ (swarm merge)
+WF1 = [ $task1, $task2; $task3 ]                (swarm coordinating)
+  ↓ (complete)
+WF1 = [ -task1, -task2, -task3 ]                (all done)
+```
 
 ---
 
 All code, docs, and examples must use these symbols and prefixes consistently.
 
 **Routing reference:** `codex/agents/ROUTING.md`  
-**Version:** 0.3.0 — last updated 2026-03-18
+**Matrix reference:** `synthetic/l-agence.org/docs/MATRICES.md`  
+**Sharding reference:** `synthetic/l-agence.org/docs/SHARDING.md`  
+**Version:** 0.3.1 — Hierarchical state model (Agent + Swarm reserved) — last updated 2026-03-31

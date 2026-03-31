@@ -1,11 +1,19 @@
 ---
 
-## Canonical Routing & State Prefixes
+## Canonical Routing & State Prefixes (Hierarchical)
 
-Agence uses a universal routing and state prefix model. See [synthetic/l-agence.org/docs/SYMBOLS.md](synthetic/l-agence.org/docs/SYMBOLS.md) for the canonical table and glossary.
+Agence uses a hierarchical state prefix model. See [synthetic/l-agence.org/docs/SYMBOLS.md](synthetic/l-agence.org/docs/SYMBOLS.md) for the canonical table and glossary.
 
-- `@` is the universal routing prefix for agent, org, team, repo, security, etc.
-- State prefixes: `~`, `$`, `%`, `&`, `_`, `#`, `+`, `-`, `^`, `;`, `>`, `<`, `@` (see canonical table).
+### Agent-Level (v0.2.3–v0.3.1, Currently Active)
+- `+` pending, `&` agent-assigned, `%` in-progress, `-` completed, `_` paused, `#` held
+- `@` universal routing for agent/org/team/repo/security
+- Dependency operators: `^` (hard), `;` (soft), `<`/`>` (precedence)
+
+### Swarm-Level (v0.3.2+, Reserved)
+- `~` swarm-accepted (reserved for future)
+- `$` swarm-coordinating (reserved for future)
+
+**All matrices below use AGENT-LEVEL prefixes.** Swarm-level will be introduced in v0.3.2+ with Skupper integration.
 
 All code, docs, and examples must use these prefixes consistently.
 

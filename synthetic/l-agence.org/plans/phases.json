@@ -1,0 +1,214 @@
+{
+  "roadmap_version": "v0.2.3.1",
+  "locked_date": "2026-03-31T00:00:00Z",
+  "owner": "l-agence team",
+  "vision": "Multi-Agent Swarm Orchestration: Single-Agent → Local Multi-Agent → Distributed (Skupper) → Production",
+  "phases": [
+    {
+      "id": 1,
+      "version": "v0.2.3.1",
+      "name": "Architecture & Stabilization",
+      "status": "complete",
+      "duration_weeks": "2 (actual)",
+      "owner": "Haiku",
+      "objectives": [
+        "Lock architectural decisions from catastrophic failure",
+        "Eliminate TOCTOU vulnerabilities",
+        "Establish clean separation: routing ≠ security"
+      ],
+      "deliverables": [
+        {
+          "item": "Path validation hardening",
+          "file": "codex/LAWS.md (Law 8)",
+          "status": "complete"
+        },
+        {
+          "item": "Symbol taxonomy refactor",
+          "file": "synthetic/l-agence.org/docs/SYMBOLS.md",
+          "status": "complete"
+        },
+        {
+          "item": "Scope model documentation",
+          "file": "codex/TAXONOMY.md",
+          "status": "complete"
+        },
+        {
+          "item": "gitignore local symlinks",
+          "file": ".gitignore",
+          "status": "in-progress"
+        }
+      ],
+      "key_decisions": [
+        "No auto-healing junctions (security layer validates only)",
+        "Symbol hierarchy: Agent-level active, Swarm reserved",
+        "Scope model: HERMETIC/NEXUS/SYNTHETIC/ORGANIC",
+        "Routing: @ suffix-based"
+      ]
+    },
+    {
+      "id": "1.5",
+      "version": "v0.2.3.2",
+      "name": "Command Router Implementation",
+      "status": "queued",
+      "duration_weeks": "1-2",
+      "owner": "Haiku",
+      "objectives": [
+        "Implement 8 command primitives",
+        "Establish routing inheritance",
+        "Enable shell completion"
+      ],
+      "commands": [
+        {
+          "name": "^lesson",
+          "scope": "synthetic/@/lessons/",
+          "operations": ["list", "show", "add"]
+        },
+        {
+          "name": "^log",
+          "scope": "nexus/logs/",
+          "operations": ["list", "show", "add"]
+        },
+        {
+          "name": "^plan",
+          "scope": "synthetic/@/plans/",
+          "operations": ["list", "show", "add"]
+        },
+        {
+          "name": "^todo",
+          "scope": "hermetic/@/todos/",
+          "operations": ["list", "show", "add"],
+          "note": "Always local, never shared"
+        },
+        {
+          "name": "^fault",
+          "scope": "nexus/faults/",
+          "operations": ["list", "show"]
+        },
+        {
+          "name": "^issue",
+          "scope": "synthetic/@/issues/",
+          "operations": ["list", "show", "add"]
+        },
+        {
+          "name": "^task",
+          "scope": "organic/tasks/",
+          "operations": ["list", "show", "add"]
+        },
+        {
+          "name": "^job",
+          "scope": "organic/jobs/",
+          "operations": ["list", "show", "add"]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "version": "v0.2.4",
+      "name": "Docker Foundations & Matrix Math",
+      "status": "queued",
+      "duration_weeks": "3-4",
+      "owner": "Haiku (lead) + Sonnet (reasoning)",
+      "objectives": [
+        "Containerize agents (WSL-Ubuntu + Docker)",
+        "Implement matrix-based priority routing",
+        "Establish Git-native state management"
+      ],
+      "parallel_streams": [
+        {
+          "stream": "Docker",
+          "tasks": ["Dockerfile", "Session metadata", "/run/secrets injection", "aibash/aishell adapters"]
+        },
+        {
+          "stream": "Matrix Math",
+          "tasks": ["Complexity eval", "Priority calculation", "Agent routing table", "Git merge strategy", "Cost tracking"]
+        }
+      ],
+      "key_decisions": [
+        "Complexity = auto-computed (no explicit cost tier)",
+        "Git = coordination layer (no central DB)",
+        "Merge strategy = deterministic (priority-based winner)"
+      ]
+    },
+    {
+      "id": 3,
+      "version": "v0.3.0",
+      "name": "VSCode Tiles & Real-Time Job Control",
+      "status": "queued",
+      "duration_weeks": "3-4",
+      "owner": "Sonnet",
+      "objectives": [
+        "Implement 2-column tile layout",
+        "Enable POSIX job control as coordination",
+        "Real-time observability + human control"
+      ],
+      "tile_model": {
+        "left": "docker exec -it (human console, full authority)",
+        "right": "aibash/aishell (agent execution, observable)"
+      },
+      "job_control": [
+        "Ctrl+K → SIGKILL aibash",
+        "Ctrl+Z → SIGSTOP aibash",
+        "%jobs → show all running tasks"
+      ]
+    },
+    {
+      "id": 4,
+      "version": "v0.3.1",
+      "name": "Multi-Agent Orchestrator & DWM Gating",
+      "status": "queued",
+      "duration_weeks": "4+",
+      "owner": "Sonnet + human",
+      "objectives": [
+        "Implement task scheduling + collision avoidance",
+        "Build execution bridge (scope validation, max_steps)",
+        "Gate distributed wisdom memory (DWM)"
+      ],
+      "orchestrator_components": [
+        "Task queue + idle agent scheduling",
+        "Collision avoidance (no scope overlap)",
+        "Execution bridge (validates, enforces limits)",
+        "DWM approval gate (human reviews lessons)"
+      ]
+    },
+    {
+      "id": 5,
+      "version": "v0.3.2+",
+      "name": "Skupper Multi-Cloud Distribution",
+      "status": "spec-only",
+      "duration_weeks": "TBD",
+      "owner": "Sonnet + DevOps",
+      "objectives": [
+        "Distribute swarm across clouds",
+        "Maintain single orchestrator + approval authority",
+        "Reuse agent logic unchanged"
+      ],
+      "principle": "Skupper is just distribution, architecture stays the same"
+    }
+  ],
+  "architectural_constraints": [
+    "Paths: realpath() validation only, NO auto-healing",
+    "Routing: @ suffix-based (task@agent, task@user)",
+    "Symbols: Hierarchical (agent-level active, swarm reserved)",
+    "Container: WSL-Ubuntu + Docker (pure POSIX)",
+    "State: Matrix math (no database, just Git)",
+    "Scopes: HERMETIC/NEXUS/SYNTHETIC/ORGANIC (isolation enforced)"
+  ],
+  "handoff_points": {
+    "haiku": {
+      "phases": ["1", "1.5"],
+      "description": "Architecture + docs + command router",
+      "remaining": "Phase 2 (if context allows) with handoff markers"
+    },
+    "sonnet": {
+      "phases": ["2", "3", "4", "5"],
+      "description": "Complex reasoning, distributed systems, VSCode integration"
+    }
+  },
+  "success_metrics": [
+    "v0.2.3.1: Zero TOCTOU vulnerabilities + symbol consistency",
+    "v0.2.4: Agents in containers, matrix math computes priorities",
+    "v0.3.0: Human sees both agent tiles in real-time",
+    "v0.3.1: Multi-agent scheduling + no collisions",
+    "v0.3.2: Same code on any Skupper node"
+  ]
+}

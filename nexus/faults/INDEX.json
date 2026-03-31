@@ -1,0 +1,42 @@
+{
+  "index": "Faults Index",
+  "version": "1.0",
+  "privacy": "LOCAL ONLY — Never share raw faults upstream. Sanitize sensitive incidents to lessons/",
+  "description": "Operational incident history. Local-only record of system failures, errors, and outages.",
+  "schema": {
+    "fault_id": "Identifier (timestamp or uuid or sequential)",
+    "timestamp": "ISO 8601 when fault occurred",
+    "category": "Category of incident (development-error, infrastructure, state-corruption, api-failure, timeout, etc.)",
+    "severity": "critical|high|medium|low",
+    "title": "Short description of the fault",
+    "description": "Full incident description",
+    "symptoms": "Observable behavior",
+    "root_cause": "Why it happened",
+    "impact": "What broke, what data was affected",
+    "recovery_steps": "How it was resolved (or attempted resolution)",
+    "prevention": "How to prevent recurrence",
+    "references": "Links to related code, logs, or documentation",
+    "status": "open|resolved|escalated",
+    "sanitized_lesson_id": "If extracted to lessons/, link here",
+    "Agent_or_system": "Which agent or system component failed"
+  },
+  "categories": [
+    "development-error",
+    "infrastructure",
+    "state-corruption",
+    "api-failure",
+    "timeout-handling",
+    "security-violation",
+    "data-loss",
+    "permission-denied",
+    "resource-exhaustion",
+    "catastrophic"
+  ],
+  "lookup_fields": ["category", "severity", "timestamp", "status"],
+  "privacy_rules": {
+    "never_share_raw": "Raw faults contain secrets, stack traces, failed credentials",
+    "sanitization_process": "Extract root cause + solution → create lesson → sanitize before sharing",
+    "storage": "nexus/faults/ (local machine only)",
+    "future": "ailedger will segregate secrets and allow controlled disclosure"
+  }
+}

@@ -4,7 +4,9 @@ Agence is essentially Git-native swarm sharding, where each fork becomes both:
 
 - a compute shard (agents running jobs)
 - a state shard (matrix data)
-- a human console (readable  knowledgebases, readable tasks/workflows/project state)
+- a human console (readable knowledgebases, readable tasks/workflows/project state)
+
+**Note:** This document describes the foundational matrix architecture (valid for all versions). State prefixes used in examples follow the **Agent-Level** hierarchy (v0.2.3–v0.3.1). When Skupper integration arrives (v0.3.2+), Swarm-Level prefixes (`~`, `$`) will coordinate across shards. See [SYMBOLS.md](SYMBOLS.md) for the complete hierarchical model.
 
 That is a very elegant architecture.
 

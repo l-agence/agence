@@ -1,0 +1,41 @@
+{
+  "index": "Plans Index",
+  "version": "1.0",
+  "description": "Strategic roadmap and phase-based plans. Team-shared knowledge base.",
+  "schema": {
+    "plan_id": "Unique identifier (e.g., v0.2.3-stabilization, phase-3-vscode)",
+    "version": "Semantic version or phase number",
+    "date_created": "ISO 8601 when plan was created",
+    "date_updated": "ISO 8601 when last updated",
+    "phase": "Phase number or milestone identifier",
+    "title": "Plan title",
+    "description": "Executive summary",
+    "scope": "What this plan covers",
+    "goals": "Objectives to achieve",
+    "deliverables": "What will be completed",
+    "timeline": "Estimated duration (weeks/days)",
+    "dependencies": "What must be done first",
+    "blockers": "Known risks or blockers",
+    "status": "planning|in-progress|complete|deferred",
+    "owner": "Who is leading this plan",
+    "team": "Agents/humans assigned",
+    "references": "Links to related code, docs, issues",
+    "notes": "Additional context"
+  },
+  "lookup_fields": ["phase", "status", "version", "date_created", "owner"],
+  "statuses": [
+    "planning",
+    "in-progress",
+    "complete",
+    "deferred",
+    "cancelled"
+  ],
+  "current_phases": [
+    "v0.2.3.1 — Design Milestone (complete)",
+    "v0.2.3.2 — Command Router (in-progress)",
+    "v0.2.4 — Docker + Matrix Math (queued)",
+    "v0.3.0 — VSCode Tiles (queued)",
+    "v0.3.1 — Orchestrator (queued)",
+    "v0.3.2+ — Skupper Multi-Cloud (queued)"
+  ]
+}

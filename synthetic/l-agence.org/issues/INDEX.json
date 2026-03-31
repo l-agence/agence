@@ -1,0 +1,54 @@
+{
+  "index": "Issues Index",
+  "version": "1.0",
+  "description": "Team-discovered problems, technical debt, and opportunities. Shared knowledge base for visibility.",
+  "schema": {
+    "issue_id": "Unique identifier (e.g., I001, path-normalization, bash-compat)",
+    "date_discovered": "ISO 8601 when issue was discovered",
+    "reporter": "@agent or @user who discovered it",
+    "category": "Topic area (llm-behavior, infrastructure, performance, compatibility, etc.)",
+    "title": "Short issue title",
+    "description": "Detailed description of the problem",
+    "impact": "Who/what is affected, severity",
+    "root_cause": "Why it exists (if known)",
+    "proposed_solution": "Suggested fix (if any)",
+    "references": "Links to related code, faults, lessons, tasks",
+    "status": "open|in-progress|resolved|deferred|duplicate",
+    "priority": "critical|high|medium|low",
+    "assigned_task": "If converted to task, link here (e.g., T042)",
+    "created_by": "Original discoverer",
+    "last_updated": "ISO 8601 when last modified",
+    "notes": "Additional context or discussion"
+  },
+  "lookup_fields": ["category", "reporter", "status", "priority", "date_discovered"],
+  "categories": [
+    "performance",
+    "infrastructure",
+    "compatibility",
+    "security",
+    "documentation",
+    "api-design",
+    "user-experience",
+    "technical-debt",
+    "architecture",
+    "integration"
+  ],
+  "statuses": [
+    "open",
+    "in-progress",
+    "resolved",
+    "deferred",
+    "duplicate"
+  ],
+  "priority_levels": [
+    "critical",
+    "high",
+    "medium",
+    "low"
+  ],
+  "distinction_from_tasks": {
+    "issues": "Discoveries, problems, tech debt. NOT assigned. Team visibility.",
+    "tasks": "Work assignments. Assigned to human or agent. Routable.",
+    "conversion_flow": "Issue (open) → Investigation → Task (assign to worker)"
+  }
+}

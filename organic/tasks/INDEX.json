@@ -1,0 +1,73 @@
+{
+  "index": "Tasks Index",
+  "version": "1.0",
+  "description": "Team assignments and work items. Routable to humans or agents.",
+  "schema": {
+    "task_id": "Unique identifier (e.g., T001, matrix-math, refactor-paths)",
+    "date_created": "ISO 8601 when task was created",
+    "assigned_to": "@human-name or @agent-name (or array for multiple)",
+    "category": "Task category (implementation, documentation, testing, review, etc.)",
+    "title": "Task title",
+    "description": "Detailed description of work to do",
+    "acceptance_criteria": "Definition of done",
+    "estimate": "Time estimate (hours, days, weeks)",
+    "priority": "Critical|high|medium|low (may be computed from matrix math)",
+    "complexity": "Trivial|small|medium|large (may be computed from scope analysis)",
+    "related_issue": "If from an issue, link here (e.g., I001)",
+    "dependencies": "Array of task IDs that must complete first",
+    "blockers": "Known blockers or risks",
+    "status": "assigned|in-progress|complete|blocked|on-hold",
+    "progress": "Percentage complete (0-100) or null",
+    "created_by": "WHO created this task",
+    "owner": "WHO is responsible if not assignee",
+    "effort_spent": "Actual time spent so far",
+    "effort_remaining": "Estimated time to completion",
+    "cost_estimate": "Token cost estimate for agent tasks",
+    "parent_task": "If subtask, link to parent",
+    "subtasks": "Array of child task IDs",
+    "references": "Links to code, docs, discussions",
+    "notes": "Additional context",
+    "last_updated": "ISO 8601 when last modified"
+  },
+  "lookup_fields": ["assigned_to", "status", "priority", "complexity", "category", "date_created"],
+  "categories": [
+    "implementation",
+    "documentation",
+    "testing",
+    "review",
+    "deployment",
+    "operations",
+    "analysis",
+    "research",
+    "refactoring",
+    "maintenance"
+  ],
+  "statuses": [
+    "assigned",
+    "in-progress",
+    "complete",
+    "blocked",
+    "on-hold"
+  ],
+  "priority_scale": [
+    "critical",
+    "high",
+    "medium",
+    "low"
+  ],
+  "complexity_scale": [
+    "trivial",
+    "small",
+    "medium",
+    "large"
+  ],
+  "matrix_math_integration": {
+    "note": "Priority and complexity values may be computed from matrix-state.json",
+    "priority_formula": "base_priority + (blocked_count * weight) + human_override",
+    "complexity_formula": "lines_of_code + (modules_affected * weight) → category"
+  },
+  "distinction_from_issues": {
+    "issues": "Discoveries, problems. NOT assigned. Team visibility.",
+    "tasks": "Work assignments. Assigned to human or agent. Actionable."
+  }
+}

@@ -1,53 +1,66 @@
-# ^Todo: Backport remaining functions from ^.73aad08.nogit
+# ^Todo: Multi-Phase Development Roadmap
 
-## Context
-
-Session 2026-03-29 recovered 4 missing functions and restored mode_session. The
-larger caret file (^.73aad08.nogit, 2407L) still has functions not yet backported
-into the current bin/agence (1569L). Ordered by priority:
-
-## Action Items
-
-- [ ] Backport `shell_bash_session()` + `shell_powershell_session()` — launch tracked shells, write meta JSON to nexus/.aisessions/
-- [ ] Backport `generate_shell_session_id()` — format: `bash-YYYYMMDD_HHMMSS-PID-HEXID`
-- [ ] Backport `set_vscode_terminal_title()` — `printf '\033]0;%s\007' "$title"`
-- [ ] Backport `get_agent_id()` — `echo "${AIDO_AGENT:-ai-agent}"`
-- [ ] Backport `parse_agent_prefix()` — parses `@agentname command` syntax, exports `AGENCE_AGENT_PARAM`
-- [ ] Backport `stash_agence_changes()` + `sync_agence_changes()` from agence.stash.nogit — `^stash`, `^sync`
-- [ ] Backport `fetch_agence_changes()` + `rebase_agence_changes()` from agence.stash.nogit
-- [ ] Replace current `learn_agence_changes` with `learn_from_sessions()` — richer, scans sessions+faults+lessons
-- [ ] Replace `commit_agence_changes` with `commit_knowledge_changes()` — targets globalcache+synthetic+nexus/faults
-- [ ] Replace `save_session` with `save_session_context()` — captures full git state, uses format helpers
-- [ ] Add `reindex_knowledge_bases()` — calls `bin/indexer`, `^reindex` command
-- [ ] Add stub commands: `^handoff`, `^pickup`, `^pause` (stubs OK for now)
-- [ ] Add `-j` JSON format flag support to `mode_init` (`agence_detect_format`)
-- [ ] Fix `bin/aibash` — duplicate help block (copy-paste LLM artifact), missing execution body
-- [ ] Integrate `lib/format.sh` into `bin/aisession` (replace inline banners with agence_format_*)
-
-## Completed This Session (2026-03-29)
-
-- [x] `.gitattributes` — LF policy enforced globally
-- [x] CRLF fix — all scripts/text converted (dos2unix)
-- [x] `bin/agence --help/version` dispatch fix (no router on non-LLM commands)
-- [x] Restored `save_session`, `learn_agence_changes`, `commit_agence_changes`, `push_agence_changes`
-- [x] Fixed `mode_init` arg parsing (`init_cmd` + `init_args`)
-- [x] Added `mode_session()` — 9 subcommands
-- [x] jq installed (WSL + Windows)
-- [x] `lib/format.sh` implemented — 8 `agence_format_*` helpers (text/plain/json modes)
-- [x] Smoke tests passing: `agence --help`, `agence version`, `lib/format.sh`, `bin/aisession list`
-- [x] Commits: 21f31bc, 4398618, 9a389c9, 0667f3e
+**Version**: v0.2.3.1 (Architecture Locked)  
+**Last Updated**: 2026-03-31  
+**Status**: 🟢 READY FOR HANDOFF TO SONNET  
+**Handoff Document**: synthetic/l-agence.org/docs/HANDOFF-HAIKU-TO-SONNET.md  
+**Status Tracking**: Use `^todo` command (synthetic/l-agence.org/plans/ for team reference)
 
 ---
 
-# ^Todo: ShellSpec Test Coverage for bin/agence
+## 📍 PHASE COMPLETE: v0.2.3.1 — Architecture & Stabilization ✅ LOCKED
 
-## Test Plan for bin/agence
+### ✅ All Completed (2026-03-31)
+- [x] PATH validation hardening (codex/LAWS.md § Law 8)
+- [x] Symbol hierarchy redesign (synthetic/l-agence.org/docs/SYMBOLS.md + Agent/Swarm scopes)
+- [x] Scope model documentation (codex/TAXONOMY.md + HERMETIC/NEXUS/SYNTHETIC/ORGANIC)
+- [x] Matrix math clarification (docs/MATRICES.md, SHARDING.md updated)
+- [x] Shell environment standardization (codex/SETUP.md + WSL-Ubuntu default)
+- [x] **Strategic plans created** (synthetic/l-agence.org/plans/ + 5-phase roadmap)
+- [x] **Command router implemented** (8 commands: ^lesson, ^log, ^plan, ^todo, ^fault, ^issue, ^task, ^job)
+- [x] **Knowledge skeleton created** (plans/, issues/, tasks/, jobs/ indices + INDEX.md/JSON)
+- [x] **Fault relocation** (nexus/faults/ as local scope; lessons extracted and sanitized)
+- [x] **Lesson extraction** (Catastrophic failure root cause analysis: [`synthetic/l-agence.org/lessons/2026-03-31-catastrophic-failure-root-cause-and-fix.md`](synthetic/l-agence.org/lessons/2026-03-31-catastrophic-failure-root-cause-and-fix.md))
+- [x] **Session saved** ([`nexus/sessions/2026-03-31-design-milestone-v0.2.3.1.meta.json`](nexus/sessions/2026-03-31-design-milestone-v0.2.3.1.meta.json))
 
-### Functions to Test
-- detect_shell_environment: Detects shell and OS environment variables.
-- normalize_path: Normalizes file paths for different OS/shells.
-- source_if_exists: Sources a file if it exists.
-- init_execution_context: Initializes repo context variables.
+### Final Before v0.2.3.1 Release
+- [ ] `.gitignore` final review (local symlinks, build artifacts)
+- [ ] Smoke tests: version bump to v0.2.3.1 + verify all commands work
+- [ ] Git commit: `^commit "v0.2.3.1: Architecture locked, design milestone complete"`
+
+---
+
+## 🚀 NEXT PHASE: v0.2.4 — Docker + Matrix Math (READY FOR SONNET)
+
+**Owner**: Claude Sonnet 4 (or stronger)  
+**Estimated Duration**: 3–4 weeks (Docker 1–2 weeks, Matrix Math 2–3 weeks parallel)  
+**Handoff Document**: [`synthetic/l-agence.org/docs/HANDOFF-HAIKU-TO-SONNET.md`](synthetic/l-agence.org/docs/HANDOFF-HAIKU-TO-SONNET.md)
+
+### Docker Foundations (Week 1–2)
+- [ ] Dockerfile (WSL-Ubuntu LTS base)
+  - Node.js (restricted, no npm)
+  - TypeScript compiler only
+  - `/workspace` mount point (POSIX-only paths)
+  - `/run/secrets/{agent-id}` injection support
+- [ ] Session metadata schema (TypeScript)
+  - Captures both shell streams (left human + right agent)
+  - File: `${NEXUS}/sessions/{sessionid}.json`
+- [ ] aibash/aishell container adapters
+  - Detect: container vs. local mode
+  - Signal handlers: SIGKILL/SIGSTOP propagate
+  - Exit hooks: flush metadata before death
+- [ ] Integration test: spin container → run aibash → verify paths are `/workspace`-relative
+
+### Matrix Math + Git Locking (Week 2–3, Parallel)
+- [ ] Complexity evaluator (task scope → category: trivial | small | medium | large)
+- [ ] Priority calculation (DAG + overrides → scores 1–10)
+- [ ] Agent routing table (4×4 matrix: priority × complexity → model)
+- [ ] Git merge strategy (resolve conflicts by agent priority + security labels)
+- [ ] Cost tracking (per-task audit trail)
+
+---
+
+## 📊 Future Phases (Queued)
 - validate_execution_context: Validates working directory context.
 - show_help: Prints help and usage.
 - mode_chat: Handles chat mode.
@@ -204,3 +217,219 @@ Each launcher should:
 - [ ] Add spec tests for !<tool> availability checks (can mock with false/true)
 - [ ] Document in COMMANDS.md
 - [ ] Consider whether agence should replicate Claude Code /loop natively (`^loop`)
+
+---
+
+# ^Todo: ARCHITECTURE — Multi-Agent Swarm with WSL/Docker & 2-Column Tiles (v0.2.4+)
+
+## Vision (2026-Q2/Q3)
+
+**Unified agent execution model** across local dev and future distributed environments:
+- **Container**: Each agent runs in isolated WSL-Ubuntu Docker container
+- **Tile interface**: 2-column VSCode layout (human control plane + agent execution plane)
+- **Job control**: POSIX signals + shell `%jobs` for coordination
+- **Real-time observability**: Both tiles logged simultaneously
+- **Path normalization**: Container mount point = single source of truth
+
+## Phase 1: v0.2.3.1 — Harden Current System & Document Architecture (IN PROGRESS)
+
+**Finalize path validation + document constraints + symbol hierarchy** (blocks Phase 2)
+
+- [x] Kill auto-healing junction creation (no security layer path patching)
+- [x] Use `realpath()` before scope validation
+- [x] Document in LAWS.md: "Symlinks/junctions for routing only, never for security"
+- [x] Add PATH validation constraints to LAWS.md (Law 8)
+- [x] Add symbol scope constraints to LAWS.md (Law 8)
+- [x] Create TAXONOMY.md: HERMETIC, NEXUS, SYNTHETIC, ORGANIC scope model
+- [x] Rewrite SYMBOLS.md with hierarchical state model (Agent + Swarm reserved)
+- [x] Update MATRICES.md with Agent/Swarm scope clarification
+- [x] Update SHARDING.md with future swarm bridge notes
+- [ ] Update `.gitignore` to exclude local user symlinks (synthetic/@, hermetic/@/*)
+- [ ] Add comment blocks to security validation functions: "Never create paths"
+- [ ] Verify in local smoke tests: path validation rejects escapes (without junctions)
+- [ ] Stabilize branch `rel_0.2.2_agence_swarm_sessions` → merge to `main`
+
+**v0.2.3.1 Completed**: LAWS.md hardened, TAXONOMY.md created, SYMBOLS.md hierarchical model locked
+
+**Remaining**: .gitignore updates, comment blocks, smoke tests, merge to main
+
+**Estimate**: 1–2 weeks (command router implementation + smoke tests)
+
+---
+
+## Phase 1.5: v0.2.3.2 — Command Router Implementation (QUEUED)
+
+**Implement scope-aware command routing** (enables TAXONOMY, consolidates CLI)
+
+- [ ] Implement `^lesson [list|show|add]` → synthetic/@/lessons/
+- [ ] Implement `^log [list|show|add]` → nexus/logs/ (local-only)
+- [ ] Implement `^plan [list|show|add]` → synthetic/@/plans/ (default routing)
+- [ ] Implement `^todo [list|show|add]` → hermetic/@/todos/ (always local)
+- [ ] Implement `^fault [list|show]` → nexus/faults/ (local-only)
+- [ ] Implement `^issue [list|show|add]` → synthetic/@/issues/
+- [ ] Implement `^task [list|show|add] --assign AGENT` → organic/tasks/
+- [ ] Implement `^job [list|show|add] --agent NAME` → organic/jobs/
+- [ ] Add routing inheritance logic: `--org NAME` override, fallback to default
+- [ ] Add shell completion for all 8 commands
+- [ ] Wire to command router (bin/^)
+- [ ] Update COMMANDS.md with new command grammar
+- [ ] Smoke tests: all 8 commands with defaults + overrides
+
+**Estimate**: 1–2 weeks (boilerplate + integration)
+
+---
+
+## Phase 2: v0.2.4 — Docker Foundations & Matrix Math
+
+**Build container + session layer + matrix math foundation** (prerequisite for Phase 3 tiles)
+
+- [ ] Create Dockerfile: WSL-Ubuntu LTS (22.04+) + Node.js (restricted, no npm) + TypeScript
+- [ ] Copy aishell + aibash into container (adapt for container environment)
+- [ ] Session metadata format: JSON structure capturing both tiles
+  ```json
+  {
+    "session_id": "ralph-20260401_120000-12345-abc123",
+    "agent": "ralph",
+    "container": "agence-ralph-001",
+    "started_at": "2026-04-01T12:00:00Z",
+    "tiles": {
+      "left": {
+        "stream": "human_console",
+        "command": ["docker", "exec", "-it", "agence-ralph-001", "/bin/bash"],
+        "tty": true
+      },
+      "right": {
+        "stream": "agent_shell",
+        "command": ["/usr/local/bin/aibash"],
+        "subjell": true,
+        "parent_pid": "TBD"
+      }
+    },
+    "secrets": {
+      "path": "/run/secrets",
+      "available": ["agent-creds", "api-tokens"]
+    }
+  }
+  ```
+- [ ] Docker entrypoint: spawn left shell (docker exec bash) + seed aibash in background
+- [ ] Implement aibash signal handlers (`trap 'flush_metadata; exit 143' SIGKILL`)
+- [ ] Session JSON written to `/tmp/agence-session.json` (inside container, human reads via left tile)
+- [ ] Test: manual docker run + 2-tile simulation (bash in left, aibash in right via bg job)
+
+### Matrix Math & Git-Based Coordination
+
+**Estimated 1–2 weeks (parallel with Docker work)**
+
+- [ ] Document: Complexity metrics schema (LOC, modules, categories: trivial/small/medium/large)
+- [ ] Document: Priority calculation (blocking impact + human overrides)
+- [ ] Create: organic/matrix-state.json schema (signed tasks + workflow dependencies)
+- [ ] Implement: matrix-math.ts core algorithm
+  - `calculatePriority(task, dag, human_overrides)`
+  - `evaluateComplexity(task_scope)`
+  - `routeAgent(priority, complexity, cost_budget)`
+  - `applyHumanOverride(task, override)`
+- [ ] Implement: Custom Git merge strategy for agent conflict resolution
+- [ ] Test: Simple DAG with 3 tasks, priority matrix ordering
+
+**v0.2.4 Estimate**: 2–3 weeks overall (Docker + Matrix Math in parallel)
+
+---
+
+## Phase 3: v0.3.0 — VSCode Tile Integration
+
+**2-column layout + job control surface**
+
+- [ ] VSCode extension: agent row layout (N agents = N rows, each 2 columns)
+  ```
+  ┌─────────────────────┬─────────────────────┐
+  │ Agent: ralph        │ ralph's aibash      │
+  │ (L: docker exec)    │ (R: agent plane)    │
+  ├─────────────────────┼─────────────────────┤
+  │ Agent: claudia      │ claudia's aishell   │
+  │ (L: docker exec)    │ (R: agent plane)    │
+  └─────────────────────┴─────────────────────┘
+  ```
+- [ ] Left tile: `docker exec -it` terminal (human has full control)
+- [ ] Right tile: subjell inside left tile (background job, `%jobs` visible)
+- [ ] Hotkey `Ctrl+K`: SIGKILL aibash (human stop, tracked in session)
+- [ ] Hotkey `Ctrl+Z`: SIGSTOP aibash (pause, then `fg` resumes)
+- [ ] Command `%jobs`: inspect all running tasks in agent row
+- [ ] Session capture: Both tiles logged simultaneously
+  - Left: console I/O (human decisions, commands issued)
+  - Right: aibash metadata (agent actions, decisions)
+- [ ] Test: N agents running, human controls left tiles, agents run tasks in right tiles
+
+**Estimate**: 3–4 weeks (VSCode extension dev + terminal API)
+
+---
+
+## Phase 4: v0.3.1 — Multi-Agent Orchestrator
+
+**Collision prevention + task queue + DWM integration**
+
+- [ ] Orchestrator core: task queue + idle agent pool
+- [ ] Task contract format: `{ scope, max_steps, constraints, inputs, approval_level }`
+- [ ] Execution bridge: validates scope (realpath against allowed roots), enforces max_steps, blocks network/subprocess
+- [ ] Collision avoidance: no two agents touch same `scope` simultaneously
+- [ ] DWM gateway: agents write lessons → human reviews → merged if approved
+- [ ] Session consolidation: read N `agence-session.json` files → merge into nexus/sessions/ entry
+- [ ] Test: 3 agents, 2 tasks (one should queue, one execute; roles swap after first completes)
+
+**Estimate**: 4+ weeks (orchestrator logic + DWM gating)
+
+---
+
+## Phase 5: Future — Multi-Cloud Distribution via Skupper
+
+**Scale to distributed agents** (after local proven stable)
+
+- [ ] Skupper networking: virtual application network across remote containers
+- [ ] Reuse same orchestrator + execution bridge logic (only networking changes)
+- [ ] Non-negotiable constraints:
+  - Policy authority stays centralized (one DWM)
+  - No auto-healing in security layer (validated at container mount time)
+  - Task queue routed through central orchestrator (not agent-to-agent messages)
+  - Append-only audit ledger (all agent actions logged with timestamp + decisions)
+- [ ] Test: agents on separate VMs/clouds, orchestrator can schedule across both
+
+**Estimate**: TBD (depends on Phase 4 maturity)
+
+---
+
+## Action Items (By Phase)
+
+### Phase 1 (v0.2.3 — NOW)
+- [ ] Read + implement LAWS.md constraint docs
+- [ ] Update `.gitignore` for local symlinks
+- [ ] Add "No path creation" comment blocks
+
+### Phase 2 (v0.2.4)
+- [ ] Build Dockerfile (start from `docker.io/ubuntu:22.04`)
+- [ ] Port aibash + aishell to container
+- [ ] Implement session JSON schema
+- [ ] Signal handlers in aibash
+
+### Phase 3 (v0.3.0)
+- [ ] Research VSCode terminal split API (proposed API?)
+- [ ] Prototype row layout (mock data)
+- [ ] Implement hotkey handlers
+
+### Phase 4 (v0.3.1)
+- [ ] Spec orchestrator task contract
+- [ ] Build execution bridge (scope validator)
+- [ ] Implement DWM approval gate
+
+### Phase 5 (Future)
+- [ ] Skupper proof-of-concept
+- [ ] Append-only ledger design
+
+---
+
+## Key Constraints (Hard Rules)
+
+1. **Path validation**: NEVER create symlinks/junctions in security layer (only validate)
+2. **Session capture**: Both tiles logged, human can see everything
+3. **Job control**: Use POSIX signals + shell `%jobs`, no custom coordination protocol
+4. **Secrets**: `/run/secrets` mounted at container start-time only
+5. **Authority**: Human always has override (left tile has full control)
+6. **Knowledge": Only humans route lessons to shared DWM (no auto-publish)

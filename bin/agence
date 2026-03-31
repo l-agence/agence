@@ -280,6 +280,11 @@ EXAMPLES:
   agence ^rebase
   agence ^push
   agence ^sync
+  agence ^lesson list
+  agence ^plan add "Phase 3 roadmap"
+  agence ^todo list
+  agence ^task add "Implement feature" --assign @ralph
+  agence ^job list
 
 ENVIRONMENT VARIABLES:
   GIT_REPO=/path/to/repo       Parent repository (auto-detected if not set)
@@ -649,9 +654,57 @@ mode_init() {
       mode_session "$init_args"
       return $?
       ;;
+    "lesson")
+      # Knowledge: lessons learned (team-shared, synthetic)
+      # Usage: agence ^lesson [list|show|add] [--org ORG]
+      mode_knowledge "lesson" "$init_args"
+      return $?
+      ;;
+    "log")
+      # Operational logs (local, nexus)
+      # Usage: agence ^log [list|show|add] [--filter=agent|session|timeline]
+      mode_knowledge "log" "$init_args"
+      return $?
+      ;;
+    "plan")
+      # Strategic plans (team-shared, synthetic)
+      # Usage: agence ^plan [list|show|add] [--org ORG]
+      mode_knowledge "plan" "$init_args"
+      return $?
+      ;;
+    "todo")
+      # Personal todos (hermetic, local only)
+      # Usage: agence ^todo [list|show|add] [--owner NAME]
+      mode_knowledge "todo" "$init_args"
+      return $?
+      ;;
+    "fault")
+      # Faults/incidents (local, nexus, sanitize before sharing)
+      # Usage: agence ^fault [list|show|add] [--sanitize]
+      mode_knowledge "fault" "$init_args"
+      return $?
+      ;;
+    "issue")
+      # Issues/discoveries (team-shared, synthetic)
+      # Usage: agence ^issue [list|show|add]
+      mode_knowledge "issue" "$init_args"
+      return $?
+      ;;
+    "task")
+      # Team tasks (shared, organic)
+      # Usage: agence ^task [list|show|add] [--assign AGENT|HUMAN]
+      mode_knowledge "task" "$init_args"
+      return $?
+      ;;
+    "job")
+      # Robot jobs (shared, organic)
+      # Usage: agence ^job [list|show|add] [--agent NAME]
+      mode_knowledge "job" "$init_args"
+      return $?
+      ;;
     *)
       echo "Error: Unknown init command: $init_cmd" >&2
-      echo "Available: init, reload, install, save, learn, commit, push, session" >&2
+      echo "Available: init, reload, install, save, learn, commit, push, session, lesson, log, plan, todo, fault, issue, task, job" >&2
       return 1
       ;;
   esac
@@ -811,6 +864,223 @@ mode_session() {
   esac
 
   return $?
+}
+
+# ============================================================================
+# MODE: KNOWLEDGE MANAGEMENT (lesson, log, plan, todo, fault, issue, task, job)
+# ============================================================================
+# Unified handler for all knowledge/work management commands
+# Routes to appropriate scope: HERMETIC, NEXUS, SYNTHETIC, ORGANIC
+# Example: agence ^lesson list
+# Example: agence ^plan add "Phase 2 roadmap"
+# Example: agence ^todo list
+
+mode_knowledge() {
+  local cmd_type="$1"    # lesson, log, plan, todo, fault, issue, task, job
+  local input="$2"       # Remaining arguments
+  
+  local sub_cmd="${input%% *}"     # list, show, add
+  sub_cmd="${sub_cmd:-list}"       # Default to list
+  
+  local args="${input#$sub_cmd}"
+  args="${args# }"  # Trim leading space
+  
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Knowledge mode: $cmd_type/$sub_cmd args='$args'" >&2
+  
+  # ============================================================================
+  # DETERMINE SCOPE & PATHS
+  # ============================================================================
+  
+  local scope_type  # HERMETIC, NEXUS, SYNTHETIC, ORGANIC
+  local base_path
+  local default_org="l-agence.org"
+  local org="$default_org"
+  
+  # Parse command-specific options
+  case "$cmd_type" in
+    "lesson"|"plan"|"issue")
+      # SYNTHETIC scope (team-shared)
+      scope_type="SYNTHETIC"
+      # Support --org flag: agence ^lesson list --org acme.tld
+      if [[ "$args" == *"--org"* ]]; then
+        org=$(echo "$args" | sed -n 's/.*--org[= ]\([^ ]*\).*/\1/p')
+      fi
+      base_path="$AGENCE_ROOT/synthetic/@$org"
+      ;;
+    "log"|"fault")
+      # NEXUS scope (local, operational)
+      scope_type="NEXUS"
+      base_path="$AGENCE_ROOT/nexus"
+      ;;
+    "todo")
+      # HERMETIC scope (local, personal)
+      scope_type="HERMETIC"
+      base_path="$AGENCE_ROOT/hermetic/@"
+      ;;
+    "task"|"job")
+      # ORGANIC scope (team-assigned work)
+      scope_type="ORGANIC"
+      if [[ "$args" == *"--org"* ]]; then
+        org=$(echo "$args" | sed -n 's/.*--org[= ]\([^ ]*\).*/\1/p')
+        base_path="$AGENCE_ROOT/organic/@$org"
+      else
+        base_path="$AGENCE_ROOT/organic"
+      fi
+      ;;
+  esac
+  
+  # Create scope-specific subdirectory
+  local data_dir="$base_path/${cmd_type}s"  # lessons/, logs/, plans/, todos/, faults/, issues/, tasks/, jobs/
+  mkdir -p "$data_dir" 2>/dev/null
+  
+  # Create INDEX file if missing
+  local index_file="$data_dir/INDEX.md"
+  if [[ ! -f "$index_file" ]]; then
+    cat > "$index_file" << EOF
+# $cmd_type Index ($scope_type/$org)
+
+Scope: $scope_type
+Org: $org
+Last Updated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+## Entries
+
+(entries will be listed here)
+EOF
+  fi
+  
+  # ============================================================================
+  # ROUTE SUBCOMMANDS
+  # ============================================================================
+  
+  case "$sub_cmd" in
+    "list")
+      knowledge_list "$cmd_type" "$data_dir" "$index_file" "$args"
+      ;;
+    "show")
+      local item; item=$(echo "$args" | awk '{print $1}')
+      if [[ -z "$item" ]]; then
+        echo "Usage: agence ^$cmd_type show <name/id>" >&2
+        return 1
+      fi
+      knowledge_show "$cmd_type" "$data_dir" "$item"
+      ;;
+    "add")
+      local title; title=$(echo "$args" | sed 's/--[^ ]*[= ][^ ]*//g' | xargs)
+      if [[ -z "$title" ]]; then
+        echo "Usage: agence ^$cmd_type add <title> [--org ORG] [other options]" >&2
+        return 1
+      fi
+      knowledge_add "$cmd_type" "$data_dir" "$index_file" "$title" "$args"
+      ;;
+    *)
+      echo "Error: Unknown subcommand: $sub_cmd" >&2
+      echo "Available subcommands: list, show, add" >&2
+      return 1
+      ;;
+  esac
+  
+  return $?
+}
+
+# ============================================================================
+# KNOWLEDGE COMMAND HELPERS
+# ============================================================================
+
+knowledge_list() {
+  local cmd_type="$1"
+  local data_dir="$2"
+  local index_file="$3"
+  local args="$4"
+  
+  echo "[${cmd_type}]"
+  
+  # If jq is available, try to parse JSON files
+  if [[ -f "$index_file" && $(command -v jq &>/dev/null && echo 1 || echo 0) == "1" ]]; then
+    # Try to read structured metadata
+    if [[ -f "${data_dir}/INDEX.json" ]]; then
+      jq '.entries[] | "\(.id): \(.title) (\(.date))"' "${data_dir}/INDEX.json" 2>/dev/null || {
+        echo "  (unable to parse)"
+      }
+    fi
+  fi
+  
+  # Fallback: list markdown files
+  local count=0
+  for entry in "$data_dir"/*.md; do
+    [[ ! -f "$entry" ]] && continue
+    [[ "$(basename "$entry")" == "INDEX.md" ]] && continue
+    
+    local name; name=$(basename "$entry" .md)
+    local title; title=$(head -n 1 "$entry" | sed 's/^# //')
+    echo "  - $name: $title"
+    ((count++)) || true
+  done
+  
+  if [[ $count -eq 0 && ! -f "${data_dir}/INDEX.json" ]]; then
+    echo "  (no entries)"
+  fi
+  
+  return 0
+}
+
+knowledge_show() {
+  local cmd_type="$1"
+  local data_dir="$2"
+  local item="$3"
+  
+  # Try structured JSON first
+  if [[ -f "${data_dir}/${item}.json" ]]; then
+    jq '.' "${data_dir}/${item}.json"
+    return 0
+  fi
+  
+  # Fall back to markdown
+  if [[ -f "${data_dir}/${item}.md" ]]; then
+    cat "${data_dir}/${item}.md"
+    return 0
+  fi
+  
+  echo "Error: $cmd_type '$item' not found" >&2
+  return 1
+}
+
+knowledge_add() {
+  local cmd_type="$1"
+  local data_dir="$2"
+  local index_file="$3"
+  local title="$4"
+  local args="$5"
+  
+  # Generate short ID: timestamp + first 4 chars of title
+  local ts; ts=$(date +%s)
+  local short_id; short_id=$(echo "$title" | tr ' ' '_' | cut -c1-8 | tr -cd '[:alnum:]_')
+  local entry_id="${ts}_${short_id}"
+  local entry_file="${data_dir}/${entry_id}.md"
+  
+  # Create entry
+  cat > "$entry_file" << EOF
+# $title
+
+**Created**: $(date -u +%Y-%m-%dT%H:%M:%SZ)  
+**ID**: $entry_id
+
+## Content
+
+Add your content here.
+EOF
+  
+  echo "✓ $cmd_type entry created: $entry_id"
+  echo "  File: $entry_file"
+  
+  # Update INDEX if JSON format exists
+  if [[ -f "${data_dir}/INDEX.json" ]]; then
+    jq ".entries += [{id: \"$entry_id\", title: \"$title\", date: \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}]" \
+      "${data_dir}/INDEX.json" > "${data_dir}/INDEX.json.tmp" && \
+      mv "${data_dir}/INDEX.json.tmp" "${data_dir}/INDEX.json"
+  fi
+  
+  return 0
 }
 
 init_agence_environment() {

@@ -1,5 +1,6 @@
 {
     "recommendations": [
-        "extensiontotal.extensiontotal-vscode"
+        "extensiontotal.extensiontotal-vscode",
+        "ms-vscode-remote.remote-containers"
     ]
 }
