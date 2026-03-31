@@ -1,12 +1,82 @@
 [
+  // ─── LEGACY SHELL LAUNCHERS ─────────────────────────────────────
   {
-    "key": "alt+shift+4", // tiled bash session
+    "key": "alt+shift+4",
     "command": "workbench.action.tasks.runTask",
     "args": "Agentic Bash Session (ai-shell)"
   },
   {
-    "key": "alt+shift+5", // tiled powershell session
+    "key": "alt+shift+5",
     "command": "workbench.action.tasks.runTask",
     "args": "Agentic PowerShell Session (ai-shell)"
-  }
+  },
+
+  // ─── SWARM TILE LAUNCHERS ────────────────────────────────────────
+  // Alt+Shift+0 → launch all agents (2-tile rows)
+  {
+    "key": "alt+shift+0",
+    "command": "workbench.action.tasks.runTask",
+    "args": "🌐 Swarm: Launch All Agents"
+  },
+  // Alt+Shift+C → @copilot 2-tile
+  {
+    "key": "alt+shift+c",
+    "command": "workbench.action.tasks.runTask",
+    "args": "🚀 Swarm: Launch @copilot (2-tile)"
+  },
+  // Alt+Shift+R → @ralph 2-tile
+  {
+    "key": "alt+shift+r",
+    "command": "workbench.action.tasks.runTask",
+    "args": "🚀 Swarm: Launch @ralph (2-tile)"
+  },
+  // Alt+Shift+S → @sonya 2-tile
+  {
+    "key": "alt+shift+s",
+    "command": "workbench.action.tasks.runTask",
+    "args": "🚀 Swarm: Launch @sonya (2-tile)"
+  },
+  // Alt+Shift+A → @aider 2-tile
+  {
+    "key": "alt+shift+a",
+    "command": "workbench.action.tasks.runTask",
+    "args": "🚀 Swarm: Launch @aider (2-tile)"
+  },
+
+  // ─── ^ QUICK COMMANDS ────────────────────────────────────────────
+  // Alt+Shift+H → ^help
+  {
+    "key": "alt+shift+h",
+    "command": "workbench.action.tasks.runTask",
+    "args": "^ agence help"
+  },
+  // Alt+Shift+Y → ^symbols (mnemon: sYmbols)
+  {
+    "key": "alt+shift+y",
+    "command": "workbench.action.tasks.runTask",
+    "args": "^ agence symbols"
+  },
+  // Alt+Shift+P → ^plan list
+  {
+    "key": "alt+shift+p",
+    "command": "workbench.action.tasks.runTask",
+    "args": "^ agence plan list"
+  },
+  // Alt+Shift+T → ^todo list
+  {
+    "key": "alt+shift+t",
+    "command": "workbench.action.tasks.runTask",
+    "args": "^ agence todo list"
+  },
+
+  // ─── CTRL+K: AGENT KILL (Phase 3 placeholder) ────────────────────
+  // Ctrl+K in terminal → sends SIGKILL to aibash subjell (%1 in ibash)
+  // BLOCKED until ibash signal handler is implemented (Phase 3 / v0.3.0)
+  // Uncomment when aibash trap handlers are live:
+  // {
+  //   "key": "ctrl+k",
+  //   "command": "workbench.action.terminal.sendSequence",
+  //   "args": { "text": "kill %1\n" },
+  //   "when": "terminalFocus && terminalProcessSupported"
+  // }
 ]

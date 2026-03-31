@@ -1,11 +1,33 @@
 {
     "windowsaistudio.openAIInferencePort": 8001,
+
+    // ─── SHELL: WSL-Ubuntu is the mandatory default ────────────────
+    // See codex/SETUP.md for rationale (path normalization, container parity)
+    "terminal.integrated.defaultProfile.windows": "Ubuntu (WSL)",
     "terminal.integrated.profiles.windows": {
+        "Ubuntu (WSL)": {
+            "path": "C:\\Windows\\System32\\wsl.exe",
+            "args": ["--distribution", "Ubuntu"],
+            "icon": "terminal-ubuntu",
+            "color": "terminal.ansiGreen"
+        },
+        "PowerShell (WSL)": {
+            "path": "C:\\Windows\\System32\\wsl.exe",
+            "args": ["--distribution", "Ubuntu", "--exec", "pwsh"],
+            "icon": "terminal-powershell",
+            "color": "terminal.ansiBlue"
+        },
         "MSYS2 Bash": {
             "path": "C:\\msys64\\usr\\bin\\bash.exe",
             "args": ["--login", "-i"],
             "icon": "terminal-bash"
         }
     },
-    "terminal.integrated.defaultProfile.windows": "Ubuntu (WSL)"
+
+    // ─── AGENCE WORKSPACE SETTINGS ────────────────────────────────
+    "files.eol": "\n",
+    "files.encoding": "utf8",
+    "editor.formatOnSave": false,
+    "terminal.integrated.fontSize": 13,
+    "terminal.integrated.fontFamily": "'Cascadia Code', 'Fira Code', monospace"
 }

@@ -1,6 +1,252 @@
 {
 	"version": "2.0.0",
 	"tasks": [
+
+		// ─────────────────────────────────────────────────────────────
+		// WSL 2-COLUMN TILE MODEL (Phase 1.5+)
+		// Each agent row: LEFT = human control plane | RIGHT = aibash
+		// Compound tasks launch both tiles side-by-side via "group"
+		// Ctrl+K kill handler: Phase 3 (requires aibash signal handler)
+		// ─────────────────────────────────────────────────────────────
+
+		{
+			"label": "⬛ @copilot: Human Plane (WSL)",
+			"type": "shell",
+			"command": "wsl.exe",
+			"args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/ibash"],
+			"isBackground": false,
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"group": "agent-copilot",
+				"focus": true,
+				"clear": false,
+				"title": "@copilot | HUMAN"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "🤖 @copilot: aibash (Agent Plane)",
+			"type": "shell",
+			"command": "wsl.exe",
+			"args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/aibash"],
+			"isBackground": false,
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"group": "agent-copilot",
+				"focus": false,
+				"clear": false,
+				"title": "@copilot | AGENT"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "🚀 Swarm: Launch @copilot (2-tile)",
+			"dependsOn": ["⬛ @copilot: Human Plane (WSL)", "🤖 @copilot: aibash (Agent Plane)"],
+			"dependsOrder": "parallel",
+			"problemMatcher": []
+		},
+
+		{
+			"label": "⬛ @ralph: Human Plane (WSL)",
+			"type": "shell",
+			"command": "wsl.exe",
+			"args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/ibash"],
+			"isBackground": false,
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"group": "agent-ralph",
+				"focus": true,
+				"clear": false,
+				"title": "@ralph | HUMAN"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "🤖 @ralph: aibash (Agent Plane)",
+			"type": "shell",
+			"command": "wsl.exe",
+			"args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/aibash"],
+			"isBackground": false,
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"group": "agent-ralph",
+				"focus": false,
+				"clear": false,
+				"title": "@ralph | AGENT"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "🚀 Swarm: Launch @ralph (2-tile)",
+			"dependsOn": ["⬛ @ralph: Human Plane (WSL)", "🤖 @ralph: aibash (Agent Plane)"],
+			"dependsOrder": "parallel",
+			"problemMatcher": []
+		},
+
+		{
+			"label": "⬛ @sonya: Human Plane (WSL)",
+			"type": "shell",
+			"command": "wsl.exe",
+			"args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/ibash"],
+			"isBackground": false,
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"group": "agent-sonya",
+				"focus": true,
+				"clear": false,
+				"title": "@sonya | HUMAN"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "🤖 @sonya: aibash (Agent Plane)",
+			"type": "shell",
+			"command": "wsl.exe",
+			"args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/aibash"],
+			"isBackground": false,
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"group": "agent-sonya",
+				"focus": false,
+				"clear": false,
+				"title": "@sonya | AGENT"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "🚀 Swarm: Launch @sonya (2-tile)",
+			"dependsOn": ["⬛ @sonya: Human Plane (WSL)", "🤖 @sonya: aibash (Agent Plane)"],
+			"dependsOrder": "parallel",
+			"problemMatcher": []
+		},
+
+		{
+			"label": "⬛ @aider: Human Plane (WSL)",
+			"type": "shell",
+			"command": "wsl.exe",
+			"args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/ibash"],
+			"isBackground": false,
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"group": "agent-aider",
+				"focus": true,
+				"clear": false,
+				"title": "@aider | HUMAN"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "🤖 @aider: aibash (Agent Plane)",
+			"type": "shell",
+			"command": "wsl.exe",
+			"args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/aibash"],
+			"isBackground": false,
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"group": "agent-aider",
+				"focus": false,
+				"clear": false,
+				"title": "@aider | AGENT"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "🚀 Swarm: Launch @aider (2-tile)",
+			"dependsOn": ["⬛ @aider: Human Plane (WSL)", "🤖 @aider: aibash (Agent Plane)"],
+			"dependsOrder": "parallel",
+			"problemMatcher": []
+		},
+
+		{
+			"label": "🌐 Swarm: Launch All Agents",
+			"dependsOn": [
+				"🚀 Swarm: Launch @copilot (2-tile)",
+				"🚀 Swarm: Launch @ralph (2-tile)",
+				"🚀 Swarm: Launch @sonya (2-tile)",
+				"🚀 Swarm: Launch @aider (2-tile)"
+			],
+			"dependsOrder": "parallel",
+			"problemMatcher": []
+		},
+
+		// ─────────────────────────────────────────────────────────────
+		// ^ QUICK COMMAND TASKS
+		// Run agence knowledge commands without leaving VSCode
+		// ─────────────────────────────────────────────────────────────
+
+		{
+			"label": "^ agence help",
+			"type": "shell",
+			"command": "wsl.exe",
+			"args": ["--distribution", "Ubuntu", "--exec", "bash", "-c", "cd /mnt/c/Users/steff/git/.agence && bin/agence help; read -p 'Press Enter to close...'"],
+			"isBackground": false,
+			"presentation": { "reveal": "always", "panel": "shared", "focus": true, "clear": true },
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
+			"label": "^ agence symbols",
+			"type": "shell",
+			"command": "wsl.exe",
+			"args": ["--distribution", "Ubuntu", "--exec", "bash", "-c", "cd /mnt/c/Users/steff/git/.agence && bin/agence symbols; read -p 'Press Enter to close...'"],
+			"isBackground": false,
+			"presentation": { "reveal": "always", "panel": "shared", "focus": true, "clear": true },
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
+			"label": "^ agence plan list",
+			"type": "shell",
+			"command": "wsl.exe",
+			"args": ["--distribution", "Ubuntu", "--exec", "bash", "-c", "cd /mnt/c/Users/steff/git/.agence && bin/agence plan list; read -p 'Press Enter to close...'"],
+			"isBackground": false,
+			"presentation": { "reveal": "always", "panel": "shared", "focus": true, "clear": true },
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
+			"label": "^ agence todo list",
+			"type": "shell",
+			"command": "wsl.exe",
+			"args": ["--distribution", "Ubuntu", "--exec", "bash", "-c", "cd /mnt/c/Users/steff/git/.agence && bin/agence todo list; read -p 'Press Enter to close...'"],
+			"isBackground": false,
+			"presentation": { "reveal": "always", "panel": "shared", "focus": true, "clear": true },
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
+			"label": "^ agence lesson list",
+			"type": "shell",
+			"command": "wsl.exe",
+			"args": ["--distribution", "Ubuntu", "--exec", "bash", "-c", "cd /mnt/c/Users/steff/git/.agence && bin/agence lesson list; read -p 'Press Enter to close...'"],
+			"isBackground": false,
+			"presentation": { "reveal": "always", "panel": "shared", "focus": true, "clear": true },
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
+			"label": "^ agence status",
+			"type": "shell",
+			"command": "wsl.exe",
+			"args": ["--distribution", "Ubuntu", "--exec", "bash", "-c", "cd /mnt/c/Users/steff/git/.agence && bin/agence status; read -p 'Press Enter to close...'"],
+			"isBackground": false,
+			"presentation": { "reveal": "always", "panel": "shared", "focus": true, "clear": true },
+			"group": "build",
+			"problemMatcher": []
+		},
+
+		// ─────────────────────────────────────────────────────────────
+		// LEGACY TASKS (PowerShell / shell-based — kept for compat)
+		// ─────────────────────────────────────────────────────────────
+
 		{
 			"label": "Agentic Bash Session",
 			"type": "shell",
