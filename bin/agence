@@ -92,22 +92,30 @@ detect_shell_environment
 normalize_path() {
   local path="$1"
   
-  # If cygwin, convert /cygdrive/c/ to /c/ (mingw style)
+  # WSL-native (preferred): use realpath to canonicalize
+  # This resolves symlinks, removes .., and gives true absolute path
+  if [[ "$AGENCE_PATH_STYLE" == "posix" ]] || [[ "$AGENCE_PATH_STYLE" == "wsl" ]]; then
+    if command -v realpath &>/dev/null; then
+      path="$(realpath -m "$path" 2>/dev/null || echo "$path")"
+    fi
+    echo "$path"
+    return
+  fi
+
+  # Legacy: cygwin /cygdrive/c/ → /c/
   if [[ "$AGENCE_PATH_STYLE" == "mingw" ]] && [[ "$path" == /cygdrive/* ]]; then
     path="${path/\/cygdrive\//\/}"
   fi
-  
-  # If Windows (for PowerShell), convert to Windows style (C:\...)
+
+  # Legacy: PowerShell Windows-style conversion
   if [[ "$AGENCE_PATH_STYLE" == "windows" ]]; then
-    # Convert unix paths to Windows paths
     if [[ "$path" == /* ]]; then
-      # /c/users/... → C:\Users\...
       local drive="${path:1:1}"
       local rest="${path:2}"
       path="${drive}:${rest//\//\\}"
     fi
   fi
-  
+
   echo "$path"
 }
 
@@ -308,9 +316,9 @@ EOF
 }
 
 show_version() {
-  echo "Agence version 0.1.0 (alpha)"
-  echo "[VERSION]: 0.1.0 (alpha)"
-  echo "[RELEASE]: main"
+  echo "Agence version 0.2.3.1"
+  echo "[VERSION]: 0.2.3.1"
+  echo "[RELEASE]: rel_0.2.2_agence_swarm_sessions"
 }
 
 # ============================================================================
@@ -649,6 +657,11 @@ mode_init() {
       push_agence_changes
       return $?
       ;;
+    "help")
+      # Show detailed command help: agence ^help
+      mode_help
+      return $?
+      ;;
     "session")
       # Session management: agence ^session <subcommand> [args]
       mode_session "$init_args"
@@ -704,13 +717,183 @@ mode_init() {
       ;;
     *)
       echo "Error: Unknown init command: $init_cmd" >&2
-      echo "Available: init, reload, install, save, learn, commit, push, session, lesson, log, plan, todo, fault, issue, task, job" >&2
+      echo "Available: help, init, reload, install, save, learn, commit, push, session, lesson, log, plan, todo, fault, issue, task, job" >&2
       return 1
       ;;
   esac
 
   return $?
 }
+
+# ============================================================================
+# ROUTING: ORG PATH RESOLUTION (@ symlink inheritance)
+# ============================================================================
+# Resolves scope path using @ symlink if present, falls back to explicit org dir.
+# Law 8: Use realpath() ONLY for validation — never create symlinks here.
+#
+# Usage: resolve_org_path "/path/to/synthetic" "l-agence.org"
+# Returns: /path/to/synthetic/@l-agence.org (via symlink) or /path/to/synthetic/l-agence.org
+resolve_org_path() {
+  local scope_root="$1"      # e.g. $AGENCE_ROOT/synthetic
+  local fallback_org="$2"    # e.g. l-agence.org
+
+  local symlink_path="$scope_root/@"
+  local named_org_path="$scope_root/@$fallback_org"
+  local canonical_path="$scope_root/$fallback_org"
+
+  # Tier 1: @ symlink (user-set org context via jlink / system setup)
+  # e.g. synthetic/@ -> l-agence.org
+  if [[ -L "$symlink_path" ]]; then
+    echo "$symlink_path"
+    return 0
+  fi
+
+  # Tier 2: named @org SYMLINK only (explicit org routing via jlink)
+  # e.g. synthetic/@l-agence.org -> ../l-agence.org (user-created symlink)
+  # NOTE: a plain @org directory is NOT a routing symlink (skip it)
+  if [[ -L "$named_org_path" ]]; then
+    echo "$named_org_path"
+    return 0
+  fi
+
+  # Tier 3: canonical org directory (e.g. synthetic/l-agence.org) — most common
+  echo "$canonical_path"
+  return 0
+}
+
+# ============================================================================
+# MODE: HELP (^help)
+# ============================================================================
+# Structured command help with scope context
+# Example: agence ^help
+
+mode_help() {
+  local version; version="0.2.3.1"
+
+  cat << EOF
+╔══════════════════════════════════════════════════════════════════╗
+║  Agence v${version} — Agentic Engineering Collaboration Environment  ║
+╚══════════════════════════════════════════════════════════════════╝
+
+SHELL ENVIRONMENT
+  Default:   WSL-Ubuntu bash (required)
+  AGENCE_ROOT: ${AGENCE_ROOT:-unset}
+  GIT_REPO:    ${GIT_REPO:-unset (auto-detect)}
+  Shell:       ${AGENCE_SHELL_ENV:-unknown}
+
+KNOWLEDGE COMMANDS (^ prefix)
+
+  HERMETIC — Local only, never committed (personal)
+  ─────────────────────────────────────────────────
+  ^todo  [list|show|add]              Personal todos     → hermetic/@/todos/
+
+  NEXUS — Local only (sensitive: faults, logs, sessions)
+  ───────────────────────────────────────────────────────
+  ^fault [list|show]                  Incidents          → nexus/faults/
+  ^log   [list|show|add]              Ops logs           → nexus/logs/
+
+  SYNTHETIC — Team-shared via Git (committed)
+  ────────────────────────────────────────────
+  ^lesson [list|show|add] [--org ORG]  Lessons learned  → synthetic/@/lessons/
+  ^plan   [list|show|add] [--org ORG]  Strategic plans  → synthetic/@/plans/
+  ^issue  [list|show|add] [--org ORG]  Discoveries      → synthetic/@/issues/
+
+  ORGANIC — Team work, agent-routable
+  ─────────────────────────────────────
+  ^task  [list|show|add] [--assign @agent|@user]  Tasks → organic/tasks/
+  ^job   [list|show|add] [--agent NAME]           Jobs  → organic/jobs/
+
+WORKFLOW COMMANDS
+  ^init                     Initialize Agence environment
+  ^reload                   Reload context files
+  ^save  [notes]            Save session checkpoint
+  ^learn                    Extract lessons from changes
+  ^commit [message]         Commit Agence changes
+  ^push                     Push committed changes
+  ^session [list|view|...]  Manage agent sessions
+  ^stash                    Stash local changes
+  ^sync                     Sync with remote
+
+ROUTING INHERITANCE
+  Commands inherit org context from @ symlink (e.g. synthetic/@→l-agence.org)
+  Override with --org flag:  agence ^plan list --org acme.tld
+
+SYMBOLS (quick ref)
+  +task   pending    &task@agent  assigned    %task@agent  in-progress
+  -task   completed  _task        paused      #task        held
+  */**/*** priority  ~,\$          reserved (swarm, v0.3.2+)
+
+See also: codex/TAXONOMY.md (scopes), codex/LAWS.md (constraints)
+EOF
+  return 0
+}
+
+# ============================================================================
+# BASH COMPLETION
+# ============================================================================
+# Source this file or add to ~/.bashrc:
+#   source /path/to/agence
+# Or install standalone:
+#   agence !completion >> ~/.bashrc
+
+_agence_completion() {
+  local cur prev words
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+  local caret_commands="help init reload install save learn commit push stash sync session lesson log plan todo fault issue task job"
+  local knowledge_subcmds="list show add"
+
+  case "${COMP_WORDS[1]}" in
+    "^help"|"^init"|"^reload"|"^save"|"^learn"|"^stash"|"^sync"|"^push")
+      COMPREPLY=()
+      ;;
+    "^lesson"|"^plan"|"^issue")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "$knowledge_subcmds" -- "$cur") )
+      elif [[ "$cur" == "--"* ]]; then
+        COMPREPLY=( $(compgen -W "--org" -- "$cur") )
+      fi
+      ;;
+    "^log"|"^fault"|"^todo")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "$knowledge_subcmds" -- "$cur") )
+      fi
+      ;;
+    "^task")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "$knowledge_subcmds" -- "$cur") )
+      elif [[ "$cur" == "--"* ]]; then
+        COMPREPLY=( $(compgen -W "--assign" -- "$cur") )
+      fi
+      ;;
+    "^job")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "$knowledge_subcmds" -- "$cur") )
+      elif [[ "$cur" == "--"* ]]; then
+        COMPREPLY=( $(compgen -W "--agent" -- "$cur") )
+      fi
+      ;;
+    "^session")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "list view handoff assign attach export import push pull" -- "$cur") )
+      fi
+      ;;
+    *)
+      # First argument: suggest ^ commands
+      if [[ $COMP_CWORD -eq 1 ]]; then
+        local suggestions=""
+        for cmd in $caret_commands; do
+          suggestions="$suggestions ^$cmd"
+        done
+        COMPREPLY=( $(compgen -W "$suggestions" -- "$cur") )
+      fi
+      ;;
+  esac
+}
+
+complete -F _agence_completion agence
 
 # ============================================================================
 # MODE: SESSION MANAGEMENT
@@ -904,8 +1087,12 @@ mode_knowledge() {
       # Support --org flag: agence ^lesson list --org acme.tld
       if [[ "$args" == *"--org"* ]]; then
         org=$(echo "$args" | sed -n 's/.*--org[= ]\([^ ]*\).*/\1/p')
+        base_path="$AGENCE_ROOT/synthetic/@$org"
+      else
+        # Routing inheritance: prefer @ symlink (user-set org context)
+        # Falls back to explicit l-agence.org if @ symlink missing
+        base_path=$(resolve_org_path "$AGENCE_ROOT/synthetic" "$default_org")
       fi
-      base_path="$AGENCE_ROOT/synthetic/@$org"
       ;;
     "log"|"fault")
       # NEXUS scope (local, operational)
@@ -915,7 +1102,8 @@ mode_knowledge() {
     "todo")
       # HERMETIC scope (local, personal)
       scope_type="HERMETIC"
-      base_path="$AGENCE_ROOT/hermetic/@"
+      # Use @ symlink if present in hermetic
+      base_path=$(resolve_org_path "$AGENCE_ROOT/hermetic" "$default_org")
       ;;
     "task"|"job")
       # ORGANIC scope (team-assigned work)
@@ -996,12 +1184,13 @@ knowledge_list() {
   echo "[${cmd_type}]"
   
   # If jq is available, try to parse JSON files
-  if [[ -f "$index_file" && $(command -v jq &>/dev/null && echo 1 || echo 0) == "1" ]]; then
-    # Try to read structured metadata
-    if [[ -f "${data_dir}/INDEX.json" ]]; then
-      jq '.entries[] | "\(.id): \(.title) (\(.date))"' "${data_dir}/INDEX.json" 2>/dev/null || {
-        echo "  (unable to parse)"
-      }
+  # Handles multiple schema variants (id/lesson_id, date/date_extracted)
+  if [[ -f "${data_dir}/INDEX.json" ]] && command -v jq &>/dev/null; then
+    local parsed
+    parsed=$(jq -r '.entries[]? | [(.id // .lesson_id // "?"), (.title // "(untitled)"), (.date // .date_extracted // "")] | "\(.[0]): \(.[1])\(if .[2] != "" then " (\(.[2]))" else "" end)"' "${data_dir}/INDEX.json" 2>/dev/null)
+    if [[ -n "$parsed" ]]; then
+      echo "$parsed" | sed 's/^/  /'
+      return 0
     fi
   fi
   
@@ -1017,7 +1206,7 @@ knowledge_list() {
     ((count++)) || true
   done
   
-  if [[ $count -eq 0 && ! -f "${data_dir}/INDEX.json" ]]; then
+  if [[ $count -eq 0 ]]; then
     echo "  (no entries)"
   fi
   
