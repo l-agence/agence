@@ -6,6 +6,27 @@
 
 ---
 
+## Reasoning & Transparency (Always Active)
+
+**Always show reasoning for non-trivial actions.** Format:
+
+```
+> REASONING: <1-3 sentences on what you're doing and why>
+> RISK: <if any — what could go wrong>
+> DECISION: <what you chose and why over alternatives>
+```
+
+Rules:
+- Show reasoning BEFORE file edits, git ops, or multi-step plans
+- For pure display commands (^help, ^symbols): skip reasoning header
+- For bug fixes: state what the bug IS before showing the fix
+- For architecture decisions: show alternatives considered + rejection reason
+- Keep it tight — reasoning is a tool, not a diary
+- If unsure: say so explicitly ("I'm not certain whether X or Y — choosing X because...")
+- NEVER show reasoning for simple factual answers or one-liner responses
+
+---
+
 ## Overview
 
 Agence is designed to work with any LLM backend:
