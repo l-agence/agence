@@ -2,7 +2,7 @@
 
 **Author**: Stephane Korning  
 **Status**: Living document — draft, not canonical  
-**Last updated**: 2026-03-28
+**Last updated**: 2026-03-31
 
 ---
 
@@ -22,11 +22,14 @@ OS boundary, and governed by immutable CODEX law.
 | Version | Branch / Tag | Status | Summary |
 |---------|-------------|--------|---------|
 | v0.1 | master | ✅ Stable | Core framework: CODEX, NEXUS, agents, bin/agence |
-| v0.2.2 | rel_0.2.2_agence_swarm_sessions | ✅ Current base | SWARM engine, router v0.4, session persistence, ishell, blast_radius |
-| v0.3.0 | lost (AI incident 2026-03) | ❌ Lost | ShellSpec tests, power shell integration, ledger, security hardening |
-| v0.4 | next | 🚧 Planning | Dev-containers + GitHub Workspaces per agent |
-| v0.5 | future | 📋 Planned | Local swarm launch |
-| v0.6 | future | 📋 Planned | Skupper multi-cloud |
+| v0.2.2 | rel_0.2.2_agence_swarm_sessions | ✅ Base | SWARM engine, router v0.4, session persistence, ishell, blast_radius |
+| v0.3.0 | lost (AI incident 2026-03) | ❌ Lost | ShellSpec tests, ledger, security hardening — see incident note below |
+| v0.2.3.1 | rel_0.2.2_agence_swarm_sessions | ✅ **Released 2026-03-31** | Architecture locked: symbol hierarchy, scope model, path validation, WSL-native shell |
+| v0.2.4 | rel_0.2.2_agence_swarm_sessions | ✅ **Released 2026-03-31** | Command router (8 cmds), backport 15 functions, VSCode 2-tile swarm model, bin/ cleanup |
+| v0.2.5 | next | 🚧 Planning | Docker foundations, matrix math algorithm, Git-native agent locking |
+| v0.3.0 (new) | future | 📋 Planned | VSCode tile integration: 2-column layout, POSIX job control, Ctrl+K signal handler |
+| v0.3.1 | future | 📋 Planned | Multi-agent orchestrator, DWM gating, task priority routing |
+| v0.3.2+ | future | 📋 Planned | Skupper multi-cloud swarm |
 
 ---
 
@@ -63,17 +66,84 @@ Interim mitigation until Phase 2 containers arrive:
 - Path normalization to absolute Windows paths internally; MSYS2 translation only at display boundary
 
 ### Deliverables
-- [ ] Reconstruct ShellSpec test suite
-- [ ] Implement write-gate process (`bin/aigate`)
-- [ ] Immutable `.ailedger` (append-only, JSONL)
-- [ ] POSIX path normalization — safe, tested, no junction-at-root
-- [ ] `swarm` fully integrated with `bin/agence`
-- [ ] `aisession` resume + handoff working
-- [ ] All T0–T3 tiers wired into `router.sh` + `agence`
+- [x] ~~POSIX path normalization~~ — **done 2026-03-31**: `realpath()` before validation, no junction creation in security layer (`codex/LAWS.md § Law 8`)
+- [x] ~~`aisession` resume + handoff working~~ — **done 2026-03-31**: `^handoff`, `^pickup`, `^pause`, `^resume` all backported and wired
+- [x] ~~All T0–T3 tiers wired into `router.sh` + `agence`~~ — **done 2026-03-31**: commands.json T0/T1/T2/T3 tiers, 11 git commands, all modes dispatched
+- [ ] Reconstruct ShellSpec test suite — deferred (low risk given WSL-native baseline)
+- [ ] Implement write-gate process (`bin/aigate`) — deferred to v0.2.5 (Docker phase)
+- [ ] Immutable `.ailedger` (append-only, JSONL) — deferred to v0.3.1 (orchestrator phase)
+- [ ] `swarm` fully integrated with `bin/agence` — deferred to v0.3.0 (tile model phase)
 
 ---
 
-## Phase 2 — Dev-Container Agent Isolation (v0.4)
+---
+
+## Design Decisions Locked In — 2026-03-31
+
+*Session: Haiku (planning) + Sonnet/Copilot (implementation). Branch: rel_0.2.2_agence_swarm_sessions.*
+
+### 1. Symbol Hierarchy (Extensible, Not Flat)
+All agent state is **signed linear algebra** — no state database, matrices are the state.
+
+| Tier | Symbols | Active? | Meaning |
+|------|---------|---------|--------|
+| Agent-level | `+, &, %, -, _, #` | ✅ v0.2.3.1+ | Task lifecycle (pending → assigned → progress → done) |
+| Swarm-level | `~, $` | 🔒 reserved v0.3.2+ | Skupper swarm queuing + coordination |
+| Priority | `*, **, ***` | ✅ v0.2.3.1+ | Independent of state, orthogonal |
+| Routing | `@agent, @org` | ✅ | Suffix-based, composes cleanly |
+
+**Key math**: `%completion = |negatives| / total`. Net work = signed sum. No state store.
+
+### 2. Scope Model (Privacy + Authority)
+```
+HERMETIC (local, personal)  → notes, todos (NEVER committed)
+NEXUS    (local-only)       → faults, logs, sessions (sensitive, not shared raw)
+SYNTHETIC (team-shared)    → plans, lessons, issues, docs (committed to git)
+ORGANIC  (team-routable)   → tasks, jobs, workflows (matrix assignments)
+```
+See: `codex/TAXONOMY.md`
+
+### 3. Path Validation (Security Layer Constraint)
+- **Routing layer** (junctions/symlinks): Routing context only (`@`, `@org` switches) — KEEP
+- **Security layer**: Uses `realpath()` only — NEVER creates junctions or heals paths
+- **Future agents**: Run in Docker containers (pure POSIX paths `/workspace/...`), no path translation needed
+
+### 4. Shell Environment (Standardized)
+- **Mandatory default**: WSL-Ubuntu bash (`codex/SETUP.md`)
+- **Optional**: `pwsh` inside WSL for Windows-familiar devs
+- **NOT recommended**: Git Bash on Windows host (emulation hacks, path gotchas)
+- **Rationale**: Local dev = container environment (same bash, same paths)
+
+### 5. 2-Column Swarm Tile Model (VSCode)
+```
+Row per agent:
+  LEFT  tile: docker exec -it (Human Plane)  ← human authority, overrides agent
+  RIGHT tile: aibash/aishell (Agent Plane)   ← session-captured, traceable
+
+Coordination: POSIX job control
+  Ctrl+K → SIGKILL aibash (agent stop)
+  Ctrl+Z → SIGSTOP (suspend + fg/bg for recovery)
+  %jobs  → inspect running tasks
+```
+
+### 6. Git-Native Agent State (No Database)
+- Matrix state (`organic/matrix-state.json`) = source of truth on main branch
+- Agent branches commit task updates atomically
+- Custom merge strategy: priority + security_label resolves conflicts
+- Human-gated DWM: agents propose lessons → human reviews → merge only if approved
+
+### 7. Intelligent Cost Routing (to rebuild)
+Lost with v0.3.0. Design preserved:
+```
+Complexity = f(LOC, modules_affected) → trivial/small/medium/large
+Priority   = 1 + count(tasks_blocked_by_me) + human_overrides
+Model      = routing_table[priority][complexity]  → free/haiku/sonnet/opus
+```
+See: `synthetic/l-agence.org/plans/v0.2.5-docker-matrix.md` for rebuild spec.
+
+---
+
+## Phase 2 — Dev-Container Agent Isolation (v0.4 → renamed v0.2.5)
 
 **Goal**: Each agent lives in its own Docker container / GitHub Codespace. OS-level isolation
 replaces advisory guardrails. A minimal TypeScript/Node runtime is the only exposed interface.
@@ -95,11 +165,12 @@ Host (GIT_ROOT)
 ```
 
 Each container:
-- Runs a **locked-down TypeScript/Node API server** (no shell escape)
-- Mounts only its scoped workspace volume (read-only for shared codex, read-write for own nexus)
-- Exposes a minimal JSON API: `{ execute, read, write_request, status }`
+- Runs pure **aibash/aishell** (same scripts as local, no path translation)
+- Mounts workspace as `/workspace` volume (pure POSIX, path validation trivial)
+- `/run/secrets/` for credential injection (never exported outside container)
+- Session logs in `/workspace/nexus/sessions/` (mapped to host nexus via volume)
+- TypeScript/Node API layer optional (for orchestrator integration in v0.3.1)
 - All `write_request` calls validated by the **gate** before filesystem commit
-- Session logs written inside container, exported as metadata via API
 
 ### Write Gate becomes a Container Boundary
 
@@ -121,16 +192,49 @@ The gate process (running on host, different UID if possible) is the only thing 
 - Session persistence per container, ledger exported to shared nexus on handoff
 
 ### Deliverables
+- [ ] Dockerfile: WSL-Ubuntu LTS + bash + aibash/aishell (no path translation)
+- [ ] `/run/secrets/` injection pattern for agent credentials
+- [ ] Session metadata schema: left tile (human) + right tile (agent) streams
 - [ ] `devcontainer.json` template per agent tier (T0–T4)
-- [ ] TypeScript/Node API server (`agent-runtime/`) — minimal, locked down
-- [ ] `bin/aigate` — host-side write gate process
-- [ ] Docker Compose for local multi-agent launch
-- [ ] GitHub Codespace launch workflow
-- [ ] Agent identity (container name / env) flows through to session metadata
+- [ ] `bin/aigate` — host-side write gate process (validates scope, appends ledger)
+- [ ] Docker Compose for local 2-tile multi-agent launch
+- [ ] Agent identity flows through `AIDO_AGENT` env var to session metadata
 
 ---
 
-## Phase 3 — Local Swarm Launch (v0.5)
+## Phase 3 — VSCode Tile Integration + Job Control (v0.3.0)
+
+**Goal**: Humans see every agent's work in real-time. Full POSIX job control surfaces in VSCode.
+
+### Architecture
+```
+VSCode Terminal Grid (N rows × 2 columns):
+  ┌─────────────────────┬─────────────────────┐
+  │ ⬛ @ralph: Human    │ 🤖 @ralph: aibash   │
+  │   (docker exec -it) │   (agent plane)     │
+  ├─────────────────────┼─────────────────────┤
+  │ ⬛ @sonya: Human    │ 🤖 @sonya: aibash   │
+  ├─────────────────────┼─────────────────────┤
+  │ ⬛ @aider: Human    │ 🤖 @aider: aibash   │
+  └─────────────────────┴─────────────────────┘
+```
+
+### Key Controls
+- `Ctrl+K` → SIGKILL agent (human issues in LEFT tile, applies to RIGHT)
+- `Ctrl+Z` → SIGSTOP (suspend), `fg` to resume
+- `%jobs` → enumerate all agent tasks
+- Signal handlers live in `ibash/ishell` (privileged) — CANNOT be overridden by aibash
+
+### Deliverables
+- [ ] VSCode extension task: `🚀 Swarm: Launch All Agents` (N rows × 2 tiles, parallel)
+- [ ] Signal handler hierarchy: ibash → aisession → aibash (privileged chain)
+- [ ] `Ctrl+K` SIGKILL binding wired to aibash subprocess
+- [ ] Session capture: both left (human audit) + right (agent metadata) streams logged
+- [ ] `swarm` CLI: `swarm launch`, `swarm status`, `swarm kill @agent`
+
+---
+
+## Phase 4 — Local Swarm Launch + Orchestrator (v0.3.1, formerly v0.5)
 
 **Goal**: Launch a full local swarm — N agents in N containers, coordinated by `bin/swarm`,
 matrix state synced via git sharding.
@@ -177,7 +281,7 @@ Critical path recomputes automatically as tasks complete. Swarm shifts effort to
 
 ---
 
-## Phase 4 — Skupper Multi-Cloud Swarm (v0.6)
+## Phase 5 — Skupper Multi-Cloud Swarm (v0.3.2+, formerly v0.6)
 
 **Goal**: Swarm spans multiple clouds (AWS, Azure, GCP) without vendor lock-in.
 Skupper provides cloud-agnostic service mesh without VPN or centralized broker.
@@ -231,12 +335,24 @@ These apply across all phases:
 
 ## Open Design Questions
 
+### Resolved 2026-03-31
+- [x] ~~Path normalization strategy~~ → WSL-Ubuntu + Docker mounts (no translation needed)
+- [x] ~~Junctions in security layer~~ → routing only, NEVER in security validation
+- [x] ~~Symbol hierarchy~~ → Agent-level active (`+,&,%,-,_,#`), Swarm reserved (`~,$`)
+- [x] ~~Scope model~~ → HERMETIC/NEXUS/SYNTHETIC/ORGANIC (see TAXONOMY.md)
+- [x] ~~Human in-progress prefix~~ → `%task@user` (unified with agent, no separate `$`)
+- [x] ~~Cost routing~~ → auto-routed by orchestrator (priority × complexity matrix)
+
+### Still Open
 - [ ] Agent API contract v1.0 — define now before Phase 2 locks it in
 - [ ] `/` slash command namespace — Option D (passthrough) + `/g<cmd>` migration path
 - [ ] Ledger format — JSONL append-only, signed entries, SHA256 chain?
 - [ ] devcontainer tier sizing — T0 Alpine, T1 node-slim, T2+ full Ubuntu?
-- [ ] Cross-agent communication protocol — HTTP REST vs. message queue vs. git-based
-- [ ] Hermetic (`~`) context in containers — how does air-gap work with Phase 4?
+- [ ] Cross-agent communication protocol — git-based (current) vs. message queue vs. HTTP
+- [ ] Hermetic (`~`) context in containers — how does local-only hermetic work inside Docker?
+- [ ] `swarm` prefix (`~task`, `$task`) — activation criteria for v0.3.2+ (when not before?)
+- [ ] SWARM.md revision — heatmap model conflicts with new tile model; needs reflection
+- [ ] ailedger design — distributed append-only audit trail (pre-Skupper design needed)
 
 ---
 
