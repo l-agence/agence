@@ -337,7 +337,7 @@ main() {
   # Parse @agent prefix first (sets AGENCE_AGENT_PARAM, strips from input)
   input=$(parse_agent_prefix "$input")
 
-  # Early exits: help and version never need the LLM router
+  # Early exits: local-only commands that NEVER need the LLM router
   case "$1" in
     --help|-h|help)
       show_help
@@ -346,6 +346,48 @@ main() {
     --version|-v|version)
       show_version
       exit 0
+      ;;
+    symbols)
+      mode_symbols
+      exit 0
+      ;;
+    status)
+      mode_system "status"
+      exit 0
+      ;;
+    config)
+      mode_system "config"
+      exit 0
+      ;;
+    # Knowledge commands: never need LLM router
+    # Supports both: 'agence plan list' AND 'agence ^plan list'
+    lesson|log|plan|todo|fault|issue|task|job)
+      mode_knowledge "$1" "${*:2}"
+      exit $?
+      ;;
+    session)
+      mode_session "${*:2}"
+      exit $?
+      ;;
+    reindex)
+      reindex_knowledge_bases
+      exit $?
+      ;;
+    handoff)
+      handoff_to_agent "${*:2}"
+      exit $?
+      ;;
+    pickup)
+      pickup_handoff "${*:2}"
+      exit $?
+      ;;
+    pause)
+      pause_session "${*:2}"
+      exit $?
+      ;;
+    resume)
+      resume_session "${*:2}"
+      exit $?
       ;;
   esac
 

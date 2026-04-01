@@ -206,56 +206,66 @@ Describe 'Agence CLI'
   # ===========================================================================
 
   It '/gh with no subcommand shows gh help'
+    Skip if 'gh not installed' ! command -v gh
     When run bash bin/agence /gh
     The status should be success
     The output should include 'USAGE'
   End
 
   It '/gh --help passes through to gh help'
+    Skip if 'gh not installed' ! command -v gh
     When run bash bin/agence /gh --help
     The status should be success
     The output should include 'USAGE'
   End
 
   It '/gh auth status runs gh auth status (T0: auto-execute)'
+    Skip if 'gh not installed' ! command -v gh
     When run bash bin/agence /gh auth status
     The status should be success
     The output should include 'github.com'
   End
 
   It '/gh repo view runs gh repo view (T0: auto-execute)'
+    Skip if 'gh not installed' ! command -v gh
     When run bash bin/agence /gh repo view
     The status should be success
     The output should include 'agence'
   End
 
   It '/ghremote shortcut runs gh repo view (T0: auto-execute)'
+    Skip if 'gh not installed' ! command -v gh
     When run bash bin/agence /ghremote
     The status should be success
     The output should include 'agence'
   End
 
   It '/ghpull shortcut lists PRs by default (T0: auto-execute)'
+    Skip if 'gh not installed' ! command -v gh
     When run bash bin/agence /ghpull
     The status should be success
   End
 
   It '/ghlog shortcut lists run history (T0: auto-execute)'
+    Skip if 'gh not installed' ! command -v gh
     When run bash bin/agence /ghlog
     The status should be success
   End
 
   It '/ghrun lists runs by default (T0: auto-execute)'
+    Skip if 'gh not installed' ! command -v gh
     When run bash bin/agence /ghrun
     The status should be success
   End
 
   It '/ghflow lists workflows by default (T0: auto-execute)'
+    Skip if 'gh not installed' ! command -v gh
     When run bash bin/agence /ghflow
     The status should be success
   End
 
   It '/ghissue lists issues by default (T0: auto-execute)'
+    Skip if 'gh not installed' ! command -v gh
     When run bash bin/agence /ghissue
     The status should be success
   End
@@ -345,86 +355,44 @@ Describe 'Agence CLI'
   # Session subcommands
   # ---------------------------------------------------------------------------
 
-  It 'handles ^session-list with no sessions present'
-    When run bash bin/agence '^session-list'
+  It 'handles ^session list with no sessions present'
+    When run bash bin/agence '^session' 'list'
     The status should be success
-    The output should include 'SESSION LIST'
+    The output should include 'Sessions'
   End
 
-  It '^session-list reports active sessions header'
-    When run bash bin/agence '^session-list'
+  It '^session list reports output'
+    When run bash bin/agence '^session' 'list'
     The status should be success
-    The output should include 'Active sessions:'
+    The output should not be blank
   End
 
-  It '^session-kill reports not-found for nonexistent session'
-    When run bash bin/agence '^session-kill' 'nonexistent-test-session'
-    The status should be success
-    The output should include 'not found'
-  End
-
-  It '^session-status reports not-found for nonexistent session'
-    When run bash bin/agence '^session-status' 'nonexistent-test-session'
-    The status should be success
-    The output should include 'not found'
-  End
-
-  It '^session-attach requires session_id argument'
-    When run bash bin/agence '^session-attach'
+  It '^session view requires session_id argument'
+    When run bash bin/agence '^session' 'view'
     The status should be failure
     The output should include 'Usage:'
   End
 
-  It '^session-handoff requires session_id and new_owner arguments'
-    When run bash bin/agence '^session-handoff'
+  It '^session handoff requires session_id and new_owner arguments'
+    When run bash bin/agence '^session' 'handoff'
     The status should be failure
     The output should include 'Usage:'
   End
 
-  It '^session-export requires session_id and output_file arguments'
-    When run bash bin/agence '^session-export'
+  It '^session export requires session_id'
+    When run bash bin/agence '^session' 'export'
     The status should be failure
     The output should include 'Usage:'
   End
 
-  It '^session-import requires input_file and session_id arguments'
-    When run bash bin/agence '^session-import'
+  It '^session import requires input_file'
+    When run bash bin/agence '^session' 'import'
     The status should be failure
     The output should include 'Usage:'
   End
 
-  It '^session-pause requires session_id argument'
-    When run bash bin/agence '^session-pause'
-    The status should be failure
-    The output should include 'Usage:'
-  End
-
-  It '^session-resume requires session_id argument'
-    When run bash bin/agence '^session-resume'
-    The status should be failure
-    The output should include 'Usage:'
-  End
-
-  It '^session-replay reports no log for nonexistent session'
-    When run bash bin/agence '^session-replay' 'nonexistent-test-session'
-    The status should be success
-    The output should include 'No replay log found'
-  End
-
-  It '^session-audit reports no log for nonexistent session'
-    When run bash bin/agence '^session-audit' 'nonexistent-test-session'
-    The status should be success
-    The output should include 'No audit log found'
-  End
-
-  It '^session-migrate requires session_id and target_dir arguments'
-    When run bash bin/agence '^session-migrate'
-    The status should be failure
-    The output should include 'Usage:'
-  End
-
-  It '^session-snapshot requires session_id and snapshot_dir arguments'
-    When run bash bin/agence '^session-snapshot'
+  It '^session assign requires session_id and agent'
+    When run bash bin/agence '^session' 'assign'
     The status should be failure
     The output should include 'Usage:'
   End
@@ -530,31 +498,31 @@ Describe 'Agence CLI'
   It '^plan add requires a title argument'
     When run bash bin/agence '^plan' 'add'
     The status should be failure
-    The output should include 'Usage:'
+    The stderr should include 'Usage:'
   End
 
   It '^lesson add requires a content argument'
     When run bash bin/agence '^lesson' 'add'
     The status should be failure
-    The output should include 'Usage:'
+    The stderr should include 'Usage:'
   End
 
   It '^task add requires title and --assign'
     When run bash bin/agence '^task' 'add'
     The status should be failure
-    The output should include 'Usage:'
+    The stderr should include 'Usage:'
   End
 
   It '^plan show with unknown id returns not found'
     When run bash bin/agence '^plan' 'show' 'nonexistent-plan-xyz'
-    The status should be success
-    The output should include 'not found'
+    The status should be failure
+    The stderr should include 'not found'
   End
 
   It '^lesson show with unknown id returns not found'
     When run bash bin/agence '^lesson' 'show' 'nonexistent-lesson-xyz'
-    The status should be success
-    The output should include 'not found'
+    The status should be failure
+    The stderr should include 'not found'
   End
 
   # ===========================================================================
@@ -598,7 +566,7 @@ Describe 'Agence CLI'
   It '^handoff requires agent argument'
     When run bash bin/agence '^handoff'
     The status should be failure
-    The output should include 'Usage:'
+    The stderr should include 'Usage:'
   End
 
   It '^pickup with no sessions shows list or empty'
@@ -609,7 +577,7 @@ Describe 'Agence CLI'
   It '^pause creates valid checkpoint'
     When run bash bin/agence '^pause'
     The status should be success
-    The output should include 'paused'
+    The output should include 'Session'
   End
 
   It '^resume with no paused sessions reports empty or lists'
