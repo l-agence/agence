@@ -1,5 +1,10 @@
 # Agence Agents: Quick Reference
 
+> **Agent Roster** (v0.2.4): aider, aiko, chad, claudia, peers, ralph, sonya, copilot, pilot, kilo, cline, haiku, claude, azure, devops
+> **Default interactive**: @copilot (Copilot Chat) | **Default shell agent**: @pilot (Copilot CLI)
+
+---
+
 ## 1. Aider
 
 | Property | Value |
@@ -255,6 +260,65 @@ These bypass agent personas and use minimal system context.
 
 ---
 
+## New Personas (v0.2.4)
+
+### @claude — Anthropic Claude Code
+
+| Property | Value |
+|----------|-------|
+| **Type** | Agentic code assistant (Anthropic) |
+| **Model** | claude-sonnet-4-20250514 (default) |
+| **Interface** | Claude Code CLI (`claude` command) |
+| **Session** | aisession tile: LEFT=ibash, RIGHT=aibash+claude |
+| **Token Cost** | $$$ (expensive, use for complex tasks) |
+| **Best For** | Deep code analysis, architecture, long context |
+| **Flavor** | Precise, transparent, extended reasoning |
+
+```bash
+agence @claude "Redesign the routing layer"
+# → Spawns claude CLI in aibash tile with full aisession capture
+```
+
+---
+
+### @azure — GitHub Copilot for Azure
+
+| Property | Value |
+|----------|-------|
+| **Type** | Azure-specialized Copilot assistant |
+| **Model** | GitHub Copilot (Azure-tuned) |
+| **Interface** | VS Code Azure extension + Copilot Chat |
+| **Session** | aisession tile: LEFT=ibash, RIGHT=aibash+azure |
+| **Token Cost** | $$ (subscription-based) |
+| **Best For** | Azure resource mgmt, Bicep, ARM, AKS, cost optimization |
+| **Flavor** | Enterprise, Azure-native, infrastructure-focused |
+
+```bash
+agence @azure "Review my Bicep template for cost optimization"
+# → Routes to Copilot for Azure in VS Code context
+```
+
+---
+
+### @devops — Git DevOps Assistant
+
+| Property | Value |
+|----------|-------|
+| **Type** | DevOps & pipeline specialist |
+| **Model** | Auto-routed (priority × complexity) |
+| **Interface** | Shell + GitHub CLI (`gh`) + git |
+| **Session** | aisession tile: LEFT=ibash, RIGHT=aibash+devops |
+| **Token Cost** | $–$$$ (depends on complexity routing) |
+| **Best For** | CI/CD pipelines, git workflows, GitHub Actions, releases |
+| **Flavor** | Methodical, audit-aware, git-native |
+
+```bash
+agence @devops "Set up GitHub Actions for this repo"
+# → Routes to devops agent with gh + git tooling
+```
+
+---
+
 ## Invocation Examples
 
 ```bash
@@ -263,16 +327,24 @@ agence @aider "Add error handling to database.py"
 agence @chad "Review my Kubernetes config"
 agence @claudia "Design the observability layer"
 agence @aiko "How do I optimize my ML training pipeline?"
+agence @claude "Redesign the routing layer"
+agence @azure "Review my Bicep template"
+agence @devops "Set up GitHub Actions"
+
+# Shell agents (dual-tile model)
+agence !ralph         # spawn ralph in aibash (right tile)
+agence !pilot         # spawn copilot-cli in aibash (right tile)
+agence !bash          # generic aibash session
 
 # Direct models (no persona)
-agence @haiku "What's the weather?"
-agence @gpt-4o "Explain this error"
+agence @haiku "Quick question?"
+agence @gpt-4o "Full analysis please"
 
-# Default (uses @ symlink or auto-select)
+# Default (uses @ symlink → copilot)
 agence "What should I do next?"
 ```
 
 ---
 
-**Version**: 0.1.0 (alpha)  
-**Last Updated**: 2026-03-04
+**Version**: 0.2.4
+**Last Updated**: 2026-04-01

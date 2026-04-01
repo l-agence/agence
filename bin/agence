@@ -1698,11 +1698,10 @@ mode_system() {
     shell)
       shell_powershell_session
       ;;
-    # Named agent launchers: !ralph, !aider, !pilot, !sonya, !claudia, !copilot
-    ralph|aider|pilot|copilot|sonya|claudia|haiku|chad|aiko)
+    # Named agent launchers: !ralph, !aider, !pilot, !sonya, !claudia, !copilot, !claude, !azure, !devops
+    ralph|aider|pilot|copilot|sonya|claudia|haiku|chad|aiko|kilo|peers|claude|azure|devops)
       local agent_name="$sys_cmd"
-      [[ "$agent_name" == "pilot" ]] && agent_name="copilot"
-      export AI_AGENT="$agent_name" AGENCE_AGENT_PARAM="$agent_name"  # AI_AGENT = canonical identity
+      export AI_AGENT="$agent_name" AGENCE_AGENT_PARAM="$agent_name"
       echo "[agence] Launching agent: @${agent_name}"
       shell_bash_session
       ;;
