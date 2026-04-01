@@ -29,7 +29,7 @@ if [[ -z "$AI_ROOT" || -z "$AI_BIN" ]]; then
 fi
 
 AIDO_SESSION_DIR="${AIDO_SESSION_DIR:-$AI_ROOT/nexus/.aisessions}"
-AIDO_AGENT="${AIDO_AGENT:-ai-agent}"
+AI_AGENT="${AI_AGENT:-${AIDO_AGENT:-ai-agent}}"  # AI_AGENT is canonical; AIDO_AGENT kept for compat
 AIDO_DEBUG="${AIDO_DEBUG:-0}"
 
 # Source format library

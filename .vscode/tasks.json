@@ -13,7 +13,7 @@
 			"label": "⬛ @copilot: Human Plane (WSL)",
 			"type": "shell",
 			"command": "wsl.exe",
-			"args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/ibash"],
+			"args": ["--distribution", "Ubuntu", "--exec", "env", "AI_AGENT=copilot", "AI_ROLE=human", "GIT_ROOT=/mnt/c/Users/steff/git/.agence", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/ibash"],
 			"isBackground": false,
 			"presentation": {
 				"reveal": "always",
@@ -29,7 +29,7 @@
 			"label": "🤖 @copilot: aibash (Agent Plane)",
 			"type": "shell",
 			"command": "wsl.exe",
-			"args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/aibash"],
+			"args": ["--distribution", "Ubuntu", "--exec", "env", "AI_AGENT=copilot", "AI_ROLE=agentic", "GIT_ROOT=/mnt/c/Users/steff/git/.agence", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/aibash"],
 			"isBackground": false,
 			"presentation": {
 				"reveal": "always",
@@ -52,7 +52,7 @@
 			"label": "⬛ @ralph: Human Plane (WSL)",
 			"type": "shell",
 			"command": "wsl.exe",
-			"args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/ibash"],
+			"args": ["--distribution", "Ubuntu", "--exec", "env", "AI_AGENT=ralph", "AI_ROLE=human", "GIT_ROOT=/mnt/c/Users/steff/git/.agence", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/ibash"],
 			"isBackground": false,
 			"presentation": {
 				"reveal": "always",
@@ -68,7 +68,7 @@
 			"label": "🤖 @ralph: aibash (Agent Plane)",
 			"type": "shell",
 			"command": "wsl.exe",
-			"args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/aibash"],
+			"args": ["--distribution", "Ubuntu", "--exec", "env", "AI_AGENT=ralph", "AI_ROLE=agentic", "GIT_ROOT=/mnt/c/Users/steff/git/.agence", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/aibash"],
 			"isBackground": false,
 			"presentation": {
 				"reveal": "always",
@@ -91,7 +91,7 @@
 			"label": "⬛ @sonya: Human Plane (WSL)",
 			"type": "shell",
 			"command": "wsl.exe",
-			"args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/ibash"],
+			"args": ["--distribution", "Ubuntu", "--exec", "env", "AI_AGENT=sonya", "AI_ROLE=human", "GIT_ROOT=/mnt/c/Users/steff/git/.agence", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/ibash"],
 			"isBackground": false,
 			"presentation": {
 				"reveal": "always",
@@ -107,7 +107,7 @@
 			"label": "🤖 @sonya: aibash (Agent Plane)",
 			"type": "shell",
 			"command": "wsl.exe",
-			"args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/aibash"],
+			"args": ["--distribution", "Ubuntu", "--exec", "env", "AI_AGENT=sonya", "AI_ROLE=agentic", "GIT_ROOT=/mnt/c/Users/steff/git/.agence", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/aibash"],
 			"isBackground": false,
 			"presentation": {
 				"reveal": "always",
@@ -130,7 +130,7 @@
 			"label": "⬛ @aider: Human Plane (WSL)",
 			"type": "shell",
 			"command": "wsl.exe",
-			"args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/ibash"],
+			"args": ["--distribution", "Ubuntu", "--exec", "env", "AI_AGENT=aider", "AI_ROLE=human", "GIT_ROOT=/mnt/c/Users/steff/git/.agence", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/ibash"],
 			"isBackground": false,
 			"presentation": {
 				"reveal": "always",
@@ -146,7 +146,7 @@
 			"label": "🤖 @aider: aibash (Agent Plane)",
 			"type": "shell",
 			"command": "wsl.exe",
-			"args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/aibash"],
+			"args": ["--distribution", "Ubuntu", "--exec", "env", "AI_AGENT=aider", "AI_ROLE=agentic", "GIT_ROOT=/mnt/c/Users/steff/git/.agence", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/aibash"],
 			"isBackground": false,
 			"presentation": {
 				"reveal": "always",

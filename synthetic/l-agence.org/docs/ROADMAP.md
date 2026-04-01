@@ -198,7 +198,7 @@ The gate process (running on host, different UID if possible) is the only thing 
 - [ ] `devcontainer.json` template per agent tier (T0–T4)
 - [ ] `bin/aigate` — host-side write gate process (validates scope, appends ledger)
 - [ ] Docker Compose for local 2-tile multi-agent launch
-- [ ] Agent identity flows through `AIDO_AGENT` env var to session metadata
+- [ ] Agent identity flows through `AI_AGENT` env var to session metadata (`AIDO_AGENT` deprecated)
 
 ---
 
@@ -348,7 +348,7 @@ These apply across all phases:
 - [ ] `/` slash command namespace — Option D (passthrough) + `/g<cmd>` migration path
 - [ ] Ledger format — JSONL append-only, signed entries, SHA256 chain?
 - [ ] devcontainer tier sizing — T0 Alpine, T1 node-slim, T2+ full Ubuntu?
-- [ ] Cross-agent communication protocol — git-based (current) vs. message queue vs. HTTP
+- [ ] Cross-agent communication protocol — git-ba sed (current) vs. message queue vs. HTTP
 - [ ] Hermetic (`~`) context in containers — how does local-only hermetic work inside Docker?
 - [ ] `swarm` prefix (`~task`, `$task`) — activation criteria for v0.3.2+ (when not before?)
 - [ ] SWARM.md revision — heatmap model conflicts with new tile model; needs reflection

@@ -475,4 +475,206 @@ Describe 'Agence CLI'
     The output should include 'Agence'
   End
 
+  # ===========================================================================
+  # Knowledge commands (^lesson, ^log, ^plan, ^todo, ^fault, ^issue, ^task, ^job)
+  # ===========================================================================
+
+  It '^plan list returns plan entries or empty'
+    When run bash bin/agence '^plan' 'list'
+    The status should be success
+    The output should include '[plan]'
+  End
+
+  It '^lesson list returns lesson entries or empty'
+    When run bash bin/agence '^lesson' 'list'
+    The status should be success
+    The output should include '[lesson]'
+  End
+
+  It '^todo list returns todo entries or empty'
+    When run bash bin/agence '^todo' 'list'
+    The status should be success
+    The output should include '[todo]'
+  End
+
+  It '^fault list returns fault entries or empty'
+    When run bash bin/agence '^fault' 'list'
+    The status should be success
+    The output should include '[fault]'
+  End
+
+  It '^issue list returns issue entries or empty'
+    When run bash bin/agence '^issue' 'list'
+    The status should be success
+    The output should include '[issue]'
+  End
+
+  It '^task list returns task entries or empty'
+    When run bash bin/agence '^task' 'list'
+    The status should be success
+    The output should include '[task]'
+  End
+
+  It '^job list returns job entries or empty'
+    When run bash bin/agence '^job' 'list'
+    The status should be success
+    The output should include '[job]'
+  End
+
+  It '^log list returns log entries or empty'
+    When run bash bin/agence '^log' 'list'
+    The status should be success
+    The output should include '[log]'
+  End
+
+  It '^plan add requires a title argument'
+    When run bash bin/agence '^plan' 'add'
+    The status should be failure
+    The output should include 'Usage:'
+  End
+
+  It '^lesson add requires a content argument'
+    When run bash bin/agence '^lesson' 'add'
+    The status should be failure
+    The output should include 'Usage:'
+  End
+
+  It '^task add requires title and --assign'
+    When run bash bin/agence '^task' 'add'
+    The status should be failure
+    The output should include 'Usage:'
+  End
+
+  It '^plan show with unknown id returns not found'
+    When run bash bin/agence '^plan' 'show' 'nonexistent-plan-xyz'
+    The status should be success
+    The output should include 'not found'
+  End
+
+  It '^lesson show with unknown id returns not found'
+    When run bash bin/agence '^lesson' 'show' 'nonexistent-lesson-xyz'
+    The status should be success
+    The output should include 'not found'
+  End
+
+  # ===========================================================================
+  # Symbols and Help commands
+  # ===========================================================================
+
+  It '^symbols displays task state table'
+    When run bash bin/agence 'symbols'
+    The status should be success
+    The output should include 'TASK STATE'
+  End
+
+  It '^symbols displays routing section'
+    When run bash bin/agence 'symbols'
+    The status should be success
+    The output should include 'ROUTING'
+  End
+
+  It '^symbols displays command modes'
+    When run bash bin/agence 'symbols'
+    The status should be success
+    The output should include 'COMMAND MODES'
+  End
+
+  It '^symbols displays workflow notation'
+    When run bash bin/agence 'symbols'
+    The status should be success
+    The output should include 'WORKFLOW'
+  End
+
+  It '^help shows all command categories'
+    When run bash bin/agence 'help'
+    The status should be success
+    The output should include 'USAGE:'
+  End
+
+  # ===========================================================================
+  # Handoff / Pickup / Pause / Resume / Reindex
+  # ===========================================================================
+
+  It '^handoff requires agent argument'
+    When run bash bin/agence '^handoff'
+    The status should be failure
+    The output should include 'Usage:'
+  End
+
+  It '^pickup with no sessions shows list or empty'
+    When run bash bin/agence '^pickup'
+    The status should be success
+  End
+
+  It '^pause creates valid checkpoint'
+    When run bash bin/agence '^pause'
+    The status should be success
+    The output should include 'paused'
+  End
+
+  It '^resume with no paused sessions reports empty or lists'
+    When run bash bin/agence '^resume'
+    The status should be success
+  End
+
+  It '^reindex runs without error'
+    When run bash bin/agence '^reindex'
+    The status should be success
+    The output should include 'Reindexing'
+  End
+
+  # ===========================================================================
+  # aibash: shebang + help (non-interactive, non-hanging tests)
+  # ===========================================================================
+
+  Describe 'aibash shell'
+
+    It 'has #!/usr/bin/env bash as first line'
+      When run bash -c 'head -1 bin/aibash'
+      The output should equal '#!/usr/bin/env bash'
+    End
+
+    It 'exits cleanly with --help'
+      When run bash bin/aibash --help
+      The status should be success
+      The output should include 'aibash: Agentic'
+    End
+
+    It 'exits cleanly with help'
+      When run bash bin/aibash help
+      The status should be success
+      The output should include 'Usage:'
+    End
+
+    It 'shows signal handler note in help'
+      When run bash bin/aibash --help
+      The status should be success
+      The output should include 'PARENT-owned'
+    End
+
+  End
+
+  # ===========================================================================
+  # ibash: sanity checks (non-hanging)
+  # ===========================================================================
+
+  Describe 'ibash shell'
+
+    It 'has #!/usr/bin/env bash as first line'
+      When run bash -c 'head -1 bin/ibash'
+      The output should equal '#!/usr/bin/env bash'
+    End
+
+    It 'uses nexus/.aisessions for session recordings'
+      When run bash -c 'grep -c "\.aisessions" bin/ibash'
+      The output should be greater_than 0
+    End
+
+    It 'does not have duplicate GIT_ROOT derivation'
+      When run bash -c 'grep -c "BASH_SOURCE\[0\]" bin/ibash'
+      The output should equal '1'
+    End
+
+  End
+
 End

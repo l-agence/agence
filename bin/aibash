@@ -1,56 +1,30 @@
-# HELP FUNCTION
-if [[ "$1" == "help" || "$1" == "--help" ]]; then
-		cat <<EOF
-aibash: Agentic (robot) Bash shell
+#!/usr/bin/env bash
 
-Usage:
-	aibash [--session <id>] [--agent <name>] [--role <role>] [--shell <bash>] [--] [command ...]
-
-Options:
-	--session <id>   Unique session ID (required for logging)
-	--agent <name>   Agent name (default: robot)
-	--role <role>    Agent role (default: agentic)
-	--shell <bash>   Shell type (default: bash)
-	--               End of options, pass remaining as command
-	help, --help     Show this help message
-
-Examples:
-	aibash --session my-session --agent haiku --role agentic --shell bash
-	aibash --session s1 -- echo "Hello from agentic shell"
-
-Description:
-	Secure, session-logged, agent-only shell for autonomous/background agent work.
-	Not for interactive human use. All I/O is logged. Exits cleanly when stdin closes.
-EOF
-		exit 0
-fi
-# HELP FUNCTION
 show_help() {
-		cat <<EOF
+	cat <<EOF
 aibash: Agentic (robot) Bash shell
 
 Usage:
-	aibash [--session <id>] [--agent <name>] [--role <role>] [--shell <bash>] [--] [command ...]
+  aibash [--session <id>] [--agent <name>] [--role <role>] [--shell <bash>] [--] [command ...]
 
 Options:
-	--session <id>   Unique session ID (required for logging)
-	--agent <name>   Agent name (default: robot)
-	--role <role>    Agent role (default: agentic)
-	--shell <bash>   Shell type (default: bash)
-	--               End of options, pass remaining as command
-	help, --help     Show this help message
+  --session <id>   Unique session ID (required for logging)
+  --agent <name>   Agent name (default: @)
+  --role <role>    Agent role (default: agentic)
+  --shell <bash>   Shell type (default: bash)
+  --               End of options, pass remaining as command
+  help, --help     Show this help message
 
 Examples:
-	aibash --session my-session --agent haiku --role agentic --shell bash
-	aibash --session s1 -- echo "Hello from agentic shell"
+  aibash --session my-session --agent ralph --role agentic
+  aibash --session s1 -- echo "Hello from agentic shell"
 
 Description:
-	Secure, session-logged, agent-only shell for autonomous/background agent work.
-	Not for interactive human use. All I/O is logged. Exits cleanly when stdin closes.
+  Secure, session-logged, agent-only shell for autonomous/background agent work.
+  Not for interactive human use. All I/O is logged. Exits cleanly when stdin closes.
+  Signal handlers (SIGKILL/SIGSTOP) are PARENT-owned (ibash) and cannot be overridden.
 EOF
 }
-
-#!/usr/bin/env bash
 
 # aibash: Agentic (robot) shell - replaces legacy ai-shell.sh
 # Purpose: Secure, session-logged, agent-only shell for autonomous/background agent work
@@ -173,11 +147,6 @@ if [[ -z "${AI_SESSION:-}" ]]; then
 	fi
 fi
 
-if [[ -z "${GIT_ROOT:-}" ]]; then
-	GIT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-fi
-
-
 # Check for script utility (session logging dependency)
 if command -v script &>/dev/null; then
 	SCRIPT_PATH="$(command -v script)"
@@ -272,27 +241,50 @@ sandbox_cd() {
 	fi
 }
 
-# MAIN EXECUTION (agentic: no banners, minimal output)
+# AWAITING INPUT NOTIFICATION
+# When agent shell is blocked waiting for stdin, write a marker file
+# VSCode / ibash parent can poll this for notification
+notify_awaiting() {
+	local marker="${GIT_ROOT}/nexus/sessions/${AI_SESSION}.awaiting"
+	mkdir -p "$(dirname "$marker")" 2>/dev/null || true
+	echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$marker"
+	# Flash title to alert human
+	printf '\033]0;⏳ %s | aibash WAITING\007' "${AI_AGENT}" 2>/dev/null || true
+}
+
+clear_awaiting() {
+	local marker="${GIT_ROOT}/nexus/sessions/${AI_SESSION}.awaiting"
+	rm -f "$marker" 2>/dev/null || true
+	# Restore normal title
+	printf '\033]0;🤖 %s | aibash\007' "${AI_AGENT}" 2>/dev/null || true
+}
+
+# MAIN EXECUTION (agentic: minimal banner, session-logged)
 main() {
-		# Help handler
-		if [[ "$1" == "help" || "$1" == "--help" ]]; then
-			show_help
-			exit 0
-		fi
+	# Help handler
+	if [[ "${1:-}" == "help" || "${1:-}" == "--help" ]]; then
+		show_help
+		exit 0
+	fi
 	init_session_logging
 	load_codex_and_format
 	cd "$GIT_ROOT" || {
-		echo "[AISHA] ✗ Failed to cd to $GIT_ROOT" >&2
+		echo "[AIBASH] ✗ Failed to cd to $GIT_ROOT" >&2
 		return 1
 	}
+	# Minimal banner for agent plane (right tile)
+	printf '\033]0;🤖 %s | aibash\007' "${AI_AGENT}" 2>/dev/null || true
+	echo "[aibash] agent=${AI_AGENT} session=${AI_SESSION:0:8} root=${GIT_ROOT}"
 
 	case "$SHELL_TYPE" in
 		bash)
+			notify_awaiting
 			setup_bash_session
+			clear_awaiting
 			;;
 		*)
-			echo "[AISHA] ✗ Unknown shell type: $SHELL_TYPE" >&2
-			echo "[AISHA]   Supported: bash" >&2
+			echo "[AIBASH] ✗ Unknown shell type: $SHELL_TYPE" >&2
+			echo "[AIBASH]   Supported: bash" >&2
 			return 1
 			;;
 	esac

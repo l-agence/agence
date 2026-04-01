@@ -25,32 +25,55 @@
 ################################################################################
 
 
-# Security: fail on error, unset, or pipefail
-set -euo pipefail
+# Human control plane: interactive-safe options (NOT set -euo pipefail)
+# set -e would exit on every failed command -- terrible for interactive use
+set -o pipefail  # Only catch pipeline errors silently (non-exit)
 
-# Restrict PATH to safe locations
-export PATH="/usr/bin:/bin:${AI_BIN:-.}:."
+# Human PATH: full system paths + agence bin
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.local/bin:${GIT_ROOT:-/usr/local}/bin"
 
-# Unset risky env vars (skip SHELLOPTS, which is readonly in Bash)
-unset HISTFILE PROMPT_COMMAND CDPATH ENV BASH_ENV IFS
+# Unset a minimal set of risky env vars (keep most for usability)
+unset HISTFILE PROMPT_COMMAND CDPATH BASH_ENV
 
-# Block dangerous signals
-trap '' SIGINT SIGQUIT SIGTSTP SIGTERM
+# ============================================================================
+# SIGNAL MANAGEMENT (Human plane owns signals -- agent plane inherits)
+# ============================================================================
+# ibash is the PARENT shell. aibash runs as a background child (%1).
+# Ctrl+C  (SIGINT)  : works normally (kills current foreground command)
+# Ctrl+Z  (SIGTSTP) : works normally (suspends foreground, use fg/bg)
+# Ctrl+K  (custom)  : SIGKILL to aibash child (Ctrl+K via stty or bind)
+# SIGTERM            : clean shutdown of ibash + kill aibash child
+
+AIBASH_PID=""
+
+kill_aibash() {
+    if [[ -n "${AIBASH_PID:-}" ]]; then
+        echo "[ibash] Ctrl+K: Sending SIGKILL to aibash (PID ${AIBASH_PID})" >&2
+        kill -9 "${AIBASH_PID}" 2>/dev/null || true
+        AIBASH_PID=""
+    else
+        echo "[ibash] Ctrl+K: No aibash child running" >&2
+    fi
+}
+
+cleanup_on_exit() {
+    if [[ -n "${AIBASH_PID:-}" ]]; then
+        echo "[ibash] Cleaning up: sending SIGTERM to aibash (PID ${AIBASH_PID})" >&2
+        kill -15 "${AIBASH_PID}" 2>/dev/null || true
+    fi
+}
+
+# On SIGTERM: kill aibash child then exit cleanly
+trap 'cleanup_on_exit; exit 0' SIGTERM SIGHUP
+# Ctrl+K binding registered after shell init (see main)
 
 # ============================================================================
 # ENVIRONMENT SETUP
 # ============================================================================
 
 
-# If not set by caller, derive from env
+# Derive GIT_ROOT from script location if not set by caller
 if [[ -z "${GIT_ROOT:-}" ]]; then
-    # Try to find .agence root by looking for .git or specific markers
-    GIT_ROOT="$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/..\" && pwd)"
-fi
-
-# If not set by caller, derive from env
-if [[ -z "${GIT_ROOT:-}" ]]; then
-    # Try to find .agence root by looking for .git or specific markers
     GIT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 fi
 
@@ -150,70 +173,47 @@ load_codex_and_format_and_policy() {
 # ============================================================================
 
 setup_bash_session() {
-    # Start script command to capture all I/O
-    script_cmd="script --quiet --return --command 'bash --noprofile --norc' '$SESSION_LOG'"
-    
-    # Export environment for child bash
-    export GIT_ROOT AI_ROLE AI_SESSION AI_AGENT SESSION_LOG SESSION_META
-    # Set PS1 to ^:<top-level-dir> >
+    # Human-plane: set up env + PS1. Called when sourced as --rcfile.
+    # The terminal bash IS the interactive shell — no nested bash needed.
     local topdir
     topdir="$(basename "$GIT_ROOT")"
-    export PS1="^:${topdir}> "
-    
-    # Load user's .bashrc if exists (but NOT .bash_profile to avoid side effects)
-    if [[ -f "$HOME/.bashrc" ]]; then
-        # Wrap bashrc to enforce sandbox
-        eval "$script_cmd" || {
-            echo "[AI-SHELL] ✗ Bash session launch failed"
-            return 1
-        }
-    else
-        # No user bashrc, use minimal shell
-        eval "$script_cmd" || {
-            echo "[AI-SHELL] ✗ Bash session fallback failed"
-            return 1
-        }
+    export GIT_ROOT AI_ROLE AI_SESSION AI_AGENT SESSION_LOG SESSION_META
+    export PS1="[${AI_AGENT}@${AI_SESSION:0:8}] ${topdir}> "
+    # If session logging is enabled, wrap in script(1)
+    if [[ "${SESSION_LOGGING_ENABLED:-0}" -eq 1 ]] && [[ ! -t 0 || "${IBASH_LOGGING:-0}" -eq 1 ]]; then
+        exec script --quiet --return --command \
+            "bash --rcfile '${GIT_ROOT}/bin/ibash'" "$SESSION_LOG"
     fi
+    # Otherwise: env is now set, PS1 is set — interactive bash continues normally
+    return 0
 }
 
 # ============================================================================
 
 # Hardened interactive shell setup
 setup_ibash_session() {
-    # Start script command to capture all I/O
-    # Allow passing arguments to bash (e.g., -c 'cmd', --rcfile ...)
-    script_cmd="script --quiet --return --command 'bash --noprofile --norc -i "$@"' '$SESSION_LOG'"
+    # Human-plane interactive bash: full privileges
+    # When used as --rcfile: just set env/PS1/bindings and return
+    # The terminal bash IS the interactive shell — no nested bash needed
+    local topdir
+    topdir="$(basename "$GIT_ROOT")"
     export GIT_ROOT AI_ROLE AI_SESSION AI_AGENT SESSION_LOG SESSION_META
-    export PS1="[\${AI_ROLE}@\${AI_SESSION:0:8}] \$ "
+    export PS1="[${AI_AGENT}@${AI_SESSION:0:8}] ${topdir}> "
+    # Bind Ctrl+K to kill aibash child (human override signal)
+    bind -x '"\C-k": kill_aibash' 2>/dev/null || true
 
-
-    # Only set policy trap in interactive shells
-    if [[ $- == *i* ]]; then
+    # Policy trap: validate commands before execution (if aipolicy loaded)
+    if [[ $- == *i* ]] && declare -F aipolicy_command >/dev/null 2>&1; then
         preexec_policy() {
-            local cmdline="$BASH_COMMAND"
-            local cmd="${cmdline%% *}"
-            local args=( $cmdline )
-            # Only check non-empty commands
-            if [[ -n "$cmd" && $(declare -F aipolicy_command) ]]; then
-                aipolicy_command "$cmd" "${args[@]:1}"
-                local rc=$?
-                if [[ $rc -ne 0 ]]; then
-                    echo "[AIPOLICY] Blocked: $cmdline" >&2
-                    return $rc
-                fi
-            fi
+            local cmd="${BASH_COMMAND%% *}"
+            [[ -n "$cmd" ]] && aipolicy_command "$cmd" || true
         }
-        if declare -F aipolicy_command >/dev/null; then
-            export -f preexec_policy
-            trap preexec_policy DEBUG
-        fi
+        export -f preexec_policy
+        trap preexec_policy DEBUG
     fi
 
-    # Launch interactive shell with logging, passing any arguments
-    eval "$script_cmd" || {
-        echo "[IBASH] ✗ Interactive shell launch failed"
-        return 1
-    }
+    # Return: interactive bash continues with the env we just set
+    return 0
 }
 # ============================================================================
 
@@ -254,19 +254,23 @@ main() {
     load_codex_and_format_and_policy
     echo ""
     echo "╔════════════════════════════════════════════════════════════════╗"
-    echo "║  AGENCE INTERACTIVE SHELL (ibash)                             ║"
+    echo "║  AGENCE HUMAN CONTROL PLANE (ibash)                           ║"
     echo "╠════════════════════════════════════════════════════════════════╣"
-    echo "║  Role:       $AI_ROLE"
-    echo "║  Session:    $AI_SESSION"
-    echo "║  Agent:      $AI_AGENT"
-    echo "║  Root:       $GIT_ROOT"
-    echo "║  Log:        $SESSION_LOG"
+    printf "║  Agent:      %-49s║\n" "${AI_AGENT}" 
+    printf "║  Session:    %-49s║\n" "${AI_SESSION:0:8}"
+    printf "║  Role:       %-49s║\n" "${AI_ROLE}"
+    printf "║  Root:       %-49s║\n" "${GIT_ROOT}"
+    echo "╠════════════════════════════════════════════════════════════════╣"
+    echo "║  Ctrl+C: interrupt  Ctrl+Z: suspend  Ctrl+K: kill agent      ║"
+    echo "║  %jobs: list agent tasks    fg %1: bring agent to foreground  ║"
     echo "╚════════════════════════════════════════════════════════════════╝"
     echo ""
     cd "$GIT_ROOT" || {
         echo "[IBASH] ✗ Failed to cd to $GIT_ROOT" >&2
         return 1
     }
+    # Set VSCode terminal title
+    printf '\033]0;⬛ %s | ibash (human)\007' "${AI_AGENT}" 2>/dev/null || true
     setup_ibash_session "$@"
 }
 
