@@ -1,4 +1,14 @@
-# ^Todo: Multi-Phase Development Roadmap
+# ^Todo — MOVED
+
+Todos are now HERMETIC (personal, not committed to git).
+
+See: `hermetic/l-agence.org/todos/INDEX.md`
+Or run: `agence ^todo list`
+
+---
+
+<!-- Legacy content preserved below for reference — do not edit -->
+# ^Todo: Multi-Phase Development Roadmap (ARCHIVED)
 
 **Version**: v0.2.3.1 (Architecture Locked)  
 **Last Updated**: 2026-03-31  

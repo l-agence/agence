@@ -316,8 +316,8 @@ EOF
 }
 
 show_version() {
-  echo "Agence version 0.2.3.2"
-  echo "[VERSION]: 0.2.3.2"
+  echo "Agence version 0.2.4"
+  echo "[VERSION]: 0.2.4"
   echo "[RELEASE]: rel_0.2.2_agence_swarm_sessions"
 }
 
@@ -333,6 +333,9 @@ main() {
     show_help
     exit 0
   fi
+
+  # Parse @agent prefix first (sets AGENCE_AGENT_PARAM, strips from input)
+  input=$(parse_agent_prefix "$input")
 
   # Early exits: help and version never need the LLM router
   case "$1" in
@@ -720,9 +723,37 @@ mode_init() {
       mode_knowledge "job" "$init_args"
       return $?
       ;;
+    "handoff")
+      # Transfer session context to another agent
+      # Usage: agence ^handoff @ralph [context message]
+      handoff_to_agent $init_args
+      return $?
+      ;;
+    "pickup")
+      # Accept a pending handoff: agence ^pickup [handoff_id]
+      pickup_handoff $init_args
+      return $?
+      ;;
+    "pause")
+      # Suspend session with checkpoint (Ctrl+Z semantics)
+      pause_session $init_args
+      return $?
+      ;;
+    "resume")
+      # Resume a paused session: agence ^resume [pause_id]
+      resume_session $init_args
+      return $?
+      ;;
+    "reindex")
+      # Refresh all knowledge base indices
+      reindex_knowledge_bases
+      return $?
+      ;;
     *)
       echo "Error: Unknown init command: $init_cmd" >&2
-      echo "Available: help, init, reload, install, save, learn, commit, push, session, lesson, log, plan, todo, fault, issue, task, job" >&2
+      echo "Available: help, init, reload, install, save, learn, commit, push, session," >&2
+      echo "           lesson, log, plan, todo, fault, issue, task, job," >&2
+      echo "           handoff, pickup, pause, resume, reindex" >&2
       return 1
       ;;
   esac
@@ -840,7 +871,7 @@ EOF
 }
 
 mode_help() {
-  local version; version="0.2.3.2"
+  local version; version="0.2.4"
 
   cat << EOF
 ╔══════════════════════════════════════════════════════════════════╗
@@ -914,7 +945,7 @@ _agence_completion() {
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  local caret_commands="help symbols init reload install save learn commit push stash sync session lesson log plan todo fault issue task job"
+  local caret_commands="help symbols init reload install save learn commit push stash sync session lesson log plan todo fault issue task job handoff pickup pause resume reindex"
   local knowledge_subcmds="list show add"
 
   case "${COMP_WORDS[1]}" in
@@ -946,6 +977,20 @@ _agence_completion() {
       elif [[ "$cur" == "--"* ]]; then
         COMPREPLY=( $(compgen -W "--agent" -- "$cur") )
       fi
+      ;;
+    "^handoff")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "@ralph @sonya @aider @copilot user" -- "$cur") )
+      fi
+      ;;
+    "^pickup"|"^resume")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        local dir="${AGENCE_ROOT:-$PWD}/nexus/.aihandoffs"
+        COMPREPLY=( $(compgen -W "$(ls "$dir" 2>/dev/null | sed 's/\.json$//')" -- "$cur") )
+      fi
+      ;;
+    "^pause"|"^reindex")
+      COMPREPLY=()
       ;;
     "^session")
       if [[ $COMP_CWORD -eq 2 ]]; then
@@ -1606,12 +1651,10 @@ mode_system() {
       return 0
       ;;
     bash)
-      echo "Launching Git Bash..."
-      exec bash --login
+      shell_bash_session
       ;;
     shell)
-      echo "Launching PowerShell..."
-      exec powershell -NoExit
+      shell_powershell_session
       ;;
     *)
       echo "Unknown system command: $sys_cmd" >&2
@@ -1621,120 +1664,113 @@ mode_system() {
 }
 
 # ============================================================================
-# SESSION: SAVE
+# SESSION: SAVE (^save)
 # ============================================================================
-# Capture current runstate to nexus/sessions/
-# Usage: agence ^save [optional notes]
+# Capture current runstate to nexus/.aisaves/
+# Richer than simple session — includes git state, lessons count, dirty files
+# Usage: agence ^save [notes]
 
 save_session() {
   local notes="${1:-}"
+  local agent_id="${AGENCE_AGENT_PARAM:-${AGENCE_AGENT_ID:-${AGENCE_AGENT:-@}}}"
+  local session_id="${AGENCE_SESSION_ID:-$(generate_shell_session_id save)}"
+  local log_id="save-$(date +%Y%m%d_%H%M%S)-$(printf '%x' $((RANDOM * RANDOM)))"
+  local saves_dir="${AGENCE_ROOT}/nexus/.aisaves"
+  local sessions_dir="${AGENCE_ROOT}/nexus/sessions"
+  local lessons_dir="${AGENCE_ROOT}/synthetic/l-agence.org/lessons"
+  mkdir -p "$saves_dir" "$sessions_dir" 2>/dev/null
 
-  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Saving session..." >&2
+  local branch; branch=$(git -C "$AGENCE_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+  local commit; commit=$(git -C "$AGENCE_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+  local dirty; dirty=$(git -C "$AGENCE_ROOT" status --short 2>/dev/null | wc -l | tr -d ' ')
+  local staged; staged=$(git -C "$AGENCE_ROOT" diff --cached --name-only 2>/dev/null | wc -l | tr -d ' ')
+  local lessons; lessons=$(find "$lessons_dir" -name "*.md" -not -name "INDEX.md" -type f 2>/dev/null | wc -l | tr -d ' ')
+  local sessions; sessions=$(find "$saves_dir" -name "*.json" -type f 2>/dev/null | wc -l | tr -d ' ')
+  local recent; recent=$(git -C "$AGENCE_ROOT" log --oneline -5 2>/dev/null | sed 's/"/\\"/g' | awk '{printf "    \"%s\",\n", $0}' | sed '$ s/,$//')
+  local dirty_files; dirty_files=$(git -C "$AGENCE_ROOT" status --short 2>/dev/null | sed 's/"/\\"/g' | awk '{printf "    \"%s\",\n", $0}' | sed '$ s/,$//')
+  local notes_esc; notes_esc=$(echo "$notes" | sed 's/"/\\"/g')
 
-  local sessions_dir="$AGENCE_ROOT/nexus/sessions"
-  mkdir -p "$sessions_dir"
-
-  # 8-char hex session ID from timestamp
-  local session_id; session_id=$(printf '%08x' $(( $(date +%s) % 0x100000000 )))
-  local timestamp; timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-  local current_pwd; current_pwd="$(normalize_path "$(pwd)")"
-  local current_agent="${AGENCE_AGENT:-unknown}"
-
-  # Prompt if notes not provided
   if [[ -z "$notes" ]]; then
     echo ""
-    echo "[^SAVE] Capturing session state:"
-    echo "  Session ID:  $session_id"
-    echo "  Timestamp:   $timestamp"
-    echo "  Agent:       $current_agent"
-    echo "  Shell:       ${AGENCE_SHELL_ENV:-unknown}"
-    echo "  Directory:   $current_pwd"
-    echo "  Repo:        ${GIT_REPO:-unset}"
-    echo ""
-    read -r -p "Enter session notes (optional, Enter to skip): " notes
+    echo "[^SAVE] Session: $session_id | Agent: $agent_id | Git: $branch @ $commit"
+    read -r -p "Notes (optional, Enter to skip): " notes
+    notes_esc=$(echo "$notes" | sed 's/"/\\"/g')
   fi
 
-  # Write session JSON
-  cat > "$sessions_dir/$session_id.meta.json" <<EOF
+  local save_file="${saves_dir}/${log_id}.json"
+  cat > "$save_file" <<EOF
 {
+  "log_id": "$log_id",
+  "agent_id": "$agent_id",
   "session_id": "$session_id",
-  "created_at": "$timestamp",
-  "status": "saved",
-  "agent": "$current_agent",
-  "shell": "${AGENCE_SHELL_ENV:-unknown}",
-  "notes": "$(echo "$notes" | sed 's/"/\\"/g')",
-  "runstate": {
-    "pwd": "$current_pwd",
-    "repo": "${GIT_REPO:-unset}"
-  }
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "user": "$(whoami)",
+  "cwd": "$(pwd)",
+  "notes": "$notes_esc",
+  "git": { "branch": "$branch", "commit": "$commit", "dirty_files": $dirty, "staged_files": $staged },
+  "knowledge": { "lessons_count": $lessons, "sessions_count": $sessions },
+  "recent_commits": [
+$recent
+  ],
+  "dirty_files": [
+$dirty_files
+  ]
 }
 EOF
 
   echo ""
-  echo "✓ Session saved: $session_id"
-  echo "  Location: $sessions_dir/$session_id.meta.json"
+  echo "✓ Saved: $log_id"
+  echo "  Agent:   $agent_id | Session: $session_id"
+  echo "  Git:     $branch @ $commit ($dirty dirty, $staged staged)"
+  echo "  File:    $save_file"
+  echo "  Next:    ^handoff @agent | ^commit | ^push"
   return 0
 }
 
 # ============================================================================
-# SESSION: LEARN
+# SESSION: LEARN (^learn) — richer version scanning sessions + faults + lessons
 # ============================================================================
-# Scan modified CODEX/context files and report what changed
-# Usage: agence ^learn
 
 learn_agence_changes() {
-  local timestamp_file="$AGENCE_ROOT/.agence_learn_timestamp"
-  local last_scan; last_scan=$(cat "$timestamp_file" 2>/dev/null || echo "0")
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  AGENCE LEARN (^learn)"; echo "══════════════════════════════════════════════"; echo ""
 
-  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Learning from Agence changes..." >&2
+  local sessions_dir="${AGENCE_ROOT}/nexus/.aisessions"
+  local saves_dir="${AGENCE_ROOT}/nexus/.aisaves"
+  local faults_dir="${AGENCE_ROOT}/nexus/faults"
+  local lessons_dir="${AGENCE_ROOT}/synthetic/l-agence.org/lessons"
+  mkdir -p "$lessons_dir" 2>/dev/null
 
-  echo ""
-  echo "[^LEARN] Scanning for modified Agence files..."
-  echo "=============================================="
-  echo ""
+  local session_count=0; local save_count=0; local fault_count=0; local lesson_count=0
 
-  local monitored=(
-    "codex/PRINCIPLES.md"
-    "codex/LAWS.md"
-    "codex/RULES.md"
-    "codex/SAFEGUARDS.md"
-    "codex/AIPOLICY.yaml"
-    "CLAUDE.md"
-    "copilot-instructions.md"
-  )
+  echo "  Step 1/3: Session history..."
+  [[ -d "$sessions_dir" ]] && session_count=$(find "$sessions_dir" -name "*.meta.json" -type f 2>/dev/null | wc -l | tr -d ' ')
+  [[ -d "$saves_dir" ]] && save_count=$(find "$saves_dir" -name "*.json" -type f 2>/dev/null | wc -l | tr -d ' ')
+  echo "    Sessions: $session_count | Saves: $save_count"
 
-  local found=0
-
-  for rel in "${monitored[@]}"; do
-    local file="$AGENCE_ROOT/$rel"
-    [[ -f "$file" ]] || continue
-    local mtime; mtime=$(stat -c%Y "$file" 2>/dev/null || stat -f%m "$file" 2>/dev/null || echo "0")
-    if [[ $mtime -gt $last_scan ]]; then
-      local size; size=$(wc -l < "$file" 2>/dev/null || echo "?")
-      echo "  ✓ UPDATED: $rel  (${size} lines)"
-      ((found++)) || true
-    fi
-  done
-
-  if [[ $found -eq 0 ]]; then
-    echo "  ✓ No changes detected since last ^learn."
+  echo "  Step 2/3: Reviewing faults..."
+  if [[ -d "$faults_dir" ]]; then
+    fault_count=$(find "$faults_dir" -name "*.md" -type f 2>/dev/null | wc -l | tr -d ' ')
+    echo "    Faults: $fault_count"
+    find "$faults_dir" -name "*.md" -type f 2>/dev/null | while read -r f; do
+      echo "      - $(basename "$f" .md)"
+    done
   else
-    echo ""
-    echo "  $found file(s) updated. Context is current."
-    # Update timestamp
-    date +%s > "$timestamp_file"
+    echo "    No faults directory"
   fi
 
-  # Quick CODEX summary
-  echo ""
-  echo "[CODEX STATUS]"
-  local p_count; p_count=$(grep -c "^## Maxim" "$AGENCE_ROOT/codex/PRINCIPLES.md" 2>/dev/null || echo 0)
-  local l_count; l_count=$(grep -c "^## Law" "$AGENCE_ROOT/codex/LAWS.md" 2>/dev/null || echo 0)
-  local r_count; r_count=$(grep -c "^## Rule" "$AGENCE_ROOT/codex/RULES.md" 2>/dev/null || echo 0)
-  echo "  Principles: $p_count maxims"
-  echo "  Laws:       $l_count"
-  echo "  Rules:      $r_count"
-  echo ""
+  echo "  Step 3/3: Current codex..."
+  local p_count; p_count=$(grep -c "^## Maxim" "${AGENCE_ROOT}/codex/PRINCIPLES.md" 2>/dev/null || echo 0)
+  local l_count; l_count=$(grep -c "^## Law" "${AGENCE_ROOT}/codex/LAWS.md" 2>/dev/null || echo 0)
+  local r_count; r_count=$(grep -c "^## Rule" "${AGENCE_ROOT}/codex/RULES.md" 2>/dev/null || echo 0)
+  lesson_count=$(find "$lessons_dir" -name "*.md" -not -name "INDEX.md" -type f 2>/dev/null | wc -l | tr -d ' ')
+  echo "    Principles: $p_count | Laws: $l_count | Rules: $r_count"
+  echo "    Shared lessons: $lesson_count"
+
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  LEARN COMPLETE"
+  echo "  Sessions: $session_count | Faults: $fault_count | Lessons: $lesson_count"
+  echo "  Next: ^lesson add \"<insight>\" | ^fault list | ^commit"; echo ""
   return 0
 }
 
@@ -2091,6 +2127,378 @@ install_linux_packages() {
     return 1
   fi
   return 0
+}
+
+# ============================================================================
+# AGENT ROUTING: Parse @agent prefix and get agent identity
+# ============================================================================
+
+parse_agent_prefix() {
+  local input="$1"
+  if [[ "$input" =~ ^@([A-Za-z0-9_-]*)[[:space:]]+(.*) ]]; then
+    local agent_name="${BASH_REMATCH[1]}"
+    local remaining_cmd="${BASH_REMATCH[2]}"
+    [[ -z "$agent_name" ]] && export AGENCE_AGENT_PARAM="@" || export AGENCE_AGENT_PARAM="$agent_name"
+    echo "$remaining_cmd"
+  else
+    export AGENCE_AGENT_PARAM="@"
+    echo "$input"
+  fi
+}
+
+get_agent_id() {
+  echo "${AIDO_AGENT:-${AGENCE_AGENT_ID:-ai-agent}}"
+}
+
+# ============================================================================
+# SHELL SESSIONS: Bash and PowerShell with session/agent pinning
+# ============================================================================
+
+generate_shell_session_id() {
+  local shell_type="$1"
+  local timestamp; timestamp=$(date +%Y%m%d_%H%M%S)
+  local pid=$$
+  local hexid; hexid=$(printf '%x' $((RANDOM * RANDOM)))
+  echo "${shell_type}-${timestamp}-${pid}-${hexid}"
+}
+
+set_vscode_terminal_title() {
+  printf '\033]0;%s\007' "$1"
+}
+
+shell_bash_session() {
+  local agent_id="${AGENCE_AGENT_PARAM:-@}"
+  local session_id; session_id=$(generate_shell_session_id "bash")
+  local vscode_title="bash:${session_id}@${agent_id}"
+  local sessions_dir="${AGENCE_ROOT}/nexus/.aisessions"
+  mkdir -p "$sessions_dir" 2>/dev/null
+  local session_meta="${sessions_dir}/${session_id}.meta.json"
+  cat > "$session_meta" <<EOF
+{
+  "session_id": "$session_id",
+  "session_type": "bash",
+  "agent_id": "$agent_id",
+  "shell": "bash",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "pid": $$,
+  "user": "$(whoami)",
+  "cwd": "$(pwd)"
+}
+EOF
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  BASH SESSION"
+  echo "══════════════════════════════════════════════"
+  echo "  Session:   $session_id"
+  echo "  Agent:     $agent_id"
+  echo "  Dir:       $(pwd)"
+  echo "  Metadata:  $session_meta"
+  echo "══════════════════════════════════════════════"; echo ""
+  set_vscode_terminal_title "$vscode_title"
+  export AGENT="$agent_id" AGENCE_SESSION_ID="$session_id" AGENCE_AGENT_ID="$agent_id" AGENCE_SESSION_TYPE="bash"
+  exec bash --rcfile "${AGENCE_ROOT}/bin/ai-shell.sh" -i 2>/dev/null || exec bash --login
+}
+
+shell_powershell_session() {
+  local agent_id="${AGENCE_AGENT_PARAM:-@}"
+  local session_id; session_id=$(generate_shell_session_id "ps")
+  local vscode_title="powershell:${session_id}@${agent_id}"
+  local sessions_dir="${AGENCE_ROOT}/nexus/.aisessions"
+  mkdir -p "$sessions_dir" 2>/dev/null
+  cat > "${sessions_dir}/${session_id}.meta.json" <<EOF
+{
+  "session_id": "$session_id",
+  "session_type": "powershell",
+  "agent_id": "$agent_id",
+  "shell": "powershell",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "pid": $$,
+  "user": "$(whoami)",
+  "cwd": "$(pwd)"
+}
+EOF
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  POWERSHELL SESSION"
+  echo "══════════════════════════════════════════════"
+  echo "  Session:   $session_id"
+  echo "  Agent:     $agent_id"
+  echo "  Dir:       $(pwd)"
+  echo "══════════════════════════════════════════════"; echo ""
+  set_vscode_terminal_title "$vscode_title"
+  export AGENCE_SESSION_ID="$session_id" AGENCE_AGENT_ID="$agent_id" AGENCE_SESSION_TYPE="powershell"
+  if command -v pwsh &>/dev/null; then
+    exec pwsh -NoExit -Command "\$env:AGENCE_SESSION_ID='$session_id'; \$env:AGENCE_AGENT_ID='$agent_id'; function prompt { return 'pwsh:${session_id}@${agent_id}: ' }"
+  elif command -v powershell.exe &>/dev/null; then
+    exec powershell.exe -NoExit -Command "\$env:AGENCE_SESSION_ID='$session_id'; \$env:AGENCE_AGENT_ID='$agent_id'"
+  else
+    echo "✗ PowerShell not found (tried pwsh and powershell.exe)"; return 1
+  fi
+}
+
+# ============================================================================
+# REINDEX: Refresh all knowledge base indices
+# ============================================================================
+
+reindex_knowledge_bases() {
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  AGENCE REINDEX (^reindex)"
+  echo "══════════════════════════════════════════════"; echo ""
+  local dirs=("synthetic" "nexus" "globalcache" "organic")
+  local reindexed=0
+  for dir in "${dirs[@]}"; do
+    local d="${AGENCE_ROOT}/$dir"
+    [[ -d "$d" ]] || continue
+    echo "  Scanning: $dir/"
+    while IFS= read -r md; do
+      local base; base=$(dirname "$md")
+      local json="${base}/INDEX.json"
+      if [[ ! -f "$json" ]]; then
+        echo "    ⚠ Missing INDEX.json: ${base#$AGENCE_ROOT/}"
+      else
+        echo "    ✓ ${base#$AGENCE_ROOT/}"
+      fi
+      ((reindexed++))
+    done < <(find "$d" -name "INDEX.md" -type f 2>/dev/null | sort)
+  done
+  echo ""
+  echo "  Directories scanned: $reindexed INDEX.md files"
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  REINDEX COMPLETE"; echo ""
+}
+
+# ============================================================================
+# HANDOFF: Transfer session context to another agent
+# ============================================================================
+
+handoff_to_agent() {
+  local target="${1:-}"
+  [[ $# -gt 0 ]] && shift
+  local context_msg="$*"
+  local source_agent="${AGENCE_AGENT_PARAM:-${AGENCE_AGENT_ID:-@}}"
+  local session_id="${AGENCE_SESSION_ID:-$(generate_shell_session_id handoff)}"
+  local handoff_id="handoff-$(date +%Y%m%d_%H%M%S)-$(printf '%x' $((RANDOM * RANDOM)))"
+
+  if [[ -z "$target" ]]; then
+    echo ""; echo "Usage: agence ^handoff <target_agent> [context message]"
+    echo "  agence ^handoff @ralph \"implement matrix-math.ts\""
+    echo "  agence ^handoff user \"analysis complete, review results\""
+    echo ""; echo "Available agents:"
+    ls "${AGENCE_ROOT}/codex/agents/" 2>/dev/null | grep -v '\.md$' | sed 's/^/  @/'
+    return 1
+  fi
+
+  local target_name="${target#@}"
+  if [[ "$target_name" != "user" ]] && [[ ! -d "${AGENCE_ROOT}/codex/agents/$target_name" ]]; then
+    echo "Error: Unknown agent: $target" >&2; return 1
+  fi
+
+  local handoffs_dir="${AGENCE_ROOT}/nexus/.aihandoffs"
+  mkdir -p "$handoffs_dir" 2>/dev/null
+
+  local branch; branch=$(git -C "$AGENCE_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+  local commit; commit=$(git -C "$AGENCE_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+  local dirty; dirty=$(git -C "$AGENCE_ROOT" status --short 2>/dev/null | wc -l | tr -d ' ')
+  local recent; recent=$(git -C "$AGENCE_ROOT" log --oneline -5 2>/dev/null | sed 's/"/\\"/g' | awk '{printf "    \"%s\",\n", $0}' | sed '$ s/,$//')
+  local ctx_esc; ctx_esc=$(echo "$context_msg" | sed 's/"/\\"/g')
+
+  local handoff_file="${handoffs_dir}/${handoff_id}.json"
+  cat > "$handoff_file" <<EOF
+{
+  "handoff_id": "$handoff_id",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "source": { "agent": "$source_agent", "session_id": "$session_id" },
+  "target": { "agent": "$target", "agent_dir": "$target_name" },
+  "context": "$ctx_esc",
+  "git": { "branch": "$branch", "commit": "$commit", "dirty_files": $dirty },
+  "recent_commits": [
+$recent
+  ],
+  "status": "pending"
+}
+EOF
+
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  AGENCE HANDOFF (^handoff)"
+  echo "══════════════════════════════════════════════"
+  echo "  From:    $source_agent"
+  echo "  To:      $target"
+  echo "  Session: $session_id"
+  echo "  ID:      $handoff_id"
+  [[ -n "$context_msg" ]] && echo "  Context: $context_msg"
+  echo "  Git:     $branch @ $commit ($dirty dirty)"
+  echo ""; echo "  File: $handoff_file"
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  HANDOFF COMPLETE"
+  echo "  Next: agence @$target_name ^pickup $handoff_id"; echo ""
+}
+
+# ============================================================================
+# PICKUP: Accept a pending handoff
+# ============================================================================
+
+pickup_handoff() {
+  local pickup_arg="${1:-}"
+  local current_agent="${AGENCE_AGENT_PARAM:-${AGENCE_AGENT_ID:-@}}"
+  local current_name="${current_agent#@}"
+  local handoffs_dir="${AGENCE_ROOT}/nexus/.aihandoffs"
+
+  if [[ ! -d "$handoffs_dir" ]]; then
+    echo ""; echo "No handoffs directory found. Nothing to pick up."; return 0
+  fi
+
+  if [[ -z "$pickup_arg" ]]; then
+    echo ""; echo "══════════════════════════════════════════════"
+    echo "  AGENCE PICKUP (^pickup) — pending handoffs"
+    echo "  Agent: $current_agent"
+    echo "══════════════════════════════════════════════"; echo ""
+    local found=0
+    while IFS= read -r f; do
+      [[ -z "$f" ]] && continue
+      local target_agent; target_agent=$(grep -o '"agent": *"[^"]*"' "$f" | tail -1 | sed 's/.*"agent": *"//;s/"//')
+      local status; status=$(grep -o '"status": *"[^"]*"' "$f" | sed 's/.*"status": *"//;s/"//')
+      local tclean="${target_agent#@}"
+      if [[ "$status" == "pending" ]] && { [[ "$tclean" == "$current_name" ]] || [[ "$current_agent" == "@" ]]; }; then
+        local hid; hid=$(grep -o '"handoff_id": *"[^"]*"' "$f" | sed 's/.*"handoff_id": *"//;s/"//')
+        local source; source=$(grep -o '"agent": *"[^"]*"' "$f" | head -1 | sed 's/.*"agent": *"//;s/"//')
+        local ctx; ctx=$(grep -o '"context": *"[^"]*"' "$f" | sed 's/.*"context": *"//;s/"//')
+        found=$((found+1))
+        echo "  [$found] $hid"
+        echo "      From: $source | Context: ${ctx:-<none>}"
+      fi
+    done < <(find "$handoffs_dir" -name "handoff-*.json" -type f 2>/dev/null | sort -r)
+    [[ $found -eq 0 ]] && echo "  No pending handoffs for $current_agent" || echo ""; echo "  Accept with: agence ^pickup <handoff_id>"
+    echo ""; return 0
+  fi
+
+  local handoff_file
+  if [[ -f "${handoffs_dir}/${pickup_arg}.json" ]]; then
+    handoff_file="${handoffs_dir}/${pickup_arg}.json"
+  else
+    handoff_file=$(find "$handoffs_dir" -name "*${pickup_arg}*.json" -type f 2>/dev/null | head -1)
+  fi
+  [[ -z "$handoff_file" ]] && { echo "Error: Handoff not found: $pickup_arg" >&2; return 1; }
+
+  local status; status=$(grep -o '"status": *"[^"]*"' "$handoff_file" | sed 's/.*"status": *"//;s/"//')
+  [[ "$status" != "pending" ]] && { echo "Error: Handoff already $status" >&2; return 1; }
+
+  local hid; hid=$(grep -o '"handoff_id": *"[^"]*"' "$handoff_file" | sed 's/.*"handoff_id": *"//;s/"//')
+  local source; source=$(grep -o '"agent": *"[^"]*"' "$handoff_file" | head -1 | sed 's/.*"agent": *"//;s/"//')
+  local ctx; ctx=$(grep -o '"context": *"[^"]*"' "$handoff_file" | sed 's/.*"context": *"//;s/"//')
+  local hbranch; hbranch=$(grep -o '"branch": *"[^"]*"' "$handoff_file" | sed 's/.*"branch": *"//;s/"//')
+  local hcommit; hcommit=$(grep -o '"commit": *"[^"]*"' "$handoff_file" | sed 's/.*"commit": *"//;s/"//')
+
+  sed -i "s/\"status\": \"pending\"/\"status\": \"accepted\"/" "$handoff_file"
+
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  AGENCE PICKUP — handoff accepted"
+  echo "  Transfer: $source → $current_agent"
+  echo "  ID:       $hid"
+  echo "  Context:  ${ctx:-<none>}"
+  echo "  Git:      $hbranch @ $hcommit"
+  echo ""; echo "  Status: pending → accepted"
+  echo "══════════════════════════════════════════════"
+  echo "  Use ^save to checkpoint | ^handoff to forward"; echo ""
+}
+
+# ============================================================================
+# PAUSE / RESUME: Suspend and restore sessions (Unix job control semantics)
+# ============================================================================
+
+pause_session() {
+  local agent_id="${AGENCE_AGENT_PARAM:-${AGENCE_AGENT_ID:-@}}"
+  local session_id="${AGENCE_SESSION_ID:-$(generate_shell_session_id pause)}"
+  local pause_id="pause-$(date +%Y%m%d_%H%M%S)-$(printf '%x' $((RANDOM * RANDOM)))"
+  local saves_dir="${AGENCE_ROOT}/nexus/.aisaves"
+  mkdir -p "$saves_dir" 2>/dev/null
+
+  local branch; branch=$(git -C "$AGENCE_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+  local commit; commit=$(git -C "$AGENCE_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+  local dirty; dirty=$(git -C "$AGENCE_ROOT" status --short 2>/dev/null | wc -l | tr -d ' ')
+  local recent; recent=$(git -C "$AGENCE_ROOT" log --oneline -5 2>/dev/null | sed 's/"/\\"/g' | awk '{printf "    \"%s\",\n", $0}' | sed '$ s/,$//')
+
+  local pause_file="${saves_dir}/${pause_id}.json"
+  cat > "$pause_file" <<EOF
+{
+  "log_id": "$pause_id",
+  "type": "pause",
+  "agent_id": "$agent_id",
+  "session_id": "$session_id",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "status": "paused",
+  "user": "$(whoami)",
+  "cwd": "$(pwd)",
+  "git": { "branch": "$branch", "commit": "$commit", "dirty_files": $dirty },
+  "recent_commits": [
+$recent
+  ]
+}
+EOF
+
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  AGENCE PAUSE (^pause)"
+  echo "  Agent:    $agent_id"
+  echo "  Session:  $session_id"
+  echo "  Pause ID: $pause_id"
+  echo "  Git:      $branch @ $commit ($dirty dirty)"
+  echo ""; echo "  File: $pause_file"
+  echo "══════════════════════════════════════════════"
+  echo "  SESSION PAUSED"
+  echo "  Resume with: agence ^resume $pause_id"; echo ""
+}
+
+resume_session() {
+  local resume_arg="${1:-}"
+  local current_agent="${AGENCE_AGENT_PARAM:-${AGENCE_AGENT_ID:-@}}"
+  local saves_dir="${AGENCE_ROOT}/nexus/.aisaves"
+
+  if [[ ! -d "$saves_dir" ]]; then
+    echo ""; echo "No saves directory found. Nothing to resume."; return 0
+  fi
+
+  if [[ -z "$resume_arg" ]]; then
+    echo ""; echo "══════════════════════════════════════════════"
+    echo "  AGENCE RESUME (^resume) — paused sessions"
+    echo "  Agent: $current_agent"
+    echo "══════════════════════════════════════════════"; echo ""
+    local found=0
+    while IFS= read -r f; do
+      [[ -z "$f" ]] && continue
+      local status; status=$(grep -o '"status": *"[^"]*"' "$f" | sed 's/.*"status": *"//;s/"//')
+      [[ "$status" != "paused" ]] && continue
+      local lid; lid=$(grep -o '"log_id": *"[^"]*"' "$f" | sed 's/.*"log_id": *"//;s/"//')
+      local aid; aid=$(grep -o '"agent_id": *"[^"]*"' "$f" | sed 's/.*"agent_id": *"//;s/"//')
+      local ts; ts=$(grep -o '"timestamp": *"[^"]*"' "$f" | sed 's/.*"timestamp": *"//;s/"//')
+      found=$((found+1))
+      echo "  [$found] $lid"
+      echo "      Agent: $aid | At: $ts"
+    done < <(find "$saves_dir" -name "pause-*.json" -type f 2>/dev/null | sort -r)
+    [[ $found -eq 0 ]] && echo "  No paused sessions found" || echo ""; echo "  Resume with: agence ^resume <pause_id>"
+    echo ""; return 0
+  fi
+
+  local save_file
+  if [[ -f "${saves_dir}/${resume_arg}.json" ]]; then
+    save_file="${saves_dir}/${resume_arg}.json"
+  else
+    save_file=$(find "$saves_dir" -name "*${resume_arg}*.json" -type f 2>/dev/null | head -1)
+  fi
+  [[ -z "$save_file" ]] && { echo "Error: Save not found: $resume_arg" >&2; return 1; }
+
+  local lid; lid=$(grep -o '"log_id": *"[^"]*"' "$save_file" | sed 's/.*"log_id": *"//;s/"//')
+  local aid; aid=$(grep -o '"agent_id": *"[^"]*"' "$save_file" | sed 's/.*"agent_id": *"//;s/"//')
+  local hbranch; hbranch=$(grep -o '"branch": *"[^"]*"' "$save_file" | sed 's/.*"branch": *"//;s/"//')
+  local hcommit; hcommit=$(grep -o '"commit": *"[^"]*"' "$save_file" | sed 's/.*"commit": *"//;s/"//')
+
+  sed -i "s/\"status\": \"paused\"/\"status\": \"resumed\"/" "$save_file"
+  export AGENCE_SESSION_ID="$lid" AGENCE_AGENT_ID="$aid"
+
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  AGENCE RESUME — session restored"
+  echo "  ID:     $lid"
+  echo "  Agent:  $aid"
+  echo "  Git:    $hbranch @ $hcommit"
+  echo "  Status: paused → resumed"
+  echo "══════════════════════════════════════════════"
+  echo "  SESSION ACTIVE — use ^save to checkpoint"; echo ""
 }
 
 # ============================================================================
