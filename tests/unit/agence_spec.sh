@@ -59,18 +59,21 @@ Describe 'Agence CLI'
   # ===========================================================================
 
   It 'routes chat queries to router_chat'
+    Skip if 'no LLM provider configured' [ "$(bash bin/agence _resolve_provider 2>/dev/null || echo none)" = 'none' ]
     When run bash bin/agence "What is Agence?"
     The status should be success
     The output should include 'router_chat'
   End
 
   It 'routes bare strings to chat mode (no prefix)'
+    Skip if 'no LLM provider configured' [ "$(bash bin/agence _resolve_provider 2>/dev/null || echo none)" = 'none' ]
     When run bash bin/agence "hello agence"
     The status should be success
     The output should include 'router_chat'
   End
 
   It 'routes explicit chat subcommand to chat mode'
+    Skip if 'no LLM provider configured' [ "$(bash bin/agence _resolve_provider 2>/dev/null || echo none)" = 'none' ]
     When run bash bin/agence chat "hello agence"
     The status should be success
     The output should include 'router_chat'

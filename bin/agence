@@ -351,6 +351,10 @@ main() {
       mode_symbols
       exit 0
       ;;
+    _resolve_provider)
+      resolve_provider
+      exit $?
+      ;;
     status)
       mode_system "status"
       exit 0
@@ -426,6 +430,56 @@ main() {
 }
 
 # ============================================================================
+# PROVIDER RESOLUTION
+# ============================================================================
+# Determines which LLM provider to use (auto-detect cascade).
+# Never calls an LLM — pure config resolution.
+#
+# Priority:
+#   1. Explicit @agent routing (AGENCE_AGENT_PARAM set by parse_agent_prefix)
+#   2. AGENCE_DEFAULT_PROVIDER env var (set in .agencerc or user env)
+#   3. Auto-detect: gh copilot CLI available → pilot
+#   4. Auto-detect: ANTHROPIC_API_KEY set → claude
+#   5. Auto-detect: OPENAI_API_KEY set → openai
+#   6. none (offline/CI — callers must handle gracefully)
+
+resolve_provider() {
+  # 1. Explicit agent routing
+  if [[ -n "${AGENCE_AGENT_PARAM:-}" ]]; then
+    echo "${AGENCE_AGENT_PARAM#@}"
+    return 0
+  fi
+
+  # 2. Explicit env override
+  if [[ -n "${AGENCE_DEFAULT_PROVIDER:-}" ]]; then
+    echo "$AGENCE_DEFAULT_PROVIDER"
+    return 0
+  fi
+
+  # 3. Auto-detect: Copilot CLI (gh copilot)
+  if command -v gh &>/dev/null && gh copilot --version &>/dev/null 2>&1; then
+    echo "pilot"
+    return 0
+  fi
+
+  # 4. Auto-detect: Anthropic
+  if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+    echo "claude"
+    return 0
+  fi
+
+  # 5. Auto-detect: OpenAI
+  if [[ -n "${OPENAI_API_KEY:-}" ]]; then
+    echo "openai"
+    return 0
+  fi
+
+  # 6. No provider available
+  echo "none"
+  return 1
+}
+
+# ============================================================================
 # MODE: CHAT
 # ============================================================================
 # Normal conversation with LLM
@@ -436,13 +490,25 @@ mode_chat() {
 
   [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Chat mode: $query" >&2
 
+  # Resolve provider (never auto-call LLM without a provider)
+  local provider
+  provider=$(resolve_provider) || {
+    echo "Error: No LLM provider configured." >&2
+    echo "  Set AGENCE_DEFAULT_PROVIDER or install gh copilot CLI." >&2
+    echo "  Providers: pilot (gh copilot), claude, openai, ollama" >&2
+    echo "  Example: export AGENCE_DEFAULT_PROVIDER=pilot" >&2
+    return 1
+  }
+
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Provider: $provider" >&2
+
   # Load router
   router_load_config
 
   # Call LLM with context
   local response
-  response=$(router_chat "$query") || {
-    echo "Error: Failed to contact LLM" >&2
+  response=$(router_chat "$query" "$provider") || {
+    echo "Error: Failed to contact LLM provider '$provider'" >&2
     return 1
   }
 
