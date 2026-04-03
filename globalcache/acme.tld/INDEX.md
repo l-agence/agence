@@ -15,4 +15,9 @@ Claude Code 2.0 as it has been labelled by some introduces new features aimed at
 
 You’ll learn how to use the /loop command to automate repetitive actions, such as scheduling updates or running system checks. The breakdown also covers the enhanced memory management system, which uses structured templates to improve data recall and minimize redundancy. Additionally, you’ll see how integration with messaging platforms like Telegram supports real-time updates, offering better oversight for collaborative projects.
 
+## Claude inspired 
+- CLAW is pure python requite of claude from Claude npm leak https://github.com/instructkr/claw-code
+
+# codex and derivatives 
+- https://github.com/Yeachan-Heo/oh-my-codex
 
