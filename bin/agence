@@ -767,6 +767,36 @@ mode_external() {
       git -C "$GIT_REPO" push -u origin
       return $?
       ;;
+    ghremote)
+      # GitHub CLI: view repo info (T0: auto-execute)
+      bash "$AGENCE_ROOT/bin/aido" gh repo view
+      return $?
+      ;;
+    ghpull)
+      # GitHub CLI: list PRs (T0: auto-execute)
+      bash "$AGENCE_ROOT/bin/aido" gh pr list
+      return $?
+      ;;
+    ghlog)
+      # GitHub CLI: list workflow run history (T0: auto-execute)
+      bash "$AGENCE_ROOT/bin/aido" gh run list
+      return $?
+      ;;
+    ghrun)
+      # GitHub CLI: list runs (T0: auto-execute)
+      bash "$AGENCE_ROOT/bin/aido" gh run list
+      return $?
+      ;;
+    ghflow)
+      # GitHub CLI: list workflows (T0: auto-execute)
+      bash "$AGENCE_ROOT/bin/aido" gh workflow list
+      return $?
+      ;;
+    ghissue)
+      # GitHub CLI: list issues (T0: auto-execute)
+      bash "$AGENCE_ROOT/bin/aido" gh issue list
+      return $?
+      ;;
   esac
 
   # Load permitted commands from config/commands.json
@@ -947,11 +977,23 @@ mode_init() {
       reindex_knowledge_bases
       return $?
       ;;
+    "session-restore")
+      # Restore a session from a snapshot: ^session-restore <session_id> <snapshot_dir>
+      local restore_session_id="${init_args%% *}"
+      local restore_snapshot_dir="${init_args#* }"
+      if [[ -z "$restore_session_id" || "$restore_session_id" == "$restore_snapshot_dir" ]]; then
+        echo "Usage: agence ^session-restore <session_id> <snapshot_dir>" >&2
+        return 1
+      fi
+      echo "[INFO] Restoring session $restore_session_id from $restore_snapshot_dir" >&2
+      bash "$AGENCE_ROOT/bin/aisession" resume "$restore_session_id"
+      return $?
+      ;;
     *)
       echo "Error: Unknown init command: $init_cmd" >&2
       echo "Available: help, init, reload, install, save, learn, commit, push, session," >&2
       echo "           lesson, log, plan, todo, fault, issue, task, job," >&2
-      echo "           handoff, pickup, pause, resume, reindex" >&2
+      echo "           handoff, pickup, pause, resume, reindex, session-restore" >&2
       return 1
       ;;
   esac
@@ -1239,6 +1281,7 @@ mode_session() {
         ((count++)) || true
       done
       [[ $count -eq 0 ]] && echo "  (no sessions found)"
+      return 0
       ;;
     "view")
       if [[ -z "$args" ]]; then
