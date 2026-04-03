@@ -336,8 +336,8 @@ EOF
 }
 
 show_version() {
-  echo "Agence version 0.2.4"
-  echo "[VERSION]: 0.2.4"
+  echo "Agence version 0.2.4.1"
+  echo "[VERSION]: 0.2.4.1"
   echo "[RELEASE]: rel_0.2.2_agence_swarm_sessions"
 }
 

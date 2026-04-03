@@ -1,1 +1,794 @@
-bash: Ran: command not found
+1..91
+ok 1 - Agence CLI shows help with --help
+ok 2 - Agence CLI shows help with -h flag
+ok 3 - Agence CLI shows help with bare help subcommand
+ok 4 - Agence CLI shows version with --version
+ok 5 - Agence CLI shows version with -v flag
+ok 6 - Agence CLI shows version with bare version subcommand
+not ok 7 - Agence CLI routes chat queries to router_chat # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 64)
+# When run bash bin/agence What is Agence?
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 65)
+# When run bash bin/agence What is Agence?
+# The output should include router_chat
+# 
+#   expected "" to include "router_chat"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 61-66, WARNING)
+# When run bash bin/agence What is Agence?
+# There was output to stderr but not found expectation
+# 
+#   stderr: Error: No LLM provider configured.
+#     Set AGENCE_DEFAULT_PROVIDER or install gh copilot CLI.
+#     Providers: pilot (gh copilot), claude, openai, ollama
+#     Example: export AGENCE_DEFAULT_PROVIDER=pilot
+# 
+not ok 8 - Agence CLI routes bare strings to chat mode (no prefix) # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 71)
+# When run bash bin/agence hello agence
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 72)
+# When run bash bin/agence hello agence
+# The output should include router_chat
+# 
+#   expected "" to include "router_chat"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 68-73, WARNING)
+# When run bash bin/agence hello agence
+# There was output to stderr but not found expectation
+# 
+#   stderr: Error: No LLM provider configured.
+#     Set AGENCE_DEFAULT_PROVIDER or install gh copilot CLI.
+#     Providers: pilot (gh copilot), claude, openai, ollama
+#     Example: export AGENCE_DEFAULT_PROVIDER=pilot
+# 
+not ok 9 - Agence CLI routes explicit chat subcommand to chat mode # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 78)
+# When run bash bin/agence chat hello agence
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 79)
+# When run bash bin/agence chat hello agence
+# The output should include router_chat
+# 
+#   expected "" to include "router_chat"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 75-80, WARNING)
+# When run bash bin/agence chat hello agence
+# There was output to stderr but not found expectation
+# 
+#   stderr: Error: No LLM provider configured.
+#     Set AGENCE_DEFAULT_PROVIDER or install gh copilot CLI.
+#     Providers: pilot (gh copilot), claude, openai, ollama
+#     Example: export AGENCE_DEFAULT_PROVIDER=pilot
+# 
+ok 10 - Agence CLI routes +plan to router_plan_action (stub) # SKIP router_plan_action stub returns ACTION: chat which has no handler yet — needs action dispatch wiring
+ok 11 - Agence CLI routes +deploy to router_plan_action (stub) # SKIP router_plan_action stub returns ACTION: chat which has no handler yet — needs action dispatch wiring
+ok 12 - Agence CLI handles ghauth external command # SKIP integration: calls bin/aido gh auth status (real gh required)
+ok 13 - Agence CLI handles ghlogin external command # SKIP integration: interactive gh auth login — cannot run headlessly
+ok 14 - Agence CLI handles gitstatus external command # SKIP integration: calls bin/aido git status (real git session capture required)
+ok 15 - Agence CLI handles ghstatus external command # SKIP integration: calls bin/aido gh repo view (real gh required)
+not ok 16 - Agence CLI /git status runs git status (T0: auto-execute) # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 139)
+# When run bash bin/agence /git status
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 140)
+# When run bash bin/agence /git status
+# The output should include branch
+# 
+#   expected "" to include "branch"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 137-141, WARNING)
+# When run bash bin/agence /git status
+# There was output to stderr but not found expectation
+# 
+#   stderr: bin/agence: line 594: validate_command: command not found
+# 
+not ok 17 - Agence CLI /git log runs git log (T0: auto-execute) # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 145)
+# When run bash bin/agence /git log --oneline -3
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 146)
+# When run bash bin/agence /git log --oneline -3
+# The output should include agence
+# 
+#   expected "" to include "agence"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 143-147, WARNING)
+# When run bash bin/agence /git log --oneline -3
+# There was output to stderr but not found expectation
+# 
+#   stderr: bin/agence: line 594: validate_command: command not found
+# 
+not ok 18 - Agence CLI /git diff runs git diff (T0: auto-execute) # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 151)
+# When run bash bin/agence /git diff --stat HEAD~1
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 152)
+# When run bash bin/agence /git diff --stat HEAD~1
+# The output should include changed
+# 
+#   expected "" to include "changed"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 149-153, WARNING)
+# When run bash bin/agence /git diff --stat HEAD~1
+# There was output to stderr but not found expectation
+# 
+#   stderr: bin/agence: line 594: validate_command: command not found
+# 
+not ok 19 - Agence CLI /git with no subcommand prints usage and fails # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 158)
+# When run bash bin/agence /git
+# The error should include Usage:
+# 
+#   expected "bin/agence: line 594: validate_command: command not found" to include "Usage:"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 159)
+# When run bash bin/agence /git
+# The error should include agence /git
+# 
+#   expected "bin/agence: line 594: validate_command: command not found" to include "agence /git"
+# 
+not ok 20 - Agence CLI /git filter-branch is T3 blocked # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 165)
+# When run bash bin/agence /git filter-branch
+# The error should include BLOCKED
+# 
+#   expected "bin/agence: line 594: validate_command: command not found" to include "BLOCKED"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 166)
+# When run bash bin/agence /git filter-branch
+# The error should include T3
+# 
+#   expected "bin/agence: line 594: validate_command: command not found" to include "T3"
+# 
+not ok 21 - Agence CLI /git gc is T3 blocked # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 172)
+# When run bash bin/agence /git gc
+# The error should include BLOCKED
+# 
+#   expected "bin/agence: line 594: validate_command: command not found" to include "BLOCKED"
+# 
+not ok 22 - Agence CLI /status shortcut runs git status (T0: auto-execute) # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 177)
+# When run bash bin/agence /status
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 178)
+# When run bash bin/agence /status
+# The output should include branch
+# 
+#   expected "" to include "branch"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 175-179, WARNING)
+# When run bash bin/agence /status
+# There was output to stderr but not found expectation
+# 
+#   stderr: bin/agence: line 594: validate_command: command not found
+# 
+not ok 23 - Agence CLI /log shortcut runs git log (T0: auto-execute) # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 183)
+# When run bash bin/agence /log --oneline -3
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 184)
+# When run bash bin/agence /log --oneline -3
+# The output should include agence
+# 
+#   expected "" to include "agence"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 181-185, WARNING)
+# When run bash bin/agence /log --oneline -3
+# There was output to stderr but not found expectation
+# 
+#   stderr: bin/agence: line 594: validate_command: command not found
+# 
+not ok 24 - Agence CLI /remote shortcut runs git remote (T0: auto-execute) # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 189)
+# When run bash bin/agence /remote
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 190)
+# When run bash bin/agence /remote
+# The output should include origin
+# 
+#   expected "" to include "origin"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 187-191, WARNING)
+# When run bash bin/agence /remote
+# There was output to stderr but not found expectation
+# 
+#   stderr: bin/agence: line 594: validate_command: command not found
+# 
+ok 25 - Agence CLI /fetch shortcut requires TTY confirmation (T2: Skip in CI) # SKIP T2: git fetch requires interactive confirm — cannot run headlessly
+ok 26 - Agence CLI /pull shortcut requires TTY confirmation (T2: Skip in CI) # SKIP T2: git pull requires interactive confirm — cannot run headlessly
+not ok 27 - Agence CLI /gh with no subcommand shows gh help # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 214)
+# When run bash bin/agence /gh
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 215)
+# When run bash bin/agence /gh
+# The output should include USAGE
+# 
+#   expected "" to include "USAGE"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 211-216, WARNING)
+# When run bash bin/agence /gh
+# There was output to stderr but not found expectation
+# 
+#   stderr: bin/agence: line 594: validate_command: command not found
+# 
+# (in specfile tests/unit/agence_spec.sh, line 211-216)
+# When run bash bin/agence /gh
+# Unexpected output to stderr occurred
+# 
+#   /mnt/c/Users/steff/git/.agence/tests/lib/shellspec/lib/core/dsl.sh: line 433: !: command not found
+# 
+not ok 28 - Agence CLI /gh --help passes through to gh help # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 221)
+# When run bash bin/agence /gh --help
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 222)
+# When run bash bin/agence /gh --help
+# The output should include USAGE
+# 
+#   expected "" to include "USAGE"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 218-223, WARNING)
+# When run bash bin/agence /gh --help
+# There was output to stderr but not found expectation
+# 
+#   stderr: bin/agence: line 594: validate_command: command not found
+# 
+# (in specfile tests/unit/agence_spec.sh, line 218-223)
+# When run bash bin/agence /gh --help
+# Unexpected output to stderr occurred
+# 
+#   /mnt/c/Users/steff/git/.agence/tests/lib/shellspec/lib/core/dsl.sh: line 433: !: command not found
+# 
+not ok 29 - Agence CLI /gh auth status runs gh auth status (T0: auto-execute) # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 228)
+# When run bash bin/agence /gh auth status
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 229)
+# When run bash bin/agence /gh auth status
+# The output should include github.com
+# 
+#   expected "" to include "github.com"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 225-230, WARNING)
+# When run bash bin/agence /gh auth status
+# There was output to stderr but not found expectation
+# 
+#   stderr: bin/agence: line 594: validate_command: command not found
+# 
+# (in specfile tests/unit/agence_spec.sh, line 225-230)
+# When run bash bin/agence /gh auth status
+# Unexpected output to stderr occurred
+# 
+#   /mnt/c/Users/steff/git/.agence/tests/lib/shellspec/lib/core/dsl.sh: line 433: !: command not found
+# 
+not ok 30 - Agence CLI /gh repo view runs gh repo view (T0: auto-execute) # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 235)
+# When run bash bin/agence /gh repo view
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 236)
+# When run bash bin/agence /gh repo view
+# The output should include agence
+# 
+#   expected "" to include "agence"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 232-237, WARNING)
+# When run bash bin/agence /gh repo view
+# There was output to stderr but not found expectation
+# 
+#   stderr: bin/agence: line 594: validate_command: command not found
+# 
+# (in specfile tests/unit/agence_spec.sh, line 232-237)
+# When run bash bin/agence /gh repo view
+# Unexpected output to stderr occurred
+# 
+#   /mnt/c/Users/steff/git/.agence/tests/lib/shellspec/lib/core/dsl.sh: line 433: !: command not found
+# 
+not ok 31 - Agence CLI /ghremote shortcut runs gh repo view (T0: auto-execute) # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 242)
+# When run bash bin/agence /ghremote
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 243)
+# When run bash bin/agence /ghremote
+# The output should include agence
+# 
+#   expected "" to include "agence"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 239-244, WARNING)
+# When run bash bin/agence /ghremote
+# There was output to stderr but not found expectation
+# 
+#   stderr: bin/agence: line 594: validate_command: command not found
+# 
+# (in specfile tests/unit/agence_spec.sh, line 239-244)
+# When run bash bin/agence /ghremote
+# Unexpected output to stderr occurred
+# 
+#   /mnt/c/Users/steff/git/.agence/tests/lib/shellspec/lib/core/dsl.sh: line 433: !: command not found
+# 
+not ok 32 - Agence CLI /ghpull shortcut lists PRs by default (T0: auto-execute) # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 249)
+# When run bash bin/agence /ghpull
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 246-250, WARNING)
+# When run bash bin/agence /ghpull
+# There was output to stderr but not found expectation
+# 
+#   stderr: bin/agence: line 594: validate_command: command not found
+# 
+# (in specfile tests/unit/agence_spec.sh, line 246-250)
+# When run bash bin/agence /ghpull
+# Unexpected output to stderr occurred
+# 
+#   /mnt/c/Users/steff/git/.agence/tests/lib/shellspec/lib/core/dsl.sh: line 433: !: command not found
+# 
+not ok 33 - Agence CLI /ghlog shortcut lists run history (T0: auto-execute) # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 255)
+# When run bash bin/agence /ghlog
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 252-256, WARNING)
+# When run bash bin/agence /ghlog
+# There was output to stderr but not found expectation
+# 
+#   stderr: bin/agence: line 594: validate_command: command not found
+# 
+# (in specfile tests/unit/agence_spec.sh, line 252-256)
+# When run bash bin/agence /ghlog
+# Unexpected output to stderr occurred
+# 
+#   /mnt/c/Users/steff/git/.agence/tests/lib/shellspec/lib/core/dsl.sh: line 433: !: command not found
+# 
+not ok 34 - Agence CLI /ghrun lists runs by default (T0: auto-execute) # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 261)
+# When run bash bin/agence /ghrun
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 258-262, WARNING)
+# When run bash bin/agence /ghrun
+# There was output to stderr but not found expectation
+# 
+#   stderr: bin/agence: line 594: validate_command: command not found
+# 
+# (in specfile tests/unit/agence_spec.sh, line 258-262)
+# When run bash bin/agence /ghrun
+# Unexpected output to stderr occurred
+# 
+#   /mnt/c/Users/steff/git/.agence/tests/lib/shellspec/lib/core/dsl.sh: line 433: !: command not found
+# 
+not ok 35 - Agence CLI /ghflow lists workflows by default (T0: auto-execute) # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 267)
+# When run bash bin/agence /ghflow
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 264-268, WARNING)
+# When run bash bin/agence /ghflow
+# There was output to stderr but not found expectation
+# 
+#   stderr: bin/agence: line 594: validate_command: command not found
+# 
+# (in specfile tests/unit/agence_spec.sh, line 264-268)
+# When run bash bin/agence /ghflow
+# Unexpected output to stderr occurred
+# 
+#   /mnt/c/Users/steff/git/.agence/tests/lib/shellspec/lib/core/dsl.sh: line 433: !: command not found
+# 
+not ok 36 - Agence CLI /ghissue lists issues by default (T0: auto-execute) # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 273)
+# When run bash bin/agence /ghissue
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 270-274, WARNING)
+# When run bash bin/agence /ghissue
+# There was output to stderr but not found expectation
+# 
+#   stderr: bin/agence: line 594: validate_command: command not found
+# 
+# (in specfile tests/unit/agence_spec.sh, line 270-274)
+# When run bash bin/agence /ghissue
+# Unexpected output to stderr occurred
+# 
+#   /mnt/c/Users/steff/git/.agence/tests/lib/shellspec/lib/core/dsl.sh: line 433: !: command not found
+# 
+ok 37 - Agence CLI /gh pr merge requires TTY confirmation (T2: Skip in CI) # SKIP T2: gh pr merge requires interactive confirm — cannot run headlessly
+ok 38 - Agence CLI /ghmerge requires TTY confirmation (T2: Skip in CI) # SKIP T2: gh pr merge requires interactive confirm — cannot run headlessly
+ok 39 - Agence CLI /gh secret set is T2 (Skip in CI) # SKIP T2: gh secret set requires interactive confirm — CI/CD secret mutation
+ok 40 - Agence CLI handles !help system command
+ok 41 - Agence CLI handles !version system command
+ok 42 - Agence CLI handles !config system command
+ok 43 - Agence CLI handles !status system command
+ok 44 - Agence CLI !status includes root path
+ok 45 - Agence CLI !status includes config path
+ok 46 - Agence CLI handles ^init init command # SKIP integration: init_agence_environment sources .agencerc — needs mock to run safely in CI
+ok 47 - Agence CLI handles ^reload init command
+ok 48 - Agence CLI handles ^install init command # SKIP integration: attempts real package installation (apt-get/winget/brew) — not safe for automated runs
+not ok 49 - Agence CLI handles ^session list with no sessions present # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 364)
+# When run bash bin/agence ^session list
+# The output should include Sessions
+# 
+#   expected "[SESSION LIST] Active sessions:
+#     (no sessions found)" to include "Sessions"
+# 
+ok 50 - Agence CLI ^session list reports output
+not ok 51 - Agence CLI ^session view requires session_id argument # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 376)
+# When run bash bin/agence ^session view
+# The output should include Usage:
+# 
+#   expected "" to include "Usage:"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 373-377, WARNING)
+# When run bash bin/agence ^session view
+# There was output to stderr but not found expectation
+# 
+#   stderr: Usage: agence ^session view <session_id>
+# 
+not ok 52 - Agence CLI ^session handoff requires session_id and new_owner arguments # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 382)
+# When run bash bin/agence ^session handoff
+# The output should include Usage:
+# 
+#   expected "" to include "Usage:"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 379-383, WARNING)
+# When run bash bin/agence ^session handoff
+# There was output to stderr but not found expectation
+# 
+#   stderr: Usage: agence ^session handoff <session_id> <@agent>
+# 
+not ok 53 - Agence CLI ^session export requires session_id # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 388)
+# When run bash bin/agence ^session export
+# The output should include Usage:
+# 
+#   expected "" to include "Usage:"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 385-389, WARNING)
+# When run bash bin/agence ^session export
+# There was output to stderr but not found expectation
+# 
+#   stderr: Usage: agence ^session export <session_id> <@user>
+# 
+not ok 54 - Agence CLI ^session import requires input_file # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 394)
+# When run bash bin/agence ^session import
+# The output should include Usage:
+# 
+#   expected "" to include "Usage:"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 391-395, WARNING)
+# When run bash bin/agence ^session import
+# There was output to stderr but not found expectation
+# 
+#   stderr: Usage: agence ^session import <exported_file.json>
+# 
+not ok 55 - Agence CLI ^session assign requires session_id and agent # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 400)
+# When run bash bin/agence ^session assign
+# The output should include Usage:
+# 
+#   expected "" to include "Usage:"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 397-401, WARNING)
+# When run bash bin/agence ^session assign
+# There was output to stderr but not found expectation
+# 
+#   stderr: Usage: agence ^session assign <session_id> <@user>
+# 
+not ok 56 - Agence CLI ^session-restore requires session_id and snapshot_dir arguments # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 406)
+# When run bash bin/agence ^session-restore
+# The output should include Usage:
+# 
+#   expected "" to include "Usage:"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 403-407, WARNING)
+# When run bash bin/agence ^session-restore
+# There was output to stderr but not found expectation
+# 
+#   stderr: Error: Unknown init command: session-restore
+#   Available: help, init, reload, install, save, learn, commit, push, session,
+#              lesson, log, plan, todo, fault, issue, task, job,
+#              handoff, pickup, pause, resume, reindex
+# 
+not ok 57 - Agence CLI shows error for unknown external command # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 416)
+# When run bash bin/agence /unknowncmd
+# The error should include Error:
+# 
+#   expected "bin/agence: line 594: validate_command: command not found" to include "Error:"
+# 
+ok 58 - Agence CLI shows error for unknown system command
+ok 59 - Agence CLI shows error for unknown init command
+ok 60 - Agence CLI execution context is initialised (exits cleanly)
+ok 61 - Agence CLI execution context tolerates pre-set GIT_ROOT env var
+ok 62 - Agence CLI ^plan list returns plan entries or empty
+ok 63 - Agence CLI ^lesson list returns lesson entries or empty
+ok 64 - Agence CLI ^todo list returns todo entries or empty
+ok 65 - Agence CLI ^fault list returns fault entries or empty
+ok 66 - Agence CLI ^issue list returns issue entries or empty
+ok 67 - Agence CLI ^task list returns task entries or empty
+ok 68 - Agence CLI ^job list returns job entries or empty
+ok 69 - Agence CLI ^log list returns log entries or empty
+ok 70 - Agence CLI ^plan add requires a title argument
+ok 71 - Agence CLI ^lesson add requires a content argument
+ok 72 - Agence CLI ^task add requires title and --assign
+ok 73 - Agence CLI ^plan show with unknown id returns not found
+ok 74 - Agence CLI ^lesson show with unknown id returns not found
+ok 75 - Agence CLI ^symbols displays task state table
+ok 76 - Agence CLI ^symbols displays routing section
+ok 77 - Agence CLI ^symbols displays command modes
+ok 78 - Agence CLI ^symbols displays workflow notation
+ok 79 - Agence CLI ^help shows all command categories
+not ok 80 - Agence CLI ^handoff requires agent argument # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 572)
+# When run bash bin/agence ^handoff
+# The stderr should include Usage:
+# 
+#   expected "" to include "Usage:"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 569-573, WARNING)
+# When run bash bin/agence ^handoff
+# There was output to stdout but not found expectation
+# 
+#   stdout: 
+#   Usage: agence ^handoff <target_agent> [context message]
+#     agence ^handoff @ralph "implement matrix-math.ts"
+#     agence ^handoff user "analysis complete, review results"
+#   
+#   Available agents:
+#     @aider
+#     @aiko
+#     @azure
+#     @chad
+#     @claude
+#     @claudia
+#     @devops
+#     @peers
+#     @ralph
+#     @sonya
+# 
+not ok 81 - Agence CLI ^pickup with no sessions shows list or empty # WARNED
+# (in specfile tests/unit/agence_spec.sh, line 575-578, WARNING)
+# When run bash bin/agence ^pickup
+# There was output to stdout but not found expectation
+# 
+#   stdout: 
+#   No handoffs directory found. Nothing to pick up.
+# 
+ok 82 - Agence CLI ^pause creates valid checkpoint
+not ok 83 - Agence CLI ^resume with no paused sessions reports empty or lists # WARNED
+# (in specfile tests/unit/agence_spec.sh, line 586-589, WARNING)
+# When run bash bin/agence ^resume
+# There was output to stdout but not found expectation
+# 
+#   stdout: 
+#   ══════════════════════════════════════════════
+#     AGENCE RESUME (^resume) — paused sessions
+#     Agent: @
+#   ══════════════════════════════════════════════
+#   
+#     [1] pause-20260402_113303-1c34fb74
+#         Agent: @ | At: 2026-04-02T15:33:06Z
+#     [2] pause-20260401_224506-2832d34
+#         Agent: @ | At: 2026-04-02T02:45:10Z
+#     [3] pause-20260401_223023-1003d62a
+#         Agent: @ | At: 2026-04-02T02:30:27Z
+#     [4] pause-20260401_222807-9f7e7a4
+#         Agent: @ | At: 2026-04-02T02:28:11Z
+#     [5] pause-20260401_210253-1289c21f
+#         Agent: @ | At: 2026-04-02T01:02:55Z
+#     [6] pause-20260401_172846-6838fe0
+#         Agent: @ | At: 2026-04-01T21:28:50Z
+#     [7] pause-20260401_172532-a3418cb
+#         Agent: @ | At: 2026-04-01T21:25:37Z
+#     [8] pause-20260401_172320-4e33256
+#         Agent: @ | At: 2026-04-01T21:23:22Z
+#     [9] pause-20260401_151747-92ce644
+#         Agent: @ | At: 2026-04-01T19:17:51Z
+#     [10] pause-20260401_151535-7553701
+#         Agent: @ | At: 2026-04-01T19:16:01Z
+#     [11] pause-20260401_150938-57a52a6
+#         Agent: @ | At: 2026-04-01T19:09:41Z
+#     [12] pause-20260401_134547-d22679
+#         Agent: @ | At: 2026-04-01T17:45:50Z
+#     [13] pause-20260401_134428-dc37da2
+#         Agent: @ | At: 2026-04-01T17:44:36Z
+#     [14] pause-20260401_133849-2d992a5
+#         Agent: @ | At: 2026-04-01T17:38:50Z
+#     [15] pause-20260401_133704-f1b5e
+#         Agent: @ | At: 2026-04-01T17:37:05Z
+#     [16] pause-20260401_133021-3abc3a4
+#         Agent: @ | At: 2026-04-01T17:30:23Z
+#     [17] pause-20260401_132236-260eb81
+#         Agent: @ | At: 2026-04-01T17:22:38Z
+#     [18] pause-20260401_132029-2b2db339
+#         Agent: @ | At: 2026-04-01T17:20:45Z
+#     [19] pause-20260331_204937-1cfce48e
+#         Agent: @ | At: 2026-04-01T00:49:42Z
+#   
+#     Resume with: agence ^resume <pause_id>
+# 
+not ok 84 - Agence CLI ^reindex runs without error # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 594)
+# When run bash bin/agence ^reindex
+# The output should include Reindexing
+# 
+#   expected "
+#   ══════════════════════════════════════════════
+#     AGENCE REINDEX (^reindex)
+#   ══════════════════════════════════════════════
+#   
+#     Scanning: synthetic/
+#       ⚠ Missing INDEX.json: synthetic/l-agence.org/docs
+#       ✓ synthetic/l-agence.org/issues
+#       ✓ synthetic/l-agence.org/lessons
+#       ✓ synthetic/l-agence.org/plans
+#     Scanning: nexus/
+#       ✓ nexus/faults
+#       ⚠ Missing INDEX.json: nexus/logs
+#     Scanning: globalcache/
+#       ⚠ Missing INDEX.json: globalcache/acme.tld
+#       ⚠ Missing INDEX.json: globalcache/l-agence.org
+#     Scanning: organic/
+#       ✓ organic/jobs
+#       ✓ organic/tasks
+#   
+#     Directories scanned: 10 INDEX.md files
+#   
+#   ══════════════════════════════════════════════
+#     REINDEX COMPLETE" to include "Reindexing"
+# 
+ok 85 - Agence CLI aibash shell has #!/usr/bin/env bash as first line
+not ok 86 - Agence CLI aibash shell exits cleanly with --help # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 610)
+# When run bash bin/aibash --help
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 611)
+# When run bash bin/aibash --help
+# The output should include aibash: Agentic
+# 
+#   expected "" to include "aibash: Agentic"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 608-612, WARNING)
+# When run bash bin/aibash --help
+# There was output to stderr but not found expectation
+# 
+#   stderr: [SESSION] ✗ Session not found: init
+#   [SESSION]   Expected: /mnt/c/Users/steff/git/.agence/nexus/.aisessions/init.typescript
+# 
+not ok 87 - Agence CLI aibash shell exits cleanly with help # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 616)
+# When run bash bin/aibash help
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 617)
+# When run bash bin/aibash help
+# The output should include Usage:
+# 
+#   expected "" to include "Usage:"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 614-618, WARNING)
+# When run bash bin/aibash help
+# There was output to stderr but not found expectation
+# 
+#   stderr: [SESSION] ✗ Session not found: init
+#   [SESSION]   Expected: /mnt/c/Users/steff/git/.agence/nexus/.aisessions/init.typescript
+# 
+not ok 88 - Agence CLI aibash shell shows signal handler note in help # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 622)
+# When run bash bin/aibash --help
+# The status should be success
+# 
+#   expected: success (zero)
+#        got: failure (non-zero) [status: 1]
+# 
+# (in specfile tests/unit/agence_spec.sh, line 623)
+# When run bash bin/aibash --help
+# The output should include PARENT-owned
+# 
+#   expected "" to include "PARENT-owned"
+# 
+# (in specfile tests/unit/agence_spec.sh, line 620-624, WARNING)
+# When run bash bin/aibash --help
+# There was output to stderr but not found expectation
+# 
+#   stderr: [SESSION] ✗ Session not found: init
+#   [SESSION]   Expected: /mnt/c/Users/steff/git/.agence/nexus/.aisessions/init.typescript
+# 
+ok 89 - Agence CLI ibash shell has #!/usr/bin/env bash as first line
+not ok 90 - Agence CLI ibash shell uses nexus/.aisessions for session recordings # FAILED
+# (in specfile tests/unit/agence_spec.sh, line 641)
+# When run bash -c grep -c "\.aisessions" bin/ibash
+# The output should be greater_than 0
+# 
+#   Unknown word 'greater_than' after be matcher. The correct word is one of the following.
+#   
+#     empty, exist, file, directory, symlink, pipe, socket, readable, 
+#     writable, executable, block, character, success, failure, valid, defined, 
+#     undefined, blank, present, exported, readonly, successful
+# 
+ok 91 - Agence CLI ibash shell does not have duplicate GIT_ROOT derivation
