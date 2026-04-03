@@ -11,6 +11,15 @@
             "icon": "terminal-ubuntu",
             "color": "terminal.ansiGreen"
         },
+        "Ubuntu (WSL, shell-integrated)": {
+            // Uses --rcfile to load .agencerc, enabling VSCode shell integration
+            // injection + agence env setup. Workaround for wsl.exe integration
+            // warning: "Shell integration cannot be enabled for wsl.exe"
+            "path": "C:\\Windows\\System32\\wsl.exe",
+            "args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/.agencerc"],
+            "icon": "terminal-ubuntu",
+            "color": "terminal.ansiCyan"
+        },
         "PowerShell (WSL)": {
             "path": "C:\\Windows\\System32\\wsl.exe",
             "args": ["--distribution", "Ubuntu", "--exec", "pwsh"],
@@ -29,5 +38,48 @@
     "files.encoding": "utf8",
     "editor.formatOnSave": false,
     "terminal.integrated.fontSize": 13,
-    "terminal.integrated.fontFamily": "'Cascadia Code', 'Fira Code', monospace"
+    "terminal.integrated.fontFamily": "'Cascadia Code', 'Fira Code', monospace",
+
+    // ─── COPILOT AGENT: run_in_terminal WHITELIST ─────────────────
+    // Derived from codex/AIPOLICY.yaml whitelist sections.
+    // These commands auto-approve in Copilot agent mode without a confirmation
+    // dialog. Anything NOT in this list still prompts. Patterns support globs.
+    // Ref: github.copilot.chat.agent.runCommand.allow (VS Code 1.99+)
+    "github.copilot.chat.agent.runCommand.allow": [
+        // ── git read-only (AIPOLICY.yaml § whitelist.git_cli) ──
+        "git status", "git log", "git log --oneline*", "git show*",
+        "git diff*", "git branch*", "git tag*", "git reflog",
+        "git describe*", "git shortlog*", "git config --list",
+        "git remote*", "git rev-parse*", "git symbolic-ref*",
+        "git ls-files*", "git ls-tree*", "git blame*", "git grep*",
+        "git cat-file*", "git fetch --dry-run*", "git ls-remote*",
+        "git --no-pager*",
+
+        // ── gh read-only (AIPOLICY.yaml § whitelist.github_cli) ──
+        "gh repo view*", "gh repo list*", "gh repo search*",
+        "gh pr list*", "gh pr view*", "gh pr status*", "gh pr checks*",
+        "gh issue list*", "gh issue view*",
+        "gh run list*", "gh run view*",
+        "gh workflow list*", "gh workflow view*",
+        "gh auth status*", "gh org list*",
+
+        // ── filesystem read (AIPOLICY.yaml § whitelist.linux_shell.filesystem_read) ──
+        "ls*", "stat*", "file*", "cat*", "head*", "tail*",
+        "wc*", "du*", "df*", "tree*",
+
+        // ── text processing (AIPOLICY.yaml § whitelist.linux_shell.text_processing) ──
+        "grep*", "egrep*", "fgrep*", "awk*", "sed*",
+        "cut*", "sort*", "uniq*", "tr*",
+
+        // ── system info (AIPOLICY.yaml § whitelist.linux_shell.system_information) ──
+        "whoami", "id", "uname*", "uptime", "date*",
+        "ps*", "free*", "lscpu", "lsblk",
+
+        // ── agence own CLI (read operations) ──
+        "agence*", "bash bin/agence*", "bash bin/aisession list*",
+        "bash bin/aisession status*", "bash bin/aisession show*",
+
+        // ── package query ──
+        "apt list*", "dpkg -l*", "which*", "command -v*"
+    ]
 }

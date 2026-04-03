@@ -378,14 +378,55 @@ session_handoff() {
 }
 
 # ============================================================================
-# MAIN ROUTER
+# SESSION INIT — called by aibash before script(1) starts recording
+# Creates the agent subdir and writes initial .meta.json.
+# The .typescript file is created by script(1) itself — not pre-created here.
 # ============================================================================
+
+session_init() {
+    local sid="${1:-}"
+    local role="${2:-shared}"
+    local agent="${3:-unknown}"
+    local shell_type="${4:-bash}"
+    local git_root="${5:-$AI_ROOT}"
+
+    if [[ -z "$sid" ]]; then
+        echo "[SESSION] ✗ init requires a session ID" >&2
+        echo "Usage: aisession init <session-id> [role] [agent] [shell] [git-root]" >&2
+        return 1
+    fi
+
+    # Create per-agent subdirectory (used by handoff and grouping)
+    local agent_dir="$SESSION_DIR/$agent"
+    mkdir -p "$agent_dir" "$SESSION_DIR"
+
+    local meta_file="$SESSION_DIR/${sid}.meta.json"
+    local typescript_file="$SESSION_DIR/${sid}.typescript"
+    local ts
+    ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+    # Write initial metadata — exit_code is null until session ends
+    printf '{\n  "session_id": "%s",\n  "agent": "%s",\n  "role": "%s",\n  "shell": "%s",\n  "git_root": "%s",\n  "timestamp": "%s",\n  "status": "recording",\n  "exit_code": null,\n  "verification_status": "pending",\n  "typescript": "%s"\n}\n' \
+        "$sid" "$agent" "$role" "$shell_type" "$git_root" "$ts" "$typescript_file" \
+        > "$meta_file"
+
+    echo "[SESSION] ✓ Initialized: $sid  agent=$agent  role=$role"
+    echo "[SESSION]   typescript → $typescript_file"
+    return 0
+}
+
+# ============================================================================  
+# MAIN ROUTER
+# ============================================================================  
 
 main() {
     local SESSION_SUBCOMMAND="${1:-status}"
     local SESSION_ID="${2:-}"
-    
+
     case "$SESSION_SUBCOMMAND" in
+        init)
+            session_init "$SESSION_ID" "${3:-}" "${4:-}" "${5:-}" "${6:-}"
+            ;;
         status)
             session_status "$SESSION_ID"
             ;;

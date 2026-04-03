@@ -17,6 +17,9 @@
 
 set -u  # Exit on undefined variable
 
+# Agentic execution: never pause on git output — robots don't read pagers
+export GIT_PAGER=cat
+
 # ============================================================================
 # SHELL ENVIRONMENT DETECTION
 # ============================================================================
@@ -139,6 +142,23 @@ source_if_exists "$AGENCE_LIB/utils.sh"
 source_if_exists "$AGENCE_LIB/logging.sh"
 source_if_exists "$AGENCE_LIB/safeguards.sh"
 source_if_exists "$AGENCE_LIB/router.sh"
+
+# ============================================================================
+# SECURITY: Command validation (injection guard)
+# ============================================================================
+# Rejects commands containing dangerous shell operators.
+# Called BEFORE any external command execution.
+# Per LAWS.md §8: security layer VALIDATES only — never creates paths.
+
+validate_command() {
+  local cmd="$1"
+  # Reject shell injection patterns
+  if echo "$cmd" | grep -qE '(\|\||&&|;[^;]|`|\$\(|>[^>]|<[^<])'; then
+    echo "Error: Command contains disallowed shell operators: $cmd" >&2
+    return 1
+  fi
+  return 0
+}
 
 # ============================================================================
 # EXECUTION CONTEXT: Git Repo vs Agence Repo
@@ -596,9 +616,79 @@ mode_external() {
   fi
 
   # =========================================================================
+  # GENERIC PASSTHROUGHS: /git <subcmd>, /gh <subcmd>
+  # These handle "agence /git log", "agence /gh pr list" etc.
+  # Must be checked BEFORE the case statement (args include spaces)
+  # =========================================================================
+  local base_cmd="${cmd_request%% *}"        # e.g. "git" from "git log --oneline"
+  local sub_args="${cmd_request#* }"         # e.g. "log --oneline" (empty if no space)
+  [[ "$sub_args" == "$cmd_request" ]] && sub_args=""  # no space = no sub_args
+
+  case "$base_cmd" in
+    git)
+      if [[ -z "$sub_args" ]]; then
+        echo "Usage: agence /git <subcommand> [args]" >&2
+        echo "  e.g. agence /git status" >&2
+        echo "  e.g. agence /git log --oneline -5" >&2
+        return 1
+      fi
+      # T3 blocklist check
+      local git_sub="${sub_args%% *}"
+      case "$git_sub" in
+        filter-branch|gc|clean|reflog|reset|fsck)
+          echo "Error: BLOCKED — git $git_sub requires T3 human approval" >&2
+          return 1
+          ;;
+        merge|rebase|cherry-pick)
+          echo "Error: git $git_sub requires T2 escalation (interactive)" >&2
+          return 1
+          ;;
+      esac
+      # T0/T1 passthrough
+      git -C "$GIT_REPO" $sub_args
+      return $?
+      ;;
+    gh)
+      if [[ -z "$sub_args" ]]; then
+        echo "Usage: agence /gh <subcommand> [args]" >&2
+        echo "  e.g. agence /gh pr list" >&2
+        echo "  e.g. agence /gh repo view" >&2
+        return 1
+      fi
+      if ! command -v gh &>/dev/null; then
+        echo "Error: gh CLI not installed" >&2
+        return 1
+      fi
+      gh $sub_args
+      return $?
+      ;;
+  esac
+
+  # =========================================================================
   # REPO COMMANDS (act on $GIT_REPO)
   # =========================================================================
   case "$cmd_request" in
+    # ----- Git shortcuts (T0: read-only, auto-execute) ---------------------
+    status)
+      git -C "$GIT_REPO" status
+      return $?
+      ;;
+    log)
+      git -C "$GIT_REPO" log --oneline -10
+      return $?
+      ;;
+    remote)
+      git -C "$GIT_REPO" remote -v
+      return $?
+      ;;
+    diff)
+      git -C "$GIT_REPO" diff
+      return $?
+      ;;
+    stash)
+      git -C "$GIT_REPO" stash
+      return $?
+      ;;
     ghauth)
       # GitHub CLI auth status
       bash "$AGENCE_ROOT/bin/aido" gh auth status
