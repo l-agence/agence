@@ -100,6 +100,8 @@ SHELL_TYPE=""
 USER_COMMAND=()
 while [[ $# -gt 0 ]]; do
 	case "$1" in
+		--help|help|-h)
+			show_help; exit 0 ;;
 		--session)
 			AI_SESSION="$2"; shift 2 ;;
 		--agent)
@@ -180,13 +182,27 @@ else
 fi
 
 if [[ $SESSION_LOGGING_ENABLED -eq 1 ]]; then
+	# Derive session file paths from AI_SESSION (aisession init uses same convention)
+	SESSION_LOG="${GIT_ROOT}/nexus/.aisessions/${AI_SESSION}.typescript"
+	SESSION_META="${GIT_ROOT}/nexus/.aisessions/${AI_SESSION}.meta.json"
+	export SESSION_LOG SESSION_META
 	# Call aisession to initialize session log and metadata
 	if command -v "$GIT_ROOT/bin/aisession" &>/dev/null; then
 		"$GIT_ROOT/bin/aisession" init "$AI_SESSION" "$AI_ROLE" "$AI_AGENT" "$SHELL_TYPE" "$GIT_ROOT"
 	else
 		echo "[AISHA] Warning: aisession not found, session logging not initialized" >&2
 	fi
+else
+	# Ensure variables are always defined (set -u safety)
+	SESSION_LOG="${GIT_ROOT}/nexus/.aisessions/${AI_SESSION}.typescript"
+	SESSION_META="${GIT_ROOT}/nexus/.aisessions/${AI_SESSION}.meta.json"
 fi
+
+# SESSION LOGGING INIT — work already done at script load time above.
+# This function stub satisfies the main() call without double-initializing.
+init_session_logging() {
+	: # no-op — aisession init already called during script initialization
+}
 
 # CODEX VALIDATION + FORMAT LIBRARY (same as legacy ai-shell.sh)
 load_codex_and_format() {

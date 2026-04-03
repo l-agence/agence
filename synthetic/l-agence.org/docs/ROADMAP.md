@@ -2,7 +2,7 @@
 
 **Author**: Stephane Korning  
 **Status**: Living document — draft, not canonical  
-**Last updated**: 2026-03-31
+**Last updated**: 2026-04-02
 
 ---
 
@@ -19,6 +19,53 @@ OS boundary, and governed by immutable CODEX law.
 
 ## Version History & Current State
 
+---
+
+### Session Log: 2026-04-02 — Shell Governance & Logging Plane Diagnosis
+
+*Agent: GitHub Copilot (Claude Sonnet 4.6). Branch: rel_0.2.2_agence_swarm_sessions. Commit: 4aa6814.*
+
+**Work completed this session:**
+
+1. **`bin/aisession init` bug fixed** — aibash's startup chain was silently dying because
+   `aisession` had no `init` subcommand. The call fell through to `session_status("init")`,
+   looked for a non-existent `init.typescript`, exited 1, and `set -euo pipefail` killed
+   aibash before `script(1)` was ever invoked. All `.aisessions/` directories were empty
+   on every agent. Now fixed: `session_init()` + `init)` dispatch added.
+
+2. **`GIT_PAGER=cat` added to `bin/agence`** — git commands were dropping into `less` and
+   hanging agentic terminal reads. `GIT_PAGER=cat` set globally at the top of the script.
+
+3. **`AIPOLICY.yaml` → VSCode whitelist** — `github.copilot.chat.agent.runCommand.allow`
+   added to `.vscode/settings.json`, derived directly from `codex/AIPOLICY.yaml` whitelist
+   sections (git_cli, github_cli, linux_shell). Single source of truth maintained.
+
+4. **Shell integration workaround** — Added `Ubuntu (WSL, shell-integrated)` terminal profile
+   using `--rcfile .agencerc` to work around VSCode's "shell integration cannot be enabled
+   for wsl.exe" warning.
+
+5. **Copilot logging plane established** — `nexus/.aisessions/copilot/` (via `@` symlink)
+   now receives daily JSONL chat logs. Copilot runs in the VS Code extension process — it
+   is architecturally outside the aibash/script(1) stack and always will be. The JSONL log
+   is the appropriate proxy.
+
+6. **I/O capture method comparison** — Full analysis of `script(1)`, `tee`, named pipes,
+   tmux `pipe-pane`, VSCode shell integration, and Claude Code's tmux approach. Conclusion:
+   `script(1)` for now (bug now fixed), tmux for v0.3.0.
+
+7. **tmux + hypervisor architecture confirmed** — v0.3.0 tile model updated: tmux sessions
+   replace Windows Terminal tiling. ibash/ishell = human hypervisor (privileged, overwatch).
+   aibash/aishell = agent plane (fully observable, script(1)-captured). No PTY bypass by
+   design — governance requires the human can see everything at any time.
+
+**Architecture decisions confirmed this session:**
+- `AIPOLICY.yaml` is canonical for all command-tier decisions (VSCode, aido, agence router)
+- Copilot/VS Code chat agents are a separate observability plane from aibash
+- tmux `pipe-pane` is the v0.3.0 supplement to `script(1)`, not a replacement
+- `.ailedger` is still planned (append-only JSONL), not yet implemented
+
+---
+
 | Version | Branch / Tag | Status | Summary |
 |---------|-------------|--------|---------|
 | v0.1 | master | ✅ Stable | Core framework: CODEX, NEXUS, agents, bin/agence |
@@ -26,8 +73,9 @@ OS boundary, and governed by immutable CODEX law.
 | v0.3.0 | lost (AI incident 2026-03) | ❌ Lost | ShellSpec tests, ledger, security hardening — see incident note below |
 | v0.2.3.1 | rel_0.2.2_agence_swarm_sessions | ✅ **Released 2026-03-31** | Architecture locked: symbol hierarchy, scope model, path validation, WSL-native shell |
 | v0.2.4 | rel_0.2.2_agence_swarm_sessions | ✅ **Released 2026-03-31** | Command router (8 cmds), backport 15 functions, VSCode 2-tile swarm model, bin/ cleanup |
+| v0.2.4 (patch) | rel_0.2.2_agence_swarm_sessions | ✅ **Released 2026-04-02** | aisession init fix, GIT_PAGER=cat, AIPOLICY→VSCode whitelist, shell-integrated profile, daily Copilot chat logs (commit 4aa6814) |
 | v0.2.5 | next | 🚧 Planning | Docker foundations, matrix math algorithm, Git-native agent locking |
-| v0.3.0 (new) | future | 📋 Planned | VSCode tile integration: 2-column layout, POSIX job control, Ctrl+K signal handler |
+| v0.3.0 (new) | future | 📋 Planned | **tmux-based** tile model: ibash/ishell as human hypervisor plane, aibash/aishell as observable agent plane, script(1)+tmux pipe-pane for PTY governance |
 | v0.3.1 | future | 📋 Planned | Multi-agent orchestrator, DWM gating, task priority routing |
 | v0.3.2+ | future | 📋 Planned | Skupper multi-cloud swarm |
 
@@ -217,6 +265,29 @@ VSCode Terminal Grid (N rows × 2 columns):
   ├─────────────────────┼─────────────────────┤
   │ ⬛ @aider: Human    │ 🤖 @aider: aibash   │
   └─────────────────────┴─────────────────────┘
+```
+
+**Updated 2026-04-02**: Tile implementation will use **tmux** rather than Windows Terminal
+tiling. This gives us:
+- True POSIX session management (tmux sessions survive VSCode restarts)
+- `pipe-pane` for real-time PTY streaming alongside `script(1)` capture
+- Portable to Docker containers (tmux runs identically inside containers)
+- `tmux send-keys` as the signal delivery mechanism (Ctrl+K SIGKILL)
+
+**Hypervisor model**: The LEFT tile (ibash/ishell) is not just a "human console" — it is an
+**agentic hypervisor**. At any moment the human can observe any agent's work or reasoning
+in any aibash/aishell pane. Governance requires full observability: no PTY bypass, no direct
+pipe shortcuts. `script(1)` inside tmux panes provides the governance record.
+
+```
+tmux session: agence-swarm
+  ├─ window 0: @copilot
+  │   ├─ pane 0 (left):  ibash    ← human overwatch (PRIVILEGED)
+  │   └─ pane 1 (right): aibash   ← agent plane (OBSERVABLE, script(1) captured)
+  ├─ window 1: @ralph
+  │   ├─ pane 0 (left):  ibash
+  │   └─ pane 1 (right): aibash
+  └─ window N: @sonya ...
 ```
 
 ### Key Controls
