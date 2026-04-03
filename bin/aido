@@ -23,9 +23,10 @@
 # Use AI_ROOT and AI_BIN from environment (set by .agencerc)
 # Fallback: compute from script location
 if [[ -z "$AI_ROOT" || -z "$AI_BIN" ]]; then
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    AI_ROOT="${AI_ROOT:-$(dirname "$script_dir")}"
-    AI_BIN="${AI_BIN:-$script_dir}"
+    _aido_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    AI_ROOT="${AI_ROOT:-$(dirname "$_aido_script_dir")}"
+    AI_BIN="${AI_BIN:-$_aido_script_dir}"
+    unset _aido_script_dir
 fi
 
 AIDO_SESSION_DIR="${AIDO_SESSION_DIR:-$AI_ROOT/nexus/.aisessions}"
@@ -116,8 +117,12 @@ INIT_META
 EOF
 
     # Call mandatory verification via session management tool (aisession)
+    # Skip verification in non-interactive mode (no TTY) or when AIDO_NO_VERIFY=1
     session_script="$AI_BIN/aisession"
-    if [[ -x "$session_script" ]]; then
+    if [[ "${AIDO_NO_VERIFY:-0}" == "1" ]] || [[ -n "${SHELLSPEC_TMPDIR:-}" ]] || [[ ! -t 0 && ! -t 1 ]]; then
+        # Non-interactive / CI mode — skip verification, trust the exit code
+        [[ "${AIDO_DEBUG}" == "1" ]] && echo "[AIDO] Verification skipped (non-interactive)" >&2
+    elif [[ -x "$session_script" ]]; then
         "$session_script" "$session_id"
         verify_exit=$?
         

@@ -277,6 +277,7 @@ router_load_config() {
     elif [[ -n "${GROK_API_KEY:-}" ]];                 then export AGENCE_LLM_PROVIDER="grok"
     elif [[ -n "${DASHSCOPE_API_KEY:-}" ]];            then export AGENCE_LLM_PROVIDER="qwen"
     elif [[ -n "${GITHUB_TOKEN:-}" ]];                 then export AGENCE_LLM_PROVIDER="copilot"
+    elif command -v gh &>/dev/null && gh auth token &>/dev/null 2>&1; then export AGENCE_LLM_PROVIDER="copilot"
     elif curl -sf --max-time 1 \
          "${OLLAMA_HOST:-http://localhost:11434}/api/tags" &>/dev/null; then
       export AGENCE_LLM_PROVIDER="ollama"
@@ -743,9 +744,16 @@ router_call_copilot() {
   local system_prompt="$1" user_message="$2"
   local model="${3:-${AGENCE_LLM_MODEL:-$ROUTER_DEFAULT_MODEL_COPILOT}}"
   local max_tokens="${4:-${ROUTER_MAX_TOKENS:-4096}}"
-  [[ -z "${GITHUB_TOKEN:-}" ]] && { echo "[router] ERROR: GITHUB_TOKEN not set" >&2; return 1; }
+
+  # Resolve token: explicit env var preferred, fall back to gh auth token
+  local _copilot_token="${GITHUB_TOKEN:-}"
+  if [[ -z "$_copilot_token" ]] && command -v gh &>/dev/null; then
+    _copilot_token="$(gh auth token 2>/dev/null || true)"
+  fi
+  [[ -z "$_copilot_token" ]] && { echo "[router] ERROR: GITHUB_TOKEN not set and gh auth token failed" >&2; return 1; }
+
   _router_call_oai_compat \
-    "https://api.githubcopilot.com" "${GITHUB_TOKEN}" \
+    "https://api.githubcopilot.com" "${_copilot_token}" \
     "$system_prompt" "$user_message" "$model" "$max_tokens" \
     "Editor-Version: agence/0.3" "copilot"
 }

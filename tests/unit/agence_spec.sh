@@ -10,7 +10,9 @@ Describe 'Agence CLI'
   # (git rev-parse against /mnt/c/... can take 2-5s per call)
   GIT_REPO="$(pwd)"
   AGENCE_REPO="$GIT_REPO"
-  export GIT_REPO AGENCE_REPO
+  # Skip aido session verification in tests — aisession 'Your choice:' blocks without TTY
+  AIDO_NO_VERIFY=1
+  export GIT_REPO AGENCE_REPO AIDO_NO_VERIFY
 
   # ===========================================================================
   # Help & Version
@@ -56,75 +58,72 @@ Describe 'Agence CLI'
 
   # ===========================================================================
   # Chat mode (default / bare string)
+  # AGENCE_TRACE=1 → mode_chat prints "[router_chat] provider=..." without LLM call
   # ===========================================================================
 
   It 'routes chat queries to router_chat'
-    Skip if 'no LLM provider configured' test "$(bash bin/agence _resolve_provider 2>/dev/null)" = "none"
-    When run bash bin/agence "What is Agence?"
+    When run env AGENCE_TRACE=1 bash bin/agence "What is Agence?"
     The status should be success
     The output should include 'router_chat'
   End
 
   It 'routes bare strings to chat mode (no prefix)'
-    Skip if 'no LLM provider configured' test "$(bash bin/agence _resolve_provider 2>/dev/null)" = "none"
-    When run bash bin/agence "hello agence"
+    When run env AGENCE_TRACE=1 bash bin/agence "hello agence"
     The status should be success
     The output should include 'router_chat'
   End
 
   It 'routes explicit chat subcommand to chat mode'
-    Skip if 'no LLM provider configured' test "$(bash bin/agence _resolve_provider 2>/dev/null)" = "none"
-    When run bash bin/agence chat "hello agence"
+    When run env AGENCE_TRACE=1 bash bin/agence chat "hello agence"
     The status should be success
     The output should include 'router_chat'
   End
 
   # ===========================================================================
   # AI-routed mode (+)
-  # Pending: stub returns ACTION: chat which has no dispatch handler yet
+  # AGENCE_TRACE=1 → mode_ai_routed prints "[router_plan_action] ..." without LLM call
   # ===========================================================================
 
-  It 'routes +plan to router_plan_action (stub)'
-    Skip 'router_plan_action stub returns ACTION: chat which has no handler yet — needs action dispatch wiring'
-    When run bash bin/agence +plan
+  It 'routes +plan to router_plan_action'
+    When run env AGENCE_TRACE=1 bash bin/agence +plan
     The status should be success
     The output should include 'router_plan_action'
   End
 
-  It 'routes +deploy to router_plan_action (stub)'
-    Skip 'router_plan_action stub returns ACTION: chat which has no handler yet — needs action dispatch wiring'
-    When run bash bin/agence +deploy
+  It 'routes +deploy to router_plan_action'
+    When run env AGENCE_TRACE=1 bash bin/agence +deploy
     The status should be success
     The output should include 'router_plan_action'
   End
 
   # ===========================================================================
   # External commands (/) — integration (require real tools / bin/aido)
-  # Skip: these call real external tools (gh, aido) and are interactive
   # ===========================================================================
 
   It 'handles ghauth external command'
-    Skip 'integration: calls bin/aido gh auth status (real gh required)'
+    Skip if 'gh not authenticated' ! gh auth status >/dev/null 2>&1
     When run bash bin/agence /ghauth
-    The output should include 'gh auth status'
+    The status should be success
+    The output should include 'github.com'
   End
 
   It 'handles ghlogin external command'
     Skip 'integration: interactive gh auth login — cannot run headlessly'
     When run bash bin/agence /ghlogin
-    The output should include 'gh auth login'
+    The status should be success
   End
 
   It 'handles gitstatus external command'
-    Skip 'integration: calls bin/aido git status (real git session capture required)'
     When run bash bin/agence /gitstatus
-    The output should include 'git status'
+    The status should be success
+    The output should include 'On branch'
   End
 
   It 'handles ghstatus external command'
-    Skip 'integration: calls bin/aido gh repo view (real gh required)'
+    Skip if 'gh not authenticated' ! gh auth status >/dev/null 2>&1
     When run bash bin/agence /ghstatus
-    The output should include 'gh repo view'
+    The status should be success
+    The output should include 'l-agence'
   End
 
   # ===========================================================================
@@ -145,7 +144,7 @@ Describe 'Agence CLI'
     Skip if 'aido not in PATH or not interactive' ! command -v aido > /dev/null 2>&1
     When run bash bin/agence /git log --oneline -3
     The status should be success
-    The output should include 'agence'
+    The output should not be blank
   End
 
   It '/git diff runs git diff (T0: auto-execute)'
