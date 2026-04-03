@@ -21,3 +21,18 @@ You’ll learn how to use the /loop command to automate repetitive actions, such
 # codex and derivatives 
 - https://github.com/Yeachan-Heo/oh-my-codex
 
+
+
+# AST Chunking - Absstract Syntax Trees for codebases. 
+We want to treat codebases more rigourously than other sorts of general knowledge RAG, as agence is all abut development. This is why objectcode lives separated from  other hermetic/synthetic knowledge. In fact objectcode will also be expanded to include code patterns and solutions. The next key piece missing is to expan on Dewey-decimal like formtags .But in object code we will use AST - Abstract Syntax Tree Chunking. What follows are sorm references, intentionally biased towards pure typescript implementations of AST chunking.
+- https://themiloway.github.io/milo-blog/agentic-coding/typescript/2026/02/03/structural-vs-textual-code-manipulation.html
+- https://arxiv.org/html/2506.15655v1
+- https://supermemory.ai/blog/building-code-chunk-ast-aware-code-chunking/
+- https://medium.com/@jouryjc0409/ast-enables-code-rag-models-to-overcome-traditional-chunking-limitations-b0bc1e61bdab
+## Typescript AST models
+- https://github.com/yilinjz/astchunk
+- Micorosft/monodex typescript lib for javascript   see https://github.com/microsoft/monodex
+- Understanding typescript AST  https://www.nexxel.dev/blog/code-chunk
+- https://www.xjavascript.com/blog/typescript-ast/
+- https://dev.to/bilelsalemdev/abstract-syntax-tree-in-typescript-25ap
+- 
