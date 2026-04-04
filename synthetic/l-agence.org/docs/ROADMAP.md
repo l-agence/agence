@@ -77,7 +77,52 @@ OS boundary, and governed by immutable CODEX law.
 | v0.2.5 | next | 🚧 Planning | Docker foundations, matrix math algorithm, Git-native agent locking |
 | v0.3.0 (new) | future | 📋 Planned | **tmux-based** tile model: ibash/ishell as human hypervisor plane, aibash/aishell as observable agent plane, script(1)+tmux pipe-pane for PTY governance |
 | v0.3.1 | future | 📋 Planned | Multi-agent orchestrator, DWM gating, task priority routing |
-| v0.3.2+ | future | 📋 Planned | Skupper multi-cloud swarm |
+| v0.2.4.1 | rel_0.2.2_agence_swarm_sessions | ✅ **Released 2026-04-03** | 91/91 tests passing, copilot auto-detect via gh auth token, AGENCE_TRACE mode, aido/aisession non-interactive bypass, /gh* shortcuts, ^session-restore (commit e06257b, pushed) |
+| v0.3.0 (new) | future | 📋 Planned | **tmux-based** tile model: ibash/ishell as human hypervisor plane, aibash/aishell as observable agent plane, Docker per-tangent isolation, agentd daemon, socat inject, git worktree per tangent |
+| v0.3.1 | future | 📋 Planned | .ailedger (append-only JSONL decision ledger), AIPOLICY.yaml BNF governance schema published, mnemonic 2-tier (ephemeral global + federated per-org), hermetic/grimoire |
+| v0.3.2 | future | 📋 Planned | Multi-agent orchestrator (swarmd), tangent tournament + resultant selection, ChunKing indexer (Bun TS) |
+| v0.4.0 | future | 📋 Planned | Flock tier: Nomad driver, ≤5 node SSH+docker-compose bootstrap |
+| v0.5.0+ | future | 📋 Planned | Style/preference model from .ailedger signal, trust ladder earned autonomy |
+
+---
+
+### Session Log: 2026-04-03 — Architecture Lock, Test Suite 91/91, @peers Board
+
+*Agent: GitHub Copilot (Claude Sonnet 4.6). Branch: rel_0.2.2_agence_swarm_sessions. Commit: e06257b (pushed).*
+
+**Work completed this session:**
+
+1. **Test suite 91/91** — 0 failures, 8 warnings, 8 skips. Fixed: aido `local`-outside-function, copilot auto-detect via `gh auth token`, AGENCE_TRACE=1 mode (routing decision without LLM call), `aisession` non-interactive bypass (`Your choice:` blocking bug), test 17 `/git log` stable assertion. AIDO_NO_VERIFY=1 global export.
+
+2. **Canonical architecture locked in SWARM.md** — sequent model, tangent/agentd/swarmd distinction, Docker-per-tangent rule, socat+Unix socket inject, matrix-native merge as CRDT, filesystem scope rule, mnemonic 2-tier, Bun runtime decision, Skupper shelved.
+
+3. **Design docs loaded and validated** — 15 hermetic design notes from external LLM sessions reviewed. Key corrections: external LLM reinvented aido (use existing), `/tmp/agency` rejected (use `$AI_ROOT/`), FIFO rejected (socat), Dev Container per tangent applies to flock not local sequents.
+
+4. **@peers architecture review board** — 9 questions, heavy flavor, 3-peer weighted consensus. Key findings:
+   - Docker gate = write access (not `--safe` flag)
+   - **Git worktree per tangent** (not full clone — major spin-up improvement)
+   - Socket path = `$AI_ROOT/nexus/agentd/sockets/<tangent-id>-<pid>.sock`
+   - Nomad over Docker Swarm for flock tier
+   - **Ship `.ailedger` stub immediately** — only compounding advantage that can't be copied
+   - Primary competitive threat: Anthropic building Claude Code multi-agent (9–18mo timeline)
+   - Three-moat model: unified governance (AIPOLICY.yaml) + git-native state + trust gradient
+
+5. **Architecture decisions clarified:**
+   - tmux = observation/control layer only (not isolation)
+   - tangents = tournament model (select resultant, discard losers) — NOT code merge
+   - complementary tangent synthesis = human call, indefinitely
+   - trust gradient model formally articulated: autonomy earned per rung of trust ladder
+   - hermetic/grimoire (renamed from mnemonic) — gated, explicit recall, never pruned
+   - swarm/flock/fleet tier naming confirmed
+
+**Architecture decisions confirmed this session:**
+- Docker required for all write-tangents, even local swarms — post-2026-03 symlink incident rule
+- tmux is observation layer; Docker containers provide isolation
+- Git worktree per tangent (shared `.git` object store, worktree dir = writable volume)
+- agentd manages worktree lifecycle on HOST; tangents cannot run `git worktree` commands
+- socat + Unix domain sockets + tmux send-keys for inject (FIFOs rejected permanently)
+- `.ailedger` = highest priority new feature (compounding data moat)
+- AIPOLICY.yaml schema publication = first-mover governance standard opportunity
 
 ---
 

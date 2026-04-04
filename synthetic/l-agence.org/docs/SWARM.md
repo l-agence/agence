@@ -1248,3 +1248,146 @@ Full reference: `codex/agents/ROUTING.md`
 ```
 
 **Token discipline by mathematical constraint — not policy.**
+
+---
+
+# CANONICAL SWARM/TANGENT/AGENTD ARCHITECTURE
+*Locked April 3, 2026 — supersedes earlier design-session notes*
+
+## Tier Hierarchy
+
+| Tier | Name | Transport | Isolation | Status |
+|------|------|-----------|-----------|--------|
+| 1 | **swarm** | tmux | per-tangent dev container | current |
+| 2 | **flock** | Docker Swarm | container cluster | next |
+| 3 | **fleet/horde** | Skupper | multi-cloud mesh | far future |
+
+## Sequent = Human Plane + N Tangents
+
+```
+SEQUENT
+  ├─ ibash/ishell pane (tmux left)   ← human control plane
+  │    kill authority (Ctrl-K = SIGKILL, Ctrl-Z = SIGSTOP)
+  │    full filesystem + git access
+  │
+  └─ tangent-1 (tmux right-1)        ← docker container
+  └─ tangent-2 (tmux right-2)        ← docker container
+  └─ tangent-N (tmux right-N)        ← docker container
+       each tangent:
+         - isolated git workspace (volume-mounted clone)
+         - own dev container (cannot see sibling tangents)
+         - own aibash/aishell session inside container
+         - own socat Unix socket for inject
+```
+
+**Rule**: Docker is used even for local swarms. Not optional. Safety after 2026-03 symlink incident.
+
+## Why Docker Even Locally
+
+- Blast radius bounded by container filesystem
+- Path normalization issues (MSYS2 //c/, cygpath) cannot escape the container
+- No cross-agent symlink traversal possible
+- Rollback = docker rm + fresh clone — deterministic
+- Same isolation model scales unchanged to flock and fleet
+
+## tmux Role (clarified)
+
+tmux is the **observation and control layer** only. It does NOT provide isolation.
+
+- Provides: pane layout, pipe-pane streaming, send-keys inject, human split view
+- Does NOT: sandbox filesystem access or replace dev container isolation
+
+Tangents stream output into tmux panes via `docker logs -f | tmux pipe-pane`. Human sees all tangents. Containers cannot see each other.
+
+## agentd vs swarmd
+
+```
+agentd (local per-user daemon)
+  ├─ spawns docker containers (one per tangent)
+  ├─ creates tmux panes (one per tangent + ibash pane)
+  ├─ binds pane <-> agent ID mapping (nexus/agentd/)
+  ├─ manages socat Unix sockets per agent (inject transport)
+  ├─ routes: inject cmd -> socat -> docker exec -> tmux send-keys
+  └─ cleans up sockets + containers on sequent teardown
+
+swarmd (cross-sequent orchestrator — future)
+  ├─ task queue + heat-based scheduling
+  ├─ collision avoidance (no overlapping scopes)
+  ├─ human-gated DWM proposals
+  └─ dispatches sequents to agentd
+```
+
+## Inject Architecture: socat + Unix Sockets + tmux send-keys
+
+FIFOs rejected: blocking, no addressing, orphan on crash, no framing.
+
+```
+agence inject @tangent-1 "git status"
+  -> echo "git status" | socat - UNIX-CONNECT:/run/agence/tangent-1.sock
+  -> agentd listener (socat UNIX-LISTEN:... fork)
+  -> docker exec -it tangent-1 tmux send-keys -t aishell "git status" Enter
+```
+
+socat `fork` = multiple concurrent injectors, no blocking. Socket per tangent = no cross-talk. Crash cleanup = socket removed with container.
+
+## Matrix-Native Merge Strategy (pre-existing, canonical)
+
+**This predates Docker/dev-container thinking.** The matrix math on TASKS was already designed to handle distributed concurrent agents. This is NOT the external LLM's merge protocol — it is the original design.
+
+**Core invariant**: every agentic change to a git repo must correspond to exactly one agentic **job**, which produces exactly one standard commit. Task ID → commit. No task = no commit. This is how matrix state and git state stay in sync.
+
+```
+task state:  & (agent executing) → - (completed)
+git state:   working tree dirty  → clean commit tagged with task ID
+```
+
+Matrix merge rules (deterministic, no human needed):
+- `task.id` = unique key across shards
+- `task.priority` = max() of both shards
+- `task.stars` = max() of both shards
+- `task.heat` = average of both shards
+- `task.state` = highest precedence wins: `& > $ > % > ~ > ? > _ > # > !`
+- `task.agent` = preserve the shard where state = `&` (running wins)
+
+State precedence is numeric (not arbitrary) — derived from the matrix scoring model. This means **merges are mathematically deterministic**: two shards merging always produce the same result regardless of merge order. Commutative and associative — true CRDT semantics without a CRDT library.
+
+Socket path for agentd: `$AI_ROOT/nexus/agentd/sockets/<tangent-id>.sock` (NOT `/run/agence/` — survives WSL2 reboot, stays inside repo tree, cleaned up with nexus).
+
+## Filesystem Scope Rule
+
+If the repo does not have the file a tangent needs, that tangent should not be doing that work.
+- Missing file = scope boundary, not a path problem to solve
+- Use ^plan to map the dependency and route to the correct owner
+- Use swarm to route to the shard/tangent that has access
+
+## Mnemonic — 2-tier (confirmed April 3)
+
+```
+$AI_ROOT/mnemonic/               <- ephemeral global cache, NOT committed
+                                    rebuilt: agence mnemonic rebuild
+                                    pruned/consolidated: agence mnemonic consolidate
+                                    hot chunks from federated indexes promoted here
+
+synthetic/<org>/mnemonic/        <- federated per-org, persistent
+                                    MAY be committed to private git
+                                    frequency-weighted promotion to global cache
+
+hermetic/grimoire/               <- gated, persistent, never auto-loaded
+                                    explicit recall only, never pruned
+                                    never part of default sequent resolution
+```
+
+## Pattern Normalisation (error memory matrix)
+
+Pattern ID = `type:md5(normalize(raw))` where:
+- normalize strips: absolute paths, line numbers, hex addresses, git SHAs, normalizes case
+- type = one of: parse | perm | missing | cmd | timeout | unknown
+- NOT raw md5 of output line (semantically useless across different errors)
+
+## TypeScript Runtime
+
+**Bun** — single statically-linked binary, runs TS natively, `bun build --compile` produces self-contained executable. Zero Node/npm on target. Used for: ChunKing indexer, sequent engine.
+
+## Skupper (fleet/horde) — Shelved
+
+Cross-node tier-system breakage and policy fragmentation risks documented. Security model insufficiently understood. Not prioritised. Requires dedicated swarmd Skupper lifecycle management when revisited.
