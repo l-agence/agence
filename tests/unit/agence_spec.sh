@@ -124,6 +124,7 @@ Describe 'Agence CLI'
     When run bash bin/agence /ghstatus
     The status should be success
     The output should include 'l-agence'
+    The error should include 'Repository status'
   End
 
   # ===========================================================================
@@ -252,30 +253,35 @@ Describe 'Agence CLI'
     Skip if 'gh not authenticated' ! gh auth status >/dev/null 2>&1
     When run bash bin/agence /ghpull
     The status should be success
+    The output should not be blank
   End
 
   It '/ghlog shortcut lists run history (T0: auto-execute)'
     Skip if 'gh not authenticated' ! gh auth status >/dev/null 2>&1
     When run bash bin/agence /ghlog
     The status should be success
+    The output should not be blank
   End
 
   It '/ghrun lists runs by default (T0: auto-execute)'
     Skip if 'gh not authenticated' ! gh auth status >/dev/null 2>&1
     When run bash bin/agence /ghrun
     The status should be success
+    The output should not be blank
   End
 
   It '/ghflow lists workflows by default (T0: auto-execute)'
     Skip if 'gh not authenticated' ! gh auth status >/dev/null 2>&1
     When run bash bin/agence /ghflow
     The status should be success
+    The output should not be blank
   End
 
   It '/ghissue lists issues by default (T0: auto-execute)'
     Skip if 'gh not authenticated' ! gh auth status >/dev/null 2>&1
     When run bash bin/agence /ghissue
     The status should be success
+    The output should not be blank
   End
 
   It '/gh pr merge requires TTY confirmation (T2: Skip in CI)'
@@ -340,11 +346,9 @@ Describe 'Agence CLI'
   # Init commands (^)
   # ===========================================================================
 
-  It 'handles ^init init command'
-    Skip 'integration: init_agence_environment sources .agencerc — needs mock to run safely in CI'
-    When run bash bin/agence '^init'
-    The status should be success
-    The output should include 'AGENCE INITIALIZATION'
+  It 'handles ^init init command (structure check)'
+    When run bash -c 'grep -c "init_agence_environment" bin/agence'
+    The output should match pattern '[1-9]*'
   End
 
   It 'handles ^reload init command'
@@ -353,10 +357,9 @@ Describe 'Agence CLI'
     The output should include 'RELOAD'
   End
 
-  It 'handles ^install init command'
-    Skip 'integration: attempts real package installation (apt-get/winget/brew) — not safe for automated runs'
-    When run bash bin/agence '^install'
-    The output should include 'AGENCE PACKAGE INSTALLATION'
+  It 'handles ^install init command (structure check)'
+    When run bash -c 'grep -c "install_agence_packages" bin/agence'
+    The output should match pattern '[1-9]*'
   End
 
   # ---------------------------------------------------------------------------
@@ -580,6 +583,7 @@ Describe 'Agence CLI'
   It '^pickup with no sessions shows list or empty'
     When run bash bin/agence '^pickup'
     The status should be success
+    The output should not be blank
   End
 
   It '^pause creates valid checkpoint'
@@ -591,6 +595,7 @@ Describe 'Agence CLI'
   It '^resume with no paused sessions reports empty or lists'
     When run bash bin/agence '^resume'
     The status should be success
+    The output should not be blank
   End
 
   It '^reindex runs without error'
