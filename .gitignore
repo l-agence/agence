@@ -11,3 +11,4 @@ hermetic/
 @
 ^
 .nogit
+.aider*

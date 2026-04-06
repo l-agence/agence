@@ -142,6 +142,7 @@ source_if_exists "$AGENCE_LIB/utils.sh"
 source_if_exists "$AGENCE_LIB/logging.sh"
 source_if_exists "$AGENCE_LIB/safeguards.sh"
 source_if_exists "$AGENCE_LIB/router.sh"
+source_if_exists "$AGENCE_LIB/ailedger.sh"
 
 # ============================================================================
 # SECURITY: Command validation (injection guard)
@@ -963,6 +964,7 @@ mode_init() {
     "fault")
       # Faults/incidents (local, nexus, sanitize before sharing)
       # Usage: agence ^fault [list|show|add] [--sanitize]
+      [[ "${init_args%% *}" == "add" ]] && ailedger_append "fault" "fault-logged" ""
       mode_knowledge "fault" "$init_args"
       return $?
       ;;
@@ -1919,6 +1921,7 @@ launch_tool() {
       fi
       echo "[agence] Launching aider (repo: ${GIT_REPO:-$(pwd)})"
       export AI_AGENT="aider"
+      ailedger_append "launch" "tool-aider" ""
       # --no-auto-commits: agence owns git, not aider
       exec aider --no-auto-commits $extra_args
       ;;
@@ -1930,6 +1933,7 @@ launch_tool() {
       fi
       echo "[agence] Launching claude code"
       export AI_AGENT="claude"
+      ailedger_append "launch" "tool-claude" ""
       exec claude $extra_args
       ;;
     pilot)
@@ -1937,10 +1941,12 @@ launch_tool() {
       if command -v copilot &>/dev/null; then
         echo "[agence] Launching GitHub Copilot CLI"
         export AI_AGENT="pilot"
+        ailedger_append "launch" "tool-pilot-standalone" ""
         exec copilot $extra_args
       elif command -v gh &>/dev/null && gh copilot --version &>/dev/null 2>&1; then
         echo "[agence] Launching gh copilot extension"
         export AI_AGENT="pilot"
+        ailedger_append "launch" "tool-pilot-gh" ""
         exec gh copilot suggest $extra_args
       else
         echo "✗ copilot CLI not found." >&2
@@ -1957,6 +1963,7 @@ launch_tool() {
       fi
       echo "[agence] Launching Microsoft AI Shell"
       export AI_AGENT="aish"
+      ailedger_append "launch" "tool-aish" ""
       exec aish $extra_args
       ;;
     *)
@@ -2004,6 +2011,7 @@ launch_tool() {
       local agent_name="$sys_cmd"
       export AI_AGENT="$agent_name" AGENCE_AGENT_PARAM="$agent_name"
       echo "[agence] Launching agent: @${agent_name}"
+      ailedger_append "route" "persona-${agent_name}" ""
       shell_bash_session
       ;;
     *)
