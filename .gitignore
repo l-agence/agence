@@ -5,6 +5,7 @@
 .mysecrets/
 .aisecrets/
 nexus/.ai*/
+nexus/agentd/
 nexus/sessions/*.meta.json
 nexus/sessions/*.awaiting
 hermetic/
@@ -12,3 +13,6 @@ hermetic/
 ^
 .nogit
 .aider*
+*.log
+__pycache__/
+node_modules/
