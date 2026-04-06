@@ -1,7 +1,7 @@
 # Agence Agents: Quick Reference
 
-> **Agent Roster** (v0.2.4): aider, aiko, chad, claudia, peers, ralph, sonya, copilot, pilot, kilo, cline, haiku, claude, azure, devops
-> **Default interactive**: @copilot (Copilot Chat) | **Default shell agent**: @pilot (Copilot CLI)
+> **Agent Roster** (v0.2.5): aider, aish, aiko, chad, claudia, peers, ralph, sonya, copilot, pilot, kilo, cline, haiku, claude, azure, devops
+> **Default interactive**: @copilot (Copilot Chat) | **Default shell agent**: @pilot (Copilot CLI) | **Windows shell**: @aish (Microsoft AI Shell)
 
 ---
 
@@ -156,11 +156,40 @@ agence @ralph --flavor=8 "Teach me Kubernetes"
 
 ---
 
+## 6. aish (Microsoft AI Shell)
+
+| Property | Value |
+|----------|-------|
+| **Type** | Interactive AI Shell (tool-based, Windows-native) |
+| **Model** | Auto (GitHub Copilot / Azure OpenAI — configured inside aish) |
+| **Token Cost** | ~0 (no agence prompt injection) |
+| **Latency** | ~1–3s |
+| **Best For** | Windows shell tasks, PowerShell scripts, Azure CLI, DevOps queries |
+| **Platform** | Windows (PowerShell / Windows Terminal) |
+| **Flavor** | Direct, shell-native, no personality layer |
+
+**System Prompt:** None — `aish` owns its context. Agence sets `AI_AGENT=aish` and `GIT_ROOT` only.
+
+**Example:**
+```bash
+agence !aish                        # launch interactive Microsoft AI Shell
+agentd start aish ralph claude      # mixed swarm: tool + persona + tool
+agentd add aish                     # add @aish window to running swarm
+```
+
+**Install:**
+```powershell
+winget install Microsoft.AIShell
+```
+
+---
+
 ## Cost Comparison
 
 | Agent | Prompt Tokens | Typical Output | Total Estimate | Cost/Query |
 |-------|---------------|----------------|-----------------|------------|
 | Aider | ~5 | N/A (patches) | 5-50 | Negligible |
+| aish  | ~0 | N/A (shell)   | 0    | Negligible (owned by aish backend) |
 | Chad (GPT-4o) | ~10 | ~400 | 410 | ~$0.006 |
 | Aiko (Haiku) | ~10 | ~400 | 410 | ~$0.003 |
 | Ralph (Sonnet) | ~20 | ~450 | 470 | ~$0.008 |

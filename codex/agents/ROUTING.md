@@ -123,7 +123,7 @@ The SWARM intelligence tier system and the router mode system are unified:
 |------------|-----------------|---------------|---------------|----------------------------|
 | T0         | query           | —             | scripts/bash  | groq/llama, kwaipilot(free)|
 | T1         | plan            | small         | @ralph        | haiku-3-5, gemini-flash    |
-| T2         | code            | medium        | @aiko, @aider | gpt-4o-mini, haiku         |
+| T2         | code            | medium        | @aiko, @aider, @aish | gpt-4o-mini, haiku, aish-auto |
 | T3         | code            | large         | @chad, @copilot| sonnet-4-5, gpt-4o        |
 | T4         | code            | critical      | @claudia, @peers| opus-4-5, gpt-o1         |
 | T5         | code (secure)   | critical      | @olena        | ollama (local, air-gapped) |
@@ -152,8 +152,9 @@ When no provider is specified, first configured key wins:
 10. GROK_API_KEY          → grok
 11. DASHSCOPE_API_KEY     → qwen
 12. GITHUB_TOKEN          → copilot
-13. Ollama running        → ollama
-14. Error
+13. aish.exe available    → aish  (Windows-only; skipped in WSL/Linux)
+14. Ollama running        → ollama
+15. Error
 ```
 
 ---
@@ -174,6 +175,7 @@ When no provider is specified, first configured key wins:
 | `openrouter` | OAI-compat       | OPENROUTER_API_KEY   | anthropic/claude-3.5-sonnet  |
 | `cline`      | Meta (OR→Anthro) | OPENROUTER_API_KEY   | kwaipilot/kat-coder-latest   |
 | `ollama`     | Direct (local)   | OLLAMA_HOST          | llama3.2                     |
+| `aish`       | Tool (Windows)   | —                    | auto (GitHub Copilot via aish) |
 
 ---
 
