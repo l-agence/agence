@@ -1667,120 +1667,73 @@ EOF
 
 init_agence_environment() {
   [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Initializing Agence environment..." >&2
-  
+
   echo ""
   echo "=============================================="
-  echo "  AGENCE INITIALIZATION (^init)"
+  echo "  AGENCE INIT (^init)"
   echo "=============================================="
   echo ""
-  
-  # ========================================================================
-  # Step 1: Source .agencerc to set up environment
-  # ========================================================================
-  echo "Step 1/3: Loading Agence profile (.agencerc)..."
-  
-  local agencerc_path="$AGENCE_REPO/bin/.agencerc"
-  if [[ -f "$agencerc_path" ]]; then
-    source "$agencerc_path" 2>/dev/null
-    if [[ $? -eq 0 ]]; then
-      echo "✓ Profile loaded (Shell: $CURRENT_SHELL, REPO_ROOT: $REPO_ROOT)"
-    else
-      echo "⚠ Profile loaded but with warnings"
-    fi
+
+  local ok=0 warn=0
+
+  # ── Step 1: Verify agence root ────────────────────────────────────────────
+  echo "Step 1/3: Verifying agence root..."
+  if [[ -f "${AGENCE_ROOT}/bin/agence" ]]; then
+    echo "  ✓ AGENCE_ROOT=${AGENCE_ROOT}"
+    ((ok++))
   else
-    echo "[WARN] .agencerc not found at $agencerc_path"
+    echo "  ✗ AGENCE_ROOT not set correctly (expected bin/agence inside it)" >&2
+    ((warn++))
   fi
   echo ""
-  
-  # ========================================================================
-  # Step 2: Create directory symlinks (globalcache/@, objectcode/@, synthesis/@)
-  # ========================================================================
-  echo "Step 2/3: Creating organization symlinks..."
-  
-  local org_dirs=("globalcache" "objectcode" "synthesis")
-  local org_created=0
-  
-  for dir in "${org_dirs[@]}"; do
-    local org_link="$REPO_ROOT/$dir/@"
-    local org_target="l-agence.org"
-    
-    # Only create if doesn't exist
-    if [[ ! -e "$org_link" ]]; then
-      mkdir -p "$(dirname "$org_link")" 2>/dev/null
-      ln -sf "$org_target" "$org_link" 2>/dev/null
-      
-      if [[ -L "$org_link" || -d "$org_link" ]]; then
-        echo "  ✓ $dir/@ → $org_target"
-        ((org_created++))
-      else
-        echo "  ⚠ $dir/@: symlink creation failed (may try mklink on next checkout)"
-      fi
+
+  # ── Step 2: Emit PATH hint ────────────────────────────────────────────────
+  echo "Step 2/3: PATH setup..."
+  if command -v agence &>/dev/null; then
+    echo "  ✓ agence is on PATH ($(command -v agence))"
+    ((ok++))
+  else
+    echo "  ⚠ agence not found on PATH. Add this to your .bashrc / .zshrc:"
+    echo "      export PATH=\"${AGENCE_ROOT}/bin:\$PATH\""
+    ((warn++))
+  fi
+  echo ""
+
+  # ── Step 3: Check key dependencies ───────────────────────────────────────
+  echo "Step 3/3: Checking dependencies..."
+  local deps=(git bash tmux jq)
+  local optional_deps=("script:session-logging" "shellspec:tests")
+  for dep in "${deps[@]}"; do
+    if command -v "$dep" &>/dev/null; then
+      echo "  ✓ $dep"
+      ((ok++))
     else
-      echo "  ⏭ $dir/@: already exists (user customization preserved)"
+      echo "  ✗ $dep — required (sudo apt install $dep)"
+      ((warn++))
     fi
   done
-  
-  if [[ $org_created -gt 0 ]]; then
-    echo ""
-    echo "✓ Created $org_created organization symlink(s)"
-  fi
-  echo ""
-  
-  # ========================================================================
-  # Step 3: Create skeleton symlinks (.github/*, CLAUDE.md, etc)
-  # ========================================================================
-  echo "Step 3/3: Creating skeleton symlinks..."
-  
-  local AGENCE_GITHUB="$AGENCE_REPO/.github"
-  local TARGET_GITHUB="$REPO_ROOT/.github"
-  
-  # Ensure .github directory exists
-  mkdir -p "$TARGET_GITHUB" 2>/dev/null
-  
-  # Symlink 3a: copilot-instructions.md
-  local source_copilot="$AGENCE_GITHUB/copilot.md"
-  local target_copilot="$TARGET_GITHUB/copilot-instructions.md"
-  
-  if [[ ! -e "$target_copilot" ]]; then
-    if [[ -f "$source_copilot" ]]; then
-      ln -sf "../.agence/.github/copilot.md" "$target_copilot" 2>/dev/null || \
-      ln -sf "$source_copilot" "$target_copilot" 2>/dev/null
-      if [[ -L "$target_copilot" ]]; then
-        echo "  ✓ .github/copilot-instructions.md → copilot.md"
-      else
-        echo "  ⚠ .github/copilot-instructions.md: creation deferred (post-checkout hook will create)"
-      fi
+  for entry in "${optional_deps[@]}"; do
+    local dep="${entry%%:*}" label="${entry##*:}"
+    if command -v "$dep" &>/dev/null; then
+      echo "  ✓ $dep ($label)"
+    else
+      echo "  - $dep not found ($label — optional)"
     fi
-  else
-    echo "  ⏭ .github/copilot-instructions.md: already exists"
-  fi
-  
-  # Symlink 3b: CLAUDE.md (in repo root)
-  local source_claude="$AGENCE_GITHUB/CLAUDE.md"
-  local target_claude="$REPO_ROOT/CLAUDE.md"
-  
-  if [[ ! -e "$target_claude" ]]; then
-    if [[ -f "$source_claude" ]]; then
-      ln -sf ".github/CLAUDE.md" "$target_claude" 2>/dev/null
-      if [[ -L "$target_claude" ]]; then
-        echo "  ✓ CLAUDE.md → .github/CLAUDE.md"
-      else
-        echo "  ⚠ CLAUDE.md: creation deferred (post-checkout hook will create)"
-      fi
-    fi
-  else
-    echo "  ⏭ CLAUDE.md: already exists"
-  fi
-  
+  done
   echo ""
+
   echo "=============================================="
-  echo "✓ Agence initialization complete!"
-  echo "  Environment: $CURRENT_SHELL"
-  echo "  AGENCE_ROOT=$AGENCE_REPO"
-  echo "  REPO_ROOT=$REPO_ROOT"
+  if [[ $warn -eq 0 ]]; then
+    echo "✓ Agence ready!"
+  else
+    echo "⚠ Agence ready with $warn warning(s) — see above"
+  fi
+  echo "  AGENCE_ROOT=${AGENCE_ROOT}"
+  echo "  Run 'agence --help' to get started"
+  echo "  Run 'agence ^install' to install AI tool dependencies"
   echo "=============================================="
   echo ""
-  
+
   return 0
 }
 
@@ -1972,6 +1925,8 @@ launch_tool() {
       ;;
   esac
 }
+
+mode_system() {
   local sys_cmd="$1"
 
   [[ "$DEBUG" == "1" ]] && echo "[DEBUG] System mode: $sys_cmd" >&2
@@ -2317,180 +2272,116 @@ install_agence_packages() {
 }
 
 install_windows_packages() {
-  echo "Installing packages via winget..."
+  echo "Installing AI tools via winget..."
   echo ""
-  
-  # Define Windows packages (winget IDs)
-  local -a windows_packages=(
-    "GitHub.cli"
-    "aider"
-    "jfrog"
-    "Hashicorp.Terraform"
-    "terrafromLinters.tflint"
-    "Amazon.AWSCli"
-    "Microsoft.AzureCLI"
-    "Google.CloudSDK"
-  )
-  
-  local installed=0
-  local skipped=0
-  local failed=0
-  
-  for pkg in "${windows_packages[@]}"; do
-    echo -n "[$pkg] "
-    
-    # Check if installed || install
-    # winget list returns 0 if found, 1 if not found
+  echo "  Required:"
+  local -a winget_required=("GitHub.cli" "Anthropic.ClaudeCode" "GitHub.Copilot" "Microsoft.AIShell")
+  for pkg in "${winget_required[@]}"; do
+    echo -n "  [$pkg] "
     if winget list --id "$pkg" &>/dev/null 2>&1; then
-      echo "✓ (already installed)"
-      ((skipped++))
+      echo "✓ already installed"
     elif winget install -e --id "$pkg" --accept-package-agreements --accept-source-agreements &>/dev/null 2>&1; then
-      echo "✓ (installed)"
-      ((installed++))
+      echo "✓ installed"
     else
-      echo "✗ (failed)"
-      ((failed++))
+      echo "✗ failed (try manually: winget install $pkg)"
     fi
   done
-  
   echo ""
-  echo "=============================================="
-  echo "Installation summary:"
-  echo "  ✓ Installed: $installed"
-  echo "  ⏭ Already present: $skipped"
-  echo "  ✗ Failed: $failed"
-  echo "=============================================="
-  
-  if [[ $failed -gt 0 ]]; then
-    echo ""
-    echo "Note: Some packages failed. This may be expected if:"
-    echo "  - Package requires manual user interaction"
-    echo "  - Package requires admin elevation"
-    echo "  - Package name/ID changed in winget registry"
-    return 1
+  echo "  Optional (Python):"
+  if command -v pip &>/dev/null || command -v pip3 &>/dev/null; then
+    local pip_cmd="pip"; command -v pip3 &>/dev/null && pip_cmd="pip3"
+    echo -n "  [aider] "
+    if command -v aider &>/dev/null; then echo "✓ already installed"
+    elif $pip_cmd install aider-chat &>/dev/null 2>&1; then echo "✓ installed"
+    else echo "✗ failed (try: pip install aider-chat)"; fi
+  else
+    echo "  - pip not found — install Python to get aider"
   fi
-  return 0
 }
 
 install_macos_packages() {
-  echo "Installing packages via Homebrew..."
+  echo "Installing AI tools via Homebrew..."
   echo ""
-  
-  # Check if Homebrew is installed
   if ! command -v brew &>/dev/null; then
-    echo "[ERROR] Homebrew not found. Install from: https://brew.sh"
+    echo "  ✗ Homebrew not found. Install from: https://brew.sh" >&2
     return 1
   fi
-  
-  # Define macOS packages (Homebrew formulae)
-  local -a macos_packages=(
-    "gh"
-    "aider"
-    "jfrog-cli"
-    "terraform"
-    "tflint"
-    "awscli"
-    "azure-cli"
-    "google-cloud-sdk"
-  )
-  
-  local installed=0
-  local skipped=0
-  local failed=0
-  
-  for pkg in "${macos_packages[@]}"; do
-    echo -n "[$pkg] "
-    
-    # Check if installed || install
-    if brew list "$pkg" &>/dev/null 2>&1; then
-      echo "✓ (already installed)"
-      ((skipped++))
-    elif brew install "$pkg" &>/dev/null 2>&1; then
-      echo "✓ (installed)"
-      ((installed++))
-    else
-      echo "✗ (failed)"
-      ((failed++))
-    fi
+  local -a brew_pkgs=("gh" "jq" "tmux")
+  for pkg in "${brew_pkgs[@]}"; do
+    echo -n "  [$pkg] "
+    if brew list "$pkg" &>/dev/null 2>&1; then echo "✓ already installed"
+    elif brew install "$pkg" &>/dev/null 2>&1; then echo "✓ installed"
+    else echo "✗ failed"; fi
   done
-  
   echo ""
-  echo "=============================================="
-  echo "Installation summary:"
-  echo "  ✓ Installed: $installed"
-  echo "  ⏭ Already present: $skipped"
-  echo "  ✗ Failed: $failed"
-  echo "=============================================="
-  
-  if [[ $failed -gt 0 ]]; then
-    return 1
+  echo "  Optional (npm):"
+  if command -v npm &>/dev/null; then
+    echo -n "  [claude] "
+    if command -v claude &>/dev/null; then echo "✓ already installed"
+    elif npm install -g @anthropic-ai/claude-code &>/dev/null 2>&1; then echo "✓ installed"
+    else echo "✗ failed (try: npm install -g @anthropic-ai/claude-code)"; fi
+  else
+    echo "  - npm not found — install Node.js to get claude CLI"
   fi
-  return 0
+  echo ""
+  echo "  Optional (pip):"
+  if command -v pip3 &>/dev/null; then
+    echo -n "  [aider] "
+    if command -v aider &>/dev/null; then echo "✓ already installed"
+    elif pip3 install aider-chat &>/dev/null 2>&1; then echo "✓ installed"
+    else echo "✗ failed (try: pip3 install aider-chat)"; fi
+  fi
+  echo ""
+  echo "  GitHub Copilot CLI: https://github.com/github/copilot-cli"
+  echo "    curl -fsSL https://gh.io/copilot-install | bash"
 }
 
 install_linux_packages() {
-  echo "Installing packages via system package manager..."
+  echo "Installing AI tools (Linux/WSL)..."
   echo ""
-  
-  # Detect package manager
-  local pkg_manager="apt-get"
-  local pkg_check_cmd="dpkg -l"
-  
-  if command -v dnf &>/dev/null; then
-    pkg_manager="dnf"
-    pkg_check_cmd="dnf list installed"
-  elif command -v pacman &>/dev/null; then
-    pkg_manager="pacman"
-    pkg_check_cmd="pacman -Q"
-  fi
-  
-  echo "Using package manager: $pkg_manager"
-  echo ""
-  
-  # Define Linux packages
-  local -a linux_packages=(
-    "gh"
-    "aider"
-    "jfrog-cli"
-    "terraform"
-    "tflint"
-    "awscli"
-    "azure-cli"
-    "google-cloud-sdk"
-  )
-  
-  local installed=0
-  local skipped=0
-  local failed=0
-  
-  for pkg in "${linux_packages[@]}"; do
-    echo -n "[$pkg] "
-    
-    # Check if installed || install
-    if $pkg_check_cmd | grep -q "$pkg" &>/dev/null 2>&1; then
-      echo "✓ (already installed)"
-      ((skipped++))
-    elif sudo $pkg_manager install -y "$pkg" &>/dev/null 2>&1; then
-      echo "✓ (installed)"
-      ((installed++))
+  # System packages
+  local -a apt_pkgs=("git" "jq" "tmux" "util-linux" "gh")
+  local pkg_ok=0 pkg_fail=0
+  echo "  System (apt):"
+  for pkg in "${apt_pkgs[@]}"; do
+    echo -n "  [$pkg] "
+    if command -v "$pkg" &>/dev/null || dpkg -l "$pkg" &>/dev/null 2>&1; then
+      echo "✓ already installed"; ((pkg_ok++))
+    elif sudo apt-get install -y "$pkg" &>/dev/null 2>&1; then
+      echo "✓ installed"; ((pkg_ok++))
     else
-      echo "✗ (failed)"
-      ((failed++))
+      echo "✗ failed (try: sudo apt-get install $pkg)"; ((pkg_fail++))
     fi
   done
-  
   echo ""
-  echo "=============================================="
-  echo "Installation summary:"
-  echo "  ✓ Installed: $installed"
-  echo "  ⏭ Already present: $skipped"
-  echo "  ✗ Failed: $failed"
-  echo "=============================================="
-  
-  if [[ $failed -gt 0 ]]; then
-    return 1
+  # npm claude
+  echo "  Optional (npm — Claude Code CLI):"
+  if command -v npm &>/dev/null; then
+    echo -n "  [claude] "
+    if command -v claude &>/dev/null; then echo "✓ already installed"
+    elif sudo npm install -g @anthropic-ai/claude-code &>/dev/null 2>&1; then echo "✓ installed"
+    else echo "✗ failed (try: sudo npm install -g @anthropic-ai/claude-code)"; fi
+  else
+    echo "  - npm not found (install node: sudo apt-get install nodejs)"
   fi
-  return 0
+  echo ""
+  # copilot
+  echo "  Optional (GitHub Copilot CLI):"
+  if command -v copilot &>/dev/null; then
+    echo "  [copilot] ✓ already installed ($(command -v copilot))"
+  else
+    echo "  [copilot] not installed"
+    echo "    Install: curl -fsSL https://gh.io/copilot-install | bash"
+  fi
+  echo ""
+  # aider
+  echo "  Optional (aider):"
+  if command -v aider &>/dev/null; then
+    echo "  [aider] ✓ already installed"
+  else
+    echo "  [aider] not installed"
+    echo "    Install: pip install aider-chat"
+  fi
 }
 
 # ============================================================================

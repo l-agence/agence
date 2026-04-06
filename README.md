@@ -1,242 +1,233 @@
-#🤖  **l 'Agence** aka **(^)** - An Agentic Engineering Collaborative Environment
-- Author:  Stephane Korning 2026 stefusss@gmail.com
-- License : MIT + Commons Clause. 
----
+# 🤖 l'Agence (^) — Multi-Agent Engineering Framework
 
-## What is l ' Agence (^)?
- **L' Agence (^)** :  distributed collaborative agentic engineering with: safe stateful handoffs, workflows, persistent &vectored knowledge management, governance etc. 
--  agence supports agentic and human development and workdlows across : multiple orgs, multi teams, multi agents,  multi projects, multi-repos .
--  vectored knowledge can be private or shared (your choice) across all of these.
--  agence is self learning and capable of independent or guided agentic coding
--  agence supports well known agentic tools
--  agence introduces agentic personas to optimise LLM models and token costs to your needs
--  Innovative cognition model unique in the field.
--  sophisticated agent and command routing modes including both Chat-prompts and CLI integration.
--  one unique command-line that augments not replaces your other tools.
--  OS and LLM model agnostic. 
+**Author**: Stephane Korning · 2026 · [MIT + Commons Clause](LICENSE.md)
 
-Instead of losing context at the end of each session, Agence lets agents:
-- 💾 **Save session state** for later resumption
-- 🤝 **Hand off work** to specialized agents with full context
-- 📚 **Build knowledge** that persists across projects
-- 🔐 **Scale securely** with git-based sharding
-
-```
-Agent A works on feature → saves state
-        ↓
-Agent B takes over → resumes with full context
-        ↓
-Your project now has institutional memory
-```
+> *The first git-native, governed multi-agent swarm for software engineering.*
 
 ---
 
-## ⚡ Install (30 seconds)
+## What is l'Agence?
 
-Add Agence as a git submodule to your existing project:
+**l'Agence** is a framework that turns your git repo into a **collaborative agent workspace** — with audit trails, session persistence, and safe multi-agent orchestration built in from the start.
+
+Unlike single-agent tools (Claude Code, Copilot, aider), agence coordinates **multiple agents in parallel**, each isolated, observable, and governed by the same CODEX rules.
+
+| Capability | How |
+|---|---|
+| Multi-agent orchestration | `agentd` — tmux swarm, one agent per window |
+| Session persistence | `^save` / `^resume` — context survives restarts |
+| Safe handoffs | `^handoff @ralph` — full context transfer between agents |
+| Audit trail | `nexus/.ailedger` — append-only JSONL decision log |
+| Tiered governance | `AIPOLICY.yaml` → T0 (free) → T4 (gated) command tiers |
+| Tool-agnostic | Works with claude, copilot, aider, aish, or your own agent |
+| LLM-agnostic | Anthropic, OpenAI, GitHub Copilot, OpenRouter, Ollama, and more |
+| Git-native | No DB, no server — just git worktrees and flat files |
+
+---
+
+## ⚡ Install (60 seconds)
+
+### As a git submodule (recommended — keeps agence separate from your project)
 
 ```bash
-# Add Agence to your repo
+# 1. Add agence to your repo
 git submodule add https://github.com/l-agence/agence-master .agence
 
-# Initialize the submodule
-git submodule update --all --init
+# 2. Initialize
+git submodule update --init --recursive
 
-# Initialize Agence environment (creates symlinks, loads context)
-sh .agence/bin/agence ^init
+# 3. Set up agence in your repo (creates .agencerc, checks dependencies)
+bash .agence/bin/agence ^init
 
-# Commit
-git add .gitmodules .agence
-git commit -m "Add Agence agent framework"
+# 4. Add agence to your PATH (add this to your .bashrc / .zshrc)
+export PATH="$PWD/.agence/bin:$PATH"
+
+# 5. Commit
+git add .gitmodules .agence && git commit -m "Add agence agent framework"
 ```
 
----
-
-**Session Logging Dependency:**
-
-
-Agentic shells use the `script` utility (from util-linux or bsdutils) for session logging. This is available by default on most Linux distributions, but **not** on Windows Git Bash or Cmder. To enable session logging on Windows, use one of the following:
-
-- **MSYS2 (Recommended for advanced users):**
-        1. Download and install MSYS2 from https://www.msys2.org/
-        2. Open the MSYS2 shell
-        3. Run: `pacman -Syu` (update package database and core system)
-        4. Run: `pacman -S util-linux` (installs `script`)
-
-- **Cygwin:** Install the `util-linux` package (provides `script`)
-- **WSL:** Install `bsdutils` or `util-linux` with `sudo apt install bsdutils`
-
-**Note:** Git Bash (from Git for Windows or Cmder) does not support `pacman` or installing `script`. For session logging, use MSYS2, Cygwin, or WSL.
-
-If `script` is not found, agentic shells will still run, but session logging will be disabled and a warning will be shown.
-
-That's it. You now have:
-- 🎯 **Agent collaboration** ready to use
-- 💾 **Session persistence** for interrupted work
-- 📖 **Knowledge base** (NEXUS/CODEX) living in your repo
-- 🔄 **Command routing** via `agence` CLI
-
----
-
-## 🚀 Quick Usage
+### Or: run directly (no install, no submodule)
 
 ```bash
-# Chat with agent about your task
-agence "How do I set up CI/CD for this?"
+git clone https://github.com/l-agence/agence-master .agence
+export PATH="$PWD/.agence/bin:$PATH"
+agence --help
+```
 
-# Save session state (agent can resume later)
-agence ^save "Implementing OAuth2, halfway through"
+### Prerequisites
 
-# Let an agent autonomously plan and execute
-agence +deploy-to-staging
+| Tool | Required | Install |
+|---|---|---|
+| `bash` 4+ | ✅ Yes | built-in on Linux/macOS/WSL |
+| `git` 2.30+ | ✅ Yes | `sudo apt install git` |
+| `tmux` | For `agentd` swarm | `sudo apt install tmux` |
+| `script` (util-linux) | For session logging | `sudo apt install util-linux` |
+| `jq` | For JSON ledger queries | `sudo apt install jq` |
 
-# Execute a validated command
+> **Windows**: Use WSL (Ubuntu recommended). All tools above available via `sudo apt install`.
+
+---
+
+## 🚀 Quick Start
+
+```bash
+# Chat with an agent about your task
+agence "How should I structure this feature?"
+
+# Save session state (resume later or hand off)
+agence ^save "Implementing OAuth2, halfway through token validation"
+
+# Launch a named agent in an aibash session
+agence !ralph                    # persona agent (learning + reliability)
+agence !claude                   # Claude Code CLI
+agence !pilot                    # GitHub Copilot CLI
+agence !aider                    # aider (code patches)
+agence !aish                     # Microsoft AI Shell
+
+# Start a multi-agent swarm (tmux)
+agentd start ralph claude aider  # three agents, three windows
+
+# Run a pre-approved git command
 agence /git-status
+agence /git-log
 
-# See what's loaded (context, principles, rules)
-agence ^reload
+# Record a decision in the audit ledger
+agence ^fault add "Missed nil check in router"
 
-# Get help
-agence !help
+# See all commands
+agence --help
 ```
 
 ---
 
-## 📚 Documentation
-- **[Documentation](synthetic/l-agence.org/docs/INDEX.md)**  Overview - What is Agence and why is it different?.
-- **[Architecture](synthetic/l-agence.org/docs/INDEX.md)** - How Agence works (sharding, sessions, handoffs, )
-- **[Commands](bin/COMMANDS.md)** - Full CLI reference
-- **[Principles](codex/PRINCIPLES.md)** - Core LLM Maxims
-- **[Laws](codex/LAWS.md)** - Mal practices to Avoid.
-- **[Rules](codex/RULES.md)** - Best practices to Follow.
-- **[Lessons](synthetic/l-agence.org/lessons/)** - Captured insights
-- **[faults](synthetic/l-agence.org/faults/)** - Captured faults
-- **[logs](synthetic/l-agence.org/logs/)** - Captured logs
-
----
-
-## 📦 What You Get
+## 📐 Architecture
 
 ```
-.agence/
-├─ bin/agence                    # Main entry point (symlink or run directly)
-├─ codex/                        # Immutable knowledge
-│  ├─ PRINCIPLES.md              # Maxims (why)
-│  ├─ LAWS.md                    # Hard constraints (must not)
-│  ├─ RULES.md                   # Best practices (should)
-│  └─ agents/                    # Agent personas
-├─ nexus/                        # Operational state (local, ephemeral)
-│  ├─ logs/                      # Activity logs
-│  ├─ faults/                    # Error tracking
-│  └─ sessions/                  # Persisted agent context
-├─ synthetic/                    # Learning & documentation
-│  └─ lessons/                   # Project lessons learned
-├─ .github/                      # Git instructions
-│  ├─ copilot-instructions.md    # Generic LLM Agent context & instructions
-│  └─ CLAUDE.md                  # Anthropic LLM Agent context & instructions
-└─ lib/                          # Utility functions
+YOUR REPO/
+└── .agence/                     ← agence lives here (submodule or clone)
+    ├── bin/
+    │   ├── agence               # Main CLI entry point
+    │   ├── agentd               # tmux swarm orchestrator
+    │   ├── aibash               # Agent plane shell (observable)
+    │   └── aido                 # Autonomous task runner
+    ├── codex/                   # Immutable governance (committed, shared)
+    │   ├── PRINCIPLES.md        # Philosophical maxims
+    │   ├── LAWS.md              # Hard constraints (must not)
+    │   ├── RULES.md             # Best practices (should)
+    │   ├── AIPOLICY.yaml        # Command tier whitelist (T0–T4)
+    │   └── agents/              # Agent personas (ralph, sonya, claude…)
+    ├── nexus/                   # Local operational state (gitignored)
+    │   ├── .ailedger            # Append-only decision audit log (JSONL)
+    │   ├── faults/              # Incident tracking
+    │   └── sessions/            # Persisted agent context
+    ├── synthetic/               # Team-shared knowledge (committed)
+    │   └── l-agence.org/
+    │       ├── docs/            # Architecture, routing, swarm docs
+    │       ├── lessons/         # Captured insights
+    │       └── plans/           # Project roadmap
+    └── lib/
+        ├── router.sh            # LLM provider routing
+        ├── ailedger.sh          # Audit log functions
+        └── format.sh            # Output formatting
 ```
 
 ---
 
-## 🎯 Usage Modes
+## 🎯 Command Reference
 
-| Mode | Example | Use When |
-|------|---------|----------|
-| **Chat** | `agence "question"` | Need advice or explanation |
-| **Autonomous** | `agence +deploy-feature` | Want agent to plan & execute |
-| **Command** | `agence /git-status` | Running pre-approved commands |
-| **System** | `agence !help` | Using utilities or agent info |
-| **hermetic** | `agence ~save` | Save/reload private context  |
-| **Synthetic** | `agence ^save` | Save/reload shared context, init |
+| Prefix | Mode | Example | Use When |
+|---|---|---|---|
+| _(none)_ | Chat | `agence "explain this error"` | Advice, explanation, Q&A |
+| `^` | Synthetic | `agence ^save`, `agence ^lesson` | Shared state, knowledge ops |
+| `~` | Hermetic | `agence ~note "idea"` | Private notes (never committed) |
+| `+` | Autonomous | `agence +refactor-auth` | Agent plans & executes a task |
+| `/` | Validated | `agence /git-status` | Pre-approved safe commands |
+| `!` | System | `agence !ralph`, `agence !claude` | Launch agents or tools |
+| `@` | Route | `agence @sonya "review this"` | Send to specific agent |
+
+---
+
+## 🤖 Agent Roster
+
+| Agent | Type | Best For | Model |
+|---|---|---|---|
+| `!ralph` | Persona | Learning, reliability, explanations | Claude Sonnet |
+| `!sonya` | Persona | Architecture, code review | Claude Sonnet |
+| `!claudia` | Persona | Deep reasoning, critical decisions | Claude Opus |
+| `!aiko` | Persona | Fast analysis, cheap queries | Claude Haiku |
+| `!chad` | Persona | DevOps, infra, CI/CD (Cockney) | GPT-4o |
+| `!claude` | Tool | Claude Code interactive CLI | Anthropic direct |
+| `!pilot` | Tool | GitHub Copilot CLI | GitHub Copilot |
+| `!aider` | Tool | Code patches, git diffs | OpenRouter/local |
+| `!aish` | Tool | Windows shell, Azure CLI | AI Shell (winget) |
 
 ---
 
 ## 🔄 How Sessions Work
 
-**Before (traditional):**
+**Before agence:**
 ```
-Session 1: Agent works → loses context
-Session 2: Agent starts fresh → repeats work
-```
-
-**With Agence:**
-```
-Session 1: Agent works → agence ^save
-Session 2: Agent or colleague → agence ^resume SESSION_ID → continues
+Session 1: Agent works on OAuth2 → context lost at end
+Session 2: Start over, re-explain everything → wasted time
 ```
 
-Each session captures:
-- 💬 Agent context and memory
-- 📝 Todo list and checkpoints  
-- 📂 File states and directory
-- 🎯 Task description and progress
+**With agence:**
+```
+Session 1: agence ^save "OAuth2: done token validation, next: refresh flow"
+Session 2: agence ^resume → agent picks up exactly where you left off
+         or: agence ^handoff @sonya → different agent, full context
+```
 
 ---
 
-## 🤖 ^ Design Philosophy
+## 🔐 Governance Model
 
-**"^ as Trademark"**
+Agence uses a 5-tier command policy (`codex/AIPOLICY.yaml`):
 
-The `^` character represents Agence values:
-- **Aleph (א)** - First letter, foundational intelligence
-- **Lambda (λ)** - Function/transformation (what agents do)
-- **Pointer (^)** - Reference to context (persistent memory)
+| Tier | Level | Example Commands | Gate |
+|---|---|---|---|
+| T0 | Free | `git status`, `git log` | None |
+| T1 | Soft confirm | `git add`, `git commit` | Logged |
+| T2 | Hard confirm | `git push`, `git reset` | Human approval |
+| T3 | Restricted | `git clean`, `rm -rf` | Explicit flag required |
+| T4 | Blocked | Force push to main, drop DB | Never without override |
 
-All special commands use `^` prefix:
+All decisions are logged to `nexus/.ailedger` (local, gitignored, append-only).
+
+---
+
+## 📚 Documentation
+
+| Doc | What it covers |
+|---|---|
+| [Architecture](synthetic/l-agence.org/docs/ARCHITECTURE.md) | How agence works end-to-end |
+| [Swarm](synthetic/l-agence.org/docs/SWARM.md) | agentd, tangents, tmux model |
+| [Routing](codex/agents/ROUTING.md) | LLM provider selection, tiers, blast_radius |
+| [Agents](codex/agents/AGENTS.md) | Full agent roster and system prompts |
+| [Commands](bin/COMMANDS.md) | Complete CLI reference |
+| [Principles](codex/PRINCIPLES.md) | Core maxims (why) |
+| [Laws](codex/LAWS.md) | Hard constraints (must not) |
+| [Rules](codex/RULES.md) | Best practices (should) |
+| [Roadmap](synthetic/l-agence.org/docs/ROADMAP.md) | What's next |
+
+---
+
+## 🧪 Tests
+
 ```bash
-agence ^init           # Initialize environment
-agence ^save "notes"   # Save session state  
-agence ^resume ID      # Resume session
-agence ^reload         # Reload knowledge base
+# Run full suite (142 examples, 0 failures)
+tests/bin/shellspec --shell bash tests/unit/
+
+# Run a specific spec
+tests/bin/shellspec --shell bash tests/unit/agence_spec.sh
 ```
 
 ---
 
-## 📊 Status
+## License
 
-| Component | Status |
-|-----------|--------|
-| Core Framework | ✅ Working |
-| Session Persistence | ✅ Working |
-| Command Routing | ✅ Working |
-| Multi-Agent Coordination | 🔄 In Development |
-| Knowledge Sharding | 🔄 In Development |
-| Session Recovery | 🔄 In Development |
+MIT + Commons Clause — free to use, modify, and self-host.  
+Commercial redistribution requires a separate agreement.  
+See [LICENSE.md](LICENSE.md).
 
-[VERSION]: 0.2.0 (alpha)
-[RELEASE]: main
 
-## 🔐 Security & Isolation
-
-- ✅ Commands are **whitelisted**, not blacklisted
-- ✅ Destructive operations require **confirmation**
-- ✅ Each project gets isolated sessions (git-based sharding)
-- ✅ Agent handoffs are **explicit** (not automatic)
-
----
-
-## 🔗 Links
-
-- **GitHub**: [l-agence/agence-master](https://github.com/l-agence/agence-master)
-- **Architecture Docs**: [Full system design](synthetic/l-agence.org/docs/ARCHITECTURE.md)
-- **Issues**: [GitHub Issues](https://github.com/l-agence/agence-master/issues)
-
----
-
-## 📝 License
-
-MIT + Commons Clause  
-See LICENSE.md for details
-
----
-
-**Questions?** Start with `agence !help` or check [the docs](synthetic/l-agence.org/INDEX.md).
-
-**Want to contribute?** See CONTRIBUTING.md (coming soon).
-
----
-
-*"An agent that remembers is an agent that learns."*
-
-**v0.2.0** • Updated 2026-03-05
