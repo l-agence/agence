@@ -1,0 +1,16 @@
+# .msysbashrc - MSYS2-specific profile for Agence agentic shells
+# Source this in aibash/ibash if running under MSYS2
+
+# Set MSYS2-specific environment variables
+export AGENCE_SHELL_ENV="msys2"
+export PATH="/usr/bin:$PATH"
+
+# Optional: Set prompt or other MSYS2-specific tweaks
+# export PS1="[MSYS2] $PS1"
+
+# Enable color support if available
+if command -v dircolors &>/dev/null; then
+    eval "$(dircolors -b)"
+fi
+
+# Add any MSYS2-specific initialization here

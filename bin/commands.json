@@ -1,8 +1,8 @@
 {
   "comment": "Agence Permitted External Commands (mode /)",
   "description": "Whitelist of external commands that can be executed via 'agence /<command>'",
-  "updated": "2026-03-05",
-  "version": "1.0.0",
+  "updated": "2026-03-31",
+  "version": "1.1.0",
 
   "terraform-commands": {
     "terraform-plan": true,
@@ -11,6 +11,24 @@
     "terraform-fmt": true,
     "terraform-state": true
   },
+
+  "tf-shortcut-commands": {
+    "_comment": "Shortcuts handled directly in mode_external via route_tf_command (AIPOLICY tier model). Not subject to terraform-commands whitelist — these bypass the jq check. Listed here for documentation only.",
+    "_tiers": "T0=auto-execute  T2=warn+confirm (infra state mutation)  T3=blocked (destroy — HIGHEST ESCALATION)",
+    "_policy": "See codex/AIPOLICY.yaml terraform section for canonical whitelist/blacklist",
+    "tf":         { "tier": "router", "desc": "Generic /tf <subcmd> [args...] — full AIPOLICY tier routing" },
+    "tfvalidate": { "tier": "T0",     "desc": "terraform validate — syntax/config check (whitelist)" },
+    "tfauth":     { "tier": "T0",     "desc": "terraform login — auth check / Terraform Cloud registry (whitelist)" },
+    "tflogin":    { "tier": "T0",     "desc": "terraform login — alias for /tfauth (whitelist)" },
+    "tfplan":     { "tier": "T0",     "desc": "terraform plan [args] — non-destructive change preview (whitelist)" },
+    "tfinit":     { "tier": "T0",     "desc": "terraform init — provider install, no --upgrade (whitelist)" },
+    "tflint":     { "tier": "T0",     "desc": "tflint [args] — Terraform linter, code quality (whitelist)" },
+    "tfupgrade":  { "tier": "T2",     "desc": "terraform init --upgrade — provider upgrade (restricted, warn+confirm)" },
+    "tfapply":    { "tier": "T2",     "desc": "terraform apply [args] — provision infra (restricted, warn+confirm)" },
+    "tfdestroy":  { "tier": "T3",     "desc": "terraform apply --destroy — HIGHEST ESCALATION: BLOCKED (run manually)" },
+    "precommit":  { "tier": "T0",     "desc": "pre-commit run [args] — git pre-commit hooks / code quality (whitelist)" }
+  },
+
 
   "git-commands": {
     "git-status": true,
@@ -26,6 +44,52 @@
     "git-rebase": true,
     "git-clone": true,
     "git-init": true
+  },
+
+  "gh-shortcut-commands": {
+    "_comment": "Shortcuts handled directly in mode_external via route_gh_command (AIPOLICY tier model). All pass args intact to 'gh', including --help. Not subject to commands.json whitelist — bypass the jq check.",
+    "_tiers": "T0=auto-execute T2=warn+confirm (remote GitHub state mutation)",
+    "_policy": "See codex/AIPOLICY.yaml github_cli section for canonical whitelist/blacklist",
+    "gh":       { "tier": "router", "desc": "Generic /gh <subcmd> [args...] — full AIPOLICY tier routing" },
+    "ghremote": { "tier": "T0",     "desc": "gh repo view — show current repo info (AIPOLICY whitelist)" },
+    "ghrepo":   { "tier": "T0/T2",  "desc": "gh repo <subcmd> — view/list=T0, create/delete/fork=T2" },
+    "ghpull":   { "tier": "T0/T2",  "desc": "gh pr list (default T0) | gh pr <subcmd> — merge/close=T2" },
+    "ghlog":    { "tier": "T0",     "desc": "gh run list — GitOps actions run history (AIPOLICY whitelist)" },
+    "ghmerge":  { "tier": "T2",     "desc": "gh pr merge — T2 confirmation required (AIPOLICY blacklist)" },
+    "ghrun":    { "tier": "T0/T2",  "desc": "gh run list (default T0) | gh run <subcmd> — cancel/rerun=T2" },
+    "ghflow":   { "tier": "T0/T2",  "desc": "gh workflow list (default T0) | gh workflow <subcmd> — run/enable=T2" },
+    "ghissue":  { "tier": "T0/T2",  "desc": "gh issue list (default T0) | gh issue <subcmd> — close/create=T2" },
+    "ghorg":    { "tier": "T0",     "desc": "gh org list — read-only (AIPOLICY whitelist)" },
+    "ghauth":   { "tier": "legacy", "desc": "gh auth status — legacy handler (uses aido), kept for compat" },
+    "ghlogin":  { "tier": "T2",     "desc": "gh auth login — interactive login (legacy handler)" },
+    "ghstatus": { "tier": "legacy", "desc": "gh repo view + gh pr list — legacy combined handler" },
+    "ghcommit": { "tier": "T2",     "desc": "git commit via gh auth — legacy handler" },
+    "ghpush":   { "tier": "T2",     "desc": "git push via gh auth — legacy handler" }
+  },
+
+  "git-shortcut-commands": {
+    "_comment": "Shortcuts handled directly in mode_external via route_git_command (AIPOLICY tier model). Not subject to commands.json whitelist — these bypass the jq check. Listed here for documentation only.",
+    "_tiers": "T0=auto-execute  T1=soft-confirm (show effect, single keypress)  T2=warn+confirm  T3=blocked (HIGHEST — run manually or via VSCode UI)",
+    "_conflicts": "aider REPL: /git and /diff pass-through to same git binary (no behavioral conflict). /commit IS different — aider injects its own message+metadata. Agence /commit wins in agence shell context; aider /commit wins in aider REPL context. No runtime collision.",
+    "git":         { "tier": "router", "desc": "Generic /git <subcmd> [args...] — full AIPOLICY tier routing" },
+    "status":      { "tier": "T0",     "desc": "git status — pure read-only (AIPOLICY whitelist)" },
+    "log":         { "tier": "T0",     "desc": "git log [args] — pure read-only (AIPOLICY whitelist)" },
+    "diff":        { "tier": "T0",     "desc": "git diff [args] — pure read-only, shows uncommitted changes (AIPOLICY whitelist)" },
+    "remote":      { "tier": "T0",     "desc": "git remote [args] — pure read-only (AIPOLICY whitelist)" },
+    "add":         { "tier": "T0",     "desc": "git add [args] — staging only, non-destructive (AIPOLICY whitelist)" },
+    "stash":       { "tier": "T0",     "desc": "git stash [list|show|push] — saves work-in-progress (AIPOLICY whitelist)" },
+    "pop":         { "tier": "T1",     "desc": "git stash pop — restores stash, modifies working tree (soft-confirm: show stash entry before apply)" },
+    "branch":      { "tier": "T1",     "desc": "git branch [args] — list=T0, create/delete=T1 soft-confirm (show target before mutation)" },
+    "fetch":       { "tier": "T2",     "desc": "git fetch — mutates .git/refs (AIPOLICY blacklist, warn+confirm)" },
+    "pull":        { "tier": "T2",     "desc": "git pull — merges remote state (AIPOLICY blacklist, warn+confirm)" },
+    "push":        { "tier": "T2",     "desc": "git push — handled by existing /push handler (warn+confirm)" },
+    "commit":      { "tier": "T2",     "desc": "git commit — handled by existing /commit handler (message+confirm)" },
+    "checkout":    { "tier": "T2",     "desc": "git checkout / git switch — can discard working tree changes (warn+confirm)" },
+    "cherry-pick": { "tier": "T2",     "desc": "git cherry-pick [sha] — rewrites history, requires explicit confirm" },
+    "rebase":      { "tier": "T2",     "desc": "git rebase [args] — rewrites commit history (warn+confirm, never on shared branches)" },
+    "reset":       { "tier": "T2/T3",  "desc": "git reset: --soft/--mixed=T2 warn+confirm | --hard=T3 BLOCKED (use VSCode source control)" },
+    "merge":       { "tier": "T3",     "desc": "git merge — T3 BLOCKED: launch VSCode merge editor (Cmd+Shift+P > Git: Merge Branch) for conflict safety" },
+    "clean":       { "tier": "T3",     "desc": "git clean — T3 BLOCKED: deletes untracked files permanently. Run manually with -n preview first." }
   },
 
   "aws-commands": {

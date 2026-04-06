@@ -1,0 +1,16 @@
+
+==============================================
+  BASH SESSION
+==============================================
+
+Session ID:  bash-20260307_161811-1724-e730a0a
+Agent:       @
+Shell:       bash
+Working Dir: /c/Users/steff/git/.agence
+Metadata:    /c/Users/steff/git/.agence/nexus/.aisessions/bash-20260307_161811-1724-e730a0a.meta.json
+
+Title:       bash:bash-20260307_161811-1724-e730a0a@@
+
+==============================================
+
+]0;bash:bash-20260307_161811-1724-e730a0a@@

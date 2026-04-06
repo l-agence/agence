@@ -1,0 +1,12 @@
+{
+  "session_id": "69c9e444",
+  "created_at": "2026-03-30T02:47:32Z",
+  "status": "saved",
+  "agent": "unknown",
+  "shell": "wsl",
+  "notes": "Stabilization sprint: CRLF fix, function recovery, format.sh implemented. Smoke tests passing. Branch: rel_0.2.2_agence_swarm_sessions. Next: backport shell session functions from ^.73aad08.nogit",
+  "runstate": {
+    "pwd": "/mnt/c/Users/steff/git/.agence",
+    "repo": "/mnt/c/Users/steff/git/.agence"
+  }
+}

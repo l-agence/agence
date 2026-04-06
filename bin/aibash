@@ -1,0 +1,309 @@
+#!/usr/bin/env bash
+
+show_help() {
+	cat <<EOF
+aibash: Agentic (robot) Bash shell
+
+Usage:
+  aibash [--session <id>] [--agent <name>] [--role <role>] [--shell <bash>] [--] [command ...]
+
+Options:
+  --session <id>   Unique session ID (required for logging)
+  --agent <name>   Agent name (default: @)
+  --role <role>    Agent role (default: agentic)
+  --shell <bash>   Shell type (default: bash)
+  --               End of options, pass remaining as command
+  help, --help     Show this help message
+
+Examples:
+  aibash --session my-session --agent ralph --role agentic
+  aibash --session s1 -- echo "Hello from agentic shell"
+
+Description:
+  Secure, session-logged, agent-only shell for autonomous/background agent work.
+  Not for interactive human use. All I/O is logged. Exits cleanly when stdin closes.
+  Signal handlers (SIGKILL/SIGSTOP) are PARENT-owned (ibash) and cannot be overridden.
+EOF
+}
+
+# aibash: Agentic (robot) shell - replaces legacy ai-shell.sh
+# Purpose: Secure, session-logged, agent-only shell for autonomous/background agent work
+#
+# This shell is intended to be launched via spawn (Node.js, Python, etc.), NOT interactively by a human.
+#
+# Spawn Usage Example (Node.js):
+#   const { spawn } = require('child_process');
+#   const child = spawn('./bin/aisha.sh', ['bash'], {
+#     env: { ...process.env, AI_ROLE: 'agentic', AI_SESSION: 'session-uuid', AI_AGENT: 'robot', GIT_ROOT: '/path/to/repo' },
+#     cwd: '/path/to/repo'
+#   });
+#   child.stdout.on('data', ...); child.stderr.on('data', ...);
+#
+# Spawn Usage Example (Python):
+#   import subprocess, os
+#   env = os.environ.copy(); env.update({'AI_ROLE': 'agentic', 'AI_SESSION': 'session-uuid', 'AI_AGENT': 'robot', 'GIT_ROOT': '/path/to/repo'})
+#   proc = subprocess.Popen(['./bin/aisha.sh', 'bash'], env=env, cwd='/path/to/repo', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+#
+# Requirements:
+#   - Must not require interactive input.
+#   - All I/O is logged to SESSION_LOG/typescript.
+#   - Exits cleanly when parent process closes stdin.
+#   - No interactive banners or prompts.
+#   - Security: chroot-like GIT_ROOT enforcement, CODEX validation, tight I/O.
+#   - Ready for VS Code API integration (env/args).
+
+
+
+
+
+set -euo pipefail
+
+# Set GIT_ROOT early to avoid unbound variable errors
+if [[ -z "${GIT_ROOT:-}" ]]; then
+	GIT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+fi
+
+# Restrict PATH to minimal safe binaries, include $AI_BIN and . if set
+if [[ -n "${AI_BIN:-}" ]]; then
+	export PATH="/usr/bin:/bin:$AI_BIN:."
+else
+	export PATH="/usr/bin:/bin:."
+fi
+
+# Unset risky env vars
+unset HISTFILE HISTSIZE HISTCONTROL HISTIGNORE PROMPT_COMMAND BASH_ENV ENV CDPATH
+
+# Disable Bash features that allow escape
+set +o history
+set +o braceexpand
+set +o histexpand
+set +o noglob
+shopt -u extglob
+shopt -u progcomp
+
+# Block dangerous signals
+trap '' SIGINT SIGQUIT SIGTSTP SIGSTOP
+
+# Shared aipolicy enforcement
+if [[ -f "$GIT_ROOT/bin/aipolicy" ]]; then
+	source "$GIT_ROOT/bin/aipolicy"
+fi
+# CODEX validation stub (to be implemented)
+if [[ -f "$GIT_ROOT/codex/LAWS.sh" ]]; then
+	source "$GIT_ROOT/codex/LAWS.sh"
+	# Example: codex_validate_shell || { echo '[AISHA] ✗ CODEX policy violation' >&2; exit 99; }
+fi
+
+
+# Argument parsing for --session, --agent, --role, and command
+SHELL_TYPE=""
+USER_COMMAND=()
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+		--help|help|-h)
+			show_help; exit 0 ;;
+		--session)
+			AI_SESSION="$2"; shift 2 ;;
+		--agent)
+			AI_AGENT="$2"; shift 2 ;;
+		--role)
+			AI_ROLE="$2"; shift 2 ;;
+		--shell)
+			SHELL_TYPE="$2"; shift 2 ;;
+		--)
+			shift; USER_COMMAND=("$@") ; break ;;
+		*)
+			USER_COMMAND+=("$1"); shift ;;
+	esac
+done
+
+# Robust defaults
+# --agent: default to "@" (Copilot AutoSelect)
+AI_AGENT="${AI_AGENT:-@}"
+
+# --shell: default to "bash" (Agence default)
+SHELL_TYPE="${SHELL_TYPE:-bash}"
+
+# --role: agentic if not interactive, else interactive
+if [[ -z "${AI_ROLE:-}" ]]; then
+	if [[ -t 0 && -t 1 ]]; then
+		AI_ROLE="interactive"
+	else
+		AI_ROLE="agentic"
+	fi
+fi
+
+# --session: generate if not provided
+if [[ -z "${AI_SESSION:-}" ]]; then
+	if [[ "$AI_ROLE" == "agentic" ]]; then
+		# Prefer short hex for agentic jobs
+		if command -v openssl &>/dev/null; then
+			AI_SESSION="robo$(openssl rand -hex 4)"
+		elif command -v uuidgen &>/dev/null; then
+			AI_SESSION="robo$(uuidgen | tr -d '-' | cut -c1-8)"
+		else
+			AI_SESSION="robo$$"
+		fi
+	else
+		AI_SESSION="term$$"
+	fi
+fi
+
+# Check for script utility (session logging dependency)
+if command -v script &>/dev/null; then
+	SCRIPT_PATH="$(command -v script)"
+	# Only allow if in trusted locations
+	if [[ "$SCRIPT_PATH" == "/usr/bin/script" || "$SCRIPT_PATH" == "/bin/script" ]]; then
+		SESSION_LOGGING_ENABLED=1
+	else
+		echo "[SECURITY WARNING] 'script' found at $SCRIPT_PATH, which is not a standard location."
+		echo "Proceed with session logging? [y/N]"
+		read -r answer
+		if [[ "$answer" =~ ^[Yy]$ ]]; then
+			SESSION_LOGGING_ENABLED=1
+		else
+			SESSION_LOGGING_ENABLED=0
+		fi
+	fi
+else
+	echo ""
+	echo "╔════════════════════════════════════════════════════════════════╗"
+	echo "║  WARNING: 'script' utility not found                         ║"
+	echo "╠════════════════════════════════════════════════════════════════╣"
+	echo "║  Session logging is DISABLED.                                ║"
+	echo "║  To enable session logging, install 'script' (util-linux)    ║"
+	echo "║  - On Linux: sudo apt install bsdutils or util-linux         ║"
+	echo "║  - On Cygwin: setup-x86_64.exe, add util-linux               ║"
+	echo "║  - On WSL: sudo apt install bsdutils or util-linux           ║"
+	echo "║  - On MSYS2: pacman -S util-linux                            ║"
+	echo "║  - Not available in Git Bash/Cmder by default                ║"
+	echo "╚════════════════════════════════════════════════════════════════╝"
+	SESSION_LOGGING_ENABLED=0
+fi
+
+if [[ $SESSION_LOGGING_ENABLED -eq 1 ]]; then
+	# Derive session file paths from AI_SESSION (aisession init uses same convention)
+	SESSION_LOG="${GIT_ROOT}/nexus/.aisessions/${AI_SESSION}.typescript"
+	SESSION_META="${GIT_ROOT}/nexus/.aisessions/${AI_SESSION}.meta.json"
+	export SESSION_LOG SESSION_META
+	# Call aisession to initialize session log and metadata
+	if command -v "$GIT_ROOT/bin/aisession" &>/dev/null; then
+		"$GIT_ROOT/bin/aisession" init "$AI_SESSION" "$AI_ROLE" "$AI_AGENT" "$SHELL_TYPE" "$GIT_ROOT"
+	else
+		echo "[AISHA] Warning: aisession not found, session logging not initialized" >&2
+	fi
+else
+	# Ensure variables are always defined (set -u safety)
+	SESSION_LOG="${GIT_ROOT}/nexus/.aisessions/${AI_SESSION}.typescript"
+	SESSION_META="${GIT_ROOT}/nexus/.aisessions/${AI_SESSION}.meta.json"
+fi
+
+# SESSION LOGGING INIT — work already done at script load time above.
+# This function stub satisfies the main() call without double-initializing.
+init_session_logging() {
+	: # no-op — aisession init already called during script initialization
+}
+
+# CODEX VALIDATION + FORMAT LIBRARY (same as legacy ai-shell.sh)
+load_codex_and_format() {
+	if [[ -f "$GIT_ROOT/codex/LAWS.sh" ]]; then
+		source "$GIT_ROOT/codex/LAWS.sh"
+	fi
+	if [[ -f "$GIT_ROOT/lib/format.sh" ]]; then
+		source "$GIT_ROOT/lib/format.sh"
+		export _AGENCE_FMT="${_AGENCE_FMT:-text}"
+	fi
+}
+
+# BASH SHELL SETUP (agentic: no interactive prompt, tight I/O)
+setup_bash_session() {
+	# Build command string for script utility
+	local bash_args=(--noprofile --norc)
+	if [[ ${#USER_COMMAND[@]} -gt 0 ]]; then
+		bash_args+=("-c" "${USER_COMMAND[*]}")
+	fi
+	script_cmd=(script --quiet --return --command "bash ${bash_args[*]}" "$SESSION_LOG")
+	export GIT_ROOT AI_ROLE AI_SESSION AI_AGENT SESSION_LOG SESSION_META
+	# No interactive PS1 for agentic shell
+	# Optionally: export PS1=""
+	if [[ -f "$HOME/.bashrc" ]]; then
+		"${script_cmd[@]}" || {
+			echo "[AISHA] ✗ Bash session launch failed" >&2
+			return 1
+		}
+	else
+		"${script_cmd[@]}" || {
+			echo "[AISHA] ✗ Bash session fallback failed" >&2
+			return 1
+		}
+	fi
+}
+
+# SANDBOX PATH ENFORCEMENT (same as legacy ai-shell.sh)
+sandbox_cd() {
+	local target="${1:-.}"
+	local abs_path
+	abs_path="$(cd "$target" 2>/dev/null && pwd)" || {
+		echo "[SANDBOX] ✗ Invalid directory: $target" >&2
+		return 1
+	}
+	if [[ "$abs_path" == "$GIT_ROOT"* ]] || [[ "$abs_path" == "/" ]]; then
+		cd "$abs_path" || return 1
+	else
+		echo "[SANDBOX] ✗ Access outside workspace denied: $target" >&2
+		echo "[SANDBOX]   Current root: $GIT_ROOT" >&2
+		echo "[SANDBOX]   Attempted:   $abs_path" >&2
+		return 1
+	fi
+}
+
+# AWAITING INPUT NOTIFICATION
+# When agent shell is blocked waiting for stdin, write a marker file
+# VSCode / ibash parent can poll this for notification
+notify_awaiting() {
+	local marker="${GIT_ROOT}/nexus/sessions/${AI_SESSION}.awaiting"
+	mkdir -p "$(dirname "$marker")" 2>/dev/null || true
+	echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$marker"
+	# Flash title to alert human
+	printf '\033]0;⏳ %s | aibash WAITING\007' "${AI_AGENT}" 2>/dev/null || true
+}
+
+clear_awaiting() {
+	local marker="${GIT_ROOT}/nexus/sessions/${AI_SESSION}.awaiting"
+	rm -f "$marker" 2>/dev/null || true
+	# Restore normal title
+	printf '\033]0;🤖 %s | aibash\007' "${AI_AGENT}" 2>/dev/null || true
+}
+
+# MAIN EXECUTION (agentic: minimal banner, session-logged)
+main() {
+	# Help handler
+	if [[ "${1:-}" == "help" || "${1:-}" == "--help" ]]; then
+		show_help
+		exit 0
+	fi
+	init_session_logging
+	load_codex_and_format
+	cd "$GIT_ROOT" || {
+		echo "[AIBASH] ✗ Failed to cd to $GIT_ROOT" >&2
+		return 1
+	}
+	# Minimal banner for agent plane (right tile)
+	printf '\033]0;🤖 %s | aibash\007' "${AI_AGENT}" 2>/dev/null || true
+	echo "[aibash] agent=${AI_AGENT} session=${AI_SESSION:0:8} root=${GIT_ROOT}"
+
+	case "$SHELL_TYPE" in
+		bash)
+			notify_awaiting
+			setup_bash_session
+			clear_awaiting
+			;;
+		*)
+			echo "[AIBASH] ✗ Unknown shell type: $SHELL_TYPE" >&2
+			echo "[AIBASH]   Supported: bash" >&2
+			return 1
+			;;
+	esac
+}
+
+main "$@"

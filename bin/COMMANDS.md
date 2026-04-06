@@ -1,4 +1,7 @@
-# Agence Commands
+
+# Agence Commands (Canonical Routing)
+
+All command modes and grammars must conform to the canonical universal `@` routing and state prefix model. See codex/agents/ROUTING.md for the canonical table and glossary.
 
 **Comprehensive reference for all Agence initialization and special commands.**
 
@@ -869,6 +872,118 @@ agence /ghcommit
 
 ---
 
+---
+
+## Terraform / IaC Commands (External Mode)
+
+Terraform shortcuts use `agence /tf*` pattern. All commands are tier-classified per `codex/AIPOLICY.yaml`.
+
+| Command | Tier | Maps to | Notes |
+|---------|------|---------|-------|
+| `/tf <subcmd> [args]` | router | `terraform <subcmd> [args]` | Generic — full tier routing |
+| `/tfvalidate` | T0 ✅ | `terraform validate` | Auto-execute |
+| `/tfauth` | T0 ✅ | `terraform login` | Auth check / registry login |
+| `/tflogin` | T0 ✅ | `terraform login` | Alias for `/tfauth` |
+| `/tfplan [args]` | T0 ✅ | `terraform plan [args]` | Non-destructive preview |
+| `/tfinit [args]` | T0 ✅ | `terraform init` | No `--upgrade` |
+| `/tflint [args]` | T0 ✅ | `tflint [args]` | Terraform linter |
+| `/tfupgrade` | T2 ⚠️ | `terraform init --upgrade` | warn+confirm |
+| `/tfapply [args]` | T2 ⚠️ | `terraform apply [args]` | warn+confirm |
+| `/tfdestroy` | T3 🔴 | `terraform apply --destroy` | **HIGHEST ESCALATION — BLOCKED** |
+| `/precommit [args]` | T0 ✅ | `pre-commit run [args]` | Code quality hooks |
+
+**Tier legend:**
+- **T0** — auto-execute (non-destructive, read-only or idempotent)
+- **T1** — light confirm (unclassified subcommands via `/tf`)
+- **T2** — warn + confirm (infrastructure state mutation)
+- **T3** — BLOCKED: HIGHEST ESCALATION (destroy operations; copy printed command and run manually)
+
+### `/tf`
+
+Generic terraform router. All subcommands pass through `route_tf_command()` for AIPOLICY tier classification.
+
+```bash
+agence /tf validate
+agence /tf fmt --check
+agence /tf plan -out=tfplan
+agence /tf state list
+agence /tf apply          # T2: prompts for confirm
+agence /tf apply --destroy  # T3: BLOCKED
+```
+
+### `/tfvalidate`
+
+```bash
+agence /tfvalidate
+# → terraform validate
+```
+
+### `/tfplan`
+
+```bash
+agence /tfplan
+agence /tfplan -out=tfplan.out
+# → terraform plan [args]  (T0: non-destructive, auto-execute)
+```
+
+### `/tfinit`
+
+```bash
+agence /tfinit
+# → terraform init  (no --upgrade)
+```
+
+### `/tfauth` / `/tflogin`
+
+```bash
+agence /tfauth
+# → terraform login  (T0: auth check / Terraform Cloud login)
+```
+
+### `/tfupgrade` ⚠️
+
+```bash
+agence /tfupgrade
+# → terraform init --upgrade
+# [AIPOLICY T2] warn+confirm required
+```
+
+### `/tfapply` ⚠️
+
+```bash
+agence /tfapply
+agence /tfapply -auto-approve   # still prompts via agence
+# [AIPOLICY T2] warn+confirm required
+```
+
+### `/tfdestroy` 🔴 HIGHEST ESCALATION
+
+```bash
+agence /tfdestroy
+# [AIPOLICY T3] BLOCKED — will NOT execute.
+# Prints the exact command to run manually after reviewing /tfplan output.
+```
+
+### `/tflint`
+
+```bash
+agence /tflint
+agence /tflint --format compact
+# → tflint [args]  (T0: auto-execute; requires tflint installed)
+```
+
+### `/precommit`
+
+Runs git pre-commit hooks via the `pre-commit` tool (or falls back to `.git/hooks/pre-commit`).
+
+```bash
+agence /precommit
+agence /precommit --all-files
+# → pre-commit run [args]  (T0: auto-execute)
+```
+
+---
+
 ### `/ghpush`
 
 **Purpose**: Push changes to remote using GitHub CLI authentication.
@@ -1036,3 +1151,311 @@ agence ^init
 - [bin/agence](./agence) - Main script
 
 test commit at Wed, Mar  4, 2026  7:23:14 PM
+
+---
+
+## Agence Command Grammar (EBNF)
+
+A robust, extensible grammar for all Agence task, routing, and metadata constructs:
+
+```
+<command>      ::= <task_expr> { ";" <task_expr> }
+<task_expr>    ::= [<priority>] <repo> ":" <task> { ":" <metadata> } [<dependency>]
+<priority>     ::= "*" | "**" | "***"
+<repo>         ::= <identifier>
+<task>         ::= <identifier>
+<metadata>     ::= <key> "=" <value>
+<key>          ::= "agent" | "sec" | "org" | "shard" | "team" | "token_cost" | ...
+<value>        ::= <identifier> | <string>
+<dependency>   ::= "^" <task_expr> | ";" <task_expr>
+<identifier>   ::= (letter | digit | "_" | "-")+ 
+<string>       ::= '"' { any character except '"' } '"'
+```
+
+- Prefixes: `*`, `**`, `***` for priority; `$`, `~`, `%`, `&`, `_`, `#`, `+`, `-`, `!`, `?` for state (see canonical table).
+- Routing: `@` is the universal routing prefix for agent, org, team, repo, security, etc. (see canonical table).
+- Multiple tasks can be chained with `;`.
+- Metadata is extensible: any key-value pair separated by `:`.
+- Dependencies: `^` for hard, `;` for soft.
+
+This grammar ensures all Agence commands and task expressions are robust, extensible, and easy to parse. All routing and state prefixes must match the canonical definitions in codex/agents/ROUTING.md.
+
+---
+
+## Knowledge Management Commands (v0.2.3.2+)
+
+**Unified command family for managing team and personal knowledge across scopes.**
+
+These commands provide access to knowledge stored in different scopes (HERMETIC, NEXUS, SYNTHETIC, ORGANIC), with implicit routing and consistent interfaces.
+
+### Scope Model
+
+| Scope | Command | Visibility | Git | Use Case |
+|-------|---------|-----------|-----|----------|
+| **HERMETIC** | `^todo` | Personal | ❌ | Personal task lists |
+| **NEXUS** | `^log`, `^fault` | Local | ❌ | Operational logs, incidents |
+| **SYNTHETIC** | `^lesson`, `^plan`, `^issue` | Team | ✅ | Shared knowledge, strategy |
+| **ORGANIC** | `^task`, `^job` | Team | ✅ | Assigned work (human/agent) |
+
+### `agence ^lesson [list|show|add]`
+
+**Scope**: SYNTHETIC (team-shared)  
+**Storage**: `synthetic/@ORG/lessons/`
+
+Manage lessons learned (extracted from faults, best practices).
+
+**Usage**:
+```bash
+agence ^lesson list                          # List all lessons
+agence ^lesson list --org acme.tld           # List org-specific lessons
+agence ^lesson show "Never auto-heal paths"  # Show specific lesson
+agence ^lesson add "New learning title"      # Create lesson entry
+```
+
+**Entry format** (Markdown):
+```markdown
+# Lesson Title
+
+**Created**: 2026-03-31T14:30:00Z  
+**ID**: 1743595200_never  
+**Extracted from**: fault-catastrophic-failure.md
+
+## Problem
+
+Brief description of what we learned.
+
+## Impact
+
+How this affects future decisions.
+```
+
+---
+
+### `agence ^log [list|show|add]`
+
+**Scope**: NEXUS (local operational)  
+**Storage**: `nexus/logs/`
+
+Operational logs, timeline records, system events.
+
+**Usage**:
+```bash
+agence ^log list                      # List all logs
+agence ^log show session-001          # Show specific log
+agence ^log add "Manual event entry"  # Record event
+agence ^log list --filter=agent       # Filter by agent
+agence ^log list --filter=timeline    # Sort by timeline
+```
+
+---
+
+### `agence ^plan [list|show|add]`
+
+**Scope**: SYNTHETIC (team-shared)  
+**Storage**: `synthetic/@ORG/plans/`
+
+Strategic plans, roadmaps, phase definitions.
+
+**Usage**:
+```bash
+agence ^plan list                     # List all plans
+agence ^plan list --org l-agence.org  # List for specific org
+agence ^plan show "v0.3.0 roadmap"    # Show plan details
+agence ^plan add "Phase 4: Orchestrator"  # Create plan
+```
+
+---
+
+### `agence ^todo [list|show|add]`
+
+**Scope**: HERMETIC (local personal)  
+**Storage**: `hermetic/@/todos/`
+
+Personal task lists (NEVER committed to git).
+
+**Usage**:
+```bash
+agence ^todo list              # My personal todos
+agence ^todo show "path-validation"  # Show todo
+agence ^todo add "Document LAWS.md"  # Create todo
+```
+
+**Notes**:
+- Always local (not shared, never upstream)
+- User-specific, not org-routed
+- Ideal for daily work tracking
+
+---
+
+### `agence ^fault [list|show]`
+
+**Scope**: NEXUS (local, sensitive)  
+**Storage**: `nexus/faults/`
+
+Incident records and failure analysis (NEVER shared raw—sanitize first).
+
+**Usage**:
+```bash
+agence ^fault list                # Show all faults
+agence ^fault show "2026-03-06-catastrophic-failure"  # Examine fault
+agence ^fault list --sanitize     # Flags: extract as lesson first
+```
+
+**Important**: 
+- Faults contain sensitive data (secrets, stack traces, user context)
+- Do NOT commit to synthetic unless sanitized as ^lesson
+- Use `^fault ... --sanitize` to extract learnings safely
+
+---
+
+### `agence ^issue [list|show|add]`
+
+**Scope**: SYNTHETIC (team-shared)  
+**Storage**: `synthetic/@ORG/issues/`
+
+Team discoveries, bugs, design questions (discoverable by team).
+
+**Usage**:
+```bash
+agence ^issue list              # List all issues
+agence ^issue show "path-normalization-gotchas"  # Show issue
+agence ^issue add "Git Bash symlink behavior"    # File issue
+```
+
+**Difference from task**:
+- Issues = discoveries, problems, questions (start of workflow)
+- Tasks = assignments, work items (explicit allocation to human/agent)
+
+---
+
+### `agence ^task [list|show|add]`
+
+**Scope**: ORGANIC (team-assigned)  
+**Storage**: `organic/tasks/`
+
+Team task assignments (human or agent executable).
+
+**Usage**:
+```bash
+agence ^task list                      # List all tasks
+agence ^task list --org acme.tld       # Org-specific tasks
+agence ^task show "implement-matrix-math"  # Show task details
+agence ^task add "New feature" --assign @ralph  # Assign to agent ralph
+agence ^task add "Review PR" --assign @steff    # Assign to human steff
+```
+
+**Task format**:
+```json
+{
+  "id": "task-001",
+  "title": "Implement matrix-math.ts",
+  "priority": "***",
+  "complexity": "large",
+  "assigned_to": "@ralph",
+  "assigned_type": "agent",
+  "status": "+",
+  "created": "2026-03-31T14:30:00Z"
+}
+```
+
+---
+
+### `agence ^job [list|show|add]`
+
+**Scope**: ORGANIC (team-assigned)  
+**Storage**: `organic/jobs/`
+
+Robot/agent job assignments (automated execution only).
+
+**Usage**:
+```bash
+agence ^job list                # List all jobs
+agence ^job show ralph          # Jobs assigned to ralph agent
+agence ^job add "Refactor lib" --agent @ralph  # Create agent job
+```
+
+**Difference from task**:
+- Jobs = executable only by agents (robot work)
+- Tasks = can be human or agent (flexible assignment)
+
+---
+
+## Command Router Routing (Implicit Via @org)
+
+All knowledge commands support optional `--org ORG` flag:
+
+```bash
+agence ^lesson list                    # Default: l-agence.org
+agence ^lesson list --org acme.tld     # Specific org subdirectory
+agence ^plan add "Roadmap" --org ops   # Creates: synthetic/@ops/plans/
+```
+
+If `--org` is omitted:
+- Defaults to `l-agence.org` (SYNTHETIC/ORGANIC)
+- For HERMETIC/NEXUS, org flag is ignored (scope-based only)
+
+---
+
+## Knowledge Entry Format
+
+All entries follow a unified pattern:
+
+**Markdown** (default):
+```
+# Entry Title
+
+**Created**: YYYY-MM-DDTHH:MM:SSZ  
+**ID**: {timestamp}_{short_title}  
+**Metadata**: key=value pairs
+
+## Summary
+
+Content here.
+```
+
+**JSON** (optional, for structured data):
+```json
+{
+  "id": "entry-001",
+  "title": "Entry Title",
+  "scope": "SYNTHETIC",
+  "org": "l-agence.org",
+  "created": "2026-03-31T14:30:00Z",
+  "content": "..."
+}
+```
+
+---
+
+## Workflow Example
+
+**Scenario**: Extract learning from a faults, publish to team
+
+```bash
+# 1. Review fault (stays local)
+agence ^fault show "catastrophic-failure"
+
+# 2. Extract lesson (publish to team)
+agence ^lesson add "Never auto-heal paths" --org l-agence.org
+
+# 3. Plan fix (add to roadmap)
+agence ^plan add "Path validation hardening (v0.2.3.1)"
+
+# 4. Assign work (create tasks)
+agence ^task add "Implement realpath() validation" --assign @ralph
+agence ^task add "Update LAWS.md" --assign @steff
+
+# 5. Verify (all published, team can see)
+agence ^lesson list
+agence ^plan list
+agence ^task list
+```
+
+---
+
+## See Also
+
+- [TAXONOMY.md](../codex/TAXONOMY.md) - Scope definitions (HERMETIC, NEXUS, SYNTHETIC, ORGANIC)
+- [SYMBOLS.md](../synthetic/l-agence.org/docs/SYMBOLS.md) - State prefixes (+, &, %, -, ~, $)
+- [LAWS.md](../codex/LAWS.md) - Scope & privacy constraints (Law 7: Scope Boundaries)
+- [bin/agence ^session](./agence) - Session management (complementary)

@@ -1,0 +1,294 @@
+#!/usr/bin/env bash
+
+################################################################################
+# SWARM - Synchronic Work Agentic Resource Manager (v1.2)
+# Author: Stephane Korning 2026
+# Purpose: Multi-agent, multi-repo, matrix-driven orchestration of tasks, workflows, projects
+# Adds context/agent/knowledge routing, modular CLI, per-task files, knowledge ops, dependency resolution
+# Requires: bash, jq, awk
+################################################################################
+
+
+# ---------- Context / Routing ----------
+resolve_context() {
+  local synthetic_dir="$AI_ROOT/synthetic"
+  local link="$synthetic_dir/@"
+  local default_context="l-agence.org"
+  if [ -L "$link" ]; then
+    local ctx
+    ctx=$(readlink "$link")
+    while [ -L "$synthetic_dir/$ctx" ]; do
+      ctx=$(readlink "$synthetic_dir/$ctx")
+    done
+    echo "$ctx"
+  else
+    echo "$default_context"
+  fi
+}
+
+resolve_agent() {
+  local agent_link="$AI_ROOT/agents/@"
+  local default_agent="@copilot"
+  if [ -L "$agent_link" ]; then
+    readlink "$agent_link"
+  else
+    echo "$default_agent"
+  fi
+}
+
+resolve_sec_label() {
+  echo "${1:-internal}"
+}
+
+# ---------- Paths ----------
+context_path() {
+  local type="$1"
+  echo "$AI_ROOT/synthetic/$(resolve_context)/$type"
+}
+
+agent_path() {
+  local type="$1"
+  echo "$(context_path $type)/$(resolve_agent)"
+}
+
+sec_path() {
+  local type="$1"
+  local sec_label
+  sec_label=$(resolve_sec_label "$2")
+  echo "$(context_path $type)/$sec_label"
+}
+
+# ---------- Task Operations ----------
+add_task() {
+  local task_json="$1"
+  local task_dir
+  task_dir=$(context_path "tasks")
+  mkdir -p "$task_dir"
+  local id
+  id=$(jq -r '.task_id' <<< "$task_json")
+  echo "$task_json" > "$task_dir/$id.json"
+}
+
+list_tasks() {
+  local task_dir
+  task_dir=$(context_path "tasks")
+  jq -s '.' "$task_dir"/*.json 2>/dev/null
+}
+
+update_task_status() {
+  local task_id="$1"
+  local status="$2"
+  local task_file
+  task_file="$(context_path "tasks")/$task_id.json"
+  if [ -f "$task_file" ]; then
+    jq --arg s "$status" '.status=$s' "$task_file" > "$task_file.tmp" && mv "$task_file.tmp" "$task_file"
+  fi
+}
+
+# ---------- DAG / Dependency Handling ----------
+resolve_dependencies() {
+  local task_file="$1"
+  jq -r '
+    .dependencies // [] |
+    map(
+      if startswith("^") then {type:"hard",task:.[1:]} 
+      elif startswith(";") then {type:"soft",task:.[1:]} 
+      else {type:"soft",task:.} end
+    )
+  ' "$task_file"
+}
+
+# ---------- Knowledge Operations ----------
+commit_hermetic() {
+  local type="$1"
+  local obj_file="$2"
+  local dest
+  dest=$(context_path "$type")
+  mkdir -p "$dest"
+  cp "$obj_file" "$dest/"
+}
+
+share_synthetic() {
+  local type="$1"
+  local obj_file="$2"
+  local sec_label="${3:-internal}"
+  local dest
+  dest=$(sec_path "$type" "$sec_label")
+  mkdir -p "$dest"
+  cp "$obj_file" "$dest/"
+}
+
+# ---------- Job Execution ----------
+run_task() {
+  local task_id="$1"
+  local task_file
+  task_file="$(context_path "tasks")/$task_id.json"
+  if [ ! -f "$task_file" ]; then echo "Task $task_id not found"; return 1; fi
+  local status
+  status=$(jq -r '.status' "$task_file")
+  # Handle human override / pause / agent run
+  case "$status" in
+    "~"* | "$"* )
+      echo "Human assigned task $task_id ready for execution"
+      ;;
+    "%"* | "&"* )
+      echo "Agent assigned task $task_id executing"
+      ;;
+    "_"* | "#"* )
+      echo "Task $task_id is paused/held, skipping execution"
+      return 0
+      ;;
+    * )
+      echo "Unknown task status $status"
+      return 1
+      ;;
+  esac
+  # simulate execution (extend for real command)
+  echo "Executing task $task_id ..."
+  sleep 1
+  update_task_status "$task_id" "-$task_id"  # mark completed
+}
+
+# ---------- Matrix / Progress ----------
+compute_progress() {
+  local workflow_file="$1"
+  awk -f "$AI_BIN/matrix.awk" "$workflow_file"
+}
+
+# ---------- CLI Command Parsing ----------
+usage() {
+  cat <<EOF
+Usage: swarm <command> [args]
+Commands:
+  add-task '<JSON>'           Add a task
+  list-tasks                  List all tasks
+  update-task <id> <status>  Update task status
+  run-task <id>               Execute a task (human/agent)
+  commit-hermetic <type> <file>
+  share-synthetic <type> <file> [sec_label]
+  compute-progress <workflow_file>
+EOF
+}
+
+if [ $# -lt 1 ]; then
+  usage
+  exit 1
+fi
+
+cmd="$1"; shift
+case "$cmd" in
+  add-task) add_task "$1" ;;
+  list-tasks) list_tasks ;;
+  update-task) update_task_status "$1" "$2" ;;
+  run-task) run_task "$1" ;;
+  commit-hermetic) commit_hermetic "$1" "$2" ;;
+  share-synthetic) share_synthetic "$1" "$2" "$3" ;;
+  compute-progress) compute_progress "$1" ;;
+  *) usage ;;
+esac
+
+# ------------------------------
+# 1️⃣ Compute TASKS Numeric Scores
+# ------------------------------
+jq 'map(
+  .score = (.blocking*5 + .stars*10 - .fail*10)
+)' "$TASK_JSON" > "$SCORED_JSON"
+
+# ------------------------------
+# 2️⃣ DAG-aware Runnable Tasks Filtering
+# ------------------------------
+
+# Function to check if dependencies are done
+check_deps() {
+  task_id=$1
+  deps=$(jq -r --arg id "$task_id" '.[] | select(.id==$id) | .deps[]?' "$SCORED_JSON")
+  for d in $deps; do
+    state=$(jq -r --arg id "$d" '.[] | select(.id==$id) | .state' "$SCORED_JSON")
+    if [[ "$state" != "-" ]]; then
+      return 1 # dependency not complete
+    fi
+  done
+  return 0
+}
+
+# Filter tasks based on state and dependency completion
+jq -c '.[]' "$SCORED_JSON" | while read task; do
+  id=$(echo "$task" | jq -r '.id')
+  state=$(echo "$task" | jq -r '.state')
+  if [[ "$state" =~ ^[+%&$~] ]]; then
+    check_deps "$id"
+    if [[ $? -eq 0 ]]; then
+      echo "$task"
+    fi
+  fi
+done > "$RUNNABLE_JSON"
+
+# ------------------------------
+# 3️⃣ Define WORKFLOWS
+# ------------------------------
+declare -A WORKFLOWS
+# Example workflows - adjust as needed
+WORKFLOWS["WF1_build_deploy"]="repo:init repo:build repo:test repo:lint repo:deploy repo:fix"
+WORKFLOWS["WF2_auth"]="repo:auth:saml repo:auth"
+
+# Compute workflow scores & completion %
+WORKFLOW_ARRAY=()
+for wf in "${!WORKFLOWS[@]}"; do
+  tasks=(${WORKFLOWS[$wf]})
+  sum=0
+  completed=0
+  total=0
+  for t in "${tasks[@]}"; do
+    score=$(jq --arg id "$t" '.[] | select(.id==$id) | .score' "$SCORED_JSON")
+    state=$(jq -r --arg id "$t" '.[] | select(.id==$id) | .state' "$SCORED_JSON")
+    sum=$((sum + score))
+    ((total++))
+    if [[ "$state" == "-" ]]; then ((completed++)); fi
+  done
+  pct=$(( (completed*100)/total ))
+  WORKFLOW_ARRAY+=("{\"workflow_id\":\"$wf\",\"score\":$sum,\"completion_pct\":$pct}")
+done
+printf '[%s]\n' "$(IFS=, ; echo "${WORKFLOW_ARRAY[*]}")" > "$WORKFLOW_JSON"
+
+# ------------------------------
+# 4️⃣ Define PROJECTS
+# ------------------------------
+declare -A PROJECTS
+# Example projects - adjust as needed
+PROJECTS["PROJ1"]="WF1_build_deploy WF2_auth"
+
+PROJECT_ARRAY=()
+for proj in "${!PROJECTS[@]}"; do
+  workflows=(${PROJECTS[$proj]})
+  sum=0
+  total=0
+  for wf in "${workflows[@]}"; do
+    wf_score=$(jq --arg wf "$wf" '.[] | select(.workflow_id==$wf) | .score' "$WORKFLOW_JSON")
+    sum=$((sum + wf_score))
+    ((total++))
+  done
+  pct=$(( (sum*100)/ (total*100) )) # normalize if needed
+  PROJECT_ARRAY+=("{\"project_id\":\"$proj\",\"score\":$sum,\"completion_pct\":$pct}")
+done
+printf '[%s]\n' "$(IFS=, ; echo "${PROJECT_ARRAY[*]}")" > "$PROJECT_JSON"
+
+# ------------------------------
+# 5️⃣ Output Summary
+# ------------------------------
+echo "✅ TASKS scored and filtered:"
+jq '.[] | {id,state,score,owner}' "$SCORED_JSON"
+
+echo
+echo "✅ Runnable tasks:"
+jq '.[] | {id,state,score,owner}' "$RUNNABLE_JSON"
+
+echo
+echo "✅ Workflows:"
+jq '.[] | {workflow_id,score,completion_pct}' "$WORKFLOW_JSON"
+
+echo
+echo "✅ Projects:"
+jq '.[] | {project_id,score,completion_pct}' "$PROJECT_JSON"
+
+echo
+echo "✅ SWARM Pipeline Complete!"

@@ -11,6 +11,8 @@ DATE       | @AGENT          | HEX-ID   | FORMTAG        | SEVERITY | LESSON
 2026-03-05 | @peers          | b4e8f1a3 | shell-compat   | high     | Bash history expansion (!) conflicts with agence ! prefix
 2026-03-05 | @peers          | c2d9e5f7 | architecture   | medium   | Weighted expertise scoring > simple majority voting
 2026-03-05 | @agence         | d7a3c8b1 | process        | high     | ADHD scope creep safeguards: hard stops prevent hyperflow
+2026-03-29 | @pilot          | e1c4a9f2 | competitive-intelligence | high | Agence vs AutoGen/CrewAI/MetaGPT/LangGraph/OpenHands/Cursor/Copilot — unique strengths, gap analysis, verdict
+2026-03-31 | @haiku          | f3d2a8e5 | security       | critical | Catastrophic failure root cause: auto-healing in security layer = sandbox escape; fix: realpath() validation, no junction creation, WSL-Ubuntu shell standardization
 ```
 
 ---

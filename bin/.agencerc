@@ -46,6 +46,25 @@ detect_shell() {
 
 CURRENT_SHELL=$(detect_shell)
 
+# ============================================================================
+# STEP 1b: LLM Provider Configuration
+# ============================================================================
+# Default provider cascade (can be overridden per-session):
+#   pilot    = GitHub Copilot CLI (gh copilot) — default if gh installed
+#   claude   = Anthropic Claude (requires ANTHROPIC_API_KEY)
+#   openai   = OpenAI GPT (requires OPENAI_API_KEY)
+#   ollama   = Local Ollama (requires ollama running on localhost)
+#   none     = Offline/CI mode (no LLM calls)
+#
+# Uncomment ONE of the following to set an explicit default:
+# export AGENCE_DEFAULT_PROVIDER="pilot"    # gh copilot (shell-callable)
+# export AGENCE_DEFAULT_PROVIDER="claude"   # Anthropic Claude
+# export AGENCE_DEFAULT_PROVIDER="openai"   # OpenAI GPT
+# export AGENCE_DEFAULT_PROVIDER="ollama"   # Local Ollama
+#
+# Auto-detection is used when AGENCE_DEFAULT_PROVIDER is unset.
+# Priority: pilot → claude → openai → ollama → none
+
 # Disable bash history expansion — agence uses ! as a command prefix
 # This prevents !bash from expanding to the last command starting with "bash"
 set +H

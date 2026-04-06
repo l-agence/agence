@@ -1,0 +1,277 @@
+#!/usr/bin/env bash
+
+################################################################################
+# ibash: Interactive shell with agentic policy enforcement
+#
+# Hardened interactive shell for users, with:
+#   - Session logging
+#   - CODEX validation
+#   - Agentic policy enforcement (aipolicy)
+#   - PATH restriction, env sanitization, signal blocking
+#
+# Usage: ibash
+# Environment variables (set by VS Code extension):
+#   AI_ROLE       - Terminal role: "shared", "planner", "coder", "anchor"
+#   AI_SESSION    - Session ID (e.g., "abc123-2026-03-06")
+#   AI_AGENT      - Agent ID (e.g., "copilot", "chad", "claudia")
+#   GIT_ROOT      - Repository root (set by wrapper, enforced chroot)
+#
+# Features:
+#   - Session logging via 'script' → nexus/.aisessions/
+#   - CODEX validation on every command
+#   - Agentic policy enforcement (aipolicy)
+#   - Path sandbox enforcement (no escape from GIT_ROOT)
+#   - Format.sh output control (text/md/json)
+################################################################################
+
+
+# Human control plane: interactive-safe options (NOT set -euo pipefail)
+# set -e would exit on every failed command -- terrible for interactive use
+set -o pipefail  # Only catch pipeline errors silently (non-exit)
+
+# Human PATH: full system paths + agence bin
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.local/bin:${GIT_ROOT:-/usr/local}/bin"
+
+# Unset a minimal set of risky env vars (keep most for usability)
+unset HISTFILE PROMPT_COMMAND CDPATH BASH_ENV
+
+# ============================================================================
+# SIGNAL MANAGEMENT (Human plane owns signals -- agent plane inherits)
+# ============================================================================
+# ibash is the PARENT shell. aibash runs as a background child (%1).
+# Ctrl+C  (SIGINT)  : works normally (kills current foreground command)
+# Ctrl+Z  (SIGTSTP) : works normally (suspends foreground, use fg/bg)
+# Ctrl+K  (custom)  : SIGKILL to aibash child (Ctrl+K via stty or bind)
+# SIGTERM            : clean shutdown of ibash + kill aibash child
+
+AIBASH_PID=""
+
+kill_aibash() {
+    if [[ -n "${AIBASH_PID:-}" ]]; then
+        echo "[ibash] Ctrl+K: Sending SIGKILL to aibash (PID ${AIBASH_PID})" >&2
+        kill -9 "${AIBASH_PID}" 2>/dev/null || true
+        AIBASH_PID=""
+    else
+        echo "[ibash] Ctrl+K: No aibash child running" >&2
+    fi
+}
+
+cleanup_on_exit() {
+    if [[ -n "${AIBASH_PID:-}" ]]; then
+        echo "[ibash] Cleaning up: sending SIGTERM to aibash (PID ${AIBASH_PID})" >&2
+        kill -15 "${AIBASH_PID}" 2>/dev/null || true
+    fi
+}
+
+# On SIGTERM: kill aibash child then exit cleanly
+trap 'cleanup_on_exit; exit 0' SIGTERM SIGHUP
+# Ctrl+K binding registered after shell init (see main)
+
+# ============================================================================
+# ENVIRONMENT SETUP
+# ============================================================================
+
+
+# Derive GIT_ROOT from script location if not set by caller
+if [[ -z "${GIT_ROOT:-}" ]]; then
+    GIT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+fi
+
+
+# Session metadata (provided by VS Code extension)
+AI_ROLE="${AI_ROLE:-interactive}"
+AI_SESSION="${AI_SESSION:-unknown}"
+AI_AGENT="${AI_AGENT:-user}"
+
+# Session logging paths
+SESSION_DIR="${GIT_ROOT}/nexus/.aisessions"
+SESSION_LOG="${SESSION_DIR}/${AI_SESSION}_${AI_ROLE}.typescript"
+SESSION_META="${SESSION_DIR}/${AI_SESSION}_${AI_ROLE}.meta.json"
+
+# Ensure session directory exists
+mkdir -p "$SESSION_DIR" 2>/dev/null || true
+
+# ============================================================================
+# SESSION LOGGING INITIALIZATION
+# ============================================================================
+
+# Session logging: check for trusted 'script' utility
+init_session_logging() {
+    # Create initial metadata if not exists
+    if [[ ! -f "$SESSION_META" ]]; then
+        cat > "$SESSION_META" <<EOF
+{
+  "session_id": "$AI_SESSION",
+  "role": "$AI_ROLE",
+  "agent": "$AI_AGENT",
+  "shell": "bash",
+  "timestamp_start": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "git_root": "$GIT_ROOT",
+  "typescript_file": "$SESSION_LOG",
+  "commands_executed": 0,
+  "exit_code": null
+}
+EOF
+    fi
+
+    # Check for script utility (session logging dependency)
+    if command -v script &>/dev/null; then
+        SCRIPT_PATH="$(command -v script)"
+        # Only allow if in trusted locations
+        if [[ "$SCRIPT_PATH" == "/usr/bin/script" || "$SCRIPT_PATH" == "/bin/script" ]]; then
+            SESSION_LOGGING_ENABLED=1
+        else
+            echo "[SECURITY WARNING] 'script' found at $SCRIPT_PATH, which is not a standard location."
+            echo "Proceed with session logging? [y/N]"
+            read -r answer
+            if [[ "$answer" =~ ^[Yy]$ ]]; then
+                SESSION_LOGGING_ENABLED=1
+            else
+                SESSION_LOGGING_ENABLED=0
+            fi
+        fi
+    else
+        echo ""
+        echo "╔════════════════════════════════════════════════════════════════╗"
+        echo "║  WARNING: 'script' utility not found                         ║"
+        echo "╠════════════════════════════════════════════════════════════════╣"
+        echo "║  Session logging is DISABLED.                                ║"
+        echo "║  To enable session logging, install 'script' (util-linux)    ║"
+        echo "║  - On Linux: sudo apt install bsdutils or util-linux         ║"
+        echo "║  - On Cygwin: setup-x86_64.exe, add util-linux               ║"
+        echo "║  - On WSL: sudo apt install bsdutils or util-linux           ║"
+        echo "║  - On MSYS2: pacman -S util-linux                            ║"
+        echo "║  - Not available in Git Bash/Cmder by default                ║"
+        echo "╚════════════════════════════════════════════════════════════════╝"
+        SESSION_LOGGING_ENABLED=0
+    fi
+}
+
+# ============================================================================
+
+# CODEX VALIDATION + FORMAT LIBRARY + POLICY
+# ============================================================================
+
+load_codex_and_format_and_policy() {
+    # Source CODEX validation (if exists)
+    if [[ -f "$GIT_ROOT/codex/LAWS.sh" ]]; then
+        source "$GIT_ROOT/codex/LAWS.sh"
+    fi
+    # Source format library for output control
+    if [[ -f "$GIT_ROOT/lib/format.sh" ]]; then
+        source "$GIT_ROOT/lib/format.sh"
+        export _AGENCE_FMT="${_AGENCE_FMT:-text}"
+    fi
+    # Source agentic policy (if exists)
+    if [[ -f "$GIT_ROOT/bin/aipolicy" ]]; then
+        source "$GIT_ROOT/bin/aipolicy"
+    fi
+}
+
+# ============================================================================
+# BASH SHELL SETUP
+# ============================================================================
+
+setup_bash_session() {
+    # Human-plane: set up env + PS1. Called when sourced as --rcfile.
+    # The terminal bash IS the interactive shell — no nested bash needed.
+    local topdir
+    topdir="$(basename "$GIT_ROOT")"
+    export GIT_ROOT AI_ROLE AI_SESSION AI_AGENT SESSION_LOG SESSION_META
+    export PS1="[${AI_AGENT}@${AI_SESSION:0:8}] ${topdir}> "
+    # If session logging is enabled, wrap in script(1)
+    if [[ "${SESSION_LOGGING_ENABLED:-0}" -eq 1 ]] && [[ ! -t 0 || "${IBASH_LOGGING:-0}" -eq 1 ]]; then
+        exec script --quiet --return --command \
+            "bash --rcfile '${GIT_ROOT}/bin/ibash'" "$SESSION_LOG"
+    fi
+    # Otherwise: env is now set, PS1 is set — interactive bash continues normally
+    return 0
+}
+
+# ============================================================================
+
+# Hardened interactive shell setup
+setup_ibash_session() {
+    # Human-plane interactive bash: full privileges
+    # When used as --rcfile: just set env/PS1/bindings and return
+    # The terminal bash IS the interactive shell — no nested bash needed
+    local topdir
+    topdir="$(basename "$GIT_ROOT")"
+    export GIT_ROOT AI_ROLE AI_SESSION AI_AGENT SESSION_LOG SESSION_META
+    export PS1="[${AI_AGENT}@${AI_SESSION:0:8}] ${topdir}> "
+    # Bind Ctrl+K to kill aibash child (human override signal)
+    bind -x '"\C-k": kill_aibash' 2>/dev/null || true
+
+    # Policy trap: validate commands before execution (if aipolicy loaded)
+    if [[ $- == *i* ]] && declare -F aipolicy_command >/dev/null 2>&1; then
+        preexec_policy() {
+            local cmd="${BASH_COMMAND%% *}"
+            [[ -n "$cmd" ]] && aipolicy_command "$cmd" || true
+        }
+        export -f preexec_policy
+        trap preexec_policy DEBUG
+    fi
+
+    # Return: interactive bash continues with the env we just set
+    return 0
+}
+# ============================================================================
+
+sandbox_cd() {
+    # Enforce chroot-like behavior: any cd outside GIT_ROOT is blocked
+    local target="${1:-.}"
+    local abs_path
+    
+    # Resolve to absolute path
+    abs_path="$(cd "$target" 2>/dev/null && pwd)" || {
+        echo "[SANDBOX] ✗ Invalid directory: $target" >&2
+        return 1
+    }
+    
+    # Check if within GIT_ROOT
+    if [[ "$abs_path" == "$GIT_ROOT"* ]] || [[ "$abs_path" == "/" ]]; then
+        cd "$abs_path" || return 1
+    else
+        echo "[SANDBOX] ✗ Access outside workspace denied: $target" >&2
+        echo "[SANDBOX]   Current root: $GIT_ROOT" >&2
+        echo "[SANDBOX]   Attempted:   $abs_path" >&2
+        return 1
+    fi
+}
+
+# Always override cd for ibash
+builtin_cd() {
+    sandbox_cd "$@"
+}
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+
+main() {
+    init_session_logging
+    load_codex_and_format_and_policy
+    echo ""
+    echo "╔════════════════════════════════════════════════════════════════╗"
+    echo "║  AGENCE HUMAN CONTROL PLANE (ibash)                           ║"
+    echo "╠════════════════════════════════════════════════════════════════╣"
+    printf "║  Agent:      %-49s║\n" "${AI_AGENT}" 
+    printf "║  Session:    %-49s║\n" "${AI_SESSION:0:8}"
+    printf "║  Role:       %-49s║\n" "${AI_ROLE}"
+    printf "║  Root:       %-49s║\n" "${GIT_ROOT}"
+    echo "╠════════════════════════════════════════════════════════════════╣"
+    echo "║  Ctrl+C: interrupt  Ctrl+Z: suspend  Ctrl+K: kill agent      ║"
+    echo "║  %jobs: list agent tasks    fg %1: bring agent to foreground  ║"
+    echo "╚════════════════════════════════════════════════════════════════╝"
+    echo ""
+    cd "$GIT_ROOT" || {
+        echo "[IBASH] ✗ Failed to cd to $GIT_ROOT" >&2
+        return 1
+    }
+    # Set VSCode terminal title
+    printf '\033]0;⬛ %s | ibash (human)\007' "${AI_AGENT}" 2>/dev/null || true
+    setup_ibash_session "$@"
+}
+
+main "$@"

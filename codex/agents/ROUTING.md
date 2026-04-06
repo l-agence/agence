@@ -1,183 +1,184 @@
-# Agence Agent Routing
+# Agence Model Routing Reference  (v0.3.0)
 
-Dynamic agent and LLM model routing for Agence.
-
-## Overview
-
-Agence supports three routing levels:
-
-1. **Agent Personas** (@agent_name): Pre-tuned system prompts + model + personality
-2. **Direct Model References** (@model_name): Use a specific LLM model
-3. **Default Fallback**: Via symlink `@` or auto-select current model
-
-## Syntax
-
-```bash
-# Agent persona (lowest token overhead)
-agence @claudia "Design a monitoring strategy"
-
-# Direct model reference
-agence @opus4.5 "Explain this error"
-agence @gpt-4o "Review this code"
-
-# Default (uses @ symlink or fallback)
-agence "What should I do here?"
-```
-
-## Agent Directory Structure
-
-```
-.agence/codex/agents/
-├── @                          ← Symlink to default agent (optional)
-├── aider/
-│   └── agent.md              ← Aider persona (tool-based, offline)
-├── chad/
-│   └── agent.md              ← Chad persona (DevOps, rude, Cockney)
-├── claudia/
-│   └── agent.md              ← Claudia persona (SRE architect, elegant)
-├── aiko/
-│   └── agent.md              ← Aiko persona (Cloud architect, gamer)
-├── olena/
-│   └── agent.md              ← (TBD) Custom persona
-├── pilot/
-│   └── agent.md              ← (TBD) Autonomous execution
-├── ralph/
-│   └── agent.md              ← Ralph persona (Learning + reliability harness)
-├── sonia/
-│   └── agent.md              ← (TBD) Custom persona
-└── ROUTING.md                 ← This file
-```
-
-## Agent Metadata
-
-Each `agent.md` contains:
-- **Identity**: Who this agent is
-- **Model Routing**: Which LLM + provider + params + **flavor_intensity (0-10)**
-- **System Prompt**: Minimal, token-efficient prompt
-- **Behavior**: How the agent operates (interactive, batch, tool-based)
-- **Personality**: Flavor profile
-- **Token Cost**: Estimated overhead
-
-### Flavor Intensity (0-10 Scale)
-
-**flavor_intensity** controls personality injection without token bloat:
-
-```
-0   = Pure technical (no personality)
-2-3 = Subtle hints (professional)
-5   = Balanced default
-6-8 = Strong personality (recommended for learning)
-10  = Maximum flavor (chaotic, fun)
-```
-
-**Per-agent defaults:**
-- **Aider**: 0 (tool-based, no personality needed)
-- **Claudia**: 2 (professional mentor, subtle)
-- **Chad**: 5 (Cockney humor balanced with utility)
-- **Aiko**: 6 (gamer refs enhance learning)
-
-**User can override:**
-```bash
-agence @chad --flavor=2 "Prod config review"      # Toned down
-agence @aiko --flavor=9 "Design my app"          # Full personality
-```
-
-## Model Aliases
-
-Models can be referenced by:
-
-### Anthropic Claude
-```
-@claude           → claude-3-5-sonnet (default)
-@haiku            → claude-3-5-haiku
-@opus             → claude-3-opus
-@sonnet           → claude-3-5-sonnet
-```
-
-### OpenAI
-```
-@gpt-4o           → gpt-4o
-@gpt-4-turbo      → gpt-4-turbo-preview
-@gpt-4            → gpt-4
-@chatgpt          → gpt-4o (or current default)
-```
-
-### Qwen (via Ollama)
-```
-@qwen7b           → qwen:7b
-@qwen14b          → qwen:14b
-@qwen72b          → qwen:72b
-```
-
-## Routing Resolution Order
-
-When user types `agence @<name> <query>`:
-
-1. **Check if agent**: Is `./agents/<name>/agent.md` present?
-   - Yes → Load agent persona, extract model, inject system prompt
-   - No → Continue to step 2
-
-2. **Check if model alias**: Is `<name>` in model alias list?
-   - Yes → Load model config directly
-   - No → Continue to step 3
-
-3. **Check default symlink**: Does `.agence/agents/@` exist?
-   - Yes → Use default agent
-   - No → Fall through to step 4
-
-4. **Auto-select**: Use current configured model or VS Code chat default
-
-## Token Efficiency
-
-Agents optimized for minimal token overhead (cost-aligned with LLM pricing):
-
-```
-aider        ~5 tokens   (offline, tool-based)
-chad         ~10 tokens  (gpt-4o, cheapest LLM)
-aiko         ~10 tokens  (haiku, 1/3 of claudia)
-ralph        ~20 tokens  (sonnet, learning-focused)
-claudia      ~30 tokens  (opus 4.5, most detailed)
-```
-
-Compare to: Typical non-optimized persona systems = 100-300+ tokens
-
-## Example: Setting Default Agent
-
-```bash
-# Make Claudia the default agent
-cd .agence/codex/agents
-ln -s claudia/@
-
-# Now these are equivalent:
-agence @claudia "Design the architecture"
-agence "Design the architecture"           # Uses @ symlink
-```
-
-## Implementation
-
-### Router Module (`lib/router.sh`)
-Implements:
-- `router_resolve_agent <name>`  → Returns model + system_prompt
-- `router_inject_context <agent>` → Adds git/repo context
-- `router_call_llm <agent> <query>` → Execute with persona
-- `router_cache_agent <name>` → Cache parsed agent metadata
-
-### CLI Integration
-```bash
-# In bin/agence, mode_chat() calls:
-router_resolve_agent <@name>
-router_inject_context <agent>
-router_call_llm <agent> <query>
-```
-
-## Adding New Agents
-
-1. Create directory: `agents/<agent_name>/`
-2. Create `agent.md` with metadata
-3. Test: `agence @<agent_name> "test query"`
-4. Optional: symlink as default `ln -s <agent_name> @`
+> This is the canonical routing reference. See also:
+> - `lib/router.sh` — implementation
+> - `synthetic/l-agence.org/docs/SWARM.md` — swarm intelligence tiers
+> - `synthetic/l-agence.org/docs/SYMBOLS.md` — symbol/prefix table
 
 ---
 
-**Version**: 0.1.0 (alpha)
-**Last Updated**: 2026-03-04
+## Routing Layers (precedence, highest first)
+
+```
+1. AGENCE_LLM_MODEL=<model>     explicit override — always wins
+2. AGENCE_BLAST_RADIUS=<level>  code scope override (v0.5)
+3. AGENCE_ROUTER_MODE=<mode>    operational mode (query|plan|code)
+4. AGENCE_LLM_PROVIDER=<name>   provider selection
+5. Auto-detection               first configured API key wins
+```
+
+---
+
+## Operational Modes  (AGENCE_ROUTER_MODE)
+
+| Mode    | Tier    | Purpose                                    | Danger  |
+|---------|---------|------------------------------------------- |---------|
+| `query` | T0/free | General Q&A, status, quick lookups         | Minimal |
+| `plan`  | T1/cheap| Architecture, step planning, analysis      | Low     |
+| `code`  | T2/T3   | Code gen, editing, execution, tool calls   | HIGH    |
+
+**Alignment with Cline/Aider:**
+- `query` = background status / trivial chat
+- `plan`  = Cline Plan mode / Aider `--architect`
+- `code`  = Cline Act mode / Aider `--editor-model`
+
+**Usage:**
+```bash
+AGENCE_ROUTER_MODE=code  agence "write unit tests for lib/router.sh"
+AGENCE_ROUTER_MODE=plan  agence "how should we restructure the swarm?"
+AGENCE_ROUTER_MODE=query agence "what branch am I on?"
+```
+
+**Convenience wrappers (from router.sh):**
+```bash
+router_query "what is X?"    # T0 free
+router_plan  "how to do X?"  # T1 cheap
+router_code  "write X"       # T2/T3 capable
+```
+
+---
+
+## blast_radius — code mode sub-tiers  (AGENCE_BLAST_RADIUS, v0.5)
+
+Refines the `code` mode by scope of impact:
+
+| Level      | Tier   | LOC / Scope                              | Model tier       |
+|------------|--------|------------------------------------------|------------------|
+| `small`    | T0/T1  | <100 lines, standalone, no shared deps   | kwaipilot, haiku |
+| `medium`   | T1/T2  | 100–500 lines, 1–2 lib touches           | haiku, gpt-4o-mini |
+| `large`    | T2/T3  | 500–1000+ lines, shared lib, many callers| sonnet, gpt-4o   |
+| `critical` | T3/T4  | 1000+ lines, cross-repo, release commit  | opus, gpt-o1     |
+
+**Swarm integration:** `bin/swarm` cross-repo runs set `AGENCE_BLAST_RADIUS=critical` automatically.
+
+**Usage:**
+```bash
+AGENCE_BLAST_RADIUS=critical agence "commit release across all repos"
+AGENCE_BLAST_RADIUS=small    agence "write a 10-line log rotation script"
+```
+
+---
+
+## @provider.tier Routing Hint Syntax
+
+The `@<provider>.<tier>` syntax is an inline routing hint that selects
+provider + model tier in a single token:
+
+```
+@<provider>.<tier>    → AGENCE_LLM_PROVIDER=<provider> + mode model for <tier>
+@<provider>.<model>   → AGENCE_LLM_PROVIDER=<provider> + AGENCE_LLM_MODEL=<model>
+@<agent>              → route to named agent persona (see AGENTS.md)
+```
+
+### Standard tier aliases
+
+| Alias   | Maps to          | Example models                          |
+|---------|------------------|-----------------------------------------|
+| `.free` | T0 free          | kwaipilot/kat-coder, groq/llama, ollama |
+| `.plan` | T1 cheap (plan)  | haiku-3-5, gpt-4o-mini, gemini-flash    |
+| `.code` | T2/T3 (code)     | claude-sonnet-4-5, gpt-4o, codestral    |
+| `.query`| T0 (alias free)  | same as .free                           |
+
+### Provider routing hint examples
+
+| Hint              | Provider   | Route / Model                          |
+|-------------------|------------|----------------------------------------|
+| `@cline.free`     | cline      | OpenRouter → kwaipilot/kat-coder-latest|
+| `@anthropic.code` | anthropic  | claude-sonnet-4-5                      |
+| `@anthropic.plan` | anthropic  | claude-haiku-3-5                       |
+| `@mistral.code`   | mistral    | codestral-latest                       |
+| `@groq.free`      | groq       | llama-3.3-70b-versatile (free)         |
+| `@copilot.auto`   | copilot    | auto (GitHub picks)                    |
+| `@copilot.code`   | copilot    | gpt-4.1                                |
+| `@openrouter.free`| openrouter | kwaipilot/kat-coder-latest             |
+| `@ollama.free`    | ollama     | llama3.2 (local)                       |
+
+### Named model aliases
+
+| Hint              | Means                        |
+|-------------------|------------------------------|
+| `@anthropic.sonnet` | claude-sonnet-4-5           |
+| `@anthropic.haiku`  | claude-haiku-3-5            |
+| `@anthropic.opus`   | claude-opus-4-5             |
+| `@openai.mini`      | gpt-4o-mini                 |
+| `@mistral.small`    | mistral-small-latest        |
+
+---
+
+## SWARM Tier ↔ Router Mode ↔ Agent Alignment
+
+The SWARM intelligence tier system and the router mode system are unified:
+
+| SWARM Tier | Router Mode     | blast_radius  | Agent         | Default Model              |
+|------------|-----------------|---------------|---------------|----------------------------|
+| T0         | query           | —             | scripts/bash  | groq/llama, kwaipilot(free)|
+| T1         | plan            | small         | @ralph        | haiku-3-5, gemini-flash    |
+| T2         | code            | medium        | @aiko, @aider, @aish | gpt-4o-mini, haiku, aish-auto |
+| T3         | code            | large         | @chad, @copilot| sonnet-4-5, gpt-4o        |
+| T4         | code            | critical      | @claudia, @peers| opus-4-5, gpt-o1         |
+| T5         | code (secure)   | critical      | @olena        | ollama (local, air-gapped) |
+
+**Emergent property:** The swarm automatically enforces token discipline because:
+- Swarm complexity score (stars + heat + deps + critical_path) maps to tier
+- Tier maps to AGENCE_ROUTER_MODE + blast_radius
+- Mode maps to cheapest capable model for that provider
+
+---
+
+## Provider Auto-Detection Order
+
+When no provider is specified, first configured key wins:
+
+```
+1. AGENCE_LLM_PROVIDER env var
+2. ~/.agence/config.yaml  provider: field
+3. ANTHROPIC_API_KEY      → anthropic
+4. OPENAI_API_KEY         → openai
+5. AZURE_OPENAI_API_KEY   → azure
+6. GEMINI_API_KEY         → gemini
+7. MISTRAL_API_KEY        → mistral
+8. GROQ_API_KEY           → groq
+9. OPENROUTER_API_KEY     → openrouter
+10. GROK_API_KEY          → grok
+11. DASHSCOPE_API_KEY     → qwen
+12. GITHUB_TOKEN          → copilot
+13. aish.exe available    → aish  (Windows-only; skipped in WSL/Linux)
+14. Ollama running        → ollama
+15. Error
+```
+
+---
+
+## Supported Providers (v0.3.0)
+
+| Provider     | Type             | Key Var              | Default Model (code mode)    |
+|--------------|------------------|----------------------|------------------------------|
+| `anthropic`  | Direct API       | ANTHROPIC_API_KEY    | claude-sonnet-4-5            |
+| `openai`     | OAI-compat       | OPENAI_API_KEY       | gpt-4o                       |
+| `azure`      | Direct API       | AZURE_OPENAI_API_KEY | gpt-4o                       |
+| `gemini`     | Direct API       | GEMINI_API_KEY       | gemini-1.5-pro               |
+| `mistral`    | OAI-compat       | MISTRAL_API_KEY      | codestral-latest             |
+| `copilot`    | OAI-compat       | GITHUB_TOKEN         | gpt-4.1                      |
+| `grok`       | OAI-compat       | GROK_API_KEY         | grok-3-fast                  |
+| `qwen`       | OAI-compat       | DASHSCOPE_API_KEY    | qwen-max                     |
+| `groq`       | OAI-compat       | GROQ_API_KEY         | llama-3.3-70b-versatile      |
+| `openrouter` | OAI-compat       | OPENROUTER_API_KEY   | anthropic/claude-3.5-sonnet  |
+| `cline`      | Meta (OR→Anthro) | OPENROUTER_API_KEY   | kwaipilot/kat-coder-latest   |
+| `ollama`     | Direct (local)   | OLLAMA_HOST          | llama3.2                     |
+| `aish`       | Tool (Windows)   | —                    | auto (GitHub Copilot via aish) |
+
+---
+
+**Version**: 0.3.0  
+**Last Updated**: 2026-03-18  
+**Implementation**: `lib/router.sh` v0.4.0

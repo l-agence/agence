@@ -5,6 +5,10 @@
 .mysecrets/
 .aisecrets/
 nexus/.ai*/
+nexus/sessions/*.meta.json
+nexus/sessions/*.awaiting
 hermetic/
 @
+^
 .nogit
+.aider*

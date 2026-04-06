@@ -1,0 +1,227 @@
+# ~/.agence/config.yaml
+# Agence LLM Router Configuration — copy to ~/.agence/config.yaml and edit.
+#
+# All values can be overridden by environment variables (env vars always win).
+#
+# Provider auto-detection order (if 'provider' key is not set):
+#   1. AGENCE_LLM_PROVIDER env var
+#   2. This file's 'provider' field
+#   3. ANTHROPIC_API_KEY     → anthropic
+#   4. OPENAI_API_KEY        → openai
+#   5. AZURE_OPENAI_API_KEY  → azure
+#   6. GEMINI_API_KEY        → gemini
+#   7. MISTRAL_API_KEY       → mistral
+#   8. GROQ_API_KEY          → groq
+#   9. OPENROUTER_API_KEY    → openrouter
+#  10. GROK_API_KEY          → grok
+#  11. DASHSCOPE_API_KEY     → qwen
+#  12. GITHUB_TOKEN          → copilot
+#  13. Ollama running        → ollama
+
+# ── Active provider ──────────────────────────────────────────────────────────
+# Options: anthropic | openai | azure | gemini | mistral | copilot | grok | qwen | groq | openrouter | cline | ollama
+provider: anthropic
+
+# ── Active model ─────────────────────────────────────────────────────────────
+# Leave blank to use provider default (see provider defaults below).
+model: claude-sonnet-4-5
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# PROVIDER CONFIGURATIONS
+# ════════════════════════════════════════════════════════════════════════════
+
+# ── Anthropic (Claude) ───────────────────────────────────────────────────────
+# API key: set via ANTHROPIC_API_KEY env var (strongly preferred).
+# Default model: claude-sonnet-4-5
+# Models: claude-opus-4-5 | claude-sonnet-4-5 | claude-haiku-3-5
+# API docs: https://docs.anthropic.com/en/api
+#
+# anthropic_api_key: sk-ant-...     # NOT RECOMMENDED — use env var
+
+# ── OpenAI (GPT / o-series) ──────────────────────────────────────────────────
+# API key: set via OPENAI_API_KEY env var.
+# Default model: gpt-4o
+# Models: gpt-4o | gpt-4o-mini | o1 | o3-mini
+# API docs: https://platform.openai.com/docs/api-reference
+#
+# openai_api_key: sk-...            # NOT RECOMMENDED — use env var
+
+# ── Azure OpenAI ─────────────────────────────────────────────────────────────
+# Required when provider: azure
+# API key: set via AZURE_OPENAI_API_KEY env var.
+# Default model: gpt-4o
+#
+# azure_endpoint:    https://YOUR-RESOURCE.openai.azure.com
+# azure_deployment:  gpt-4o          # deployment name in Azure portal
+# azure_api_version: 2024-02-01      # API version
+
+# ── Google Gemini ─────────────────────────────────────────────────────────────
+# API key: set via GEMINI_API_KEY env var.
+# Default model: gemini-2.0-flash
+# Models: gemini-2.0-flash | gemini-2.0-flash-thinking | gemini-1.5-pro | gemini-1.5-flash
+# API docs: https://ai.google.dev/api/generate-content
+# Get key: https://aistudio.google.com/app/apikey
+#
+# gemini_api_key: AIza...            # NOT RECOMMENDED — use env var
+
+# -- Mistral AI / Codestral ---------------------------------------------------
+# API key: set via MISTRAL_API_KEY env var.
+# Default model: codestral-latest  (code-specialized)
+# Models: codestral-latest | mistral-large-latest | mistral-small-latest | open-mistral-nemo
+# Note: Codestral is purpose-built for code generation, completion, and FIM.
+# API docs: https://docs.mistral.ai/api
+# Get key:  https://console.mistral.ai/api-keys
+#
+# mistral_api_key: ...              # NOT RECOMMENDED -- use env var
+
+# ── GitHub Copilot ───────────────────────────────────────────────────────────
+# Uses your GitHub OAuth token (GITHUB_TOKEN).
+# Default model: auto  (server auto-selects; override: AGENCE_LLM_MODEL=gpt-4.1)
+# Models: auto | gpt-4.1 | gpt-4o | gpt-4o-mini | o1-mini | claude-3.5-sonnet
+# Note: Requires a GitHub Copilot subscription.
+# Env: GITHUB_TOKEN=ghp_...
+#
+# copilot model aliases are managed by GitHub — use model name from their docs.
+
+# ── xAI Grok ─────────────────────────────────────────────────────────────────
+# API key: set via GROK_API_KEY env var.
+# Default model: grok-3-mini-fast
+# Models: grok-3 | grok-3-fast | grok-3-mini | grok-3-mini-fast | grok-2-latest
+# API docs: https://docs.x.ai/api
+# Get key: https://console.x.ai/
+#
+# grok_api_key: xai-...             # NOT RECOMMENDED — use env var
+
+# ── Alibaba Qwen ──────────────────────────────────────────────────────────────
+# API key: set via DASHSCOPE_API_KEY env var.
+# Default model: qwen-plus
+# Models: qwen-max | qwen-plus | qwen-turbo | qwen2.5-coder-32b-instruct
+# API docs: https://www.alibabacloud.com/help/en/model-studio/
+# Get key: https://dashscope.console.aliyun.com/apiKey
+#
+# dashscope_api_key: sk-...         # NOT RECOMMENDED — use env var
+
+# ── Groq Cloud (fast inference) ──────────────────────────────────────────────
+# API key: set via GROQ_API_KEY env var.
+# Default model: llama-3.3-70b-versatile
+# Models: llama-3.3-70b-versatile | llama-3.1-8b-instant | mixtral-8x7b-32768 | gemma2-9b-it
+# Note: Groq provides extremely fast inference for open models.
+# API docs: https://console.groq.com/docs/openai
+# Get key: https://console.groq.com/keys
+#
+# groq_api_key: gsk_...             # NOT RECOMMENDED — use env var
+
+# ── OpenRouter (aggregator — any model via one API key) ───────────────────────
+# API key: set via OPENROUTER_API_KEY env var.
+# Default model: anthropic/claude-3.5-sonnet
+# Models: any model listed at https://openrouter.ai/models
+#   e.g.: openai/gpt-4o | anthropic/claude-3.5-sonnet | google/gemini-pro
+#         meta-llama/llama-3.3-70b-instruct | mistralai/mistral-large
+# API docs: https://openrouter.ai/docs
+# Get key: https://openrouter.ai/keys
+#
+# openrouter_api_key: sk-or-...     # NOT RECOMMENDED — use env var
+
+# ── Cline AI (meta-provider) ─────────────────────────────────────────────────
+# Cline is a meta-provider that routes through the Anthropic API using the
+# exact model and API key that Cline (the VS Code AI assistant) uses.
+# Default model: kwaipilot/kat-coder-latest  (free via OpenRouter)
+# Route: OPENROUTER_API_KEY (free, kwaipilot/kat-coder) > CLINE_API_KEY > ANTHROPIC_API_KEY
+#
+# This lets Agence shell commands run through the same model as your active
+# Cline coding session, ensuring consistent AI context and behavior.
+
+# ── Ollama (local, no key needed) ────────────────────────────────────────────
+# Default host: http://localhost:11434
+# Default model: llama3.2
+# Install: https://ollama.com/
+# Pull a model: ollama pull llama3.2
+# Models: llama3.2 | llama3.1 | codellama | deepseek-coder | mistral | phi3
+#
+# ollama_host: http://localhost:11434
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# CONTEXT INJECTION
+# ════════════════════════════════════════════════════════════════════════════
+
+# Inject codex/ files (LAWS.md, PRINCIPLES.md, RULES.md) into every system prompt.
+# router_inject_codex: 1          # 1=enabled (default), 0=disabled
+# router_codex_max_lines: 120     # max lines per codex file in system prompt
+# router_max_tokens: 4096         # max response tokens per call
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# QUICK-START EXAMPLES
+# ════════════════════════════════════════════════════════════════════════════
+
+# Claude (Anthropic) — most capable for complex coding:
+#   export ANTHROPIC_API_KEY=sk-ant-...
+#   agence "Refactor this function for clarity"
+
+# Cline AI (same model as your Cline session):
+#   export CLINE_API_KEY=sk-ant-...    # same key as ANTHROPIC_API_KEY
+#   export AGENCE_LLM_PROVIDER=cline
+#   agence "What does this module do?"
+
+# OpenAI GPT-4o:
+#   export OPENAI_API_KEY=sk-...
+#   export AGENCE_LLM_PROVIDER=openai
+#   agence "Write tests for this class"
+
+# Google Gemini 2.0 Flash (fast + cheap):
+#   export GEMINI_API_KEY=AIza...
+#   export AGENCE_LLM_PROVIDER=gemini
+#   agence "Explain this bash script"
+
+# GitHub Copilot (uses your existing subscription):
+#   export GITHUB_TOKEN=ghp_...
+#   export AGENCE_LLM_PROVIDER=copilot
+#   agence "Review this PR diff"
+
+# xAI Grok:
+#   export GROK_API_KEY=xai-...
+#   export AGENCE_LLM_PROVIDER=grok
+#   agence "Debug this async function"
+
+# Alibaba Qwen (good for multilingual + code):
+#   export DASHSCOPE_API_KEY=sk-...
+#   export AGENCE_LLM_PROVIDER=qwen
+#   agence "Optimize this SQL query"
+
+# Groq (blazing fast open models):
+#   export GROQ_API_KEY=gsk_...
+#   export AGENCE_LLM_PROVIDER=groq
+#   agence "Summarize these git changes"
+
+# Mistral / Codestral (best code completion + FIM):
+#   export MISTRAL_API_KEY=...
+#   export AGENCE_LLM_PROVIDER=mistral
+#   agence "Complete this function"
+
+# OpenRouter (access any model, one key):
+#   export OPENROUTER_API_KEY=sk-or-...
+#   export AGENCE_LLM_PROVIDER=openrouter
+#   export AGENCE_LLM_MODEL=meta-llama/llama-3.3-70b-instruct
+#   agence "Plan a refactoring strategy"
+
+# Azure OpenAI:
+#   export AZURE_OPENAI_API_KEY=...
+#   export AZURE_OPENAI_ENDPOINT=https://myresource.openai.azure.com
+#   export AGENCE_LLM_PROVIDER=azure
+#   agence "Plan a terraform module for VPC"
+
+# Ollama (local, private, no key needed):
+#   ollama pull llama3.2
+#   export AGENCE_LLM_PROVIDER=ollama
+#   agence "Explain this bash function"
+
+# List all providers and their status:
+#   agence /providers
+
+# Debug mode (shows API calls):
+#   AGENCE_DEBUG=1 agence "test query"
+
+# Per-call model override:
+#   AGENCE_LLM_MODEL=claude-opus-4-5 agence "Complex architectural question"

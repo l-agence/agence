@@ -98,3 +98,6 @@ fi
 export AI_ROOT="${AI_ROOT:-.}"
 export GIT_ROOT="${GIT_ROOT:-.}"
 export AI_BIN="${AI_BIN:-.}"
+
+# Configure Git to use Windows certificate store for SSL
+git config --global http.sslBackend schannel

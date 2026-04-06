@@ -17,6 +17,9 @@
 
 set -u  # Exit on undefined variable
 
+# Agentic execution: never pause on git output — robots don't read pagers
+export GIT_PAGER=cat
+
 # ============================================================================
 # SHELL ENVIRONMENT DETECTION
 # ============================================================================
@@ -92,22 +95,30 @@ detect_shell_environment
 normalize_path() {
   local path="$1"
   
-  # If cygwin, convert /cygdrive/c/ to /c/ (mingw style)
+  # WSL-native (preferred): use realpath to canonicalize
+  # This resolves symlinks, removes .., and gives true absolute path
+  if [[ "$AGENCE_PATH_STYLE" == "posix" ]] || [[ "$AGENCE_PATH_STYLE" == "wsl" ]]; then
+    if command -v realpath &>/dev/null; then
+      path="$(realpath -m "$path" 2>/dev/null || echo "$path")"
+    fi
+    echo "$path"
+    return
+  fi
+
+  # Legacy: cygwin /cygdrive/c/ → /c/
   if [[ "$AGENCE_PATH_STYLE" == "mingw" ]] && [[ "$path" == /cygdrive/* ]]; then
     path="${path/\/cygdrive\//\/}"
   fi
-  
-  # If Windows (for PowerShell), convert to Windows style (C:\...)
+
+  # Legacy: PowerShell Windows-style conversion
   if [[ "$AGENCE_PATH_STYLE" == "windows" ]]; then
-    # Convert unix paths to Windows paths
     if [[ "$path" == /* ]]; then
-      # /c/users/... → C:\Users\...
       local drive="${path:1:1}"
       local rest="${path:2}"
       path="${drive}:${rest//\//\\}"
     fi
   fi
-  
+
   echo "$path"
 }
 
@@ -131,6 +142,24 @@ source_if_exists "$AGENCE_LIB/utils.sh"
 source_if_exists "$AGENCE_LIB/logging.sh"
 source_if_exists "$AGENCE_LIB/safeguards.sh"
 source_if_exists "$AGENCE_LIB/router.sh"
+source_if_exists "$AGENCE_LIB/ailedger.sh"
+
+# ============================================================================
+# SECURITY: Command validation (injection guard)
+# ============================================================================
+# Rejects commands containing dangerous shell operators.
+# Called BEFORE any external command execution.
+# Per LAWS.md §8: security layer VALIDATES only — never creates paths.
+
+validate_command() {
+  local cmd="$1"
+  # Reject shell injection patterns
+  if echo "$cmd" | grep -qE '(\|\||&&|;[^;]|`|\$\(|>[^>]|<[^<])'; then
+    echo "Error: Command contains disallowed shell operators: $cmd" >&2
+    return 1
+  fi
+  return 0
+}
 
 # ============================================================================
 # EXECUTION CONTEXT: Git Repo vs Agence Repo
@@ -270,8 +299,14 @@ EXAMPLES:
   agence "How do I deploy this to AWS?"
   agence +plan-vpc-infrastructure
   agence /terraform-plan
-  agence !help
-  agence ^init
+  agence !bash                     Open aibash session (current agent)
+  agence !shell                    Open PowerShell session
+  agence !aider                    Launch aider CLI (requires: pip install aider-chat)
+  agence !claude                   Launch Claude Code CLI (requires: npm i -g @anthropic-ai/claude-code)
+  agence !pilot                    Launch GitHub Copilot CLI (winget: GitHub.Copilot; or: gh extension install github/gh-copilot)
+  agence !aish                     Launch Microsoft AI Shell (winget: Microsoft.AIShell)
+  agence !ralph                    Open aibash session as @ralph agent
+  agence !sonya                    Open aibash session as @sonya agent
   agence ^install
   agence ^learn
   agence ^status
@@ -280,6 +315,11 @@ EXAMPLES:
   agence ^rebase
   agence ^push
   agence ^sync
+  agence ^lesson list
+  agence ^plan add "Phase 3 roadmap"
+  agence ^todo list
+  agence ^task add "Implement feature" --assign @ralph
+  agence ^job list
 
 ENVIRONMENT VARIABLES:
   GIT_REPO=/path/to/repo       Parent repository (auto-detected if not set)
@@ -303,7 +343,9 @@ EOF
 }
 
 show_version() {
-  echo "Agence version 0.1.0 (alpha)"
+  echo "Agence version 0.2.5"
+  echo "[VERSION]: 0.2.5"
+  echo "[RELEASE]: rel_0.2.2_agence_swarm_sessions"
 }
 
 # ============================================================================
@@ -318,6 +360,67 @@ main() {
     show_help
     exit 0
   fi
+
+  # Parse @agent prefix first (sets AGENCE_AGENT_PARAM, strips from input)
+  input=$(parse_agent_prefix "$input")
+
+  # Early exits: local-only commands that NEVER need the LLM router
+  case "$1" in
+    --help|-h|help)
+      show_help
+      exit 0
+      ;;
+    --version|-v|version)
+      show_version
+      exit 0
+      ;;
+    symbols)
+      mode_symbols
+      exit 0
+      ;;
+    _resolve_provider)
+      resolve_provider
+      exit $?
+      ;;
+    status)
+      mode_system "status"
+      exit 0
+      ;;
+    config)
+      mode_system "config"
+      exit 0
+      ;;
+    # Knowledge commands: never need LLM router
+    # Supports both: 'agence plan list' AND 'agence ^plan list'
+    lesson|log|plan|todo|fault|issue|task|job)
+      mode_knowledge "$1" "${*:2}"
+      exit $?
+      ;;
+    session)
+      mode_session "${*:2}"
+      exit $?
+      ;;
+    reindex)
+      reindex_knowledge_bases
+      exit $?
+      ;;
+    handoff)
+      handoff_to_agent "${*:2}"
+      exit $?
+      ;;
+    pickup)
+      pickup_handoff "${*:2}"
+      exit $?
+      ;;
+    pause)
+      pause_session "${*:2}"
+      exit $?
+      ;;
+    resume)
+      resume_session "${*:2}"
+      exit $?
+      ;;
+  esac
 
   local first_char="${input:0:1}"
 
@@ -354,6 +457,66 @@ main() {
 }
 
 # ============================================================================
+# PROVIDER RESOLUTION
+# ============================================================================
+# Determines which LLM provider to use (auto-detect cascade).
+# Never calls an LLM — pure config resolution.
+#
+# Priority:
+#   1. Explicit @agent routing (AGENCE_AGENT_PARAM set by parse_agent_prefix)
+#   2. AGENCE_DEFAULT_PROVIDER env var (set in .agencerc or user env)
+#   3. Auto-detect: gh copilot CLI available → pilot
+#   4. Auto-detect: ANTHROPIC_API_KEY set → claude
+#   5. Auto-detect: OPENAI_API_KEY set → openai
+#   6. none (offline/CI — callers must handle gracefully)
+
+resolve_provider() {
+  # 1. Explicit agent routing
+  if [[ -n "${AGENCE_AGENT_PARAM:-}" ]]; then
+    echo "${AGENCE_AGENT_PARAM#@}"
+    return 0
+  fi
+
+  # 2. Explicit env override
+  if [[ -n "${AGENCE_DEFAULT_PROVIDER:-}" ]]; then
+    echo "$AGENCE_DEFAULT_PROVIDER"
+    return 0
+  fi
+
+  # 3. Auto-detect: standalone copilot CLI (snap) or gh copilot extension
+  if command -v copilot &>/dev/null; then
+    echo "pilot"
+    return 0
+  fi
+  if command -v gh &>/dev/null && gh copilot --version &>/dev/null 2>&1; then
+    echo "pilot"
+    return 0
+  fi
+
+  # 3b. Auto-detect: gh authenticated (use GitHub Copilot API via GITHUB_TOKEN)
+  if command -v gh &>/dev/null && gh auth token &>/dev/null 2>&1; then
+    echo "copilot"
+    return 0
+  fi
+
+  # 4. Auto-detect: Anthropic
+  if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+    echo "claude"
+    return 0
+  fi
+
+  # 5. Auto-detect: OpenAI
+  if [[ -n "${OPENAI_API_KEY:-}" ]]; then
+    echo "openai"
+    return 0
+  fi
+
+  # 6. No provider available
+  echo "none"
+  return 1
+}
+
+# ============================================================================
 # MODE: CHAT
 # ============================================================================
 # Normal conversation with LLM
@@ -364,13 +527,31 @@ mode_chat() {
 
   [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Chat mode: $query" >&2
 
+  # Resolve provider (never auto-call LLM without a provider)
+  local provider
+  provider=$(resolve_provider) || {
+    echo "Error: No LLM provider configured." >&2
+    echo "  Set AGENCE_DEFAULT_PROVIDER or configure gh auth." >&2
+    echo "  Providers: copilot (gh), claude, openai, ollama" >&2
+    echo "  Example: export AGENCE_DEFAULT_PROVIDER=copilot" >&2
+    return 1
+  }
+
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Provider: $provider" >&2
+
+  # Trace mode: print routing decision without calling LLM (for testing/CI)
+  if [[ "${AGENCE_TRACE:-0}" == "1" ]]; then
+    echo "[router_chat] provider=${provider} query=${query}"
+    return 0
+  fi
+
   # Load router
   router_load_config
 
   # Call LLM with context
   local response
-  response=$(router_chat "$query") || {
-    echo "Error: Failed to contact LLM" >&2
+  response=$(router_chat "$query" "$provider") || {
+    echo "Error: Failed to contact LLM provider '$provider'" >&2
     return 1
   }
 
@@ -392,6 +573,13 @@ mode_ai_routed() {
   # Validate request for dangerous operators
   if ! validate_command "$request"; then
     return 1
+  fi
+
+  # Trace mode: print routing decision without calling LLM (for testing/CI)
+  if [[ "${AGENCE_TRACE:-0}" == "1" ]]; then
+    local provider; provider=$(resolve_provider 2>/dev/null || echo "none")
+    echo "[router_plan_action] provider=${provider} request=${request}"
+    return 0
   fi
 
   # Load router
@@ -432,6 +620,10 @@ mode_ai_routed() {
     cloud)
       router_execute cloud "$plan"
       ;;
+    chat|"")
+      # LLM decided a chat/explain action — route to mode_chat
+      mode_chat "$request"
+      ;;
     *)
       echo "Error: Unknown action type: $action" >&2
       return 1
@@ -458,9 +650,79 @@ mode_external() {
   fi
 
   # =========================================================================
+  # GENERIC PASSTHROUGHS: /git <subcmd>, /gh <subcmd>
+  # These handle "agence /git log", "agence /gh pr list" etc.
+  # Must be checked BEFORE the case statement (args include spaces)
+  # =========================================================================
+  local base_cmd="${cmd_request%% *}"        # e.g. "git" from "git log --oneline"
+  local sub_args="${cmd_request#* }"         # e.g. "log --oneline" (empty if no space)
+  [[ "$sub_args" == "$cmd_request" ]] && sub_args=""  # no space = no sub_args
+
+  case "$base_cmd" in
+    git)
+      if [[ -z "$sub_args" ]]; then
+        echo "Usage: agence /git <subcommand> [args]" >&2
+        echo "  e.g. agence /git status" >&2
+        echo "  e.g. agence /git log --oneline -5" >&2
+        return 1
+      fi
+      # T3 blocklist check
+      local git_sub="${sub_args%% *}"
+      case "$git_sub" in
+        filter-branch|gc|clean|reflog|reset|fsck)
+          echo "Error: BLOCKED — git $git_sub requires T3 human approval" >&2
+          return 1
+          ;;
+        merge|rebase|cherry-pick)
+          echo "Error: git $git_sub requires T2 escalation (interactive)" >&2
+          return 1
+          ;;
+      esac
+      # T0/T1 passthrough
+      git -C "$GIT_REPO" $sub_args
+      return $?
+      ;;
+    gh)
+      if [[ -z "$sub_args" ]]; then
+        echo "Usage: agence /gh <subcommand> [args]" >&2
+        echo "  e.g. agence /gh pr list" >&2
+        echo "  e.g. agence /gh repo view" >&2
+        return 1
+      fi
+      if ! command -v gh &>/dev/null; then
+        echo "Error: gh CLI not installed" >&2
+        return 1
+      fi
+      gh $sub_args
+      return $?
+      ;;
+  esac
+
+  # =========================================================================
   # REPO COMMANDS (act on $GIT_REPO)
   # =========================================================================
   case "$cmd_request" in
+    # ----- Git shortcuts (T0: read-only, auto-execute) ---------------------
+    status)
+      git -C "$GIT_REPO" status
+      return $?
+      ;;
+    log)
+      git -C "$GIT_REPO" log --oneline -10
+      return $?
+      ;;
+    remote)
+      git -C "$GIT_REPO" remote -v
+      return $?
+      ;;
+    diff)
+      git -C "$GIT_REPO" diff
+      return $?
+      ;;
+    stash)
+      git -C "$GIT_REPO" stash
+      return $?
+      ;;
     ghauth)
       # GitHub CLI auth status
       bash "$AGENCE_ROOT/bin/aido" gh auth status
@@ -539,6 +801,36 @@ mode_external() {
       git -C "$GIT_REPO" push -u origin
       return $?
       ;;
+    ghremote)
+      # GitHub CLI: view repo info (T0: auto-execute)
+      bash "$AGENCE_ROOT/bin/aido" gh repo view
+      return $?
+      ;;
+    ghpull)
+      # GitHub CLI: list PRs (T0: auto-execute)
+      bash "$AGENCE_ROOT/bin/aido" gh pr list
+      return $?
+      ;;
+    ghlog)
+      # GitHub CLI: list workflow run history (T0: auto-execute)
+      bash "$AGENCE_ROOT/bin/aido" gh run list
+      return $?
+      ;;
+    ghrun)
+      # GitHub CLI: list runs (T0: auto-execute)
+      bash "$AGENCE_ROOT/bin/aido" gh run list
+      return $?
+      ;;
+    ghflow)
+      # GitHub CLI: list workflows (T0: auto-execute)
+      bash "$AGENCE_ROOT/bin/aido" gh workflow list
+      return $?
+      ;;
+    ghissue)
+      # GitHub CLI: list issues (T0: auto-execute)
+      bash "$AGENCE_ROOT/bin/aido" gh issue list
+      return $?
+      ;;
   esac
 
   # Load permitted commands from config/commands.json
@@ -593,9 +885,12 @@ mode_external() {
 # Example: agence ^init
 
 mode_init() {
-  local init_cmd="$1"
+  local input="$*"
+  local init_cmd="${input%% *}"       # First word is the command
+  local init_args="${input#$init_cmd}" # Rest is arguments
+  init_args="${init_args# }"           # Trim leading space
 
-  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Init mode: $init_cmd" >&2
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Init mode: $init_cmd, args: $init_args" >&2
 
   case "$init_cmd" in
     "init"|"")
@@ -607,13 +902,767 @@ mode_init() {
     "install")
       install_agence_packages
       ;;
+    "save")
+      # Save session state: agence ^save [optional notes]
+      save_session "$init_args"
+      return $?
+      ;;
+    "learn")
+      # Scan and re-read modified CODEX/context files
+      learn_agence_changes
+      return $?
+      ;;
+    "commit")
+      # Commit changed Agence files: agence ^commit [message]
+      commit_agence_changes "$init_args"
+      return $?
+      ;;
+    "push")
+      # Push committed Agence changes to origin
+      push_agence_changes
+      return $?
+      ;;
+    "help")
+      # Show detailed command help: agence ^help
+      mode_help
+      return $?
+      ;;
+    "symbols")
+      # Show symbols reference table: agence ^symbols
+      mode_symbols
+      return $?
+      ;;
+    "session")
+      # Session management: agence ^session <subcommand> [args]
+      mode_session "$init_args"
+      return $?
+      ;;
+    "lesson")
+      # Knowledge: lessons learned (team-shared, synthetic)
+      # Usage: agence ^lesson [list|show|add] [--org ORG]
+      mode_knowledge "lesson" "$init_args"
+      return $?
+      ;;
+    "log")
+      # Operational logs (local, nexus)
+      # Usage: agence ^log [list|show|add] [--filter=agent|session|timeline]
+      mode_knowledge "log" "$init_args"
+      return $?
+      ;;
+    "plan")
+      # Strategic plans (team-shared, synthetic)
+      # Usage: agence ^plan [list|show|add] [--org ORG]
+      mode_knowledge "plan" "$init_args"
+      return $?
+      ;;
+    "todo")
+      # Personal todos (hermetic, local only)
+      # Usage: agence ^todo [list|show|add] [--owner NAME]
+      mode_knowledge "todo" "$init_args"
+      return $?
+      ;;
+    "fault")
+      # Faults/incidents (local, nexus, sanitize before sharing)
+      # Usage: agence ^fault [list|show|add] [--sanitize]
+      [[ "${init_args%% *}" == "add" ]] && ailedger_append "fault" "fault-logged" ""
+      mode_knowledge "fault" "$init_args"
+      return $?
+      ;;
+    "issue")
+      # Issues/discoveries (team-shared, synthetic)
+      # Usage: agence ^issue [list|show|add]
+      mode_knowledge "issue" "$init_args"
+      return $?
+      ;;
+    "task")
+      # Team tasks (shared, organic)
+      # Usage: agence ^task [list|show|add] [--assign AGENT|HUMAN]
+      mode_knowledge "task" "$init_args"
+      return $?
+      ;;
+    "job")
+      # Robot jobs (shared, organic)
+      # Usage: agence ^job [list|show|add] [--agent NAME]
+      mode_knowledge "job" "$init_args"
+      return $?
+      ;;
+    "handoff")
+      # Transfer session context to another agent
+      # Usage: agence ^handoff @ralph [context message]
+      handoff_to_agent $init_args
+      return $?
+      ;;
+    "pickup")
+      # Accept a pending handoff: agence ^pickup [handoff_id]
+      pickup_handoff $init_args
+      return $?
+      ;;
+    "pause")
+      # Suspend session with checkpoint (Ctrl+Z semantics)
+      pause_session $init_args
+      return $?
+      ;;
+    "resume")
+      # Resume a paused session: agence ^resume [pause_id]
+      resume_session $init_args
+      return $?
+      ;;
+    "reindex")
+      # Refresh all knowledge base indices
+      reindex_knowledge_bases
+      return $?
+      ;;
+    "session-restore")
+      # Restore a session from a snapshot: ^session-restore <session_id> <snapshot_dir>
+      local restore_session_id="${init_args%% *}"
+      local restore_snapshot_dir="${init_args#* }"
+      if [[ -z "$restore_session_id" || "$restore_session_id" == "$restore_snapshot_dir" ]]; then
+        echo "Usage: agence ^session-restore <session_id> <snapshot_dir>" >&2
+        return 1
+      fi
+      echo "[INFO] Restoring session $restore_session_id from $restore_snapshot_dir" >&2
+      bash "$AGENCE_ROOT/bin/aisession" resume "$restore_session_id"
+      return $?
+      ;;
     *)
       echo "Error: Unknown init command: $init_cmd" >&2
+      echo "Available: help, init, reload, install, save, learn, commit, push, session," >&2
+      echo "           lesson, log, plan, todo, fault, issue, task, job," >&2
+      echo "           handoff, pickup, pause, resume, reindex, session-restore" >&2
       return 1
       ;;
   esac
 
   return $?
+}
+
+# ============================================================================
+# ROUTING: ORG PATH RESOLUTION (@ symlink inheritance)
+# ============================================================================
+# Resolves scope path using @ symlink if present, falls back to explicit org dir.
+# Law 8: Use realpath() ONLY for validation — never create symlinks here.
+#
+# Usage: resolve_org_path "/path/to/synthetic" "l-agence.org"
+# Returns: /path/to/synthetic/@l-agence.org (via symlink) or /path/to/synthetic/l-agence.org
+resolve_org_path() {
+  local scope_root="$1"      # e.g. $AGENCE_ROOT/synthetic
+  local fallback_org="$2"    # e.g. l-agence.org
+
+  local symlink_path="$scope_root/@"
+  local named_org_path="$scope_root/@$fallback_org"
+  local canonical_path="$scope_root/$fallback_org"
+
+  # Tier 1: @ symlink (user-set org context via jlink / system setup)
+  # e.g. synthetic/@ -> l-agence.org
+  if [[ -L "$symlink_path" ]]; then
+    echo "$symlink_path"
+    return 0
+  fi
+
+  # Tier 2: named @org SYMLINK only (explicit org routing via jlink)
+  # e.g. synthetic/@l-agence.org -> ../l-agence.org (user-created symlink)
+  # NOTE: a plain @org directory is NOT a routing symlink (skip it)
+  if [[ -L "$named_org_path" ]]; then
+    echo "$named_org_path"
+    return 0
+  fi
+
+  # Tier 3: canonical org directory (e.g. synthetic/l-agence.org) — most common
+  echo "$canonical_path"
+  return 0
+}
+
+# ============================================================================
+# MODE: HELP (^help)
+# ============================================================================
+# Structured command help with scope context
+# Example: agence ^help
+
+mode_symbols() {
+  cat << 'EOF'
+╔══════════════════════════════════════════════════════╗
+║  Agence Symbol Reference  (^symbols)                 ║
+╚══════════════════════════════════════════════════════╝
+
+TASK STATE  (agent-level, matrix-signed)
+  +task          pending / todo            (positive, unstarted)
+  &task@agent    assigned to agent         (positive, queued)
+  %task@agent    in-progress — agent       (positive, running)
+  %task@user     in-progress — human       (positive, running)
+  -task          completed                 (negative, done)
+  _task          paused / deferred         (neutral)
+  #task          held by human             (neutral, locked)
+
+  RESERVED (swarm, v0.3.2+)
+  ~task          swarm-queued              (not yet delegated)
+  $task          swarm-coordinating        (merging across agents)
+
+PRIORITY  (independent of state)
+  *task          low priority
+  **task         medium priority
+  ***task        high priority
+
+  Compose:  ***&task@ralph  (urgent + agent-assigned)
+
+ROUTING
+  @agent         Route to agent            @ralph, @aider, @copilot
+  @org           Route to org context      @acme.tld, @l-agence.org
+  @user          Route to human            @steff
+  --org ORG      CLI override for org      agence ^plan list --org acme.tld
+
+COMMAND MODES  (first character of argument)
+  ^cmd           Init / lifecycle          ^init, ^save, ^commit, ^push
+  !cmd           System command            !git status, !bash
+  /cmd           External command          /deploy, /build
+  ~cmd           (reserved, swarm)
+  query          Plain text → LLM chat     agence "what is the status?"
+  +query         AI-routed action          +refactor this module
+
+WORKFLOW NOTATION
+  WF = [task1, task2; task3]
+        ↑ parallel  ↑ pause/sequential
+  WF = [(repo1:+task1@ralph) + (repo2:%task2@aider)]
+  
+  ,   parallel execution (no ordering)
+  ;   sequential pause (must complete before next)
+  ^   hard dependency (blocks downstream)
+  <   precedes (task1 < task2 = task1 before task2)
+
+COMPLETION MATH  (signed addition)
+  net_work   = sum(all signed tasks)
+  remaining  = sum(positive tasks only)
+  done       = |sum(negative tasks)|
+  %done      = done / (done + remaining)
+
+SCOPES
+  hermetic/   personal, never committed    ^todo, ^notes
+  nexus/      local-only, sensitive        ^fault, ^log, ^session
+  synthetic/  team-shared, git-committed   ^plan, ^lesson, ^issue
+  organic/    team work, agent-routable    ^task, ^job
+
+See also: codex/TAXONOMY.md · synthetic/@/docs/SYMBOLS.md · MATRICES.md
+EOF
+  return 0
+}
+
+mode_help() {
+  local version; version="0.2.5"
+
+  cat << EOF
+╔══════════════════════════════════════════════════════════════════╗
+║  Agence v${version} — Agentic Engineering Collaboration Environment  ║
+╚══════════════════════════════════════════════════════════════════╝
+
+SHELL ENVIRONMENT
+  Default:   WSL-Ubuntu bash (required)
+  AGENCE_ROOT: ${AGENCE_ROOT:-unset}
+  GIT_REPO:    ${GIT_REPO:-unset (auto-detect)}
+  Shell:       ${AGENCE_SHELL_ENV:-unknown}
+
+KNOWLEDGE COMMANDS (^ prefix)
+
+  HERMETIC — Local only, never committed (personal)
+  ─────────────────────────────────────────────────
+  ^todo  [list|show|add]              Personal todos     → hermetic/@/todos/
+
+  NEXUS — Local only (sensitive: faults, logs, sessions)
+  ───────────────────────────────────────────────────────
+  ^fault [list|show]                  Incidents          → nexus/faults/
+  ^log   [list|show|add]              Ops logs           → nexus/logs/
+
+  SYNTHETIC — Team-shared via Git (committed)
+  ────────────────────────────────────────────
+  ^lesson [list|show|add] [--org ORG]  Lessons learned  → synthetic/@/lessons/
+  ^plan   [list|show|add] [--org ORG]  Strategic plans  → synthetic/@/plans/
+  ^issue  [list|show|add] [--org ORG]  Discoveries      → synthetic/@/issues/
+
+  ORGANIC — Team work, agent-routable
+  ─────────────────────────────────────
+  ^task  [list|show|add] [--assign @agent|@user]  Tasks → organic/tasks/
+  ^job   [list|show|add] [--agent NAME]           Jobs  → organic/jobs/
+
+WORKFLOW COMMANDS
+  ^init                     Initialize Agence environment
+  ^reload                   Reload context files
+  ^save  [notes]            Save session checkpoint
+  ^learn                    Extract lessons from changes
+  ^commit [message]         Commit Agence changes
+  ^push                     Push committed changes
+  ^session [list|view|...]  Manage agent sessions
+  ^stash                    Stash local changes
+  ^sync                     Sync with remote
+
+ROUTING INHERITANCE
+  Commands inherit org context from @ symlink (e.g. synthetic/@→l-agence.org)
+  Override with --org flag:  agence ^plan list --org acme.tld
+
+SYMBOLS (quick ref)
+  +task   pending    &task@agent  assigned    %task@agent  in-progress
+  -task   completed  _task        paused      #task        held
+  */**/*** priority  ~,\$          reserved (swarm, v0.3.2+)
+
+See also: codex/TAXONOMY.md (scopes), codex/LAWS.md (constraints)
+EOF
+  return 0
+}
+
+# ============================================================================
+# BASH COMPLETION
+# ============================================================================
+# Source this file or add to ~/.bashrc:
+#   source /path/to/agence
+# Or install standalone:
+#   agence !completion >> ~/.bashrc
+
+_agence_completion() {
+  local cur prev words
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+  local caret_commands="help symbols init reload install save learn commit push stash sync session lesson log plan todo fault issue task job handoff pickup pause resume reindex"
+  local knowledge_subcmds="list show add"
+
+  case "${COMP_WORDS[1]}" in
+    "^help"|"^init"|"^reload"|"^save"|"^learn"|"^stash"|"^sync"|"^push")
+      COMPREPLY=()
+      ;;
+    "^lesson"|"^plan"|"^issue")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "$knowledge_subcmds" -- "$cur") )
+      elif [[ "$cur" == "--"* ]]; then
+        COMPREPLY=( $(compgen -W "--org" -- "$cur") )
+      fi
+      ;;
+    "^log"|"^fault"|"^todo")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "$knowledge_subcmds" -- "$cur") )
+      fi
+      ;;
+    "^task")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "$knowledge_subcmds" -- "$cur") )
+      elif [[ "$cur" == "--"* ]]; then
+        COMPREPLY=( $(compgen -W "--assign" -- "$cur") )
+      fi
+      ;;
+    "^job")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "$knowledge_subcmds" -- "$cur") )
+      elif [[ "$cur" == "--"* ]]; then
+        COMPREPLY=( $(compgen -W "--agent" -- "$cur") )
+      fi
+      ;;
+    "^handoff")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "@ralph @sonya @aider @copilot user" -- "$cur") )
+      fi
+      ;;
+    "^pickup"|"^resume")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        local dir="${AGENCE_ROOT:-$PWD}/nexus/.aihandoffs"
+        COMPREPLY=( $(compgen -W "$(ls "$dir" 2>/dev/null | sed 's/\.json$//')" -- "$cur") )
+      fi
+      ;;
+    "^pause"|"^reindex")
+      COMPREPLY=()
+      ;;
+    "^session")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "list view handoff assign attach export import push pull" -- "$cur") )
+      fi
+      ;;
+    *)
+      # First argument: suggest ^ commands
+      if [[ $COMP_CWORD -eq 1 ]]; then
+        local suggestions=""
+        for cmd in $caret_commands; do
+          suggestions="$suggestions ^$cmd"
+        done
+        COMPREPLY=( $(compgen -W "$suggestions" -- "$cur") )
+      fi
+      ;;
+  esac
+}
+
+complete -F _agence_completion agence
+
+# ============================================================================
+# MODE: SESSION MANAGEMENT
+# ============================================================================
+# Manage agentic sessions: list, view, handoff, assign, attach, export/import
+# Example: agence ^session list
+# Example: agence ^session handoff <id> @agent
+
+mode_session() {
+  local input="$*"
+  local sub_cmd="${input%% *}"
+  local args="${input#$sub_cmd}"; args="${args# }"
+
+  local sessions_dir="$AGENCE_ROOT/nexus/.aisessions"
+  mkdir -p "$sessions_dir" 2>/dev/null
+
+  case "$sub_cmd" in
+    "list"|"")
+      echo "[SESSION LIST] Active sessions:"
+      local count=0
+      for meta in "$sessions_dir"/*.meta.json; do
+        [[ ! -f "$meta" ]] && continue
+        local sid; sid=$(jq -r '.session_id // .sessionID // "unknown"' "$meta" 2>/dev/null)
+        local agent; agent=$(jq -r '.agent // .agent_id // .agentID // "unknown"' "$meta" 2>/dev/null)
+        local role; role=$(jq -r '.role // "unknown"' "$meta" 2>/dev/null)
+        local ts; ts=$(jq -r '.timestamp // "unknown"' "$meta" 2>/dev/null)
+        echo "  - $sid  agent=$agent  role=$role  started=$ts"
+        ((count++)) || true
+      done
+      [[ $count -eq 0 ]] && echo "  (no sessions found)"
+      return 0
+      ;;
+    "view")
+      if [[ -z "$args" ]]; then
+        echo "Usage: agence ^session view <session_id>" >&2; return 1
+      fi
+      local meta="$sessions_dir/$args.meta.json"
+      if [[ -f "$meta" ]]; then
+        jq '.' "$meta"
+      else
+        echo "Session $args not found." >&2; return 1
+      fi
+      ;;
+    "handoff")
+      # Local agent assignment: ^session handoff <id> @agent
+      local sid; sid=$(echo "$args" | awk '{print $1}')
+      local target; target=$(echo "$args" | awk '{print $2}')
+      if [[ -z "$sid" || -z "$target" || "$target" != @* ]]; then
+        echo "Usage: agence ^session handoff <session_id> <@agent>" >&2; return 1
+      fi
+      local meta="$sessions_dir/$sid.meta.json"
+      if [[ -f "$meta" ]]; then
+        jq --arg a "$target" '.assigned = $a' "$meta" > "$meta.tmp" && mv "$meta.tmp" "$meta"
+        echo "Session $sid handed off to $target."
+      else
+        echo "Session $sid not found." >&2; return 1
+      fi
+      ;;
+    "assign")
+      # Remote human assignment — exports sanitized metadata: ^session assign <id> @user
+      local sid; sid=$(echo "$args" | awk '{print $1}')
+      local target; target=$(echo "$args" | awk '{print $2}')
+      if [[ -z "$sid" || -z "$target" || "$target" != @* ]]; then
+        echo "Usage: agence ^session assign <session_id> <@user>" >&2; return 1
+      fi
+      local meta="$sessions_dir/$sid.meta.json"
+      local export_dir="$GIT_REPO/.agence-sessions"
+      mkdir -p "$export_dir"
+      if [[ -f "$meta" ]]; then
+        jq --arg t "$target" \
+          '{session_id, agent_id, role, timestamp, owner, assigned: $t,
+            summary: (.summary // ""), exported_at: now | todate}' \
+          "$meta" > "$export_dir/$sid.export.json"
+        echo "Session $sid assigned to $target (export: $export_dir/$sid.export.json)"
+      else
+        echo "Session $sid not found." >&2; return 1
+      fi
+      ;;
+    "attach")
+      if [[ -z "$args" ]]; then
+        echo "Usage: agence ^session attach <session_id>" >&2; return 1
+      fi
+      local meta="$sessions_dir/$args.meta.json"
+      if [[ -f "$meta" ]]; then
+        export AGENCE_SESSION_ID="$args"
+        export AI_AGENT; AI_AGENT=$(jq -r '.agent // .agent_id // "unknown"' "$meta" 2>/dev/null)
+        export AGENCE_SESSION_TYPE; AGENCE_SESSION_TYPE=$(jq -r '.role // "unknown"' "$meta" 2>/dev/null)
+        echo "Attached to session $args (agent=$AI_AGENT role=$AGENCE_SESSION_TYPE)"
+      else
+        echo "Session $args not found." >&2; return 1
+      fi
+      ;;
+    "export")
+      # Export sanitized session for handoff: ^session export <id> @user
+      local sid; sid=$(echo "$args" | awk '{print $1}')
+      local target; target=$(echo "$args" | awk '{print $2}')
+      if [[ -z "$sid" || -z "$target" ]]; then
+        echo "Usage: agence ^session export <session_id> <@user>" >&2; return 1
+      fi
+      local meta="$sessions_dir/$sid.meta.json"
+      local export_dir="$GIT_REPO/.agence-sessions"
+      mkdir -p "$export_dir"
+      if [[ -f "$meta" ]]; then
+        jq --arg t "$target" \
+          '{session_id, agent_id, role, timestamp, owner, assigned: $t,
+            summary: (.summary // ""), exported_at: now | todate}' \
+          "$meta" > "$export_dir/$sid.export.json"
+        echo "Session $sid exported for $target: $export_dir/$sid.export.json"
+      else
+        echo "Session $sid not found." >&2; return 1
+      fi
+      ;;
+    "import")
+      local file="$args"
+      if [[ -z "$file" || ! -f "$file" ]]; then
+        echo "Usage: agence ^session import <exported_file.json>" >&2; return 1
+      fi
+      local sid; sid=$(jq -r '.session_id' "$file" 2>/dev/null)
+      if [[ -z "$sid" || "$sid" == "null" ]]; then
+        echo "Invalid session export file." >&2; return 1
+      fi
+      cp "$file" "$sessions_dir/$sid.meta.json"
+      echo "Imported session $sid."
+      ;;
+    "push")
+      local sid="$args"
+      local export_dir="$GIT_REPO/.agence-sessions"
+      if [[ -z "$sid" || ! -f "$export_dir/$sid.export.json" ]]; then
+        echo "Usage: agence ^session push <session_id>  (must export first)" >&2; return 1
+      fi
+      git -C "$GIT_REPO" add ".agence-sessions/$sid.export.json"
+      git -C "$GIT_REPO" commit -m "[session] Export session $sid for handoff" || echo "Nothing to commit."
+      git -C "$GIT_REPO" push
+      echo "Pushed session $sid to origin."
+      ;;
+    "pull")
+      local sid="$args"
+      local export_dir="$GIT_REPO/.agence-sessions"
+      git -C "$GIT_REPO" pull
+      if [[ -f "$export_dir/$sid.export.json" ]]; then
+        cp "$export_dir/$sid.export.json" "$sessions_dir/$sid.meta.json"
+        echo "Pulled and imported session $sid."
+      else
+        echo "Session $sid export not found after pull." >&2; return 1
+      fi
+      ;;
+    *)
+      echo "Error: Unknown session subcommand: $sub_cmd" >&2
+      echo "Available: list, view, handoff, assign, attach, export, import, push, pull" >&2
+      return 1
+      ;;
+  esac
+
+  return $?
+}
+
+# ============================================================================
+# MODE: KNOWLEDGE MANAGEMENT (lesson, log, plan, todo, fault, issue, task, job)
+# ============================================================================
+# Unified handler for all knowledge/work management commands
+# Routes to appropriate scope: HERMETIC, NEXUS, SYNTHETIC, ORGANIC
+# Example: agence ^lesson list
+# Example: agence ^plan add "Phase 2 roadmap"
+# Example: agence ^todo list
+
+mode_knowledge() {
+  local cmd_type="$1"    # lesson, log, plan, todo, fault, issue, task, job
+  local input="$2"       # Remaining arguments
+  
+  local sub_cmd="${input%% *}"     # list, show, add
+  sub_cmd="${sub_cmd:-list}"       # Default to list
+  
+  local args="${input#$sub_cmd}"
+  args="${args# }"  # Trim leading space
+  
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Knowledge mode: $cmd_type/$sub_cmd args='$args'" >&2
+  
+  # ============================================================================
+  # DETERMINE SCOPE & PATHS
+  # ============================================================================
+  
+  local scope_type  # HERMETIC, NEXUS, SYNTHETIC, ORGANIC
+  local base_path
+  local default_org="l-agence.org"
+  local org="$default_org"
+  
+  # Parse command-specific options
+  case "$cmd_type" in
+    "lesson"|"plan"|"issue")
+      # SYNTHETIC scope (team-shared)
+      scope_type="SYNTHETIC"
+      # Support --org flag: agence ^lesson list --org acme.tld
+      if [[ "$args" == *"--org"* ]]; then
+        org=$(echo "$args" | sed -n 's/.*--org[= ]\([^ ]*\).*/\1/p')
+        base_path="$AGENCE_ROOT/synthetic/@$org"
+      else
+        # Routing inheritance: prefer @ symlink (user-set org context)
+        # Falls back to explicit l-agence.org if @ symlink missing
+        base_path=$(resolve_org_path "$AGENCE_ROOT/synthetic" "$default_org")
+      fi
+      ;;
+    "log"|"fault")
+      # NEXUS scope (local, operational)
+      scope_type="NEXUS"
+      base_path="$AGENCE_ROOT/nexus"
+      ;;
+    "todo")
+      # HERMETIC scope (local, personal)
+      scope_type="HERMETIC"
+      # Use @ symlink if present in hermetic
+      base_path=$(resolve_org_path "$AGENCE_ROOT/hermetic" "$default_org")
+      ;;
+    "task"|"job")
+      # ORGANIC scope (team-assigned work)
+      scope_type="ORGANIC"
+      if [[ "$args" == *"--org"* ]]; then
+        org=$(echo "$args" | sed -n 's/.*--org[= ]\([^ ]*\).*/\1/p')
+        base_path="$AGENCE_ROOT/organic/@$org"
+      else
+        base_path="$AGENCE_ROOT/organic"
+      fi
+      ;;
+  esac
+  
+  # Create scope-specific subdirectory
+  local data_dir="$base_path/${cmd_type}s"  # lessons/, logs/, plans/, todos/, faults/, issues/, tasks/, jobs/
+  mkdir -p "$data_dir" 2>/dev/null
+  
+  # Create INDEX file if missing
+  local index_file="$data_dir/INDEX.md"
+  if [[ ! -f "$index_file" ]]; then
+    cat > "$index_file" << EOF
+# $cmd_type Index ($scope_type/$org)
+
+Scope: $scope_type
+Org: $org
+Last Updated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+## Entries
+
+(entries will be listed here)
+EOF
+  fi
+  
+  # ============================================================================
+  # ROUTE SUBCOMMANDS
+  # ============================================================================
+  
+  case "$sub_cmd" in
+    "list")
+      knowledge_list "$cmd_type" "$data_dir" "$index_file" "$args"
+      ;;
+    "show")
+      local item; item=$(echo "$args" | awk '{print $1}')
+      if [[ -z "$item" ]]; then
+        echo "Usage: agence ^$cmd_type show <name/id>" >&2
+        return 1
+      fi
+      knowledge_show "$cmd_type" "$data_dir" "$item"
+      ;;
+    "add")
+      local title; title=$(echo "$args" | sed 's/--[^ ]*[= ][^ ]*//g' | xargs)
+      if [[ -z "$title" ]]; then
+        echo "Usage: agence ^$cmd_type add <title> [--org ORG] [other options]" >&2
+        return 1
+      fi
+      knowledge_add "$cmd_type" "$data_dir" "$index_file" "$title" "$args"
+      ;;
+    *)
+      echo "Error: Unknown subcommand: $sub_cmd" >&2
+      echo "Available subcommands: list, show, add" >&2
+      return 1
+      ;;
+  esac
+  
+  return $?
+}
+
+# ============================================================================
+# KNOWLEDGE COMMAND HELPERS
+# ============================================================================
+
+knowledge_list() {
+  local cmd_type="$1"
+  local data_dir="$2"
+  local index_file="$3"
+  local args="$4"
+  
+  echo "[${cmd_type}]"
+  
+  # If jq is available, try to parse JSON files
+  # Handles multiple schema variants (id/lesson_id, date/date_extracted)
+  if [[ -f "${data_dir}/INDEX.json" ]] && command -v jq &>/dev/null; then
+    local parsed
+    parsed=$(jq -r '.entries[]? | [(.id // .lesson_id // "?"), (.title // "(untitled)"), (.date // .date_extracted // "")] | "\(.[0]): \(.[1])\(if .[2] != "" then " (\(.[2]))" else "" end)"' "${data_dir}/INDEX.json" 2>/dev/null)
+    if [[ -n "$parsed" ]]; then
+      echo "$parsed" | sed 's/^/  /'
+      return 0
+    fi
+  fi
+  
+  # Fallback: list markdown files
+  local count=0
+  for entry in "$data_dir"/*.md; do
+    [[ ! -f "$entry" ]] && continue
+    [[ "$(basename "$entry")" == "INDEX.md" ]] && continue
+    
+    local name; name=$(basename "$entry" .md)
+    local title; title=$(head -n 1 "$entry" | sed 's/^# //')
+    echo "  - $name: $title"
+    ((count++)) || true
+  done
+  
+  if [[ $count -eq 0 ]]; then
+    echo "  (no entries)"
+  fi
+  
+  return 0
+}
+
+knowledge_show() {
+  local cmd_type="$1"
+  local data_dir="$2"
+  local item="$3"
+  
+  # Try structured JSON first
+  if [[ -f "${data_dir}/${item}.json" ]]; then
+    jq '.' "${data_dir}/${item}.json"
+    return 0
+  fi
+  
+  # Fall back to markdown
+  if [[ -f "${data_dir}/${item}.md" ]]; then
+    cat "${data_dir}/${item}.md"
+    return 0
+  fi
+  
+  echo "Error: $cmd_type '$item' not found" >&2
+  return 1
+}
+
+knowledge_add() {
+  local cmd_type="$1"
+  local data_dir="$2"
+  local index_file="$3"
+  local title="$4"
+  local args="$5"
+  
+  # Generate short ID: timestamp + first 4 chars of title
+  local ts; ts=$(date +%s)
+  local short_id; short_id=$(echo "$title" | tr ' ' '_' | cut -c1-8 | tr -cd '[:alnum:]_')
+  local entry_id="${ts}_${short_id}"
+  local entry_file="${data_dir}/${entry_id}.md"
+  
+  # Create entry
+  cat > "$entry_file" << EOF
+# $title
+
+**Created**: $(date -u +%Y-%m-%dT%H:%M:%SZ)  
+**ID**: $entry_id
+
+## Content
+
+Add your content here.
+EOF
+  
+  echo "✓ $cmd_type entry created: $entry_id"
+  echo "  File: $entry_file"
+  
+  # Update INDEX if JSON format exists
+  if [[ -f "${data_dir}/INDEX.json" ]]; then
+    jq ".entries += [{id: \"$entry_id\", title: \"$title\", date: \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}]" \
+      "${data_dir}/INDEX.json" > "${data_dir}/INDEX.json.tmp" && \
+      mv "${data_dir}/INDEX.json.tmp" "${data_dir}/INDEX.json"
+  fi
+  
+  return 0
 }
 
 init_agence_environment() {
@@ -852,7 +1901,77 @@ create_windows_symlink() {
 # Example: agence !help
 # Example: agence !bash (open new shell)
 
-mode_system() {
+# ============================================================================
+# TOOL LAUNCHER — !aider, !claude, !pilot
+# ============================================================================
+# Checks installation, sets env, execs the tool directly.
+# Called from mode_system for real CLI tools (not agence persona agents).
+# Usage: launch_tool <tool> [extra-args...]
+
+launch_tool() {
+  local tool="$1"; shift
+  local extra_args="$*"
+
+  case "$tool" in
+    aider)
+      if ! command -v aider &>/dev/null; then
+        echo "✗ aider not installed." >&2
+        echo "  Install: pip install aider-chat" >&2
+        return 1
+      fi
+      echo "[agence] Launching aider (repo: ${GIT_REPO:-$(pwd)})"
+      export AI_AGENT="aider"
+      ailedger_append "launch" "tool-aider" ""
+      # --no-auto-commits: agence owns git, not aider
+      exec aider --no-auto-commits $extra_args
+      ;;
+    claude)
+      if ! command -v claude &>/dev/null; then
+        echo "✗ claude not installed." >&2
+        echo "  Install: npm install -g @anthropic-ai/claude-code" >&2
+        return 1
+      fi
+      echo "[agence] Launching claude code"
+      export AI_AGENT="claude"
+      ailedger_append "launch" "tool-claude" ""
+      exec claude $extra_args
+      ;;
+    pilot)
+      # Prefer standalone copilot CLI (~/.local/bin/copilot or snap)
+      if command -v copilot &>/dev/null; then
+        echo "[agence] Launching GitHub Copilot CLI"
+        export AI_AGENT="pilot"
+        ailedger_append "launch" "tool-pilot-standalone" ""
+        exec copilot $extra_args
+      elif command -v gh &>/dev/null && gh copilot --version &>/dev/null 2>&1; then
+        echo "[agence] Launching gh copilot extension"
+        export AI_AGENT="pilot"
+        ailedger_append "launch" "tool-pilot-gh" ""
+        exec gh copilot suggest $extra_args
+      else
+        echo "✗ copilot CLI not found." >&2
+        echo "  Install (snap): sudo snap install copilot" >&2
+        echo "  Install (gh):   gh extension install github/gh-copilot" >&2
+        return 1
+      fi
+      ;;
+    aish)
+      if ! command -v aish &>/dev/null; then
+        echo "✗ aish not installed." >&2
+        echo "  Install (Windows): winget install Microsoft.AIShell" >&2
+        return 1
+      fi
+      echo "[agence] Launching Microsoft AI Shell"
+      export AI_AGENT="aish"
+      ailedger_append "launch" "tool-aish" ""
+      exec aish $extra_args
+      ;;
+    *)
+      echo "✗ Unknown tool: $tool" >&2
+      return 1
+      ;;
+  esac
+}
   local sys_cmd="$1"
 
   [[ "$DEBUG" == "1" ]] && echo "[DEBUG] System mode: $sys_cmd" >&2
@@ -878,18 +1997,230 @@ mode_system() {
       return 0
       ;;
     bash)
-      echo "Launching Git Bash..."
-      exec bash --login
+      shell_bash_session
       ;;
     shell)
-      echo "Launching PowerShell..."
-      exec powershell -NoExit
+      shell_powershell_session
+      ;;
+    # Real CLI tool launchers — check installed, exec directly
+    aider|claude|pilot|aish)
+      launch_tool "$sys_cmd" "${@:2}"
+      ;;
+    # Persona agents — aibash session with AI_AGENT set
+    ralph|copilot|sonya|claudia|haiku|chad|aiko|kilo|peers|azure|devops)
+      local agent_name="$sys_cmd"
+      export AI_AGENT="$agent_name" AGENCE_AGENT_PARAM="$agent_name"
+      echo "[agence] Launching agent: @${agent_name}"
+      ailedger_append "route" "persona-${agent_name}" ""
+      shell_bash_session
       ;;
     *)
-      echo "Unknown system command: $sys_cmd" >&2
-      return 1
+      # Fallback: try as a direct system command (pass-through)
+      if command -v "$sys_cmd" &>/dev/null; then
+        shift
+        "$sys_cmd" "$@"
+      else
+        echo "Unknown system command: $sys_cmd" >&2
+        return 1
+      fi
       ;;
   esac
+}
+
+# ============================================================================
+# SESSION: SAVE (^save)
+# ============================================================================
+# Capture current runstate to nexus/.aisaves/
+# Richer than simple session — includes git state, lessons count, dirty files
+# Usage: agence ^save [notes]
+
+save_session() {
+  local notes="${1:-}"
+  local agent_id="${AGENCE_AGENT_PARAM:-${AI_AGENT:-@}}"
+  local session_id="${AGENCE_SESSION_ID:-$(generate_shell_session_id save)}"
+  local log_id="save-$(date +%Y%m%d_%H%M%S)-$(printf '%x' $((RANDOM * RANDOM)))"
+  local saves_dir="${AGENCE_ROOT}/nexus/.aisaves"
+  local sessions_dir="${AGENCE_ROOT}/nexus/sessions"
+  local lessons_dir="${AGENCE_ROOT}/synthetic/l-agence.org/lessons"
+  mkdir -p "$saves_dir" "$sessions_dir" 2>/dev/null
+
+  local branch; branch=$(git -C "$AGENCE_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+  local commit; commit=$(git -C "$AGENCE_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+  local dirty; dirty=$(git -C "$AGENCE_ROOT" status --short 2>/dev/null | wc -l | tr -d ' ')
+  local staged; staged=$(git -C "$AGENCE_ROOT" diff --cached --name-only 2>/dev/null | wc -l | tr -d ' ')
+  local lessons; lessons=$(find "$lessons_dir" -name "*.md" -not -name "INDEX.md" -type f 2>/dev/null | wc -l | tr -d ' ')
+  local sessions; sessions=$(find "$saves_dir" -name "*.json" -type f 2>/dev/null | wc -l | tr -d ' ')
+  local recent; recent=$(git -C "$AGENCE_ROOT" log --oneline -5 2>/dev/null | sed 's/"/\\"/g' | awk '{printf "    \"%s\",\n", $0}' | sed '$ s/,$//')
+  local dirty_files; dirty_files=$(git -C "$AGENCE_ROOT" status --short 2>/dev/null | sed 's/"/\\"/g' | awk '{printf "    \"%s\",\n", $0}' | sed '$ s/,$//')
+  local notes_esc; notes_esc=$(echo "$notes" | sed 's/"/\\"/g')
+
+  if [[ -z "$notes" ]]; then
+    echo ""
+    echo "[^SAVE] Session: $session_id | Agent: $agent_id | Git: $branch @ $commit"
+    read -r -p "Notes (optional, Enter to skip): " notes
+    notes_esc=$(echo "$notes" | sed 's/"/\\"/g')
+  fi
+
+  local save_file="${saves_dir}/${log_id}.json"
+  cat > "$save_file" <<EOF
+{
+  "log_id": "$log_id",
+  "agent_id": "$agent_id",
+  "session_id": "$session_id",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "user": "$(whoami)",
+  "cwd": "$(pwd)",
+  "notes": "$notes_esc",
+  "git": { "branch": "$branch", "commit": "$commit", "dirty_files": $dirty, "staged_files": $staged },
+  "knowledge": { "lessons_count": $lessons, "sessions_count": $sessions },
+  "recent_commits": [
+$recent
+  ],
+  "dirty_files": [
+$dirty_files
+  ]
+}
+EOF
+
+  echo ""
+  echo "✓ Saved: $log_id"
+  echo "  Agent:   $agent_id | Session: $session_id"
+  echo "  Git:     $branch @ $commit ($dirty dirty, $staged staged)"
+  echo "  File:    $save_file"
+  echo "  Next:    ^handoff @agent | ^commit | ^push"
+  return 0
+}
+
+# ============================================================================
+# SESSION: LEARN (^learn) — richer version scanning sessions + faults + lessons
+# ============================================================================
+
+learn_agence_changes() {
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  AGENCE LEARN (^learn)"; echo "══════════════════════════════════════════════"; echo ""
+
+  local sessions_dir="${AGENCE_ROOT}/nexus/.aisessions"
+  local saves_dir="${AGENCE_ROOT}/nexus/.aisaves"
+  local faults_dir="${AGENCE_ROOT}/nexus/faults"
+  local lessons_dir="${AGENCE_ROOT}/synthetic/l-agence.org/lessons"
+  mkdir -p "$lessons_dir" 2>/dev/null
+
+  local session_count=0; local save_count=0; local fault_count=0; local lesson_count=0
+
+  echo "  Step 1/3: Session history..."
+  [[ -d "$sessions_dir" ]] && session_count=$(find "$sessions_dir" -name "*.meta.json" -type f 2>/dev/null | wc -l | tr -d ' ')
+  [[ -d "$saves_dir" ]] && save_count=$(find "$saves_dir" -name "*.json" -type f 2>/dev/null | wc -l | tr -d ' ')
+  echo "    Sessions: $session_count | Saves: $save_count"
+
+  echo "  Step 2/3: Reviewing faults..."
+  if [[ -d "$faults_dir" ]]; then
+    fault_count=$(find "$faults_dir" -name "*.md" -type f 2>/dev/null | wc -l | tr -d ' ')
+    echo "    Faults: $fault_count"
+    find "$faults_dir" -name "*.md" -type f 2>/dev/null | while read -r f; do
+      echo "      - $(basename "$f" .md)"
+    done
+  else
+    echo "    No faults directory"
+  fi
+
+  echo "  Step 3/3: Current codex..."
+  local p_count; p_count=$(grep -c "^## Maxim" "${AGENCE_ROOT}/codex/PRINCIPLES.md" 2>/dev/null || echo 0)
+  local l_count; l_count=$(grep -c "^## Law" "${AGENCE_ROOT}/codex/LAWS.md" 2>/dev/null || echo 0)
+  local r_count; r_count=$(grep -c "^## Rule" "${AGENCE_ROOT}/codex/RULES.md" 2>/dev/null || echo 0)
+  lesson_count=$(find "$lessons_dir" -name "*.md" -not -name "INDEX.md" -type f 2>/dev/null | wc -l | tr -d ' ')
+  echo "    Principles: $p_count | Laws: $l_count | Rules: $r_count"
+  echo "    Shared lessons: $lesson_count"
+
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  LEARN COMPLETE"
+  echo "  Sessions: $session_count | Faults: $fault_count | Lessons: $lesson_count"
+  echo "  Next: ^lesson add \"<insight>\" | ^fault list | ^commit"; echo ""
+  return 0
+}
+
+# ============================================================================
+# SESSION: COMMIT
+# ============================================================================
+# Stage and commit all Agence changes
+# Usage: agence ^commit [message]
+
+commit_agence_changes() {
+  local commit_msg="${1:-}"
+
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Committing Agence changes..." >&2
+
+  local status; status=$(git -C "$AGENCE_ROOT" status --short 2>/dev/null)
+
+  if [[ -z "$status" ]]; then
+    echo ""
+    echo "✓ No changes to commit."
+    return 0
+  fi
+
+  echo ""
+  echo "[^COMMIT] Changed files:"
+  echo "=============================================="
+  echo "$status" | head -25
+  local total; total=$(echo "$status" | wc -l)
+  [[ $total -gt 25 ]] && echo "  ... and $(( total - 25 )) more"
+  echo ""
+
+  # Prompt if no message given
+  if [[ -z "$commit_msg" ]]; then
+    read -r -p "Commit message (Enter to show diff first): " commit_msg
+    if [[ -z "$commit_msg" ]]; then
+      git -C "$AGENCE_ROOT" diff --color=auto | head -80
+      echo ""
+      read -r -p "Commit message: " commit_msg
+      [[ -z "$commit_msg" ]] && { echo "[CANCELLED]"; return 1; }
+    fi
+  fi
+
+  git -C "$AGENCE_ROOT" add -A && git -C "$AGENCE_ROOT" commit -m "$commit_msg"
+
+  if [[ $? -eq 0 ]]; then
+    echo ""
+    echo "✓ Committed."
+    echo "  Next: agence ^push"
+    return 0
+  else
+    echo "[ERROR] Commit failed." >&2
+    return 1
+  fi
+}
+
+# ============================================================================
+# SESSION: PUSH
+# ============================================================================
+# Push committed Agence changes to origin (confirmation-gated)
+# Usage: agence ^push
+
+push_agence_changes() {
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Pushing Agence changes..." >&2
+
+  local branch; branch=$(git -C "$AGENCE_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
+  [[ "$branch" == "HEAD" ]] && branch="main"
+
+  echo ""
+  echo "[^PUSH] Preparing push"
+  echo "=============================================="
+  echo "  Repo:   $(git -C "$AGENCE_ROOT" remote get-url origin 2>/dev/null || echo 'unknown')"
+  echo "  Branch: $branch → origin/$branch"
+  echo ""
+  read -r -p "Continue? [y/N] " confirm
+  [[ "$confirm" != "y" && "$confirm" != "Y" ]] && { echo "[CANCELLED]"; return 1; }
+
+  echo ""
+  git -C "$AGENCE_ROOT" push -u origin "$branch"
+
+  if [[ $? -eq 0 ]]; then
+    echo ""
+    echo "✓ Pushed to origin/$branch"
+    return 0
+  else
+    echo "[ERROR] Push failed." >&2
+    return 1
+  fi
 }
 
 # ============================================================================
@@ -1160,6 +2491,378 @@ install_linux_packages() {
     return 1
   fi
   return 0
+}
+
+# ============================================================================
+# AGENT ROUTING: Parse @agent prefix and get agent identity
+# ============================================================================
+
+parse_agent_prefix() {
+  local input="$1"
+  if [[ "$input" =~ ^@([A-Za-z0-9_-]*)[[:space:]]+(.*) ]]; then
+    local agent_name="${BASH_REMATCH[1]}"
+    local remaining_cmd="${BASH_REMATCH[2]}"
+    [[ -z "$agent_name" ]] && export AGENCE_AGENT_PARAM="@" || export AGENCE_AGENT_PARAM="$agent_name"
+    echo "$remaining_cmd"
+  else
+    export AGENCE_AGENT_PARAM="@"
+    echo "$input"
+  fi
+}
+
+get_agent_id() {
+  echo "${AI_AGENT:-${AIDO_AGENT:-ai-agent}}"  # AI_AGENT canonical; AIDO_AGENT compat fallback
+}
+
+# ============================================================================
+# SHELL SESSIONS: Bash and PowerShell with session/agent pinning
+# ============================================================================
+
+generate_shell_session_id() {
+  local shell_type="$1"
+  local timestamp; timestamp=$(date +%Y%m%d_%H%M%S)
+  local pid=$$
+  local hexid; hexid=$(printf '%x' $((RANDOM * RANDOM)))
+  echo "${shell_type}-${timestamp}-${pid}-${hexid}"
+}
+
+set_vscode_terminal_title() {
+  printf '\033]0;%s\007' "$1"
+}
+
+shell_bash_session() {
+  local agent_id="${AGENCE_AGENT_PARAM:-${AI_AGENT:-@}}"
+  local session_id; session_id=$(generate_shell_session_id "bash")
+  local vscode_title="bash:${session_id}@${agent_id}"
+  local sessions_dir="${AGENCE_ROOT}/nexus/.aisessions"
+  mkdir -p "$sessions_dir" 2>/dev/null
+  local session_meta="${sessions_dir}/${session_id}.meta.json"
+  cat > "$session_meta" <<EOF
+{
+  "session_id": "$session_id",
+  "session_type": "bash",
+  "agent_id": "$agent_id",
+  "shell": "bash",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "pid": $$,
+  "user": "$(whoami)",
+  "cwd": "$(pwd)"
+}
+EOF
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  BASH SESSION"
+  echo "══════════════════════════════════════════════"
+  echo "  Session:   $session_id"
+  echo "  Agent:     $agent_id"
+  echo "  Dir:       $(pwd)"
+  echo "  Metadata:  $session_meta"
+  echo "══════════════════════════════════════════════"; echo ""
+  set_vscode_terminal_title "$vscode_title"
+  export AGENT="$agent_id" AI_AGENT="$agent_id" AGENCE_SESSION_ID="$session_id" AGENCE_SESSION_TYPE="bash"
+  exec bash --rcfile "${AGENCE_ROOT}/bin/ai-shell.sh" -i 2>/dev/null || exec bash --login
+}
+
+shell_powershell_session() {
+  local agent_id="${AGENCE_AGENT_PARAM:-${AI_AGENT:-@}}"
+  local session_id; session_id=$(generate_shell_session_id "ps")
+  local vscode_title="powershell:${session_id}@${agent_id}"
+  local sessions_dir="${AGENCE_ROOT}/nexus/.aisessions"
+  mkdir -p "$sessions_dir" 2>/dev/null
+  cat > "${sessions_dir}/${session_id}.meta.json" <<EOF
+{
+  "session_id": "$session_id",
+  "session_type": "powershell",
+  "agent_id": "$agent_id",
+  "shell": "powershell",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "pid": $$,
+  "user": "$(whoami)",
+  "cwd": "$(pwd)"
+}
+EOF
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  POWERSHELL SESSION"
+  echo "══════════════════════════════════════════════"
+  echo "  Session:   $session_id"
+  echo "  Agent:     $agent_id"
+  echo "  Dir:       $(pwd)"
+  echo "══════════════════════════════════════════════"; echo ""
+  set_vscode_terminal_title "$vscode_title"
+  export AI_AGENT="$agent_id" AGENCE_SESSION_ID="$session_id" AGENCE_SESSION_TYPE="powershell"
+  if command -v pwsh &>/dev/null; then
+    exec pwsh -NoExit -Command "\$env:AI_AGENT='$agent_id'; \$env:AGENCE_SESSION_ID='$session_id'; function prompt { return 'pwsh:${session_id}@${agent_id}: ' }"
+  elif command -v powershell.exe &>/dev/null; then
+    exec powershell.exe -NoExit -Command "\$env:AI_AGENT='$agent_id'; \$env:AGENCE_SESSION_ID='$session_id'"
+  else
+    echo "✗ PowerShell not found (tried pwsh and powershell.exe)"; return 1
+  fi
+}
+
+# ============================================================================
+# REINDEX: Refresh all knowledge base indices
+# ============================================================================
+
+reindex_knowledge_bases() {
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  AGENCE REINDEX (^reindex)"
+  echo "══════════════════════════════════════════════"; echo ""
+  local dirs=("synthetic" "nexus" "globalcache" "organic")
+  local reindexed=0
+  for dir in "${dirs[@]}"; do
+    local d="${AGENCE_ROOT}/$dir"
+    [[ -d "$d" ]] || continue
+    echo "  Scanning: $dir/"
+    while IFS= read -r md; do
+      local base; base=$(dirname "$md")
+      local json="${base}/INDEX.json"
+      if [[ ! -f "$json" ]]; then
+        echo "    ⚠ Missing INDEX.json: ${base#$AGENCE_ROOT/}"
+      else
+        echo "    ✓ ${base#$AGENCE_ROOT/}"
+      fi
+      ((reindexed++))
+    done < <(find "$d" -name "INDEX.md" -type f 2>/dev/null | sort)
+  done
+  echo ""
+  echo "  Directories scanned: $reindexed INDEX.md files"
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  REINDEX COMPLETE"; echo ""
+}
+
+# ============================================================================
+# HANDOFF: Transfer session context to another agent
+# ============================================================================
+
+handoff_to_agent() {
+  local target="${1:-}"
+  [[ $# -gt 0 ]] && shift
+  local context_msg="$*"
+  local source_agent="${AGENCE_AGENT_PARAM:-${AI_AGENT:-@}}"
+  local session_id="${AGENCE_SESSION_ID:-$(generate_shell_session_id handoff)}"
+  local handoff_id="handoff-$(date +%Y%m%d_%H%M%S)-$(printf '%x' $((RANDOM * RANDOM)))"
+
+  if [[ -z "$target" ]]; then
+    echo ""; echo "Usage: agence ^handoff <target_agent> [context message]"
+    echo "  agence ^handoff @ralph \"implement matrix-math.ts\""
+    echo "  agence ^handoff user \"analysis complete, review results\""
+    echo ""; echo "Available agents:"
+    ls "${AGENCE_ROOT}/codex/agents/" 2>/dev/null | grep -v '\.md$' | sed 's/^/  @/'
+    return 1
+  fi
+
+  local target_name="${target#@}"
+  if [[ "$target_name" != "user" ]] && [[ ! -d "${AGENCE_ROOT}/codex/agents/$target_name" ]]; then
+    echo "Error: Unknown agent: $target" >&2; return 1
+  fi
+
+  local handoffs_dir="${AGENCE_ROOT}/nexus/.aihandoffs"
+  mkdir -p "$handoffs_dir" 2>/dev/null
+
+  local branch; branch=$(git -C "$AGENCE_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+  local commit; commit=$(git -C "$AGENCE_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+  local dirty; dirty=$(git -C "$AGENCE_ROOT" status --short 2>/dev/null | wc -l | tr -d ' ')
+  local recent; recent=$(git -C "$AGENCE_ROOT" log --oneline -5 2>/dev/null | sed 's/"/\\"/g' | awk '{printf "    \"%s\",\n", $0}' | sed '$ s/,$//')
+  local ctx_esc; ctx_esc=$(echo "$context_msg" | sed 's/"/\\"/g')
+
+  local handoff_file="${handoffs_dir}/${handoff_id}.json"
+  cat > "$handoff_file" <<EOF
+{
+  "handoff_id": "$handoff_id",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "source": { "agent": "$source_agent", "session_id": "$session_id" },
+  "target": { "agent": "$target", "agent_dir": "$target_name" },
+  "context": "$ctx_esc",
+  "git": { "branch": "$branch", "commit": "$commit", "dirty_files": $dirty },
+  "recent_commits": [
+$recent
+  ],
+  "status": "pending"
+}
+EOF
+
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  AGENCE HANDOFF (^handoff)"
+  echo "══════════════════════════════════════════════"
+  echo "  From:    $source_agent"
+  echo "  To:      $target"
+  echo "  Session: $session_id"
+  echo "  ID:      $handoff_id"
+  [[ -n "$context_msg" ]] && echo "  Context: $context_msg"
+  echo "  Git:     $branch @ $commit ($dirty dirty)"
+  echo ""; echo "  File: $handoff_file"
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  HANDOFF COMPLETE"
+  echo "  Next: agence @$target_name ^pickup $handoff_id"; echo ""
+}
+
+# ============================================================================
+# PICKUP: Accept a pending handoff
+# ============================================================================
+
+pickup_handoff() {
+  local pickup_arg="${1:-}"
+  local current_agent="${AGENCE_AGENT_PARAM:-${AI_AGENT:-@}}"
+  local current_name="${current_agent#@}"
+  local handoffs_dir="${AGENCE_ROOT}/nexus/.aihandoffs"
+
+  if [[ ! -d "$handoffs_dir" ]]; then
+    echo ""; echo "No handoffs directory found. Nothing to pick up."; return 0
+  fi
+
+  if [[ -z "$pickup_arg" ]]; then
+    echo ""; echo "══════════════════════════════════════════════"
+    echo "  AGENCE PICKUP (^pickup) — pending handoffs"
+    echo "  Agent: $current_agent"
+    echo "══════════════════════════════════════════════"; echo ""
+    local found=0
+    while IFS= read -r f; do
+      [[ -z "$f" ]] && continue
+      local target_agent; target_agent=$(grep -o '"agent": *"[^"]*"' "$f" | tail -1 | sed 's/.*"agent": *"//;s/"//')
+      local status; status=$(grep -o '"status": *"[^"]*"' "$f" | sed 's/.*"status": *"//;s/"//')
+      local tclean="${target_agent#@}"
+      if [[ "$status" == "pending" ]] && { [[ "$tclean" == "$current_name" ]] || [[ "$current_agent" == "@" ]]; }; then
+        local hid; hid=$(grep -o '"handoff_id": *"[^"]*"' "$f" | sed 's/.*"handoff_id": *"//;s/"//')
+        local source; source=$(grep -o '"agent": *"[^"]*"' "$f" | head -1 | sed 's/.*"agent": *"//;s/"//')
+        local ctx; ctx=$(grep -o '"context": *"[^"]*"' "$f" | sed 's/.*"context": *"//;s/"//')
+        found=$((found+1))
+        echo "  [$found] $hid"
+        echo "      From: $source | Context: ${ctx:-<none>}"
+      fi
+    done < <(find "$handoffs_dir" -name "handoff-*.json" -type f 2>/dev/null | sort -r)
+    [[ $found -eq 0 ]] && echo "  No pending handoffs for $current_agent" || echo ""; echo "  Accept with: agence ^pickup <handoff_id>"
+    echo ""; return 0
+  fi
+
+  local handoff_file
+  if [[ -f "${handoffs_dir}/${pickup_arg}.json" ]]; then
+    handoff_file="${handoffs_dir}/${pickup_arg}.json"
+  else
+    handoff_file=$(find "$handoffs_dir" -name "*${pickup_arg}*.json" -type f 2>/dev/null | head -1)
+  fi
+  [[ -z "$handoff_file" ]] && { echo "Error: Handoff not found: $pickup_arg" >&2; return 1; }
+
+  local status; status=$(grep -o '"status": *"[^"]*"' "$handoff_file" | sed 's/.*"status": *"//;s/"//')
+  [[ "$status" != "pending" ]] && { echo "Error: Handoff already $status" >&2; return 1; }
+
+  local hid; hid=$(grep -o '"handoff_id": *"[^"]*"' "$handoff_file" | sed 's/.*"handoff_id": *"//;s/"//')
+  local source; source=$(grep -o '"agent": *"[^"]*"' "$handoff_file" | head -1 | sed 's/.*"agent": *"//;s/"//')
+  local ctx; ctx=$(grep -o '"context": *"[^"]*"' "$handoff_file" | sed 's/.*"context": *"//;s/"//')
+  local hbranch; hbranch=$(grep -o '"branch": *"[^"]*"' "$handoff_file" | sed 's/.*"branch": *"//;s/"//')
+  local hcommit; hcommit=$(grep -o '"commit": *"[^"]*"' "$handoff_file" | sed 's/.*"commit": *"//;s/"//')
+
+  sed -i "s/\"status\": \"pending\"/\"status\": \"accepted\"/" "$handoff_file"
+
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  AGENCE PICKUP — handoff accepted"
+  echo "  Transfer: $source → $current_agent"
+  echo "  ID:       $hid"
+  echo "  Context:  ${ctx:-<none>}"
+  echo "  Git:      $hbranch @ $hcommit"
+  echo ""; echo "  Status: pending → accepted"
+  echo "══════════════════════════════════════════════"
+  echo "  Use ^save to checkpoint | ^handoff to forward"; echo ""
+}
+
+# ============================================================================
+# PAUSE / RESUME: Suspend and restore sessions (Unix job control semantics)
+# ============================================================================
+
+pause_session() {
+  local agent_id="${AGENCE_AGENT_PARAM:-${AI_AGENT:-@}}"
+  local session_id="${AGENCE_SESSION_ID:-$(generate_shell_session_id pause)}"
+  local pause_id="pause-$(date +%Y%m%d_%H%M%S)-$(printf '%x' $((RANDOM * RANDOM)))"
+  local saves_dir="${AGENCE_ROOT}/nexus/.aisaves"
+  mkdir -p "$saves_dir" 2>/dev/null
+
+  local branch; branch=$(git -C "$AGENCE_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+  local commit; commit=$(git -C "$AGENCE_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+  local dirty; dirty=$(git -C "$AGENCE_ROOT" status --short 2>/dev/null | wc -l | tr -d ' ')
+  local recent; recent=$(git -C "$AGENCE_ROOT" log --oneline -5 2>/dev/null | sed 's/"/\\"/g' | awk '{printf "    \"%s\",\n", $0}' | sed '$ s/,$//')
+
+  local pause_file="${saves_dir}/${pause_id}.json"
+  cat > "$pause_file" <<EOF
+{
+  "log_id": "$pause_id",
+  "type": "pause",
+  "agent_id": "$agent_id",
+  "session_id": "$session_id",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "status": "paused",
+  "user": "$(whoami)",
+  "cwd": "$(pwd)",
+  "git": { "branch": "$branch", "commit": "$commit", "dirty_files": $dirty },
+  "recent_commits": [
+$recent
+  ]
+}
+EOF
+
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  AGENCE PAUSE (^pause)"
+  echo "  Agent:    $agent_id"
+  echo "  Session:  $session_id"
+  echo "  Pause ID: $pause_id"
+  echo "  Git:      $branch @ $commit ($dirty dirty)"
+  echo ""; echo "  File: $pause_file"
+  echo "══════════════════════════════════════════════"
+  echo "  SESSION PAUSED"
+  echo "  Resume with: agence ^resume $pause_id"; echo ""
+}
+
+resume_session() {
+  local resume_arg="${1:-}"
+  local current_agent="${AGENCE_AGENT_PARAM:-${AI_AGENT:-@}}"
+  local saves_dir="${AGENCE_ROOT}/nexus/.aisaves"
+
+  if [[ ! -d "$saves_dir" ]]; then
+    echo ""; echo "No saves directory found. Nothing to resume."; return 0
+  fi
+
+  if [[ -z "$resume_arg" ]]; then
+    echo ""; echo "══════════════════════════════════════════════"
+    echo "  AGENCE RESUME (^resume) — paused sessions"
+    echo "  Agent: $current_agent"
+    echo "══════════════════════════════════════════════"; echo ""
+    local found=0
+    while IFS= read -r f; do
+      [[ -z "$f" ]] && continue
+      local status; status=$(grep -o '"status": *"[^"]*"' "$f" | sed 's/.*"status": *"//;s/"//')
+      [[ "$status" != "paused" ]] && continue
+      local lid; lid=$(grep -o '"log_id": *"[^"]*"' "$f" | sed 's/.*"log_id": *"//;s/"//')
+      local aid; aid=$(grep -o '"agent_id": *"[^"]*"' "$f" | sed 's/.*"agent_id": *"//;s/"//')
+      local ts; ts=$(grep -o '"timestamp": *"[^"]*"' "$f" | sed 's/.*"timestamp": *"//;s/"//')
+      found=$((found+1))
+      echo "  [$found] $lid"
+      echo "      Agent: $aid | At: $ts"
+    done < <(find "$saves_dir" -name "pause-*.json" -type f 2>/dev/null | sort -r)
+    [[ $found -eq 0 ]] && echo "  No paused sessions found" || echo ""; echo "  Resume with: agence ^resume <pause_id>"
+    echo ""; return 0
+  fi
+
+  local save_file
+  if [[ -f "${saves_dir}/${resume_arg}.json" ]]; then
+    save_file="${saves_dir}/${resume_arg}.json"
+  else
+    save_file=$(find "$saves_dir" -name "*${resume_arg}*.json" -type f 2>/dev/null | head -1)
+  fi
+  [[ -z "$save_file" ]] && { echo "Error: Save not found: $resume_arg" >&2; return 1; }
+
+  local lid; lid=$(grep -o '"log_id": *"[^"]*"' "$save_file" | sed 's/.*"log_id": *"//;s/"//')
+  local aid; aid=$(grep -o '"agent_id": *"[^"]*"' "$save_file" | sed 's/.*"agent_id": *"//;s/"//')
+  local hbranch; hbranch=$(grep -o '"branch": *"[^"]*"' "$save_file" | sed 's/.*"branch": *"//;s/"//')
+  local hcommit; hcommit=$(grep -o '"commit": *"[^"]*"' "$save_file" | sed 's/.*"commit": *"//;s/"//')
+
+  sed -i "s/\"status\": \"paused\"/\"status\": \"resumed\"/" "$save_file"
+  export AI_AGENT="$aid" AGENCE_SESSION_ID="$lid"
+
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  AGENCE RESUME — session restored"
+  echo "  ID:     $lid"
+  echo "  Agent:  $aid"
+  echo "  Git:    $hbranch @ $hcommit"
+  echo "  Status: paused → resumed"
+  echo "══════════════════════════════════════════════"
+  echo "  SESSION ACTIVE — use ^save to checkpoint"; echo ""
 }
 
 # ============================================================================

@@ -135,6 +135,10 @@ All mistake resolution is joint human-AI cooperation, never unilateral.
 
 ---
 
+## Principle: Todos are personal, tasks are team based
+
+Todos are for individual tracking and reflection. Tasks are for collaborative, team-based execution and accountability.
+
 ## Summary
 
 The PRINCIPLES guide the LAWS and RULES:

@@ -1,0 +1,380 @@
+version: 1
+policy: AI_COMMAND_EXECUTION_POLICY
+
+description: |
+  Read-only command policy for AI shells and agentic command routers.
+  Commands in the whitelist are considered non-destructive and may run
+  without confirmation. Commands in the blacklist require human approval
+  or must be blocked entirely.
+
+global_rules:
+
+  shell_safety:
+    block_operators:
+      - ">"
+      - ">>"
+      - "|"
+      - "&&"
+      - ";"
+      - "$("
+      - "`"
+    block_privilege_escalation:
+      - "sudo"
+      - "doas"
+      - "runas"
+    block_background_execution:
+      - "&"
+    block_interpreters:
+      - "bash -c"
+      - "sh -c"
+      - "python -c"
+      - "node -e"
+
+  environment_protection:
+    block_env_exposure:
+      - "printenv"
+      - "env"
+    note: |
+      These may reveal credentials and should be optionally gated
+      depending on environment security requirements.
+
+whitelist:
+
+  git_cli:
+    allowed_commands:
+
+      - "git status"
+      - "git log"
+      - "git log --oneline"
+      - "git show"
+      - "git diff"
+      - "git diff --cached"
+      - "git branch"
+      - "git branch -a"
+      - "git tag"
+      - "git reflog"
+      - "git describe"
+      - "git shortlog"
+
+      - "git config --list"
+
+      - "git remote"
+      - "git remote -v"
+
+      - "git rev-parse"
+      - "git symbolic-ref"
+      - "git name-rev"
+      - "git show-ref"
+
+      - "git ls-files"
+      - "git ls-tree"
+      - "git blame"
+      - "git grep"
+
+      - "git cat-file"
+
+      - "git fetch --dry-run"
+      - "git ls-remote"
+
+
+  github_cli:
+    allowed_commands:
+
+      - "gh repo view"
+      - "gh repo list"
+      - "gh repo search"
+
+      - "gh pr list"
+      - "gh pr view"
+      - "gh pr status"
+      - "gh pr checks"
+
+      - "gh issue list"
+      - "gh issue view"
+
+      - "gh run list"
+      - "gh run view"
+      - "gh run download"
+
+      - "gh workflow list"
+      - "gh workflow view"
+
+      - "gh auth status"
+
+      - "gh org list"
+
+      - "gh api GET"
+
+
+  aws_cli:
+
+    allowed_prefixes:
+
+      - "describe-"
+      - "get-"
+      - "list-"
+      - "head-"
+
+    examples:
+
+      ec2:
+        - "aws ec2 describe-instances"
+        - "aws ec2 describe-volumes"
+        - "aws ec2 describe-security-groups"
+        - "aws ec2 describe-vpcs"
+
+      s3:
+        - "aws s3 ls"
+        - "aws s3api list-buckets"
+        - "aws s3api list-objects"
+        - "aws s3api head-object"
+
+      iam:
+        - "aws iam list-users"
+        - "aws iam list-roles"
+        - "aws iam get-role"
+        - "aws iam get-user"
+        - "aws iam list-policies"
+
+      cloudformation:
+        - "aws cloudformation list-stacks"
+        - "aws cloudformation describe-stacks"
+
+      lambda:
+        - "aws lambda list-functions"
+        - "aws lambda get-function"
+
+      sts:
+        - "aws sts get-caller-identity"
+
+      cloudwatch:
+        - "aws logs describe-log-groups"
+        - "aws logs describe-log-streams"
+        - "aws logs get-log-events"
+
+
+  terraform:
+
+    allowed_commands:
+
+      - "terraform init"
+      - "terraform validate"
+      - "terraform plan"
+
+    restrictions:
+
+      terraform_init:
+        forbid_flags:
+          - "-upgrade"
+
+      terraform_plan:
+        note: |
+          Plan is considered read-only but may access remote state.
+
+
+  linux_shell:
+
+    filesystem_read:
+
+      - "ls"
+      - "stat"
+      - "file"
+      - "cat"
+      - "less"
+      - "head"
+      - "tail"
+      - "wc"
+      - "du"
+      - "df"
+      - "tree"
+
+    text_processing:
+
+      - "grep"
+      - "egrep"
+      - "fgrep"
+      - "awk"
+      - "sed"
+      - "cut"
+      - "sort"
+      - "uniq"
+      - "tr"
+
+    system_information:
+
+      - "whoami"
+      - "id"
+      - "uname"
+      - "uptime"
+      - "date"
+      - "ps"
+      - "top"
+      - "htop"
+      - "free"
+      - "lscpu"
+      - "lsblk"
+      - "mount"
+      - "ip addr"
+      - "netstat"
+      - "ss"
+
+    package_queries:
+
+      - "apt list"
+      - "apt-cache policy"
+      - "rpm -qa"
+      - "dpkg -l"
+
+
+  powershell:
+
+    allowed_verbs:
+
+      - "Get"
+      - "Test"
+      - "Measure"
+      - "Select"
+      - "Where"
+      - "Sort"
+      - "Group"
+      - "Compare"
+
+    example_cmdlets:
+
+      filesystem:
+        - "Get-ChildItem"
+        - "Get-Content"
+        - "Get-Item"
+        - "Get-ItemProperty"
+        - "Test-Path"
+
+      system:
+        - "Get-Process"
+        - "Get-Service"
+        - "Get-EventLog"
+        - "Get-WinEvent"
+
+      networking:
+        - "Get-NetIPAddress"
+        - "Get-NetAdapter"
+        - "Test-Connection"
+
+      cloud_or_ad:
+        - "Get-ADUser"
+        - "Get-ADGroup"
+        - "Get-AzVM"
+        - "Get-AzResource"
+
+
+blacklist:
+
+  git_cli:
+
+    unsafe_commands:
+
+      - "git commit"
+      - "git push"
+      - "git pull"
+      - "git merge"
+      - "git rebase"
+      - "git reset"
+      - "git checkout"
+      - "git switch"
+      - "git add"
+      - "git stash"
+      - "git clean"
+
+
+  github_cli:
+
+    unsafe_commands:
+
+      - "gh repo create"
+      - "gh repo delete"
+      - "gh pr merge"
+      - "gh pr close"
+      - "gh issue close"
+      - "gh release create"
+      - "gh secret set"
+      - "gh variable set"
+      - "gh workflow run"
+
+
+  aws_cli:
+
+    blocked_prefixes:
+
+      - "create-"
+      - "delete-"
+      - "put-"
+      - "update-"
+      - "modify-"
+      - "attach-"
+      - "detach-"
+      - "start-"
+      - "stop-"
+      - "terminate-"
+
+    examples:
+
+      - "aws ec2 terminate-instances"
+      - "aws ec2 start-instances"
+      - "aws iam create-user"
+      - "aws s3 rm"
+      - "aws s3 cp"
+
+
+  terraform:
+
+    unsafe_commands:
+
+      - "terraform destroy"
+      - "terraform apply"
+      - "terraform init --upgrade"
+
+    note: |
+      These commands modify infrastructure and must always require
+      explicit human approval.
+
+
+  linux_shell:
+
+    destructive_commands:
+
+      - "rm"
+      - "mv"
+      - "cp"
+      - "chmod"
+      - "chown"
+      - "kill"
+      - "killall"
+      - "systemctl"
+      - "service"
+      - "shutdown"
+      - "reboot"
+      - "mount"
+      - "umount"
+
+
+  powershell:
+
+    blocked_verbs:
+
+      - "Set"
+      - "New"
+      - "Remove"
+      - "Add"
+      - "Clear"
+      - "Restart"
+      - "Stop"
+      - "Start"
+      - "Invoke"
+      - "Write"
+
+    dangerous_cmdlets:
+
+      - "Out-File"
+      - "Export-*"
+      - "Import-*"
+      - "Invoke-Expression"
+      - "Invoke-Command"

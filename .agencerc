@@ -21,6 +21,9 @@ export AGENT="${AGENT:-@}"
 export SHELL="${SHELL:-bash}"
 export SESSION="${SESSION:-unknown}"
 
+# Set default internal agence docs as an environment variable (synthetic DWM for agence itself)
+export AI_DOCS="C:\Users\steff\git\.agence\synthetic\l-agence.org\docs"
+
 # ============================================================================
 # PROMPT
 # ============================================================================
