@@ -298,8 +298,13 @@ EXAMPLES:
   agence "How do I deploy this to AWS?"
   agence +plan-vpc-infrastructure
   agence /terraform-plan
-  agence !help
-  agence ^init
+  agence !bash                     Open aibash session (current agent)
+  agence !shell                    Open PowerShell session
+  agence !aider                    Launch aider CLI (requires: pip install aider-chat)
+  agence !claude                   Launch Claude Code CLI (requires: npm i -g @anthropic-ai/claude-code)
+  agence !pilot                    Launch gh copilot CLI (requires: gh extension install github/gh-copilot)
+  agence !ralph                    Open aibash session as @ralph agent
+  agence !sonya                    Open aibash session as @sonya agent
   agence ^install
   agence ^learn
   agence ^status
@@ -1889,6 +1894,60 @@ create_windows_symlink() {
 # Example: agence !help
 # Example: agence !bash (open new shell)
 
+# ============================================================================
+# TOOL LAUNCHER — !aider, !claude, !pilot
+# ============================================================================
+# Checks installation, sets env, execs the tool directly.
+# Called from mode_system for real CLI tools (not agence persona agents).
+# Usage: launch_tool <tool> [extra-args...]
+
+launch_tool() {
+  local tool="$1"; shift
+  local extra_args="$*"
+
+  case "$tool" in
+    aider)
+      if ! command -v aider &>/dev/null; then
+        echo "✗ aider not installed." >&2
+        echo "  Install: pip install aider-chat" >&2
+        return 1
+      fi
+      echo "[agence] Launching aider (repo: ${GIT_REPO:-$(pwd)})"
+      export AI_AGENT="aider"
+      # --no-auto-commits: agence owns git, not aider
+      exec aider --no-auto-commits $extra_args
+      ;;
+    claude)
+      if ! command -v claude &>/dev/null; then
+        echo "✗ claude not installed." >&2
+        echo "  Install: npm install -g @anthropic-ai/claude-code" >&2
+        return 1
+      fi
+      echo "[agence] Launching claude code"
+      export AI_AGENT="claude"
+      exec claude $extra_args
+      ;;
+    pilot)
+      if ! command -v gh &>/dev/null; then
+        echo "✗ gh CLI not installed." >&2
+        return 1
+      fi
+      if ! gh copilot --version &>/dev/null 2>&1; then
+        echo "✗ gh copilot extension not installed." >&2
+        echo "  Install: gh extension install github/gh-copilot" >&2
+        return 1
+      fi
+      echo "[agence] Launching gh copilot"
+      export AI_AGENT="pilot"
+      exec gh copilot suggest $extra_args
+      ;;
+    *)
+      echo "✗ Unknown tool: $tool" >&2
+      return 1
+      ;;
+  esac
+}
+
 mode_system() {
   local sys_cmd="$1"
 
@@ -1920,8 +1979,12 @@ mode_system() {
     shell)
       shell_powershell_session
       ;;
-    # Named agent launchers: !ralph, !aider, !pilot, !sonya, !claudia, !copilot, !claude, !azure, !devops
-    ralph|aider|pilot|copilot|sonya|claudia|haiku|chad|aiko|kilo|peers|claude|azure|devops)
+    # Real CLI tool launchers — check installed, exec directly
+    aider|claude|pilot)
+      launch_tool "$sys_cmd" "${@:2}"
+      ;;
+    # Persona agents — aibash session with AI_AGENT set
+    ralph|copilot|sonya|claudia|haiku|chad|aiko|kilo|peers|azure|devops)
       local agent_name="$sys_cmd"
       export AI_AGENT="$agent_name" AGENCE_AGENT_PARAM="$agent_name"
       echo "[agence] Launching agent: @${agent_name}"

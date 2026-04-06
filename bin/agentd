@@ -1,0 +1,175 @@
+#!/usr/bin/env bash
+################################################################################
+# agentd — tmux-based agence swarm orchestrator
+#
+# Manages a named tmux session ("agence") with one window per agent.
+# Each window runs an aibash Agent Plane shell with AI_AGENT set.
+#
+# Usage:
+#   agentd start [agent1 agent2 ...]   Start swarm (default: copilot ralph sonya aider)
+#   agentd stop                        Kill the tmux session
+#   agentd status                      Show running windows
+#   agentd attach [agent]              Attach to session (or jump to agent window)
+#   agentd add <agent>                 Add a new agent window to a running session
+#
+# Environment:
+#   AGENTD_SESSION   tmux session name (default: agence)
+#   AGENTD_AGENTS    space-separated agent list (default: copilot ralph sonya aider)
+################################################################################
+
+set -u
+
+AGENCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SESSION="${AGENTD_SESSION:-agence}"
+DEFAULT_AGENTS="copilot ralph sonya aider"
+
+_require_tmux() {
+  if ! command -v tmux &>/dev/null; then
+    echo "✗ tmux not installed." >&2
+    echo "  Install: sudo apt-get install tmux" >&2
+    exit 1
+  fi
+}
+
+_agent_window() {
+  local agent="$1"
+  echo "env AI_AGENT=${agent} AI_ROLE=agentic GIT_ROOT=${AGENCE_ROOT} \
+bash --rcfile ${AGENCE_ROOT}/bin/aibash"
+}
+
+cmd_start() {
+  _require_tmux
+  local agents=("${@:-$DEFAULT_AGENTS}")
+  [[ ${#agents[@]} -eq 1 && "${agents[0]}" == "$DEFAULT_AGENTS" ]] && \
+    IFS=' ' read -ra agents <<< "$DEFAULT_AGENTS"
+
+  if tmux has-session -t "$SESSION" 2>/dev/null; then
+    echo "[agentd] Session '$SESSION' already running."
+    echo "  Attach: agentd attach   |   Stop: agentd stop"
+    exit 0
+  fi
+
+  echo "[agentd] Starting swarm (session: $SESSION) — agents: ${agents[*]}"
+
+  # Create session detached with first agent as first window
+  local first="${agents[0]}"
+  tmux new-session -d -s "$SESSION" -n "@${first}" \
+    "$(_agent_window "$first")"
+
+  # Add remaining agents as windows
+  for agent in "${agents[@]:1}"; do
+    tmux new-window -t "$SESSION" -n "@${agent}" \
+      "$(_agent_window "$agent")"
+  done
+
+  # Select first window
+  tmux select-window -t "$SESSION:@${first}"
+
+  echo "[agentd] Started."
+  echo "  Attach:     agentd attach"
+  echo "  Jump to:    agentd attach <agent>"
+  echo "  tmux cmd:   tmux attach -t $SESSION"
+}
+
+cmd_stop() {
+  _require_tmux
+  if tmux kill-session -t "$SESSION" 2>/dev/null; then
+    echo "[agentd] Session '$SESSION' stopped."
+  else
+    echo "[agentd] Not running."
+  fi
+}
+
+cmd_status() {
+  _require_tmux
+  if tmux has-session -t "$SESSION" 2>/dev/null; then
+    echo "[agentd] Session: $SESSION (running)"
+    echo ""
+    tmux list-windows -t "$SESSION" -F "  #{window_index}  #{window_name}  #{?window_active,(active),}"
+  else
+    echo "[agentd] Not running. Start with: agentd start"
+  fi
+}
+
+cmd_attach() {
+  _require_tmux
+  local agent="${1:-}"
+  if ! tmux has-session -t "$SESSION" 2>/dev/null; then
+    echo "[agentd] Not running. Start with: agentd start" >&2
+    exit 1
+  fi
+  if [[ -n "$agent" ]]; then
+    local window="@${agent#@}"   # normalise: accept "ralph" or "@ralph"
+    tmux select-window -t "$SESSION:$window" 2>/dev/null || {
+      echo "✗ No window for agent '$agent' in session '$SESSION'" >&2
+      echo "  Windows: $(tmux list-windows -t "$SESSION" -F "#{window_name}" | tr '\n' ' ')" >&2
+      exit 1
+    }
+  fi
+  tmux attach-session -t "$SESSION"
+}
+
+cmd_add() {
+  _require_tmux
+  local agent="${1:-}"
+  if [[ -z "$agent" ]]; then
+    echo "Usage: agentd add <agent>" >&2
+    exit 1
+  fi
+  if ! tmux has-session -t "$SESSION" 2>/dev/null; then
+    echo "[agentd] Not running. Start first: agentd start" >&2
+    exit 1
+  fi
+  local window="@${agent#@}"
+  if tmux list-windows -t "$SESSION" -F "#{window_name}" 2>/dev/null | grep -qxF "$window"; then
+    echo "[agentd] Window '$window' already exists."
+  else
+    tmux new-window -t "$SESSION" -n "$window" \
+      "$(_agent_window "${agent#@}")"
+    echo "[agentd] Added window: $window"
+  fi
+}
+
+cmd_help() {
+  cat << 'EOF'
+agentd — tmux swarm orchestrator for agence
+
+USAGE:
+  agentd start [agent ...]   Start swarm (default agents: copilot ralph sonya aider)
+  agentd stop                Stop the swarm (kills tmux session)
+  agentd status              Show running windows
+  agentd attach [agent]      Attach to session; jump to agent window if given
+  agentd add <agent>         Add agent window to running session
+
+EXAMPLES:
+  agentd start                        # Start 4-agent default swarm
+  agentd start copilot ralph          # Start 2-agent swarm
+  agentd attach ralph                 # Attach and jump to @ralph window
+  agentd add sonya                    # Add @sonya to running session
+  agentd stop                         # Kill everything
+
+ENVIRONMENT:
+  AGENTD_SESSION=agence               # tmux session name
+  AGENTD_AGENTS="copilot ralph"       # override default agent list
+
+VSCODE INTEGRATION:
+  Add to tasks.json:
+    { "label": "🐙 agentd start", "command": "agentd", "args": ["start"],
+      "type": "shell", "isBackground": true, "problemMatcher": [] }
+EOF
+}
+
+# ── main ────────────────────────────────────────────────────────────────────
+case "${1:-help}" in
+  start)   shift; cmd_start "$@" ;;
+  stop)    cmd_stop ;;
+  status)  cmd_status ;;
+  attach)  shift; cmd_attach "${1:-}" ;;
+  add)     shift; cmd_add "${1:-}" ;;
+  help|-h|--help) cmd_help ;;
+  *)
+    echo "Unknown command: $1" >&2
+    echo "Run 'agentd help' for usage." >&2
+    exit 1
+    ;;
+esac

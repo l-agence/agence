@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# figrep — find + grep: search file contents recursively
+# Usage: figrep <path> <pattern> [grep-options...]
+set -euo pipefail
+
+if [[ $# -lt 2 ]]; then
+  echo "Usage: figrep <path> <pattern> [grep-options...]" >&2
+  exit 1
+fi
+
+path="$1"; shift
+pattern="$1"; shift
+
+find "$path" -type f -not -path '*/.git/*' -exec grep -Hi "$pattern" "$@" {} +
+
