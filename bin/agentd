@@ -52,7 +52,7 @@ _agent_cmd() {
         echo "env AI_AGENT=pilot GIT_ROOT=${AGENCE_ROOT} bash"
       fi
       ;;
-    *)
+    aish)\n      echo \"env AI_AGENT=aish GIT_ROOT=${AGENCE_ROOT} aish\"\n      ;;\n    *)
       echo "env AI_AGENT=${agent} AI_ROLE=agentic GIT_ROOT=${AGENCE_ROOT} bash --rcfile ${AGENCE_ROOT}/bin/aibash"
       ;;
   esac

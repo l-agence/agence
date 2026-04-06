@@ -302,7 +302,8 @@ EXAMPLES:
   agence !shell                    Open PowerShell session
   agence !aider                    Launch aider CLI (requires: pip install aider-chat)
   agence !claude                   Launch Claude Code CLI (requires: npm i -g @anthropic-ai/claude-code)
-  agence !pilot                    Launch Copilot CLI (snap: copilot, or gh extension install github/gh-copilot)
+  agence !pilot                    Launch GitHub Copilot CLI (winget: GitHub.Copilot; or: gh extension install github/gh-copilot)
+  agence !aish                     Launch Microsoft AI Shell (winget: Microsoft.AIShell)
   agence !ralph                    Open aibash session as @ralph agent
   agence !sonya                    Open aibash session as @sonya agent
   agence ^install
@@ -1948,14 +1949,22 @@ launch_tool() {
         return 1
       fi
       ;;
+    aish)
+      if ! command -v aish &>/dev/null; then
+        echo "✗ aish not installed." >&2
+        echo "  Install (Windows): winget install Microsoft.AIShell" >&2
+        return 1
+      fi
+      echo "[agence] Launching Microsoft AI Shell"
+      export AI_AGENT="aish"
+      exec aish $extra_args
+      ;;
     *)
       echo "✗ Unknown tool: $tool" >&2
       return 1
       ;;
   esac
 }
-
-mode_system() {
   local sys_cmd="$1"
 
   [[ "$DEBUG" == "1" ]] && echo "[DEBUG] System mode: $sys_cmd" >&2
@@ -1987,7 +1996,7 @@ mode_system() {
       shell_powershell_session
       ;;
     # Real CLI tool launchers — check installed, exec directly
-    aider|claude|pilot)
+    aider|claude|pilot|aish)
       launch_tool "$sys_cmd" "${@:2}"
       ;;
     # Persona agents — aibash session with AI_AGENT set
