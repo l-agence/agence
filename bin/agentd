@@ -31,10 +31,36 @@ _require_tmux() {
   fi
 }
 
+# Returns the shell command to run in a tmux window for the given agent.
+# CLI tools (claude, aider, pilot) run their binary directly.
+# Persona agents run an aibash Agent Plane session.
+_agent_cmd() {
+  local agent="$1"
+  case "$agent" in
+    claude)
+      echo "env AI_AGENT=claude GIT_ROOT=${AGENCE_ROOT} claude"
+      ;;
+    aider)
+      echo "env AI_AGENT=aider GIT_ROOT=${AGENCE_ROOT} aider --no-auto-commits"
+      ;;
+    pilot)
+      if command -v copilot &>/dev/null; then
+        echo "env AI_AGENT=pilot GIT_ROOT=${AGENCE_ROOT} copilot"
+      elif command -v gh &>/dev/null; then
+        echo "env AI_AGENT=pilot GIT_ROOT=${AGENCE_ROOT} gh copilot suggest"
+      else
+        echo "env AI_AGENT=pilot GIT_ROOT=${AGENCE_ROOT} bash"
+      fi
+      ;;
+    *)
+      echo "env AI_AGENT=${agent} AI_ROLE=agentic GIT_ROOT=${AGENCE_ROOT} bash --rcfile ${AGENCE_ROOT}/bin/aibash"
+      ;;
+  esac
+}
+
 _agent_window() {
   local agent="$1"
-  echo "env AI_AGENT=${agent} AI_ROLE=agentic GIT_ROOT=${AGENCE_ROOT} \
-bash --rcfile ${AGENCE_ROOT}/bin/aibash"
+  _agent_cmd "$agent"
 }
 
 cmd_start() {
@@ -141,11 +167,15 @@ USAGE:
   agentd attach [agent]      Attach to session; jump to agent window if given
   agentd add <agent>         Add agent window to running session
 
+AGENT TYPES:
+  CLI tools (run binary directly):   claude  aider  pilot
+  Persona agents (run via aibash):   ralph  sonya  copilot  claudia  haiku  chad
+
 EXAMPLES:
   agentd start                        # Start 4-agent default swarm
-  agentd start copilot ralph          # Start 2-agent swarm
+  agentd start claude aider ralph     # Start tool + persona swarm
   agentd attach ralph                 # Attach and jump to @ralph window
-  agentd add sonya                    # Add @sonya to running session
+  agentd add pilot                    # Add @pilot (copilot CLI) to running session
   agentd stop                         # Kill everything
 
 ENVIRONMENT:

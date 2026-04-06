@@ -302,7 +302,7 @@ EXAMPLES:
   agence !shell                    Open PowerShell session
   agence !aider                    Launch aider CLI (requires: pip install aider-chat)
   agence !claude                   Launch Claude Code CLI (requires: npm i -g @anthropic-ai/claude-code)
-  agence !pilot                    Launch gh copilot CLI (requires: gh extension install github/gh-copilot)
+  agence !pilot                    Launch Copilot CLI (snap: copilot, or gh extension install github/gh-copilot)
   agence !ralph                    Open aibash session as @ralph agent
   agence !sonya                    Open aibash session as @sonya agent
   agence ^install
@@ -481,7 +481,11 @@ resolve_provider() {
     return 0
   fi
 
-  # 3. Auto-detect: gh copilot extension installed
+  # 3. Auto-detect: standalone copilot CLI (snap) or gh copilot extension
+  if command -v copilot &>/dev/null; then
+    echo "pilot"
+    return 0
+  fi
   if command -v gh &>/dev/null && gh copilot --version &>/dev/null 2>&1; then
     echo "pilot"
     return 0
@@ -1928,18 +1932,21 @@ launch_tool() {
       exec claude $extra_args
       ;;
     pilot)
-      if ! command -v gh &>/dev/null; then
-        echo "✗ gh CLI not installed." >&2
+      # Prefer standalone copilot CLI (~/.local/bin/copilot or snap)
+      if command -v copilot &>/dev/null; then
+        echo "[agence] Launching GitHub Copilot CLI"
+        export AI_AGENT="pilot"
+        exec copilot $extra_args
+      elif command -v gh &>/dev/null && gh copilot --version &>/dev/null 2>&1; then
+        echo "[agence] Launching gh copilot extension"
+        export AI_AGENT="pilot"
+        exec gh copilot suggest $extra_args
+      else
+        echo "✗ copilot CLI not found." >&2
+        echo "  Install (snap): sudo snap install copilot" >&2
+        echo "  Install (gh):   gh extension install github/gh-copilot" >&2
         return 1
       fi
-      if ! gh copilot --version &>/dev/null 2>&1; then
-        echo "✗ gh copilot extension not installed." >&2
-        echo "  Install: gh extension install github/gh-copilot" >&2
-        return 1
-      fi
-      echo "[agence] Launching gh copilot"
-      export AI_AGENT="pilot"
-      exec gh copilot suggest $extra_args
       ;;
     *)
       echo "✗ Unknown tool: $tool" >&2
