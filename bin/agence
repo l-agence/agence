@@ -1674,10 +1674,10 @@ init_agence_environment() {
   echo "=============================================="
   echo ""
 
-  local ok=0 warn=0
+  local ok=0 warn=0 created=0
 
   # ── Step 1: Verify agence root ────────────────────────────────────────────
-  echo "Step 1/3: Verifying agence root..."
+  echo "Step 1/6: Verifying agence root..."
   if [[ -f "${AGENCE_ROOT}/bin/agence" ]]; then
     echo "  ✓ AGENCE_ROOT=${AGENCE_ROOT}"
     ((ok++))
@@ -1687,8 +1687,102 @@ init_agence_environment() {
   fi
   echo ""
 
-  # ── Step 2: Emit PATH hint ────────────────────────────────────────────────
-  echo "Step 2/3: PATH setup..."
+  # ── Step 2: Create required directories ───────────────────────────────────
+  echo "Step 2/6: Creating directory structure..."
+  local -a required_dirs=(
+    "nexus/sessions"
+    "nexus/faults"
+    "nexus/logs"
+    "organic/tasks"
+    "organic/jobs"
+    "globalcache"
+    "objectcode"
+  )
+  for dir in "${required_dirs[@]}"; do
+    if [[ -d "${AGENCE_ROOT}/$dir" ]]; then
+      echo "  ✓ $dir/"
+    else
+      mkdir -p "${AGENCE_ROOT}/$dir" 2>/dev/null
+      if [[ -d "${AGENCE_ROOT}/$dir" ]]; then
+        echo "  + $dir/ (created)"
+        ((created++))
+      else
+        echo "  ✗ $dir/ (failed to create)" >&2
+        ((warn++))
+      fi
+    fi
+  done
+  echo ""
+
+  # ── Step 3: Create .agencerc in parent repo if submodule ──────────────────
+  echo "Step 3/6: Checking .agencerc..."
+  if [[ -n "$GIT_REPO" && "$GIT_REPO" != "$AGENCE_ROOT" ]]; then
+    # Submodule mode — parent repo needs .agencerc
+    local rc_path="$GIT_REPO/.agencerc"
+    if [[ -f "$rc_path" ]]; then
+      echo "  ✓ $rc_path exists"
+    else
+      cat > "$rc_path" <<'AGENCERC'
+# .agencerc — Agence environment configuration
+# Source this from your .bashrc/.zshrc, or agence sources it automatically.
+# All values can be overridden by environment variables.
+
+# Uncomment and set your preferred LLM provider:
+# export AGENCE_LLM_PROVIDER="anthropic"   # anthropic|openai|copilot|ollama|...
+# export AGENCE_DEFAULT_AGENT="ralph"       # default persona agent
+
+# API keys (prefer env vars or a secrets manager over this file):
+# export ANTHROPIC_API_KEY="sk-ant-..."
+# export OPENAI_API_KEY="sk-..."
+AGENCERC
+      echo "  + Created $rc_path (edit to set API keys)"
+      ((created++))
+    fi
+  else
+    # Standalone mode
+    if [[ -f "${AGENCE_ROOT}/.agencerc" ]]; then
+      echo "  ✓ .agencerc exists (standalone mode)"
+    else
+      echo "  - .agencerc not found (standalone mode — optional)"
+    fi
+  fi
+  echo ""
+
+  # ── Step 4: Set up @ symlink routing ──────────────────────────────────────
+  echo "Step 4/6: Checking @ symlink routing..."
+  echo "  The '@' symlink inside synthetic/ and hermetic/ points to the"
+  echo "  active org directory (e.g. hermetic/@ → hermetic/l-agence.org)."
+  echo "  This lets commands resolve paths without hardcoding org names."
+  echo ""
+  local -a scope_dirs=("synthetic" "hermetic")
+  for scope in "${scope_dirs[@]}"; do
+    local scope_path="${AGENCE_ROOT}/$scope"
+    local at_link="${scope_path}/@"
+    if [[ -L "$at_link" ]]; then
+      local target
+      target="$(readlink "$at_link" 2>/dev/null || echo "?")"
+      echo "  ✓ $scope/@ → $target"
+    elif [[ -d "$scope_path" ]]; then
+      # Try to find the first org directory to suggest
+      local first_org=""
+      for d in "$scope_path"/*/; do
+        [[ -d "$d" ]] && first_org="$(basename "$d")" && break
+      done
+      if [[ -n "$first_org" ]]; then
+        echo "  ⚠ $scope/@ missing — create with:"
+        echo "      ln -s ${scope_path}/${first_org} ${at_link}"
+      else
+        echo "  - $scope/ exists but has no org directories yet"
+      fi
+      ((warn++))
+    else
+      echo "  - $scope/ not found (will be created when needed)"
+    fi
+  done
+  echo ""
+
+  # ── Step 5: Emit PATH hint ───────────────────────────────────────────────
+  echo "Step 5/6: PATH setup..."
   if command -v agence &>/dev/null; then
     echo "  ✓ agence is on PATH ($(command -v agence))"
     ((ok++))
@@ -1699,10 +1793,10 @@ init_agence_environment() {
   fi
   echo ""
 
-  # ── Step 3: Check key dependencies ───────────────────────────────────────
-  echo "Step 3/3: Checking dependencies..."
+  # ── Step 6: Check key dependencies ───────────────────────────────────────
+  echo "Step 6/6: Checking dependencies..."
   local deps=(git bash tmux jq)
-  local optional_deps=("script:session-logging" "shellspec:tests")
+  local optional_deps=("script:session-logging" "bun:typescript-modules")
   for dep in "${deps[@]}"; do
     if command -v "$dep" &>/dev/null; then
       echo "  ✓ $dep"
@@ -1728,6 +1822,7 @@ init_agence_environment() {
   else
     echo "⚠ Agence ready with $warn warning(s) — see above"
   fi
+  [[ $created -gt 0 ]] && echo "  Created $created new item(s)"
   echo "  AGENCE_ROOT=${AGENCE_ROOT}"
   echo "  Run 'agence --help' to get started"
   echo "  Run 'agence ^install' to install AI tool dependencies"
@@ -2401,6 +2496,15 @@ install_linux_packages() {
   else
     echo "  [aider] not installed"
     echo "    Install: pip install aider-chat"
+  fi
+  echo ""
+  # bun
+  echo "  Optional (Bun — TypeScript runtime):"
+  if command -v bun &>/dev/null; then
+    echo "  [bun] ✓ already installed ($(bun --version 2>/dev/null))"
+  else
+    echo "  [bun] not installed"
+    echo "    Install: curl -fsSL https://bun.sh/install | bash"
   fi
 }
 

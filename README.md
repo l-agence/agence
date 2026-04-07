@@ -8,13 +8,13 @@
 
 ## What is l'Agence?
 
-**l'Agence** is a framework that turns your git repo into a **collaborative agent workspace** — with audit trails, session persistence, and safe multi-agent orchestration built in from the start.
+**l'Agence** is a framework that turns your git repo into a **collaborative agent workspace** — with audit trails, session persistence, and safe multi-agent coordination built in from the start.
 
 Unlike single-agent tools (Claude Code, Copilot, aider), agence coordinates **multiple agents in parallel**, each isolated, observable, and governed by the same CODEX rules.
 
 | Capability | How |
 |---|---|
-| Multi-agent orchestration | `agentd` — tmux swarm, one agent per window |
+| Multi-agent swarm | tmux tiles — one agent per pane, human hypervisor |
 | Session persistence | `^save` / `^resume` — context survives restarts |
 | Safe handoffs | `^handoff @ralph` — full context transfer between agents |
 | Audit trail | `nexus/.ailedger` — append-only JSONL decision log |
@@ -84,9 +84,6 @@ agence !pilot                    # GitHub Copilot CLI
 agence !aider                    # aider (code patches)
 agence !aish                     # Microsoft AI Shell
 
-# Start a multi-agent swarm (tmux)
-agentd start ralph claude aider  # three agents, three windows
-
 # Run a pre-approved git command
 agence /git-status
 agence /git-log
@@ -107,8 +104,8 @@ YOUR REPO/
 └── .agence/                     ← agence lives here (submodule or clone)
     ├── bin/
     │   ├── agence               # Main CLI entry point
-    │   ├── agentd               # tmux swarm orchestrator
     │   ├── aibash               # Agent plane shell (observable)
+    │   ├── ibash                # Human plane shell (hypervisor)
     │   └── aido                 # Autonomous task runner
     ├── codex/                   # Immutable governance (committed, shared)
     │   ├── PRINCIPLES.md        # Philosophical maxims
@@ -121,15 +118,41 @@ YOUR REPO/
     │   ├── faults/              # Incident tracking
     │   └── sessions/            # Persisted agent context
     ├── synthetic/               # Team-shared knowledge (committed)
+    │   ├── @                    # → symlink to active org (e.g. l-agence.org)
     │   └── l-agence.org/
     │       ├── docs/            # Architecture, routing, swarm docs
     │       ├── lessons/         # Captured insights
     │       └── plans/           # Project roadmap
+    ├── hermetic/                # Private knowledge (gitignored, never shared)
+    │   ├── @                    # → symlink to active org
+    │   └── l-agence.org/
+    │       ├── todos/           # Personal task tracking
+    │       └── brainstorms/     # Design notes, analysis
+    ├── organic/                 # Swarm coordination (tasks, jobs, workflows)
+    │   ├── tasks/               # In-progress agent work items
+    │   └── jobs/                # Scheduled background work
     └── lib/
         ├── router.sh            # LLM provider routing
-        ├── ailedger.sh          # Audit log functions
         └── format.sh            # Output formatting
 ```
+
+### The `@` Symlink (Org Routing)
+
+Inside `synthetic/` and `hermetic/`, the `@` symlink points to the **active organization directory**:
+
+```
+synthetic/@ → synthetic/l-agence.org/
+hermetic/@  → hermetic/l-agence.org/
+```
+
+This lets all commands resolve paths like `synthetic/@/docs/ARCHITECTURE.md` without hardcoding the org name. When you add agence to a different org's repo, just point `@` at that org's directory:
+
+```bash
+# In your-company's repo:
+ln -s synthetic/your-company.com synthetic/@
+```
+
+The `^init` command checks and reports `@` symlink status. If missing, it tells you what to create.
 
 ---
 
@@ -215,11 +238,8 @@ All decisions are logged to `nexus/.ailedger` (local, gitignored, append-only).
 ## 🧪 Tests
 
 ```bash
-# Run full suite (142 examples, 0 failures)
-tests/bin/shellspec --shell bash tests/unit/
-
-# Run a specific spec
-tests/bin/shellspec --shell bash tests/unit/agence_spec.sh
+# Run full suite (91 examples, 0 failures)
+AIDO_NO_VERIFY=1 tests/lib/shellspec/shellspec --shell bash tests/unit/agence_spec.sh
 ```
 
 ---
