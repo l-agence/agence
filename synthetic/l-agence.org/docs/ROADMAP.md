@@ -80,7 +80,7 @@ OS boundary, and governed by immutable CODEX law.
 | v0.2.4.1 | rel_0.2.2_agence_swarm_sessions | ✅ **Released 2026-04-03** | 91/91 tests passing, copilot auto-detect via gh auth token, AGENCE_TRACE mode, aido/aisession non-interactive bypass, /gh* shortcuts, ^session-restore (commit e06257b, pushed) |
 | v0.3.0 (new) | future | 📋 Planned | **tmux-based** tile model: ibash/ishell as human hypervisor plane, aibash/aishell as observable agent plane, Docker per-tangent isolation, agentd daemon, socat inject, git worktree per tangent |
 | v0.3.1 | future | 📋 Planned | .ailedger (append-only JSONL decision ledger), AIPOLICY.yaml BNF governance schema published, mnemonic 2-tier (ephemeral global + federated per-org), hermetic/grimoire |
-| v0.3.2 | future | 📋 Planned | Multi-agent orchestrator (swarmd), tangent tournament + resultant selection, ChunKing indexer (Bun TS) |
+| v0.3.2 | future | 📋 Planned | Multi-agent orchestrator (swarmd), tangent tournament + resultant selection, chunk indexer (Bun TS) |
 | v0.4.0 | future | 📋 Planned | Flock tier: Nomad driver, ≤5 node SSH+docker-compose bootstrap |
 | v0.5.0+ | future | 📋 Planned | Style/preference model from .ailedger signal, trust ladder earned autonomy |
 

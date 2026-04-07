@@ -473,6 +473,23 @@ nexus/sessions/
 - **Distributed Tracing** across multi-shard workflows
 - **Session Replay** for debugging agent decisions
 - **Knowledge Graph** for lesson relationships
+
+---
+
+## 13. Glossary
+
+| Term | Definition |
+|------|------------|
+| **tangent** | A single execution branch — one agent thread exploring a problem or subtask autonomously. Named for the geometric sense: a line touching the curve at one point, then diverging. |
+| **sequent** | An orchestrated set of tangents running in parallel. The swarm scheduler composes sequents to explore multiple solution paths simultaneously. |
+| **resultant** | The chosen outcome selected from competing tangents after a tournament. The vector sum of all exploration, collapsed to a single commit/artifact. |
+| **divergent** | The point where an exploration path forked from the main line. Recorded for time-travel replay and post-hoc analysis of decision trees. |
+| **chunk** | The AST-aware indexing system for codebase knowledge (objectcode). Pure TypeScript, Bun-compiled. Formerly "ChunKing". |
+| **formtag** | Dewey-decimal-like tagging system for general semantic knowledge (synthetic/hermetic). Lightweight context classification. |
+| **mnemonic** | Two-tier memory: ephemeral global index + federated per-org stores. Caches frequently accessed chunks/formtags. |
+| **shard** | A git repository configured with Agence. Each shard has its own CODEX (rules) and NEXUS (state). |
+| **CODEX** | Immutable governance layer: PRINCIPLES, LAWS, RULES, AIPOLICY. Versioned in git. |
+| **NEXUS** | Mutable operational state: sessions, logs, faults. Not version-controlled by design. |
 - **Cost Tracking** per agent, per session, per shard
 - **Real-time Sync** for cross-shard collaboration
 

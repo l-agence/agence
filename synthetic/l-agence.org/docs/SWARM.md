@@ -1386,7 +1386,7 @@ Pattern ID = `type:md5(normalize(raw))` where:
 
 ## TypeScript Runtime
 
-**Bun** — single statically-linked binary, runs TS natively, `bun build --compile` produces self-contained executable. Zero Node/npm on target. Used for: ChunKing indexer, sequent engine.
+**Bun** — single statically-linked binary, runs TS natively, `bun build --compile` produces self-contained executable. Zero Node/npm on target. Used for: chunk indexer, sequent engine.
 
 ## Skupper (fleet/horde) — Shelved
 
