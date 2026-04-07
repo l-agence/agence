@@ -1931,6 +1931,26 @@ mode_system() {
 
   [[ "$DEBUG" == "1" ]] && echo "[DEBUG] System mode: $sys_cmd" >&2
 
+  # ── @agent.model suffix parsing ──────────────────────────────────────────
+  # Syntax: !ralph.opus  !sonya.sonnet  !claude.haiku  !bash.opus
+  # Strips the suffix, exports AGENCE_LLM_MODEL, continues with base cmd.
+  # AGENCE_MODEL env override also honoured (takes precedence over agent.md).
+  if [[ "$sys_cmd" == *"."* ]] && [[ "$sys_cmd" != *"/"* ]]; then
+    local _base="${sys_cmd%%.*}"
+    local _tier="${sys_cmd#*.}"
+    case "$_tier" in
+      opus)   export AGENCE_LLM_MODEL="${AGENCE_MODEL:-claude-opus-4-5}" ;;
+      sonnet) export AGENCE_LLM_MODEL="${AGENCE_MODEL:-claude-sonnet-4-5}" ;;
+      haiku)  export AGENCE_LLM_MODEL="${AGENCE_MODEL:-claude-haiku-3-5}" ;;
+      *)      export AGENCE_LLM_MODEL="${AGENCE_MODEL:-$_tier}" ;;
+    esac
+    echo "[agence] Model override: AGENCE_LLM_MODEL=$AGENCE_LLM_MODEL"
+    sys_cmd="$_base"
+  elif [[ -n "${AGENCE_MODEL:-}" ]]; then
+    export AGENCE_LLM_MODEL="$AGENCE_MODEL"
+    echo "[agence] Model override: AGENCE_LLM_MODEL=$AGENCE_LLM_MODEL"
+  fi
+
   case "$sys_cmd" in
     help)
       show_help
@@ -2433,6 +2453,7 @@ shell_bash_session() {
   "session_id": "$session_id",
   "session_type": "bash",
   "agent_id": "$agent_id",
+  "model": "${AGENCE_LLM_MODEL:-default}",
   "shell": "bash",
   "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "pid": $$,
@@ -2440,16 +2461,18 @@ shell_bash_session() {
   "cwd": "$(pwd)"
 }
 EOF
+  local model_display="${AGENCE_LLM_MODEL:-${AGENCE_MODEL:-default}}"
   echo ""; echo "══════════════════════════════════════════════"
   echo "  BASH SESSION"
   echo "══════════════════════════════════════════════"
   echo "  Session:   $session_id"
   echo "  Agent:     $agent_id"
+  echo "  Model:     $model_display"
   echo "  Dir:       $(pwd)"
   echo "  Metadata:  $session_meta"
   echo "══════════════════════════════════════════════"; echo ""
   set_vscode_terminal_title "$vscode_title"
-  export AGENT="$agent_id" AI_AGENT="$agent_id" AGENCE_SESSION_ID="$session_id" AGENCE_SESSION_TYPE="bash"
+  export AGENT="$agent_id" AI_AGENT="$agent_id" AGENCE_SESSION_ID="$session_id" AGENCE_SESSION_TYPE="bash" AGENCE_LLM_MODEL="$model_display"
   exec bash --rcfile "${AGENCE_ROOT}/bin/ai-shell.sh" -i 2>/dev/null || exec bash --login
 }
 
