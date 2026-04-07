@@ -5,6 +5,7 @@
 .mysecrets/
 .aisecrets/
 nexus/.ai*/
+nexus/.ailedger
 nexus/agentd/
 nexus/sessions/*.meta.json
 nexus/sessions/*.awaiting

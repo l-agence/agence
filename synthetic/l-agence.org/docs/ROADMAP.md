@@ -74,15 +74,23 @@ OS boundary, and governed by immutable CODEX law.
 | v0.2.3.1 | rel_0.2.2_agence_swarm_sessions | ✅ **Released 2026-03-31** | Architecture locked: symbol hierarchy, scope model, path validation, WSL-native shell |
 | v0.2.4 | rel_0.2.2_agence_swarm_sessions | ✅ **Released 2026-03-31** | Command router (8 cmds), backport 15 functions, VSCode 2-tile swarm model, bin/ cleanup |
 | v0.2.4 (patch) | rel_0.2.2_agence_swarm_sessions | ✅ **Released 2026-04-02** | aisession init fix, GIT_PAGER=cat, AIPOLICY→VSCode whitelist, shell-integrated profile, daily Copilot chat logs (commit 4aa6814) |
-| v0.2.5 | next | 🚧 Planning | Docker foundations, matrix math algorithm, Git-native agent locking |
-| v0.3.0 (new) | future | 📋 Planned | **tmux-based** tile model: ibash/ishell as human hypervisor plane, aibash/aishell as observable agent plane, script(1)+tmux pipe-pane for PTY governance |
-| v0.3.1 | future | 📋 Planned | Multi-agent orchestrator, DWM gating, task priority routing |
 | v0.2.4.1 | rel_0.2.2_agence_swarm_sessions | ✅ **Released 2026-04-03** | 91/91 tests passing, copilot auto-detect via gh auth token, AGENCE_TRACE mode, aido/aisession non-interactive bypass, /gh* shortcuts, ^session-restore (commit e06257b, pushed) |
-| v0.3.0 (new) | future | 📋 Planned | **tmux-based** tile model: ibash/ishell as human hypervisor plane, aibash/aishell as observable agent plane, Docker per-tangent isolation, agentd daemon, socat inject, git worktree per tangent |
-| v0.3.1 | future | 📋 Planned | .ailedger (append-only JSONL decision ledger), AIPOLICY.yaml BNF governance schema published, mnemonic 2-tier (ephemeral global + federated per-org), hermetic/grimoire |
-| v0.3.2 | future | 📋 Planned | Multi-agent orchestrator (swarmd), tangent tournament + resultant selection, chunk indexer (Bun TS) |
-| v0.4.0 | future | 📋 Planned | Flock tier: Nomad driver, ≤5 node SSH+docker-compose bootstrap |
-| v0.5.0+ | future | 📋 Planned | Style/preference model from .ailedger signal, trust ladder earned autonomy |
+| v0.2.5 | main | ✅ **Released 2026-04-07** | Stabilization: model routing (!agent.model + AGENCE_MODEL), stale ref fixes, glossary + terminology normalization (ChunKing→chunk), .gitignore final review. Merge rel_0.2.2 → main. |
+| v0.3.0 | next | 📋 Planned | **tmux 1+1 tile model** + begin bash→TS split. See v0.3.0 deliverables below. |
+| v0.3.1 | future | 📋 Planned | Docker per-tangent isolation, agentd daemon, socat inject, git worktree per tangent |
+| v0.3.2 | future | 📋 Planned | .ailedger (append-only JSONL decision ledger), AIPOLICY.yaml EBNF governance schema, mnemonic 2-tier, hermetic/grimoire |
+| v0.3.3 | future | 📋 Planned | Multi-agent orchestrator (swarmd), tangent tournament + resultant selection, chunk indexer (Bun TS) |
+| v0.4.0 | future | 📋 Planned | Matrix math: complexity evaluator, priority DAG, agent routing table, cost tracking |
+| v0.5.0 | future | 📋 Planned | Flock tier: Nomad driver, ≤5 node SSH+docker-compose bootstrap |
+| v0.6.0+ | future | 📋 Planned | Style/preference model from .ailedger signal, trust ladder earned autonomy |
+
+### v0.3.0 Deliverables (priority order)
+
+1. **tmux 1+1 launcher** (`bin/swarm`) — single command: left=ibash (human hypervisor), right=aibash (focusable agent pane). No Docker yet.
+2. **`lib/env.sh` extraction** — single canonical env bootstrap sourced by all bin/ scripts. Kills wrapper proliferation.
+3. **First TS module: `lib/session.ts`** — extract session CRUD (~300 lines) from bin/agence into Bun TS. Proves the incremental split pattern.
+4. **tmux `pipe-pane` capture** — replace script(1) with tmux-native PTY streaming. Agent pane fully observable from human pane.
+5. **`.ailedger` stub** — append-only JSONL: `{timestamp, agent, command, outcome}`. Compounding advantage starts accumulating immediately.
 
 ---
 
