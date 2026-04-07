@@ -267,7 +267,7 @@
 			"command": "bash",
 			"args": [
 				"--rcfile",
-				"${workspaceFolder}/bin/ai-shell.sh"
+				"${workspaceFolder}/bin/aibash"
 			],
 			"isBackground": false,
 			"presentation": {
@@ -285,7 +285,7 @@
 			"args": [
 				"-NoExit",
 				"-File",
-				"${workspaceFolder}/bin/ai-shell.ps1"
+				"${workspaceFolder}/bin/aishell.ps1"
 			],
 			"isBackground": false,
 			"presentation": {

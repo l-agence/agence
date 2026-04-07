@@ -2473,7 +2473,7 @@ EOF
   echo "══════════════════════════════════════════════"; echo ""
   set_vscode_terminal_title "$vscode_title"
   export AGENT="$agent_id" AI_AGENT="$agent_id" AGENCE_SESSION_ID="$session_id" AGENCE_SESSION_TYPE="bash" AGENCE_LLM_MODEL="$model_display"
-  exec bash --rcfile "${AGENCE_ROOT}/bin/ai-shell.sh" -i 2>/dev/null || exec bash --login
+  exec bash --rcfile "${AGENCE_ROOT}/bin/aibash" -i 2>/dev/null || exec bash --login
 }
 
 shell_powershell_session() {
