@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
 
 ################################################################################
-# SWARM - Synchronic Work Agentic Resource Manager (v1.2)
+# SWARM - Synchronic Work Agentic Resource Manager
 # Author: Stephane Korning 2026
-# Purpose: Multi-agent, multi-repo, matrix-driven orchestration of tasks, workflows, projects
-# Adds context/agent/knowledge routing, modular CLI, per-task files, knowledge ops, dependency resolution
-# Requires: bash, jq, awk
+# Purpose: Multi-agent tmux launcher + task/workflow coordination
+# Requires: bash, tmux, jq
 ################################################################################
 
+set -uo pipefail
 
-# ---------- Context / Routing ----------
+# ---------- Resolve AGENCE_ROOT ----------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AGENCE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+AI_ROOT="${AI_ROOT:-$AGENCE_ROOT}"
+export AGENCE_ROOT AI_ROOT
 resolve_context() {
   local synthetic_dir="$AI_ROOT/synthetic"
   local link="$synthetic_dir/@"
@@ -159,15 +163,161 @@ compute_progress() {
 usage() {
   cat <<EOF
 Usage: swarm <command> [args]
-Commands:
-  add-task '<JSON>'           Add a task
-  list-tasks                  List all tasks
+
+Tmux Commands:
+  launch [agent...]          Launch tmux 1+1: ibash (human) + aibash (agent)
+                             Default agent: copilot. Pass multiple for N tiles.
+  attach [session]           Attach to existing swarm session
+  kill [session]             Kill a swarm session
+  list                       List active swarm sessions
+
+Task Commands:
+  add-task '<JSON>'          Add a task
+  list-tasks                 List all tasks
   update-task <id> <status>  Update task status
-  run-task <id>               Execute a task (human/agent)
+  run-task <id>              Execute a task (human/agent)
+
+Knowledge Commands:
   commit-hermetic <type> <file>
   share-synthetic <type> <file> [sec_label]
-  compute-progress <workflow_file>
 EOF
+}
+
+# ============================================================================
+# TMUX 1+1 LAUNCHER
+# ============================================================================
+
+SWARM_SESSION_PREFIX="agence"
+
+swarm_launch() {
+  # Verify tmux is available
+  if ! command -v tmux &>/dev/null; then
+    echo "[swarm] ✗ tmux not found. Install: sudo apt install tmux" >&2
+    return 1
+  fi
+
+  # Parse agents — default to "copilot" if none given
+  local -a agents=("$@")
+  [[ ${#agents[@]} -eq 0 ]] && agents=("copilot")
+
+  # Session name: agence-<first_agent> or agence-multi if >1
+  local session_name
+  if [[ ${#agents[@]} -eq 1 ]]; then
+    session_name="${SWARM_SESSION_PREFIX}-${agents[0]}"
+  else
+    session_name="${SWARM_SESSION_PREFIX}-multi"
+  fi
+
+  # Abort if session already exists
+  if tmux has-session -t "$session_name" 2>/dev/null; then
+    echo "[swarm] Session '$session_name' already running. Use: swarm attach $session_name" >&2
+    return 1
+  fi
+
+  local git_repo
+  git_repo="$(git -C "$AGENCE_ROOT" rev-parse --show-toplevel 2>/dev/null || echo "$AGENCE_ROOT")"
+
+  echo "[swarm] Launching tmux session: $session_name"
+  echo "[swarm] Agents: ${agents[*]}"
+  echo "[swarm] Root: $git_repo"
+  echo ""
+
+  # --- Create session with first agent's ibash (human pane, left) ---
+  local first_agent="${agents[0]}"
+  tmux new-session -d -s "$session_name" -x 200 -y 50 \
+    -e "GIT_ROOT=$git_repo" \
+    -e "AI_ROOT=$AI_ROOT" \
+    -e "AI_AGENT=$first_agent" \
+    -e "AI_ROLE=interactive" \
+    "bash --rcfile '$AGENCE_ROOT/bin/ibash'"
+
+  # Name the first window
+  tmux rename-window -t "$session_name:0" "$first_agent"
+
+  # Split right: aibash pane (agent pane) for first agent
+  tmux split-window -h -t "$session_name:0" \
+    -e "GIT_ROOT=$git_repo" \
+    -e "AI_ROOT=$AI_ROOT" \
+    -e "AI_AGENT=$first_agent" \
+    -e "AI_ROLE=agentic" \
+    "bash '$AGENCE_ROOT/bin/aibash' --agent '$first_agent'"
+
+  # Set left pane (ibash) as active
+  tmux select-pane -t "$session_name:0.0"
+
+  # --- Additional agents: each gets a new window with ibash|aibash split ---
+  local i
+  for (( i=1; i<${#agents[@]}; i++ )); do
+    local agent="${agents[$i]}"
+    # New window: ibash (left)
+    tmux new-window -t "$session_name" -n "$agent" \
+      -e "GIT_ROOT=$git_repo" \
+      -e "AI_ROOT=$AI_ROOT" \
+      -e "AI_AGENT=$agent" \
+      -e "AI_ROLE=interactive" \
+      "bash --rcfile '$AGENCE_ROOT/bin/ibash'"
+
+    # Split right: aibash (agent)
+    tmux split-window -h -t "$session_name:$i" \
+      -e "GIT_ROOT=$git_repo" \
+      -e "AI_ROOT=$AI_ROOT" \
+      -e "AI_AGENT=$agent" \
+      -e "AI_ROLE=agentic" \
+      "bash '$AGENCE_ROOT/bin/aibash' --agent '$agent'"
+
+    # Focus left pane
+    tmux select-pane -t "$session_name:$i.0"
+  done
+
+  # Go back to first window
+  tmux select-window -t "$session_name:0"
+
+  # Status bar: show session name + agent
+  tmux set-option -t "$session_name" status-left "[${session_name}] "
+  tmux set-option -t "$session_name" status-right "#W | %H:%M"
+  tmux set-option -t "$session_name" status-style "bg=black,fg=green"
+
+  echo "[swarm] ✓ Session '$session_name' ready (${#agents[@]} agent(s))"
+  echo "[swarm] Attaching..."
+  echo ""
+
+  # Attach (interactive)
+  tmux attach-session -t "$session_name"
+}
+
+swarm_attach() {
+  local session_name="${1:-}"
+  if [[ -z "$session_name" ]]; then
+    # Try to find any agence session
+    session_name=$(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep "^${SWARM_SESSION_PREFIX}" | head -1)
+    if [[ -z "$session_name" ]]; then
+      echo "[swarm] No active agence sessions. Use: swarm launch [agent...]" >&2
+      return 1
+    fi
+  fi
+  tmux attach-session -t "$session_name"
+}
+
+swarm_kill() {
+  local session_name="${1:-}"
+  if [[ -z "$session_name" ]]; then
+    echo "[swarm] Usage: swarm kill <session-name>" >&2
+    echo "[swarm] Active sessions:" >&2
+    tmux list-sessions -F '  #{session_name}' 2>/dev/null | grep "^  ${SWARM_SESSION_PREFIX}" >&2 || echo "  (none)" >&2
+    return 1
+  fi
+  tmux kill-session -t "$session_name" 2>/dev/null && echo "[swarm] ✓ Killed $session_name" || echo "[swarm] ✗ Session not found: $session_name" >&2
+}
+
+swarm_list() {
+  local sessions
+  sessions=$(tmux list-sessions -F '#{session_name} (#{session_windows} windows, created #{session_created_string})' 2>/dev/null | grep "^${SWARM_SESSION_PREFIX}")
+  if [[ -z "$sessions" ]]; then
+    echo "[swarm] No active agence sessions"
+  else
+    echo "[swarm] Active sessions:"
+    echo "$sessions" | sed 's/^/  /'
+  fi
 }
 
 if [ $# -lt 1 ]; then
@@ -177,118 +327,16 @@ fi
 
 cmd="$1"; shift
 case "$cmd" in
+  launch) swarm_launch "$@" ;;
+  attach) swarm_attach "$@" ;;
+  kill) swarm_kill "$@" ;;
+  list|ls) swarm_list ;;
   add-task) add_task "$1" ;;
   list-tasks) list_tasks ;;
   update-task) update_task_status "$1" "$2" ;;
   run-task) run_task "$1" ;;
   commit-hermetic) commit_hermetic "$1" "$2" ;;
-  share-synthetic) share_synthetic "$1" "$2" "$3" ;;
-  compute-progress) compute_progress "$1" ;;
-  *) usage ;;
+  share-synthetic) share_synthetic "$1" "$2" "${3:-}" ;;
+  help|--help|-h) usage ;;
+  *) echo "[swarm] Unknown command: $cmd" >&2; usage; exit 1 ;;
 esac
-
-# ------------------------------
-# 1️⃣ Compute TASKS Numeric Scores
-# ------------------------------
-jq 'map(
-  .score = (.blocking*5 + .stars*10 - .fail*10)
-)' "$TASK_JSON" > "$SCORED_JSON"
-
-# ------------------------------
-# 2️⃣ DAG-aware Runnable Tasks Filtering
-# ------------------------------
-
-# Function to check if dependencies are done
-check_deps() {
-  task_id=$1
-  deps=$(jq -r --arg id "$task_id" '.[] | select(.id==$id) | .deps[]?' "$SCORED_JSON")
-  for d in $deps; do
-    state=$(jq -r --arg id "$d" '.[] | select(.id==$id) | .state' "$SCORED_JSON")
-    if [[ "$state" != "-" ]]; then
-      return 1 # dependency not complete
-    fi
-  done
-  return 0
-}
-
-# Filter tasks based on state and dependency completion
-jq -c '.[]' "$SCORED_JSON" | while read task; do
-  id=$(echo "$task" | jq -r '.id')
-  state=$(echo "$task" | jq -r '.state')
-  if [[ "$state" =~ ^[+%&$~] ]]; then
-    check_deps "$id"
-    if [[ $? -eq 0 ]]; then
-      echo "$task"
-    fi
-  fi
-done > "$RUNNABLE_JSON"
-
-# ------------------------------
-# 3️⃣ Define WORKFLOWS
-# ------------------------------
-declare -A WORKFLOWS
-# Example workflows - adjust as needed
-WORKFLOWS["WF1_build_deploy"]="repo:init repo:build repo:test repo:lint repo:deploy repo:fix"
-WORKFLOWS["WF2_auth"]="repo:auth:saml repo:auth"
-
-# Compute workflow scores & completion %
-WORKFLOW_ARRAY=()
-for wf in "${!WORKFLOWS[@]}"; do
-  tasks=(${WORKFLOWS[$wf]})
-  sum=0
-  completed=0
-  total=0
-  for t in "${tasks[@]}"; do
-    score=$(jq --arg id "$t" '.[] | select(.id==$id) | .score' "$SCORED_JSON")
-    state=$(jq -r --arg id "$t" '.[] | select(.id==$id) | .state' "$SCORED_JSON")
-    sum=$((sum + score))
-    ((total++))
-    if [[ "$state" == "-" ]]; then ((completed++)); fi
-  done
-  pct=$(( (completed*100)/total ))
-  WORKFLOW_ARRAY+=("{\"workflow_id\":\"$wf\",\"score\":$sum,\"completion_pct\":$pct}")
-done
-printf '[%s]\n' "$(IFS=, ; echo "${WORKFLOW_ARRAY[*]}")" > "$WORKFLOW_JSON"
-
-# ------------------------------
-# 4️⃣ Define PROJECTS
-# ------------------------------
-declare -A PROJECTS
-# Example projects - adjust as needed
-PROJECTS["PROJ1"]="WF1_build_deploy WF2_auth"
-
-PROJECT_ARRAY=()
-for proj in "${!PROJECTS[@]}"; do
-  workflows=(${PROJECTS[$proj]})
-  sum=0
-  total=0
-  for wf in "${workflows[@]}"; do
-    wf_score=$(jq --arg wf "$wf" '.[] | select(.workflow_id==$wf) | .score' "$WORKFLOW_JSON")
-    sum=$((sum + wf_score))
-    ((total++))
-  done
-  pct=$(( (sum*100)/ (total*100) )) # normalize if needed
-  PROJECT_ARRAY+=("{\"project_id\":\"$proj\",\"score\":$sum,\"completion_pct\":$pct}")
-done
-printf '[%s]\n' "$(IFS=, ; echo "${PROJECT_ARRAY[*]}")" > "$PROJECT_JSON"
-
-# ------------------------------
-# 5️⃣ Output Summary
-# ------------------------------
-echo "✅ TASKS scored and filtered:"
-jq '.[] | {id,state,score,owner}' "$SCORED_JSON"
-
-echo
-echo "✅ Runnable tasks:"
-jq '.[] | {id,state,score,owner}' "$RUNNABLE_JSON"
-
-echo
-echo "✅ Workflows:"
-jq '.[] | {workflow_id,score,completion_pct}' "$WORKFLOW_JSON"
-
-echo
-echo "✅ Projects:"
-jq '.[] | {project_id,score,completion_pct}' "$PROJECT_JSON"
-
-echo
-echo "✅ SWARM Pipeline Complete!"

@@ -305,6 +305,7 @@ EXAMPLES:
   agence !claude                   Launch Claude Code CLI (requires: npm i -g @anthropic-ai/claude-code)
   agence !pilot                    Launch GitHub Copilot CLI (winget: GitHub.Copilot; or: gh extension install github/gh-copilot)
   agence !aish                     Launch Microsoft AI Shell (winget: Microsoft.AIShell)
+  agence !swarm [agent...]         Launch tmux 1+1 session (ibash + aibash per agent)
   agence !ralph                    Open aibash session as @ralph agent
   agence !sonya                    Open aibash session as @sonya agent
   agence ^install
@@ -2075,6 +2076,10 @@ mode_system() {
     # Real CLI tool launchers — check installed, exec directly
     aider|claude|pilot|aish)
       launch_tool "$sys_cmd" "${@:2}"
+      ;;
+    # Swarm launcher — tmux 1+1 sessions
+    swarm)
+      "${AGENCE_BIN}/swarm" launch "${@:2}"
       ;;
     # Persona agents — aibash session with AI_AGENT set
     ralph|copilot|sonya|claudia|haiku|chad|aiko|kilo|peers|azure|devops)
