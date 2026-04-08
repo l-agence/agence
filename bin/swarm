@@ -186,6 +186,35 @@ EOF
 
 SWARM_SESSION_PREFIX="agence"
 
+# ---------- pipe-pane helper ----------
+# Wire tmux pipe-pane on an agent pane to capture output.
+# Creates the session log directory + typescript file, then attaches
+# a pipe-pane that appends all pane output to the file.
+#
+# Usage: _swarm_pipe_pane <pane-target> <agent-name>
+#   e.g. _swarm_pipe_pane "agence-copilot:0.1" "copilot"
+_swarm_pipe_pane() {
+  local pane_target="$1"
+  local agent="$2"
+
+  # Generate session ID matching aibash convention
+  local sid
+  sid="bash-$(date +%Y%m%d_%H%M%S)-$$-$(openssl rand -hex 2 2>/dev/null || printf '%04x' $RANDOM)"
+
+  local session_dir="$AI_ROOT/nexus/.aisessions"
+  local typescript_file="$session_dir/${sid}.typescript"
+  mkdir -p "$session_dir"
+
+  # Start pipe-pane: -o = output only (what the pane produces), append mode
+  tmux pipe-pane -o -t "$pane_target" "cat >> '${typescript_file}'"
+
+  # Write session env into the pane so aibash can pick it up
+  tmux set-environment -t "${pane_target%%.*}" "AGENCE_PIPE_PANE_SID" "$sid"
+  tmux set-environment -t "${pane_target%%.*}" "AGENCE_PIPE_PANE_LOG" "$typescript_file"
+
+  echo "[swarm] pipe-pane: ${agent} → ${typescript_file##*/}"
+}
+
 swarm_launch() {
   # Verify tmux is available
   if ! command -v tmux &>/dev/null; then
@@ -237,7 +266,11 @@ swarm_launch() {
     -e "AI_ROOT=$AI_ROOT" \
     -e "AI_AGENT=$first_agent" \
     -e "AI_ROLE=agentic" \
+    -e "AGENCE_PIPE_PANE=1" \
     "bash '$AGENCE_ROOT/bin/aibash' --agent '$first_agent'"
+
+  # Wire pipe-pane capture on the agent pane (pane .1 = right)
+  _swarm_pipe_pane "$session_name:0.1" "$first_agent"
 
   # Set left pane (ibash) as active
   tmux select-pane -t "$session_name:0.0"
@@ -260,7 +293,11 @@ swarm_launch() {
       -e "AI_ROOT=$AI_ROOT" \
       -e "AI_AGENT=$agent" \
       -e "AI_ROLE=agentic" \
+      -e "AGENCE_PIPE_PANE=1" \
       "bash '$AGENCE_ROOT/bin/aibash' --agent '$agent'"
+
+    # Wire pipe-pane capture on agent pane
+    _swarm_pipe_pane "$session_name:$i.1" "$agent"
 
     # Focus left pane
     tmux select-pane -t "$session_name:$i.0"

@@ -215,23 +215,30 @@ load_codex_and_format() {
 
 # BASH SHELL SETUP (agentic: no interactive prompt, tight I/O)
 setup_bash_session() {
-	# Build command string for script utility
+	# Build command string
 	local bash_args=(--noprofile --norc)
 	if [[ ${#USER_COMMAND[@]} -gt 0 ]]; then
 		bash_args+=("-c" "${USER_COMMAND[*]}")
 	fi
-	script_cmd=(script --quiet --return --command "bash ${bash_args[*]}" "$SESSION_LOG")
 	export GIT_ROOT AI_ROLE AI_SESSION AI_AGENT SESSION_LOG SESSION_META
-	# No interactive PS1 for agentic shell
-	# Optionally: export PS1=""
-	if [[ -f "$HOME/.bashrc" ]]; then
+
+	# If swarm has pipe-pane active, skip script(1) — tmux is already capturing.
+	# AGENCE_PIPE_PANE=1 is set by swarm_launch() via tmux -e.
+	if [[ "${AGENCE_PIPE_PANE:-0}" == "1" ]] && [[ -n "${TMUX:-}" ]]; then
+		bash "${bash_args[@]}" || {
+			echo "[AIBASH] ✗ Bash session failed (pipe-pane mode)" >&2
+			return 1
+		}
+	elif [[ $SESSION_LOGGING_ENABLED -eq 1 ]]; then
+		script_cmd=(script --quiet --return --command "bash ${bash_args[*]}" "$SESSION_LOG")
 		"${script_cmd[@]}" || {
-			echo "[AISHA] ✗ Bash session launch failed" >&2
+			echo "[AIBASH] ✗ Bash session launch failed" >&2
 			return 1
 		}
 	else
-		"${script_cmd[@]}" || {
-			echo "[AISHA] ✗ Bash session fallback failed" >&2
+		# No logging — run bash directly
+		bash "${bash_args[@]}" || {
+			echo "[AIBASH] ✗ Bash session fallback failed" >&2
 			return 1
 		}
 	fi
