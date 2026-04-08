@@ -332,9 +332,9 @@ EOF
 }
 
 show_version() {
-  echo "Agence version 0.2.5"
-  echo "[VERSION]: 0.2.5"
-  echo "[RELEASE]: rel_0.2.2_agence_swarm_sessions"
+  echo "Agence version 0.3.0"
+  echo "[VERSION]: 0.3.0"
+  echo "[RELEASE]: v0.3.0"
 }
 
 # ============================================================================
@@ -1135,7 +1135,7 @@ EOF
 }
 
 mode_help() {
-  local version; version="0.2.5"
+  local version; version="0.3.0"
 
   cat << EOF
 ╔══════════════════════════════════════════════════════════════════╗
