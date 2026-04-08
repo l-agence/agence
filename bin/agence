@@ -810,8 +810,21 @@ mode_external() {
       return $?
       ;;
     ghrun)
-      # GitHub CLI: list runs (T0: auto-execute)
-      bash "$AGENCE_ROOT/bin/aido" gh run list
+      # GitHub CLI: run list/view (T0: auto-execute)
+      local ghrun_sub="${2:-list}"
+      shift 2 2>/dev/null || shift 1 2>/dev/null || true
+      case "$ghrun_sub" in
+        list)
+          bash "$AGENCE_ROOT/bin/aido" gh run list "$@"
+          ;;
+        view)
+          bash "$AGENCE_ROOT/bin/aido" gh run view "$@"
+          ;;
+        *)
+          echo "Usage: agence /ghrun [list|view] [args...]" >&2
+          return 1
+          ;;
+      esac
       return $?
       ;;
     ghflow)
