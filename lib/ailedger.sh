@@ -138,3 +138,37 @@ ailedger_list() {
     printf '%s\t%d entries\n' "$(basename "$f")" "$(wc -l < "$f")"
   done
 }
+
+# Query ledger entries with jq filters
+# Usage:
+#   ailedger_query                          — all entries (current month)
+#   ailedger_query --type commit            — filter by decision_type
+#   ailedger_query --agent copilot          — filter by agent
+#   ailedger_query --all                    — all months
+#   ailedger_query --all --type route       — all months, type filter
+ailedger_query() {
+  local filter="."
+  local all_months=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --type)  filter="$filter | select(.decision_type == \"$2\")"; shift 2 ;;
+      --agent) filter="$filter | select(.agent == \"$2\")"; shift 2 ;;
+      --tag)   filter="$filter | select(.rationale_tag == \"$2\")"; shift 2 ;;
+      --all)   all_months=1; shift ;;
+      *)       echo "ailedger_query: unknown flag $1" >&2; return 1 ;;
+    esac
+  done
+
+  if ! command -v jq &>/dev/null; then
+    echo "[ailedger] jq required for query" >&2
+    return 1
+  fi
+
+  if [[ $all_months -eq 1 ]]; then
+    cat "$_AILEDGER_DIR"/*.jsonl 2>/dev/null | jq -c "$filter"
+  else
+    local current
+    current="$_AILEDGER_DIR/$(date -u +%Y-%m).jsonl"
+    [[ -f "$current" ]] && jq -c "$filter" "$current" || echo "[]"
+  fi
+}

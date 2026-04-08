@@ -737,7 +737,9 @@ mode_external() {
         return 1
       fi
       git -C "$GIT_REPO" commit -m "$commit_msg"
-      return $?
+      local _rc=$?
+      [[ $_rc -eq 0 ]] && ailedger_append "commit" "slash-commit" "" "$commit_msg" "$_rc"
+      return $_rc
       ;;
     push)
       # Push changes to origin (sets upstream on first push)
@@ -748,7 +750,9 @@ mode_external() {
         return 1
       fi
       git -C "$GIT_REPO" push -u origin
-      return $?
+      local _rc=$?
+      [[ $_rc -eq 0 ]] && ailedger_append "push" "slash-push" "" "git push -u origin" "$_rc"
+      return $_rc
       ;;
     ghstatus)
       # GitHub CLI: show repo and PR status
@@ -2242,6 +2246,9 @@ commit_agence_changes() {
   git -C "$AGENCE_ROOT" add -A && git -C "$AGENCE_ROOT" commit -m "$commit_msg"
 
   if [[ $? -eq 0 ]]; then
+    local _sha
+    _sha=$(git -C "$AGENCE_ROOT" rev-parse --short HEAD 2>/dev/null)
+    ailedger_append "commit" "agence-commit" "" "$commit_msg" "0"
     echo ""
     echo "✓ Committed."
     echo "  Next: agence ^push"
@@ -2277,6 +2284,7 @@ push_agence_changes() {
   git -C "$AGENCE_ROOT" push -u origin "$branch"
 
   if [[ $? -eq 0 ]]; then
+    ailedger_append "push" "agence-push" "" "git push origin $branch" "0"
     echo ""
     echo "✓ Pushed to origin/$branch"
     return 0

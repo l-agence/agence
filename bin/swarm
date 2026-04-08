@@ -11,6 +11,8 @@ set -uo pipefail
 
 # ---------- Resolve AGENCE_ROOT ----------
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/env.sh"
+source_if_exists "$AGENCE_LIB/ailedger.sh"
+
 resolve_context() {
   local synthetic_dir="$AI_ROOT/synthetic"
   local link="$synthetic_dir/@"
@@ -312,6 +314,7 @@ swarm_launch() {
   tmux set-option -t "$session_name" status-style "bg=black,fg=green"
 
   echo "[swarm] ✓ Session '$session_name' ready (${#agents[@]} agent(s))"
+  ailedger_append "launch" "swarm-launch" "" "swarm launch ${agents[*]}" "0"
   echo "[swarm] Attaching..."
   echo ""
 
@@ -340,7 +343,10 @@ swarm_kill() {
     tmux list-sessions -F '  #{session_name}' 2>/dev/null | grep "^  ${SWARM_SESSION_PREFIX}" >&2 || echo "  (none)" >&2
     return 1
   fi
-  tmux kill-session -t "$session_name" 2>/dev/null && echo "[swarm] ✓ Killed $session_name" || echo "[swarm] ✗ Session not found: $session_name" >&2
+  tmux kill-session -t "$session_name" 2>/dev/null && {
+    ailedger_append "kill" "swarm-kill" "" "swarm kill $session_name" "0"
+    echo "[swarm] ✓ Killed $session_name"
+  } || echo "[swarm] ✗ Session not found: $session_name" >&2
 }
 
 swarm_list() {

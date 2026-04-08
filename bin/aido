@@ -29,6 +29,7 @@ AIDO_DEBUG="${AIDO_DEBUG:-0}"
 
 # Source format library
 source_if_exists "$AGENCE_LIB/format.sh"
+source_if_exists "$AGENCE_LIB/ailedger.sh"
 
 # ============================================================================
 # SESSION HELPER FUNCTIONS
@@ -76,6 +77,9 @@ INIT_META
     # Run command inside PTY with 'script' capturing output
     script --quiet --return --command "$full_command" "$typescript_file" 2>&1
     local exit_code=$?
+
+    # Log execution to ailedger
+    ailedger_append "execute" "aido-run" "$session_id" "$full_command" "$exit_code"
 
     # Append AI_EXIT_CODE marker to typescript so aisession can parse it
     printf '\n=== AI_EXIT_CODE: %d ===\n' "$exit_code" >> "$typescript_file"

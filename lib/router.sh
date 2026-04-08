@@ -835,6 +835,12 @@ router_chat() {
 
   # Restore model state if we overrode it
   [[ -z "$_saved_model" && -n "$_mode_model" ]] && unset AGENCE_LLM_MODEL
+
+  # Log routing decision to ailedger (if sourced — silent no-op otherwise)
+  if type ailedger_append &>/dev/null; then
+    ailedger_append "route" "llm-${mode}" "" "${AGENCE_LLM_PROVIDER}/${AGENCE_LLM_MODEL:-default}" "$_rc"
+  fi
+
   return $_rc
 }
 
