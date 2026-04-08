@@ -10,10 +10,7 @@
 set -uo pipefail
 
 # ---------- Resolve AGENCE_ROOT ----------
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AGENCE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-AI_ROOT="${AI_ROOT:-$AGENCE_ROOT}"
-export AGENCE_ROOT AI_ROOT
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/env.sh"
 resolve_context() {
   local synthetic_dir="$AI_ROOT/synthetic"
   local link="$synthetic_dir/@"

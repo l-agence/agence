@@ -20,22 +20,15 @@
 # SESSION CONFIGURATION
 # ============================================================================
 
-# Use AI_ROOT and AI_BIN from environment (set by .agencerc)
-# Fallback: compute from script location
-if [[ -z "$AI_ROOT" || -z "$AI_BIN" ]]; then
-    _aido_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    AI_ROOT="${AI_ROOT:-$(dirname "$_aido_script_dir")}"
-    AI_BIN="${AI_BIN:-$_aido_script_dir}"
-    unset _aido_script_dir
-fi
+# Source canonical environment (sets AI_ROOT, AI_BIN, AGENCE_LIB, etc.)
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/env.sh"
 
 AIDO_SESSION_DIR="${AIDO_SESSION_DIR:-$AI_ROOT/nexus/.aisessions}"
 AI_AGENT="${AI_AGENT:-${AIDO_AGENT:-ai-agent}}"  # AI_AGENT is canonical; AIDO_AGENT kept for compat
 AIDO_DEBUG="${AIDO_DEBUG:-0}"
 
 # Source format library
-AIDO_LIB="${AI_ROOT}/lib"
-[[ -f "$AIDO_LIB/format.sh" ]] && source "$AIDO_LIB/format.sh"
+source_if_exists "$AGENCE_LIB/format.sh"
 
 # ============================================================================
 # SESSION HELPER FUNCTIONS

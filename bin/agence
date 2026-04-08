@@ -17,8 +17,8 @@
 
 set -u  # Exit on undefined variable
 
-# Agentic execution: never pause on git output — robots don't read pagers
-export GIT_PAGER=cat
+# Source canonical environment bootstrap (AGENCE_ROOT, AI_ROOT, GIT_ROOT, pager suppression, etc.)
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/env.sh"
 
 # ============================================================================
 # SHELL ENVIRONMENT DETECTION
@@ -122,21 +122,9 @@ normalize_path() {
   echo "$path"
 }
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT_DIR="$(normalize_path "$SCRIPT_DIR")"
-
-AGENCE_ROOT="$(dirname "$SCRIPT_DIR")"
-AGENCE_ROOT="$(normalize_path "$AGENCE_ROOT")"
-
-AGENCE_BIN="$SCRIPT_DIR"
-AGENCE_LIB="$AGENCE_ROOT/lib"
+# Agence-specific paths (extends lib/env.sh)
 AGENCE_MODULES="$AGENCE_ROOT/modules"
 AGENCE_CONFIG="${HOME}/.agence/config.yaml"
-
-# Source utility functions (to be created)
-source_if_exists() {
-  [[ -f "$1" ]] && source "$1"
-}
 
 source_if_exists "$AGENCE_LIB/utils.sh"
 source_if_exists "$AGENCE_LIB/logging.sh"

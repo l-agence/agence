@@ -29,6 +29,9 @@
 # set -e would exit on every failed command -- terrible for interactive use
 set -o pipefail  # Only catch pipeline errors silently (non-exit)
 
+# Source canonical environment (sets GIT_ROOT, AGENCE_ROOT, etc.)
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/env.sh"
+
 # Human PATH: full system paths + agence bin
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.local/bin:${GIT_ROOT:-/usr/local}/bin"
 
@@ -72,10 +75,7 @@ trap 'cleanup_on_exit; exit 0' SIGTERM SIGHUP
 # ============================================================================
 
 
-# Derive GIT_ROOT from script location if not set by caller
-if [[ -z "${GIT_ROOT:-}" ]]; then
-    GIT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-fi
+# GIT_ROOT set by lib/env.sh above
 
 
 # Session metadata (provided by VS Code extension)

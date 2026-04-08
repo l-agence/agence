@@ -21,12 +21,8 @@
 
 set -e
 
-# Determine AI_ROOT and AI_BIN from environment (set by .agencerc)
-if [[ -z "$AI_ROOT" || -z "$AI_BIN" ]]; then
-    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    AI_ROOT="${AI_ROOT:-$(dirname "$script_dir")}"
-    AI_BIN="${AI_BIN:-$script_dir}"
-fi
+# Source canonical environment (sets AI_ROOT, AI_BIN, etc.)
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/env.sh"
 
 SESSION_DIR="$AI_ROOT/nexus/.aisessions"
 LEDGER_DIR="$AI_ROOT/nexus/.ailedger"

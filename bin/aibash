@@ -58,10 +58,8 @@ EOF
 
 set -euo pipefail
 
-# Set GIT_ROOT early to avoid unbound variable errors
-if [[ -z "${GIT_ROOT:-}" ]]; then
-	GIT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-fi
+# Source canonical environment (sets GIT_ROOT, AGENCE_ROOT, etc.)
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/env.sh"
 
 # Restrict PATH to minimal safe binaries, include $AI_BIN and . if set
 if [[ -n "${AI_BIN:-}" ]]; then
