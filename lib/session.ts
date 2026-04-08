@@ -1,0 +1,247 @@
+#!/usr/bin/env bun
+// lib/session.ts — Session management module (Bun)
+//
+// Usage (from bash):
+//   bun run lib/session.ts list
+//   bun run lib/session.ts status <session-id>
+//   bun run lib/session.ts init <session-id> [role] [agent] [shell] [git-root]
+//   bun run lib/session.ts resume <session-id>
+//
+// Exit codes: 0 = success, 1 = error
+
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync } from "fs";
+import { join, basename } from "path";
+
+// Resolve paths from env (set by lib/env.sh) or fallback
+const AI_ROOT = process.env.AI_ROOT || process.env.AGENCE_ROOT || join(import.meta.dir, "..");
+const SESSION_DIR = join(AI_ROOT, "nexus", ".aisessions");
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface SessionMeta {
+  session_id: string;
+  agent: string;
+  role: string;
+  shell: string;
+  git_root: string;
+  timestamp: string;
+  status: string;
+  exit_code: number | null;
+  verification_status: string;
+  command?: string;
+  typescript?: string;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function readMeta(sid: string): SessionMeta | null {
+  const metaFile = join(SESSION_DIR, `${sid}.meta.json`);
+  if (!existsSync(metaFile)) return null;
+  try {
+    return JSON.parse(readFileSync(metaFile, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+function isoNow(): string {
+  return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+// ─── Commands ────────────────────────────────────────────────────────────────
+
+function sessionList(): number {
+  if (!existsSync(SESSION_DIR)) {
+    console.error(`[SESSION] ✗ No sessions directory: ${SESSION_DIR}`);
+    return 1;
+  }
+
+  const metaFiles = readdirSync(SESSION_DIR)
+    .filter((f) => f.endsWith(".meta.json"))
+    .sort()
+    .reverse();
+
+  if (metaFiles.length === 0) {
+    console.log(`No sessions found in ${SESSION_DIR}`);
+    return 0;
+  }
+
+  // Header
+  const hdr = [
+    "SESSION ID".padEnd(45),
+    "COMMAND".padEnd(40),
+    "EXIT".padEnd(6),
+    "TIMESTAMP",
+  ].join(" ");
+  console.log(hdr);
+  console.log("=".repeat(125));
+
+  for (const file of metaFiles) {
+    const sid = basename(file, ".meta.json");
+    const meta = readMeta(sid);
+    if (!meta) continue;
+
+    const cmd = (meta.command || "").slice(0, 40);
+    const exit = meta.exit_code;
+    const exitStr = exit === 0 ? `✓ ${exit}` : exit != null ? `✗ ${exit}` : "?";
+    const ts = (meta.timestamp || "").slice(0, 20);
+
+    console.log(
+      `${sid.padEnd(45)} ${cmd.padEnd(40)} ${exitStr.padEnd(6)} ${ts}`
+    );
+  }
+
+  return 0;
+}
+
+function sessionInit(
+  sid: string,
+  role = "shared",
+  agent = "unknown",
+  shell = "bash",
+  gitRoot = AI_ROOT
+): number {
+  if (!sid) {
+    console.error("[SESSION] ✗ init requires a session ID");
+    console.error("Usage: session init <session-id> [role] [agent] [shell] [git-root]");
+    return 1;
+  }
+
+  const agentDir = join(SESSION_DIR, agent);
+  mkdirSync(agentDir, { recursive: true });
+  mkdirSync(SESSION_DIR, { recursive: true });
+
+  const metaFile = join(SESSION_DIR, `${sid}.meta.json`);
+  const typescriptFile = join(SESSION_DIR, `${sid}.typescript`);
+
+  const meta: SessionMeta = {
+    session_id: sid,
+    agent,
+    role,
+    shell,
+    git_root: gitRoot,
+    timestamp: isoNow(),
+    status: "recording",
+    exit_code: null,
+    verification_status: "pending",
+    typescript: typescriptFile,
+  };
+
+  writeFileSync(metaFile, JSON.stringify(meta, null, 2) + "\n");
+
+  console.log(`[SESSION] ✓ Initialized: ${sid}  agent=${agent}  role=${role}`);
+  console.log(`[SESSION]   typescript → ${typescriptFile}`);
+  return 0;
+}
+
+function sessionStatus(sid: string): number {
+  if (!sid) {
+    console.error("ERROR: Session ID required");
+    console.error("Usage: aisession status <sessionid>");
+    return 1;
+  }
+
+  const typescriptFile = join(SESSION_DIR, `${sid}.typescript`);
+  const meta = readMeta(sid);
+
+  if (!existsSync(typescriptFile)) {
+    console.error(`[SESSION] ✗ Session not found: ${sid}`);
+    console.error(`[SESSION]   Expected: ${typescriptFile}`);
+    return 1;
+  }
+
+  if (!meta) {
+    console.error(`[SESSION] ✗ Session metadata missing: ${sid}`);
+    return 1;
+  }
+
+  const stat = statSync(typescriptFile);
+  const lines = readFileSync(typescriptFile, "utf-8").split("\n").length;
+
+  console.log("");
+  console.log("=".repeat(80));
+  console.log("  SESSION STATUS");
+  console.log("=".repeat(80));
+  console.log("");
+  console.log(`Session ID:   ${sid}`);
+  console.log(`Timestamp:    ${meta.timestamp}`);
+  console.log(`Command:      ${meta.command || "(none)"}`);
+  console.log(`Exit Code:    ${meta.exit_code ?? "?"}`);
+  console.log(`Status:       ${meta.verification_status}`);
+  console.log(`Agent:        ${meta.agent}`);
+  console.log(`Role:         ${meta.role}`);
+  console.log(`File:         ${typescriptFile}`);
+  console.log(`Size:         ${stat.size} bytes`);
+  console.log(`Lines:        ${lines}`);
+  console.log("");
+
+  // Print exit status summary
+  if (meta.exit_code === 0) {
+    console.log("  Status: ✓ SUCCESS (exit code 0)");
+  } else if (meta.exit_code != null) {
+    console.log(`  Status: ✗ FAILED (exit code ${meta.exit_code})`);
+  } else {
+    console.log("  Status: ? UNKNOWN (exit code not yet recorded)");
+  }
+  console.log("");
+
+  return 0;
+}
+
+function sessionResume(sid: string): number {
+  if (!sid) {
+    console.error("ERROR: Session ID required");
+    console.error("Usage: session resume <sessionid>");
+    return 1;
+  }
+
+  const meta = readMeta(sid);
+  if (!meta) {
+    console.error(`[SESSION] ✗ Session not found: ${sid}`);
+    return 1;
+  }
+
+  // Output as eval-able shell exports
+  console.log(`export AI_CURRENT_SESSION="${sid}"`);
+  console.log(`export AI_LAST_COMMAND="${(meta.command || "").replace(/"/g, '\\"')}"`);
+  console.log(`export AI_LAST_EXIT="${meta.exit_code ?? ""}"`);
+
+  // Also print human-readable to stderr
+  console.error("");
+  console.error(`✓ Session resumed: ${sid}`);
+  console.error(`  Command:   ${meta.command || "(none)"}`);
+  console.error(`  Exit Code: ${meta.exit_code ?? "?"}`);
+  console.error("");
+
+  return 0;
+}
+
+// ─── Main Router ─────────────────────────────────────────────────────────────
+
+const [cmd, ...args] = process.argv.slice(2);
+
+let exitCode = 0;
+switch (cmd) {
+  case "list":
+    exitCode = sessionList();
+    break;
+  case "init":
+    exitCode = sessionInit(args[0], args[1], args[2], args[3], args[4]);
+    break;
+  case "status":
+    exitCode = sessionStatus(args[0]);
+    break;
+  case "resume":
+    exitCode = sessionResume(args[0]);
+    break;
+  default:
+    // Treat unknown arg as session ID (backward compat)
+    if (cmd) {
+      exitCode = sessionStatus(cmd);
+    } else {
+      console.error("Usage: bun run lib/session.ts <list|init|status|resume> [args...]");
+      exitCode = 1;
+    }
+}
+
+process.exit(exitCode);

@@ -416,6 +416,21 @@ session_init() {
 }
 
 # ============================================================================  
+# BUN DELEGATION HELPER
+# ============================================================================  
+
+# Find Bun executable; returns path on stdout, exits 1 if absent.
+_bun_cmd() {
+    if command -v bun &>/dev/null; then
+        command -v bun
+    elif [[ -x "$HOME/.bun/bin/bun" ]]; then
+        echo "$HOME/.bun/bin/bun"
+    else
+        return 1
+    fi
+}
+
+# ============================================================================  
 # MAIN ROUTER
 # ============================================================================  
 
@@ -423,18 +438,36 @@ main() {
     local SESSION_SUBCOMMAND="${1:-status}"
     local SESSION_ID="${2:-}"
 
+    # Delegate read-heavy subcommands to Bun when available;
+    # bash implementations remain as fallback.
+    local bun
+    bun=$(_bun_cmd 2>/dev/null) || bun=""
+
     case "$SESSION_SUBCOMMAND" in
         init)
-            session_init "$SESSION_ID" "${3:-}" "${4:-}" "${5:-}" "${6:-}"
+            if [[ -n "$bun" ]]; then
+                "$bun" run "$AGENCE_LIB/session.ts" init "${@:2}"
+            else
+                session_init "$SESSION_ID" "${3:-}" "${4:-}" "${5:-}" "${6:-}"
+            fi
             ;;
         status)
+            # Interactive verification prompt — stays in bash
             session_status "$SESSION_ID"
             ;;
         resume)
-            session_resume "$SESSION_ID"
+            if [[ -n "$bun" ]]; then
+                "$bun" run "$AGENCE_LIB/session.ts" resume "$SESSION_ID"
+            else
+                session_resume "$SESSION_ID"
+            fi
             ;;
         list)
-            session_list
+            if [[ -n "$bun" ]]; then
+                "$bun" run "$AGENCE_LIB/session.ts" list
+            else
+                session_list
+            fi
             ;;
         handoff)
             session_handoff "$SESSION_ID" "${3:-}"

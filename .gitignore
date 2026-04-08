@@ -17,3 +17,8 @@ hermetic/
 *.log
 __pycache__/
 node_modules/
+
+# npm artifacts (Bun is standalone)
+package.json
+package-lock.json
+node_modules/
