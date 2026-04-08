@@ -1,59 +1,140 @@
 #!/usr/bin/env bash
-# lib/ailedger.sh — Append-only decision ledger for agence
+# lib/ailedger.sh — Append-only Merkle-chained decision ledger for agence
 #
 # Usage:
 #   source lib/ailedger.sh
-#   ailedger_append <decision_type> <rationale_tag> [task_id]
+#   ailedger_append <decision_type> <rationale_tag> [task_id] [command] [exit_code]
 #
-# Fields (JSONL):
+# Fields (JSONL, one object per line, append-only, never rewritten):
+#   seq            Monotonic sequence number (1-based, per ledger file)
 #   timestamp      ISO-8601 UTC
 #   session_id     from AI_SESSION_ID or generated once per shell
-#   decision_type  route|launch|fault|plan|commit|push|policy
+#   decision_type  route|launch|fault|plan|commit|push|policy|verify|inject
 #   agent          from AI_AGENT env (default: "unknown")
 #   rationale_tag  short slug — why this decision was made
 #   task_id        optional — organic task id or ""
+#   command        optional — the command that was executed
+#   exit_code      optional — numeric exit code (-1 = not applicable)
+#   prev_hash      SHA-256 of the previous line ("genesis" for first entry)
 #
-# File: nexus/.ailedger  (gitignored via nexus/.ai*)
-# Format: JSONL (one JSON object per line, append-only, never rewritten)
+# Storage: nexus/.ailedger/YYYY-MM.jsonl (monthly rotation, gitignored)
+# Integrity: Each entry's prev_hash = SHA-256 of the previous raw line.
+#            Verify with: ailedger_verify [file]
 
-_AILEDGER_FILE="${AGENCE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/nexus/.ailedger"
+# Resolve ledger directory
+_AILEDGER_DIR="${AGENCE_LEDGER_DIR:-${AGENCE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/nexus/.ailedger}"
+
+# Current month's ledger file
+_ailedger_current_file() {
+  echo "$_AILEDGER_DIR/$(date -u '+%Y-%m').jsonl"
+}
+
+# Get SHA-256 of a string (portable: sha256sum or shasum)
+_ailedger_hash() {
+  if command -v sha256sum &>/dev/null; then
+    printf '%s' "$1" | sha256sum | cut -d' ' -f1
+  elif command -v shasum &>/dev/null; then
+    printf '%s' "$1" | shasum -a 256 | cut -d' ' -f1
+  else
+    echo "no-hash-tool"
+  fi
+}
 
 ailedger_append() {
   local decision_type="${1:-unknown}"
   local rationale_tag="${2:-}"
   local task_id="${3:-}"
+  local command_str="${4:-}"
+  local exit_code="${5:--1}"
 
   # Lazy session ID — stable for the shell's lifetime
   if [[ -z "${_AILEDGER_SESSION_ID:-}" ]]; then
     _AILEDGER_SESSION_ID="${AI_SESSION_ID:-$(printf '%08x' $$)}"
   fi
 
-  local ts agent entry
+  local ledger_file seq prev_hash ts agent entry
+  ledger_file="$(_ailedger_current_file)"
+  mkdir -p "$(dirname "$ledger_file")"
+
+  # Sequence number: line count + 1
+  if [[ -f "$ledger_file" ]]; then
+    seq=$(( $(wc -l < "$ledger_file") + 1 ))
+    prev_hash="$(_ailedger_hash "$(tail -n 1 "$ledger_file")")"
+  else
+    seq=1
+    prev_hash="genesis"
+  fi
+
   ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo 'unknown')"
   agent="${AI_AGENT:-unknown}"
 
-  entry=$(printf '{"timestamp":"%s","session_id":"%s","decision_type":"%s","agent":"%s","rationale_tag":"%s","task_id":"%s"}\n' \
-    "$ts" "$_AILEDGER_SESSION_ID" "$decision_type" "$agent" "$rationale_tag" "$task_id")
+  # Escape strings for JSON (backslash, double-quote, control chars)
+  local cmd_esc
+  cmd_esc="$(printf '%s' "$command_str" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g')"
+  local tag_esc
+  tag_esc="$(printf '%s' "$rationale_tag" | sed 's/\\/\\\\/g; s/"/\\"/g')"
 
-  # Ensure nexus/ exists (it always should, but be safe)
-  mkdir -p "$(dirname "$_AILEDGER_FILE")"
-  printf '%s' "$entry" >> "$_AILEDGER_FILE"
+  entry=$(printf '{"seq":%d,"timestamp":"%s","session_id":"%s","decision_type":"%s","agent":"%s","rationale_tag":"%s","task_id":"%s","command":"%s","exit_code":%s,"prev_hash":"%s"}' \
+    "$seq" "$ts" "$_AILEDGER_SESSION_ID" "$decision_type" "$agent" "$tag_esc" "$task_id" "$cmd_esc" "$exit_code" "$prev_hash")
+
+  printf '%s\n' "$entry" >> "$ledger_file"
+}
+
+# Verify Merkle chain integrity of a ledger file
+# Returns 0 if valid, 1 if broken (prints break point)
+ailedger_verify() {
+  local file="${1:-$(_ailedger_current_file)}"
+  if [[ ! -f "$file" ]]; then
+    echo "[ailedger] No ledger file: $file" >&2
+    return 1
+  fi
+
+  local prev_hash="genesis" line_num=0 actual_hash
+  while IFS= read -r line; do
+    line_num=$((line_num + 1))
+    # Extract prev_hash from the JSON line
+    local claimed_hash
+    claimed_hash="$(printf '%s' "$line" | sed 's/.*"prev_hash":"\([^"]*\)".*/\1/')"
+
+    if [[ "$claimed_hash" != "$prev_hash" ]]; then
+      echo "[ailedger] CHAIN BROKEN at line $line_num: expected $prev_hash, got $claimed_hash" >&2
+      return 1
+    fi
+    prev_hash="$(_ailedger_hash "$line")"
+  done < "$file"
+
+  echo "[ailedger] VERIFIED: $line_num entries, chain intact ($file)"
+  return 0
 }
 
 # Read/display helpers (non-destructive)
 ailedger_tail() {
   local n="${1:-20}"
-  if [[ -f "$_AILEDGER_FILE" ]]; then
-    tail -n "$n" "$_AILEDGER_FILE"
+  local file="$(_ailedger_current_file)"
+  if [[ -f "$file" ]]; then
+    tail -n "$n" "$file"
   else
-    echo "[ailedger] No entries yet: $_AILEDGER_FILE" >&2
+    echo "[ailedger] No entries yet: $file" >&2
   fi
 }
 
 ailedger_count() {
-  if [[ -f "$_AILEDGER_FILE" ]]; then
-    wc -l < "$_AILEDGER_FILE"
+  local file="$(_ailedger_current_file)"
+  if [[ -f "$file" ]]; then
+    wc -l < "$file"
   else
     echo 0
   fi
+}
+
+# List all ledger files with entry counts
+ailedger_list() {
+  if [[ ! -d "$_AILEDGER_DIR" ]] || ! ls "$_AILEDGER_DIR"/*.jsonl &>/dev/null; then
+    echo "[ailedger] No ledger files in $_AILEDGER_DIR" >&2
+    return 0
+  fi
+  local f
+  for f in "$_AILEDGER_DIR"/*.jsonl; do
+    printf '%s\t%d entries\n' "$(basename "$f")" "$(wc -l < "$f")"
+  done
 }

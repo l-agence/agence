@@ -27,6 +27,9 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/env.sh"
 SESSION_DIR="$AI_ROOT/nexus/.aisessions"
 LEDGER_DIR="$AI_ROOT/nexus/.ailedger"
 
+# Source shared ledger library
+source_if_exists "$AGENCE_LIB/ailedger.sh"
+
 # ============================================================================
 # HELPERS: Exit code parsing, metadata update, ailedger
 # ============================================================================
@@ -61,23 +64,12 @@ update_metadata_verified() {
     fi
 }
 
-# Append verified entry to .ailedger (stub — full ledger TBD)
+# Append verified entry to .ailedger via shared lib/ailedger.sh
 create_ailedger_entry() {
     local sid="$1"
     local exit_code="$2"
     local command_str="$3"
-
-    mkdir -p "$LEDGER_DIR" 2>/dev/null || return 0
-
-    local ledger_file="$LEDGER_DIR/$(date +%Y-%m).jsonl"
-    local ts
-    ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    # Escape command string for JSON
-    local cmd_escaped
-    cmd_escaped="$(printf '%s' "$command_str" | sed 's/\\/\\\\/g; s/"/\\"/g')"
-
-    printf '{"session_id":"%s","timestamp":"%s","exit_code":%d,"command":"%s","status":"verified"}\n' \
-        "$sid" "$ts" "$exit_code" "$cmd_escaped" >> "$ledger_file" 2>/dev/null || true
+    ailedger_append "verify" "session-verified" "$sid" "$command_str" "$exit_code"
 }
 
 # ============================================================================
