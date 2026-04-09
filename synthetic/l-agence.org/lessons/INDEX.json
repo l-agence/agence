@@ -17,7 +17,13 @@
     "applies_to": "Which agents/components this lesson affects",
     "severity": "critical|high|medium|low"
   },
-  "lookup_fields": ["category", "agent", "severity", "status", "date_extracted"],
+  "lookup_fields": [
+    "category",
+    "agent",
+    "severity",
+    "status",
+    "date_extracted"
+  ],
   "categories": [
     "infrastructure",
     "llm-hallucination",
@@ -37,6 +43,11 @@
       "title": "Git symlinks (mode 120000) for cross-platform support",
       "severity": "high",
       "status": "active"
+    },
+    {
+      "id": "1775746248_bashtobu",
+      "title": "bash-to-bun-router-extraction-pattern",
+      "date": "2026-04-09T14:50:48Z"
     }
   ],
   "total_lessons": 1,

@@ -1856,6 +1856,14 @@ AGENCERC
   echo "=============================================="
   echo ""
 
+  # ── Init .ailedger nested repo (two-tier: local + shard) ─────────────────
+  local _ailedger_ts="${AGENCE_ROOT}/lib/ailedger.ts"
+  if command -v bun &>/dev/null && [[ -f "$_ailedger_ts" ]]; then
+    echo "Initializing .ailedger (two-tier Merkle ledger)..."
+    bun run "$_ailedger_ts" init 2>&1
+    echo ""
+  fi
+
   return 0
 }
 

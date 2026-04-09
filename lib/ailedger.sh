@@ -47,6 +47,25 @@ ailedger_append() {
   local command_str="${4:-}"
   local exit_code="${5:--1}"
 
+  # ── Bun delegation (preferred — two-tier with shard + filter) ─────────────
+  local _ailedger_ts="${AGENCE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/lib/ailedger.ts"
+  if [[ "${AGENCE_LEDGER_NO_BUN:-0}" != "1" ]] && \
+     command -v bun &>/dev/null && [[ -f "$_ailedger_ts" ]]; then
+    local _bun_result
+    _bun_result=$(AI_SESSION_ID="${AI_SESSION_ID:-${_AILEDGER_SESSION_ID:-$(printf '%08x' $$)}}" \
+      AI_AGENT="${AI_AGENT:-unknown}" \
+      bun run "$_ailedger_ts" append \
+        "$decision_type" "$rationale_tag" "$task_id" "$command_str" "$exit_code" \
+      2>/dev/null)
+    if [[ $? -eq 0 ]]; then
+      eval "$_bun_result" 2>/dev/null
+      return 0
+    fi
+    [[ "${AGENCE_DEBUG:-0}" == "1" ]] && echo "[ailedger] Bun delegation failed, falling back to bash" >&2
+  fi
+
+  # ── Bash fallback (local-only, no shard) ──────────────────────────────────
+
   # Lazy session ID — stable for the shell's lifetime
   if [[ -z "${_AILEDGER_SESSION_ID:-}" ]]; then
     _AILEDGER_SESSION_ID="${AI_SESSION_ID:-$(printf '%08x' $$)}"
