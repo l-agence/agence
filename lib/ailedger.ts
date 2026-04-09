@@ -117,6 +117,7 @@ function filterEntry(raw: string): FilterResult {
 // ─── Entry Types ─────────────────────────────────────────────────────────────
 
 interface LocalEntry {
+  id: string;             // 8-char hex — content-addressable short ID
   seq: number;
   timestamp: string;
   session_id: string;
@@ -126,6 +127,7 @@ interface LocalEntry {
   task_id: string;
   command: string;
   exit_code: number;
+  commit?: string;        // git HEAD at entry time (if available)
   prev_hash: string;
 }
 
@@ -182,8 +184,20 @@ function append(
   const sessionId = process.env.AI_SESSION_ID || process.env._AILEDGER_SESSION_ID || `ts-${process.pid}`;
   const agent = process.env.AI_AGENT || "unknown";
 
+  // Generate deterministic 8-char hex ID from entry content
+  const idSeed = `${ts}|${sessionId}|${seq}|${agent}|${decisionType}`;
+  const entryId = sha256(idSeed).slice(0, 8);
+
+  // Capture git HEAD if available (best-effort, no error on failure)
+  let commitId: string | undefined;
+  try {
+    commitId = execSync("git rev-parse --short HEAD", { cwd: AGENCE_ROOT, timeout: 2000 })
+      .toString().trim() || undefined;
+  } catch { /* not in a git repo or git unavailable */ }
+
   // ── Local entry (full fidelity) ──
   const local: LocalEntry = {
+    id: entryId,
     seq,
     timestamp: ts,
     session_id: sessionId,
@@ -193,6 +207,7 @@ function append(
     task_id: taskId,
     command,
     exit_code: exitCode,
+    ...(commitId ? { commit: commitId } : {}),
     prev_hash: prevHash,
   };
 

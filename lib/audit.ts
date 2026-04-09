@@ -29,6 +29,7 @@ const SESSIONS_DIR = join(AGENCE_ROOT, "nexus", ".aisessions");
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface LedgerEntry {
+  id?: string;            // 8-char hex — unique entry ID (v0.3.1+)
   seq: number;
   timestamp: string;
   session_id: string;
@@ -38,6 +39,7 @@ interface LedgerEntry {
   task_id: string;
   command: string;
   exit_code: number;
+  commit?: string;        // git short-SHA at entry time
   prev_hash: string;
   // Shard-only fields
   local_hash?: string;
@@ -125,12 +127,14 @@ const TYPE_ICONS: Record<string, string> = {
 function fmtEntry(e: LedgerEntry, verbose: boolean = false): string {
   const icon = TYPE_ICONS[e.decision_type] || "•";
   const ts = e.timestamp.replace("T", " ").replace("Z", "");
+  const eid = e.id ? `${e.id} ` : "";
   const redacted = e.redacted ? " [REDACTED]" : "";
-  const cmd = e.command ? ` → ${e.command.slice(0, 80)}${e.command.length > 80 ? "…" : ""}` : "";
+  const cmd = e.command ? ` → ${e.command.slice(0, 70)}${e.command.length > 70 ? "…" : ""}` : "";
   const exit = e.exit_code >= 0 ? ` (exit=${e.exit_code})` : "";
   const task = e.task_id ? ` task=${e.task_id}` : "";
+  const gitRef = e.commit ? ` @${e.commit}` : "";
 
-  let line = `${icon} #${e.seq} ${ts}  ${e.decision_type.padEnd(8)} @${e.agent.padEnd(10)} ${e.rationale_tag}${cmd}${exit}${task}${redacted}`;
+  let line = `${icon} ${eid}#${e.seq} ${ts}  ${e.decision_type.padEnd(8)} @${e.agent.padEnd(10)} ${e.rationale_tag}${cmd}${exit}${task}${gitRef}${redacted}`;
 
   if (verbose) {
     line += `\n   session=${e.session_id}  prev_hash=${e.prev_hash.slice(0, 12)}…`;
@@ -182,13 +186,24 @@ function cmdShow(target: string): number {
   let shardMatch: LedgerEntry | undefined;
   let source = "local";
 
-  // Search by seq number
-  const seqNum = parseInt(target, 10);
-  if (!isNaN(seqNum)) {
-    found = localEntries.find(e => e.seq === seqNum);
+  // Search by hex ID (8-char prefix match)
+  if (!found && /^[0-9a-f]{4,}$/i.test(target)) {
+    found = localEntries.find(e => e.id?.startsWith(target));
     if (!found) {
-      found = shardEntries.find(e => e.seq === seqNum);
-      source = "shard";
+      found = shardEntries.find(e => e.id?.startsWith(target));
+      if (found) source = "shard";
+    }
+  }
+
+  // Search by seq number
+  if (!found) {
+    const seqNum = parseInt(target, 10);
+    if (!isNaN(seqNum)) {
+      found = localEntries.find(e => e.seq === seqNum);
+      if (!found) {
+        found = shardEntries.find(e => e.seq === seqNum);
+        if (found) source = "shard";
+      }
     }
   }
 
@@ -225,7 +240,8 @@ function cmdShow(target: string): number {
     shardMatch = shardEntries.find(e => e.local_hash === lineHash);
   }
 
-  console.log(fmtHeader(`DECISION DETAIL — #${found.seq} (${source})`));
+  const showId = found.id ? ` [${found.id}]` : "";
+  console.log(fmtHeader(`DECISION DETAIL — #${found.seq}${showId} (${source})`));
   console.log("");
   console.log(JSON.stringify(found, null, 2));
 
@@ -466,7 +482,7 @@ if (!subCmd) {
   console.error("");
   console.error("Commands:");
   console.error("  trail [--limit N] [--type T] [--shard]   Decision timeline");
-  console.error("  show <seq|hash>                          Detail view + context");
+  console.error("  show <id|seq|hash>                       Detail view + context");
   console.error("  agent <name> [--limit N]                 Decisions by agent");
   console.error("  session <id> [--limit N]                 Decisions in session");
   console.error("  diff <local-hash>                        Compare local ↔ shard");
