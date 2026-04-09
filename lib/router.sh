@@ -258,6 +258,36 @@ _router_model_for_mode() {
 router_load_config() {
   [[ "$_ROUTER_LOADED" == "1" ]] && return 0
 
+  # ── Bun delegation (preferred — typed resolution in lib/router.ts) ────────
+  # If bun is available and lib/router.ts exists, delegate provider+model
+  # resolution to the TS module. Falls back to bash logic on failure.
+  local _router_ts="${AGENCE_ROOT:-$(dirname "$(dirname "${BASH_SOURCE[0]}")")}/lib/router.ts"
+  if [[ "${AGENCE_ROUTER_NO_BUN:-0}" != "1" ]] && \
+     command -v bun &>/dev/null && [[ -f "$_router_ts" ]]; then
+    local _bun_out
+    _bun_out=$(bun run "$_router_ts" resolve-route \
+      ${AGENCE_LLM_PROVIDER:+--provider "$AGENCE_LLM_PROVIDER"} \
+      ${AGENCE_ROUTER_MODE:+--mode "$AGENCE_ROUTER_MODE"} \
+      ${AGENCE_BLAST_RADIUS:+--blast-radius "$AGENCE_BLAST_RADIUS"} \
+      2>&1 1>/dev/null) 2>/dev/null
+    # Try again capturing stdout (eval-safe exports)
+    local _bun_exports
+    _bun_exports=$(bun run "$_router_ts" resolve-route \
+      ${AGENCE_LLM_PROVIDER:+--provider "$AGENCE_LLM_PROVIDER"} \
+      ${AGENCE_ROUTER_MODE:+--mode "$AGENCE_ROUTER_MODE"} \
+      ${AGENCE_BLAST_RADIUS:+--blast-radius "$AGENCE_BLAST_RADIUS"} \
+      2>/dev/null)
+    if [[ $? -eq 0 && -n "$_bun_exports" ]]; then
+      eval "$_bun_exports"
+      export _ROUTER_LOADED=1
+      [[ "${AGENCE_DEBUG:-0}" == "1" ]] && \
+        echo "[router] Bun delegation: Provider=${AGENCE_LLM_PROVIDER}  Model=${AGENCE_LLM_MODEL}" >&2
+      return 0
+    fi
+    [[ "${AGENCE_DEBUG:-0}" == "1" ]] && \
+      echo "[router] Bun delegation failed, falling back to bash" >&2
+  fi
+
   _router_check_deps || return 1
 
   local cfg="$ROUTER_CONFIG_PATH"
