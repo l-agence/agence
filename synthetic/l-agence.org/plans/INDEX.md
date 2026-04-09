@@ -1,39 +1,40 @@
 # Agence Development Roadmap (2026 Q1–Q2)
 
-**Locked**: 2026-03-31 by GitHub Copilot (Haiku)  
-**Status**: v0.2.3.1 Architecture & Docs Complete  
-**Next**: Phase 1.5 Command Router Implementation
+**Updated**: 2026-04-09
+**Status**: v0.3.0 shipped, v0.3.1 in progress
+**Current**: main @ a73b2bf
 
 ---
 
 ## 🎯 Vision: Multi-Agent Swarm Orchestration
 
-Path: **Single-Agent Stabilization** → **Local Multi-Agent** → **Distributed (Skupper)** → **Production**
+Path: **Single-Agent Stabilization** → **Routing + Ledger + Audit** → **Guard + Compute** → **Distributed**
 
 ```
-v0.2.3.1 (CURRENT)   ← Architecture locked, docs complete
+v0.2.5 (RELEASED)     ← Stabilization, model routing, 91/91 tests
     ↓
-v0.2.4              ← Docker + Matrix Math foundations
+v0.3.0 (RELEASED)     ← tmux, env, session.ts, .ailedger, pipe-pane
     ↓
-v0.3.0              ← VSCode tiles + real-time observability
+v0.3.1 (CURRENT)      ← router.ts, audit.ts, airun, CI, ledger IDs
     ↓
-v0.3.1              ← Orchestrator + collision avoidance
+v0.4.0                ← guard.ts, matrix-math compute, MLS enforcement
     ↓
-v0.3.2+             ← Skupper multi-cloud distribution
+v0.5.0+               ← Skupper multi-cloud distribution
 ```
 
 ---
 
 ## 📋 Phase Breakdown
 
-| Phase | Version | Focus | Estimate | Status |
-|-------|---------|-------|----------|--------|
-| **1** | v0.2.3.1 | Architecture & docs (PATH hardening, symbols, scopes) | ✅ Complete | 🟢 DONE |
-| **1.5** | v0.2.3.2 | Command router (8 commands, routing, completion) | 1–2 weeks | ⏳ NEXT |
-| **2** | v0.2.4 | Docker foundations + matrix math | 3–4 weeks | 📍 QUEUED |
-| **3** | v0.3.0 | VSCode tiles + job control | 3–4 weeks | 📍 QUEUED |
-| **4** | v0.3.1 | Orchestrator + DWM gating | 4+ weeks | 📍 QUEUED |
-| **5** | v0.3.2+ | Skupper multi-cloud | TBD | 📍 QUEUED |
+| Phase | Version | Focus | Status |
+|-------|---------|-------|--------|
+| **1** | v0.2.3.1 | Architecture & docs | 🟢 DONE |
+| **1.5** | v0.2.4 | Shell session fixes, test suite | 🟢 DONE |
+| **2** | v0.2.5 | Stabilization & release | 🟢 DONE |
+| **2.1** | v0.3.0 | tmux 1+1, env.sh, session.ts, .ailedger, pipe-pane | 🟢 DONE |
+| **2.2** | v0.3.1 | Bun extraction (router.ts, audit.ts), CI, airun | ⏳ CURRENT |
+| **3** | v0.4.0 | guard.ts, matrix-math compute, MLS enforcement | 📍 NEXT |
+| **4** | v0.5.0+ | Skupper multi-cloud | 📍 FUTURE |
 
 ---
 

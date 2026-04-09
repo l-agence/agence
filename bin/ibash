@@ -179,6 +179,11 @@ setup_bash_session() {
     topdir="$(basename "$GIT_ROOT")"
     export GIT_ROOT AI_ROLE AI_SESSION AI_AGENT SESSION_LOG SESSION_META
     export PS1="[${AI_AGENT}@${AI_SESSION:0:8}] ${topdir}> "
+    # If swarm has pipe-pane active, skip script(1) — tmux is already capturing.
+    # AGENCE_PIPE_PANE=1 is set by swarm_launch() via tmux -e.
+    if [[ "${AGENCE_PIPE_PANE:-0}" == "1" ]] && [[ -n "${TMUX:-}" ]]; then
+        return 0
+    fi
     # If session logging is enabled, wrap in script(1)
     if [[ "${SESSION_LOGGING_ENABLED:-0}" -eq 1 ]] && [[ ! -t 0 || "${IBASH_LOGGING:-0}" -eq 1 ]]; then
         exec script --quiet --return --command \

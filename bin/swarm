@@ -343,6 +343,14 @@ swarm_kill() {
     tmux list-sessions -F '  #{session_name}' 2>/dev/null | grep "^  ${SWARM_SESSION_PREFIX}" >&2 || echo "  (none)" >&2
     return 1
   fi
+
+  # Stop pipe-pane on all panes before killing (flushes buffers)
+  local panes
+  panes=$(tmux list-panes -t "$session_name" -a -F '#{pane_id}' 2>/dev/null) || true
+  for pane_id in $panes; do
+    tmux pipe-pane -t "$pane_id" 2>/dev/null || true
+  done
+
   tmux kill-session -t "$session_name" 2>/dev/null && {
     ailedger_append "kill" "swarm-kill" "" "swarm kill $session_name" "0"
     echo "[swarm] ✓ Killed $session_name"
