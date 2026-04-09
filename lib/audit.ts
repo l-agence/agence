@@ -5,12 +5,12 @@
 // and cross-references with pipe-pane session captures.
 //
 // Usage:
-//   bun run lib/audit.ts trail [--limit N] [--type T] [--shard]
-//   bun run lib/audit.ts show <seq|hash>
-//   bun run lib/audit.ts agent <name> [--limit N]
-//   bun run lib/audit.ts session <id> [--limit N]
-//   bun run lib/audit.ts diff <local-hash>
-//   bun run lib/audit.ts stats [--all]
+//   airun audit trail [--limit N] [--type T] [--shard]
+//   airun audit show <seq|hash>
+//   airun audit agent <name> [--limit N]
+//   airun audit session <id> [--limit N]
+//   airun audit diff <local-hash>
+//   airun audit stats [--all]
 //
 // Exit codes: 0 = success, 1 = error
 
@@ -488,7 +488,7 @@ function hasFlag(flag: string): boolean {
 }
 
 if (!subCmd) {
-  console.error("Usage: bun run lib/audit.ts <command> [options]");
+  console.error("Usage: airun audit <command> [options]");
   console.error("");
   console.error("Commands:");
   console.error("  trail [--limit N] [--type T] [--shard]   Decision timeline");

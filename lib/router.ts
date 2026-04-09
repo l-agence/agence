@@ -6,11 +6,11 @@
 //          config loading, provider availability, model tier parsing.
 //
 // Usage (from bash — eval for shell env export):
-//   eval $(bun run lib/router.ts resolve-provider)
-//   eval $(bun run lib/router.ts resolve-model --provider anthropic --mode code)
-//   eval $(bun run lib/router.ts resolve-model --provider anthropic --blast-radius critical)
-//   bun run lib/router.ts list-providers         # JSON to stdout
-//   bun run lib/router.ts parse-model-tier opus  # → claude-opus-4-5
+//   eval $(airun router resolve-provider)
+//   eval $(airun router resolve-model --provider anthropic --mode code)
+//   eval $(airun router resolve-model --provider anthropic --blast-radius critical)
+//   airun router list-providers         # JSON to stdout
+//   airun router parse-model-tier opus  # → claude-opus-4-5
 //
 // Exit codes: 0 = success, 1 = error (message on stderr)
 
@@ -327,7 +327,7 @@ function parseFlag(flag: string): string | undefined {
 }
 
 if (!subCmd) {
-  console.error("Usage: bun run lib/router.ts <command> [options]");
+  console.error("Usage: airun router <command> [options]");
   console.error("Commands:");
   console.error("  resolve-provider                  Detect + export AGENCE_LLM_PROVIDER");
   console.error("  resolve-model [--provider P] [--mode M] [--blast-radius B]");
@@ -387,7 +387,7 @@ switch (subCmd) {
   case "parse-model-tier": {
     const tier = args[0];
     if (!tier) {
-      console.error("Usage: bun run lib/router.ts parse-model-tier <tier>");
+      console.error("Usage: airun router parse-model-tier <tier>");
       exitCode = 1;
     } else {
       console.log(parseModelTier(tier));

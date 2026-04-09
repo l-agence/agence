@@ -38,6 +38,11 @@ AGENCE_SESSION_DIR="${AGENCE_SESSION_DIR:-$AI_ROOT/nexus/.aisessions}"
 AGENCE_LEDGER_DIR="${AGENCE_LEDGER_DIR:-$AI_ROOT/nexus/.ailedger}"
 export AGENCE_SESSION_DIR AGENCE_LEDGER_DIR
 
+# Shard: shared upstream ledger remote URL
+# Override: AI_SHARD env var > ~/.agence/config.yaml shard: field
+AI_SHARD="${AI_SHARD:-}"
+export AI_SHARD
+
 # Pager suppression: prevent gh/git/less from hanging agentic shells
 export GIT_PAGER=cat
 export GH_PAGER=cat

@@ -5,11 +5,11 @@
 // Handles: ^lesson, ^plan, ^todo, ^fault, ^issue, ^task, ^job, ^log
 //
 // Usage (from bash):
-//   bun run lib/commands.ts <cmd_type> <sub_cmd> [args...]
-//   bun run lib/commands.ts lesson list
-//   bun run lib/commands.ts todo list
-//   bun run lib/commands.ts plan show v0.3.0-tiles
-//   bun run lib/commands.ts fault add "description here"
+//   airun commands <cmd_type> <sub_cmd> [args...]
+//   airun commands lesson list
+//   airun commands todo list
+//   airun commands plan show v0.3.0-tiles
+//   airun commands fault add "description here"
 //
 // Exit codes: 0 = success, 1 = error
 
@@ -220,7 +220,7 @@ Add your content here.
 const [cmdType, subCmd, ...rest] = process.argv.slice(2);
 
 if (!cmdType) {
-  console.error("Usage: bun run lib/commands.ts <type> <list|show|add> [args...]");
+  console.error("Usage: airun commands <type> <list|show|add> [args...]");
   console.error("Types: lesson, plan, todo, fault, issue, task, job, log");
   process.exit(1);
 }

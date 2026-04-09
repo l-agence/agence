@@ -12,11 +12,11 @@
 //   - redacted:      true if content was stripped by the filter
 //
 // Usage (from bash via eval):
-//   bun run lib/ailedger.ts append <type> <tag> [task_id] [command] [exit_code]
-//   bun run lib/ailedger.ts verify [--local|--shard]
-//   bun run lib/ailedger.ts init          # init nested git repo
-//   bun run lib/ailedger.ts status        # entry counts, chain status
-//   bun run lib/ailedger.ts filter-test "some string"  # test filter
+//   airun ailedger append <type> <tag> [task_id] [command] [exit_code]
+//   airun ailedger verify [--local|--shard]
+//   airun ailedger init          # init nested git repo
+//   airun ailedger status        # entry counts, chain status
+//   airun ailedger filter-test "some string"  # test filter
 //
 // Exit codes: 0 = success, 1 = error
 
@@ -359,7 +359,7 @@ function status(): void {
 const [subCmd, ...args] = process.argv.slice(2);
 
 if (!subCmd) {
-  console.error("Usage: bun run lib/ailedger.ts <command> [args]");
+  console.error("Usage: airun ailedger <command> [args]");
   console.error("Commands:");
   console.error("  append <type> <tag> [task_id] [command] [exit_code]");
   console.error("  verify [--local|--shard]");
@@ -375,7 +375,7 @@ switch (subCmd) {
   case "append": {
     const [type, tag, taskId, cmd, ec] = args;
     if (!type) {
-      console.error("Usage: bun run lib/ailedger.ts append <type> <tag> [task_id] [command] [exit_code]");
+      console.error("Usage: airun ailedger append <type> <tag> [task_id] [command] [exit_code]");
       exitCode = 1;
       break;
     }
@@ -428,7 +428,7 @@ switch (subCmd) {
   case "filter-test": {
     const input = args.join(" ");
     if (!input) {
-      console.error("Usage: bun run lib/ailedger.ts filter-test <string>");
+      console.error("Usage: airun ailedger filter-test <string>");
       exitCode = 1;
       break;
     }

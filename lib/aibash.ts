@@ -11,8 +11,8 @@
 // Human-readable messages go to stderr.
 //
 // Usage (from bash):
-//   eval "$(bun run lib/aibash.ts init [args...])"
-//   eval "$(bun run lib/aibash.ts init --session abc --agent ralph --role agentic)"
+//   eval "$(airun aibash init [args...])"
+//   eval "$(airun aibash init --session abc --agent ralph --role agentic)"
 //
 // Exit codes: 0 = success, 1 = config error, 2 = policy violation
 
@@ -181,7 +181,7 @@ switch (cmd) {
     break;
   case "--help":
   case "help":
-    console.error(`Usage: bun run lib/aibash.ts <init|validate> [options...]
+    console.error(`Usage: airun aibash <init|validate> [options...]
   init     Resolve config, create session, emit shell exports
   validate Check policy (stub — always allow for now)
 
@@ -194,6 +194,6 @@ Options (for init):
     process.exit(0);
     break;
   default:
-    console.error(`Unknown command: ${cmd || "(none)"}. Try: bun run lib/aibash.ts help`);
+    console.error(`Unknown command: ${cmd || "(none)"}. Try: airun aibash help`);
     process.exit(1);
 }

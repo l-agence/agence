@@ -26,6 +26,11 @@ provider: anthropic
 # Leave blank to use provider default (see provider defaults below).
 model: claude-sonnet-4-5
 
+# ── Shard (shared upstream ledger) ───────────────────────────────────────────
+# Git remote URL for the shared .ailedger submodule.
+# Override with AI_SHARD env var.
+# shard: https://github.com/YOUR-ORG/ailedger.git
+
 
 # ════════════════════════════════════════════════════════════════════════════
 # PROVIDER CONFIGURATIONS

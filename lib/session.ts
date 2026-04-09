@@ -2,10 +2,10 @@
 // lib/session.ts — Session management module (Bun)
 //
 // Usage (from bash):
-//   bun run lib/session.ts list
-//   bun run lib/session.ts status <session-id>
-//   bun run lib/session.ts init <session-id> [role] [agent] [shell] [git-root]
-//   bun run lib/session.ts resume <session-id>
+//   airun session list
+//   airun session status <session-id>
+//   airun session init <session-id> [role] [agent] [shell] [git-root]
+//   airun session resume <session-id>
 //
 // Exit codes: 0 = success, 1 = error
 
@@ -239,7 +239,7 @@ switch (cmd) {
     if (cmd) {
       exitCode = sessionStatus(cmd);
     } else {
-      console.error("Usage: bun run lib/session.ts <list|init|status|resume> [args...]");
+      console.error("Usage: airun session <list|init|status|resume> [args...]");
       exitCode = 1;
     }
 }

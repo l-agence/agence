@@ -409,6 +409,17 @@ main() {
       fi
       exit $?
       ;;
+    ledger)
+      # Shared ledger shard: agence ^ledger init|list|show|add|sync|status
+      local _ledger_ts="${AGENCE_ROOT}/lib/ledger.ts"
+      if command -v bun &>/dev/null && [[ -f "$_ledger_ts" ]]; then
+        bun run "$_ledger_ts" ${*:2}
+      else
+        echo "Error: ^ledger requires bun + lib/ledger.ts" >&2
+        exit 1
+      fi
+      exit $?
+      ;;
     session)
       mode_session "${*:2}"
       exit $?
@@ -1263,7 +1274,7 @@ _agence_completion() {
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  local caret_commands="help symbols init reload install save learn commit push stash sync session lesson log plan todo fault issue task job audit handoff pickup pause resume reindex"
+  local caret_commands="help symbols init reload install save learn commit push stash sync session lesson log plan todo fault issue task job audit ledger handoff pickup pause resume reindex"
   local knowledge_subcmds="list show add"
 
   case "${COMP_WORDS[1]}" in
@@ -1303,6 +1314,15 @@ _agence_completion() {
         COMPREPLY=( $(compgen -W "--type --shard" -- "$cur") )
       elif [[ "${COMP_WORDS[2]}" == "show" || "${COMP_WORDS[2]}" == "agent" || "${COMP_WORDS[2]}" == "session" || "${COMP_WORDS[2]}" == "diff" ]]; then
         COMPREPLY=()
+      fi
+      ;;
+    "^ledger")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "init list show add sync status" -- "$cur") )
+      elif [[ "${COMP_WORDS[2]}" == "list" && "$cur" == "--"* ]]; then
+        COMPREPLY=( $(compgen -W "--last --all" -- "$cur") )
+      elif [[ "${COMP_WORDS[2]}" == "init" && "$cur" == "--"* ]]; then
+        COMPREPLY=( $(compgen -W "--remote" -- "$cur") )
       fi
       ;;
     "^handoff")
