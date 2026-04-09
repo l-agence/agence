@@ -133,6 +133,19 @@ source_if_exists "$AGENCE_LIB/router.sh"
 source_if_exists "$AGENCE_LIB/ailedger.sh"
 
 # ============================================================================
+# BUN DELEGATION HELPER
+# ============================================================================
+_bun_cmd() {
+    if command -v bun &>/dev/null; then
+        command -v bun
+    elif [[ -x "$HOME/.bun/bin/bun" ]]; then
+        echo "$HOME/.bun/bin/bun"
+    else
+        return 1
+    fi
+}
+
+# ============================================================================
 # SECURITY: Command validation (injection guard)
 # ============================================================================
 # Rejects commands containing dangerous shell operators.
@@ -1469,8 +1482,16 @@ mode_knowledge() {
   
   [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Knowledge mode: $cmd_type/$sub_cmd args='$args'" >&2
   
+  # Delegate to Bun when available (lib/commands.ts)
+  local _bun
+  _bun=$(_bun_cmd 2>/dev/null) || _bun=""
+  if [[ -n "$_bun" && -f "$AGENCE_LIB/commands.ts" ]]; then
+    "$_bun" run "$AGENCE_LIB/commands.ts" "$cmd_type" "$sub_cmd" $args
+    return $?
+  fi
+
   # ============================================================================
-  # DETERMINE SCOPE & PATHS
+  # DETERMINE SCOPE & PATHS (bash fallback)
   # ============================================================================
   
   local scope_type  # HERMETIC, NEXUS, SYNTHETIC, ORGANIC
