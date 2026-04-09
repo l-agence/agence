@@ -300,6 +300,16 @@ function cmdAgent(agentName: string, limit: number): number {
 
 function cmdSession(sessionId: string, limit: number): number {
   let entries = loadEntries("local");
+
+  // Auto-resolve: if input looks like a hex entry ID, find its session_id
+  if (/^[0-9a-f]{4,8}$/i.test(sessionId)) {
+    const match = entries.find(e => e.id?.startsWith(sessionId));
+    if (match) {
+      console.log(`  (resolved entry ${sessionId} → session ${match.session_id})\n`);
+      sessionId = match.session_id;
+    }
+  }
+
   entries = entries.filter(e => e.session_id === sessionId);
 
   if (entries.length === 0) {
