@@ -398,6 +398,17 @@ main() {
       mode_knowledge "$1" "${*:2}"
       exit $?
       ;;
+    audit)
+      # Ledger audit: agence ^audit trail|show|agent|session|diff|stats
+      local _audit_ts="${AGENCE_ROOT}/lib/audit.ts"
+      if command -v bun &>/dev/null && [[ -f "$_audit_ts" ]]; then
+        bun run "$_audit_ts" ${*:2}
+      else
+        echo "Error: ^audit requires bun + lib/audit.ts" >&2
+        exit 1
+      fi
+      exit $?
+      ;;
     session)
       mode_session "${*:2}"
       exit $?
@@ -1005,6 +1016,18 @@ mode_init() {
       mode_knowledge "job" "$init_args"
       return $?
       ;;
+    "audit")
+      # Ledger audit & decision review
+      # Usage: agence ^audit trail|show|agent|session|diff|stats [args]
+      local _audit_ts="${AGENCE_ROOT}/lib/audit.ts"
+      if command -v bun &>/dev/null && [[ -f "$_audit_ts" ]]; then
+        bun run "$_audit_ts" $init_args
+      else
+        echo "Error: ^audit requires bun + lib/audit.ts" >&2
+        return 1
+      fi
+      return $?
+      ;;
     "handoff")
       # Transfer session context to another agent
       # Usage: agence ^handoff @ralph [context message]
@@ -1046,7 +1069,7 @@ mode_init() {
     *)
       echo "Error: Unknown init command: $init_cmd" >&2
       echo "Available: help, init, reload, install, save, learn, commit, push, session," >&2
-      echo "           lesson, log, plan, todo, fault, issue, task, job," >&2
+      echo "           lesson, log, plan, todo, fault, issue, task, job, audit," >&2
       echo "           handoff, pickup, pause, resume, reindex, session-restore" >&2
       return 1
       ;;
@@ -1188,6 +1211,7 @@ KNOWLEDGE COMMANDS (^ prefix)
   ───────────────────────────────────────────────────────
   ^fault [list|show]                  Incidents          → nexus/faults/
   ^log   [list|show|add]              Ops logs           → nexus/logs/
+  ^audit [trail|show|agent|session|diff|stats]  Ledger audit → .ailedger
 
   SYNTHETIC — Team-shared via Git (committed)
   ────────────────────────────────────────────
@@ -1239,7 +1263,7 @@ _agence_completion() {
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  local caret_commands="help symbols init reload install save learn commit push stash sync session lesson log plan todo fault issue task job handoff pickup pause resume reindex"
+  local caret_commands="help symbols init reload install save learn commit push stash sync session lesson log plan todo fault issue task job audit handoff pickup pause resume reindex"
   local knowledge_subcmds="list show add"
 
   case "${COMP_WORDS[1]}" in
@@ -1270,6 +1294,15 @@ _agence_completion() {
         COMPREPLY=( $(compgen -W "$knowledge_subcmds" -- "$cur") )
       elif [[ "$cur" == "--"* ]]; then
         COMPREPLY=( $(compgen -W "--agent" -- "$cur") )
+      fi
+      ;;
+    "^audit")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "trail show agent session diff stats" -- "$cur") )
+      elif [[ "${COMP_WORDS[2]}" == "trail" && "$cur" == "--"* ]]; then
+        COMPREPLY=( $(compgen -W "--type --shard" -- "$cur") )
+      elif [[ "${COMP_WORDS[2]}" == "show" || "${COMP_WORDS[2]}" == "agent" || "${COMP_WORDS[2]}" == "session" || "${COMP_WORDS[2]}" == "diff" ]]; then
+        COMPREPLY=()
       fi
       ;;
     "^handoff")
