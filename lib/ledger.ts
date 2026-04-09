@@ -110,6 +110,28 @@ function cmdInit(args: string[]): number {
   stderr(`[ledger] Initializing shared shard...`);
   stderr(`  Remote: ${remote}`);
 
+  // Extract org/repo from remote URL for gh CLI
+  // Supports: https://github.com/ORG/REPO.git, git@github.com:ORG/REPO.git
+  const repoMatch = remote.match(/github\.com[:/]([^/]+\/[^/.]+)/);
+  const ghRepo = repoMatch ? repoMatch[1] : "";
+
+  // Create remote repo if it doesn't exist (GitHub only)
+  if (ghRepo) {
+    const check = run(`gh repo view ${ghRepo} --json name 2>&1`);
+    if (!check.includes(`"name"`)) {
+      stderr(`  Creating remote repo: ${ghRepo}`);
+      try {
+        runOrFail(`gh repo create ${ghRepo} --private --description "Shared decision ledger shard for Agence"`);
+        stderr(`  ✓ Created ${ghRepo} (private)`);
+      } catch (e: any) {
+        stderr(`[ledger] Warning: Could not create remote repo: ${e.message || e}`);
+        stderr(`  You may need to create it manually: gh repo create ${ghRepo} --private`);
+      }
+    } else {
+      stderr(`  Remote repo ${ghRepo} already exists`);
+    }
+  }
+
   // Create shard directory
   mkdirSync(SHARD_DIR, { recursive: true });
 
@@ -131,12 +153,16 @@ function cmdInit(args: string[]): number {
   runOrFail(`git add ledger.jsonl`, SHARD_DIR);
   runOrFail(`git commit -m "genesis: initialize shared ailedger shard"`, SHARD_DIR);
 
-  // Add remote
+  // Add remote + push
   runOrFail(`git remote add origin ${remote}`, SHARD_DIR);
-
-  stderr(`[ledger] ✓ Shard initialized at ${SHARD_DIR}`);
-  stderr(`  Next: git push -u origin main (from ${SHARD_DIR})`);
-  stderr(`  Then: update AGENCE_SHARD_LEDGER=${SHARD_LEDGER}`);
+  try {
+    runOrFail(`git push -u origin main`, SHARD_DIR);
+    stderr(`[ledger] ✓ Shard initialized and pushed to ${remote}`);
+  } catch {
+    stderr(`[ledger] ✓ Shard initialized locally at ${SHARD_DIR}`);
+    stderr(`  Push failed — retry with: cd ${SHARD_DIR} && git push -u origin main`);
+  }
+  stderr(`  Update env: export AGENCE_SHARD_LEDGER='${SHARD_LEDGER}'`);
 
   // Emit eval-safe exports for bash integration
   console.log(`export AGENCE_SHARD_LEDGER='${SHARD_LEDGER.replace(/'/g, "'\\''")}'`);
