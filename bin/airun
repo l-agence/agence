@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# bin/airun — Run Agence Bun TS modules by short name
+#
+# Usage:
+#   airun <module> [args...]      e.g. airun audit trail --shard
+#   airun --list                  list available modules
+#
+# Maps:  airun audit trail  →  bun run lib/audit.ts trail
+#        airun router resolve-route  →  bun run lib/router.ts resolve-route
+
+set -euo pipefail
+
+AGENCE_ROOT="${AGENCE_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+LIB_DIR="${AGENCE_ROOT}/lib"
+
+if [[ "${1:-}" == "--list" || "${1:-}" == "-l" ]]; then
+  echo "Available modules:"
+  for f in "$LIB_DIR"/*.ts; do
+    [[ -f "$f" ]] || continue
+    name="$(basename "$f" .ts)"
+    # Extract first comment line as description
+    desc=$(head -2 "$f" | grep -oP '//\s*\K.*' | head -1)
+    printf "  %-16s %s\n" "$name" "$desc"
+  done
+  exit 0
+fi
+
+if [[ $# -lt 1 || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  echo "Usage: airun <module> [args...]"
+  echo ""
+  echo "  airun audit trail          → bun run lib/audit.ts trail"
+  echo "  airun router resolve-route → bun run lib/router.ts resolve-route"
+  echo "  airun ailedger status      → bun run lib/ailedger.ts status"
+  echo "  airun --list               → list available modules"
+  exit 0
+fi
+
+module="$1"
+shift
+
+ts_file="${LIB_DIR}/${module}.ts"
+
+if [[ ! -f "$ts_file" ]]; then
+  echo "Error: module not found: lib/${module}.ts" >&2
+  echo "Run 'airun --list' to see available modules." >&2
+  exit 1
+fi
+
+exec bun run "$ts_file" "$@"
