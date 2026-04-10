@@ -231,28 +231,38 @@ function sessionPrune(args: string[]): number {
     if (args[i] === "--dry-run") dryRun = true;
   }
 
-  if (!existsSync(SESSION_DIR)) {
-    console.error(`[SESSION] No sessions directory: ${SESSION_DIR}`);
+  // Scan both session directories:
+  //   nexus/.aisessions/ — aisession-created .meta.json + .typescript files
+  //   nexus/sessions/    — aibash/signal .awaiting markers + legacy .meta.json
+  const LEGACY_SESSION_DIR = join(AI_ROOT, "nexus", "sessions");
+  const sessionDirs = [SESSION_DIR, LEGACY_SESSION_DIR].filter(d => existsSync(d));
+
+  if (sessionDirs.length === 0) {
+    console.error(`[SESSION] No sessions directory found`);
     return 1;
   }
 
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-  const allFiles = readdirSync(SESSION_DIR);
-  const candidates: { file: string; mtime: Date }[] = [];
+  const candidates: { dir: string; file: string; mtime: Date }[] = [];
+  let totalFiles = 0;
 
-  for (const f of allFiles) {
-    const full = join(SESSION_DIR, f);
-    try {
-      const st = statSync(full);
-      if (!st.isFile()) continue;  // skip symlinks, junctions, directories
-      if (st.mtimeMs < cutoff) {
-        candidates.push({ file: f, mtime: st.mtime });
-      }
-    } catch { /* skip */ }
+  for (const dir of sessionDirs) {
+    const allFiles = readdirSync(dir);
+    totalFiles += allFiles.length;
+    for (const f of allFiles) {
+      const full = join(dir, f);
+      try {
+        const st = statSync(full);
+        if (!st.isFile()) continue;
+        if (st.mtimeMs < cutoff) {
+          candidates.push({ dir, file: f, mtime: st.mtime });
+        }
+      } catch { /* skip */ }
+    }
   }
 
   if (candidates.length === 0) {
-    console.error(`[SESSION] Nothing to prune (cutoff: ${days} days, ${allFiles.length} total files)`);
+    console.error(`[SESSION] Nothing to prune (cutoff: ${days} days, ${totalFiles} total files across ${sessionDirs.length} dirs)`);
     return 0;
   }
 
@@ -279,7 +289,7 @@ function sessionPrune(args: string[]): number {
   let removed = 0;
 
   for (const c of candidates) {
-    const src = join(SESSION_DIR, c.file);
+    const src = join(c.dir, c.file);
     if (dryRun) {
       console.error(`  [dry-run] ${archive ? "archive + " : ""}remove: ${c.file}`);
       removed++;
@@ -310,7 +320,7 @@ function sessionPrune(args: string[]): number {
     }
   }
 
-  const remaining = allFiles.length - removed;
+  const remaining = totalFiles - removed;
   console.error(`  ${dryRun ? "[dry-run] " : ""}Removed: ${removed} files | ${archive ? `Archived: ${archived} | ` : ""}Remaining: ${remaining}`);
 
   return 0;
