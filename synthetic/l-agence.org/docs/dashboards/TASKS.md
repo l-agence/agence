@@ -19,7 +19,7 @@
 | ~~TEST-001~~ | ~~Shellspec: ^ledger, ^audit, ^session prune~~ | `-` | 2 | 0 | 0.3 | **50** | copilot | — |
 | ~~CLI-003~~ | ~~Smoke tests: path validation rejects escapes~~ | `-` | 2 | 0 | 0.3 | **50** | copilot | — |
 | ~~DOC-001~~ | ~~Update docs for v0.3.2~~ | `-` | 2 | 0 | 0.2 | **40** | copilot | — |
-| DOC-002 | Update show_help() with new commands | `~` | 2 | 0 | 0.2 | **40** | — | — |
+| ~~DOC-002~~ | ~~Update show_help() with new commands~~ | `-` | 2 | 0 | 0.2 | **40** | copilot | — |
 | ~~BUG-001~~ | ~~mnemonic prune + sessions prune~~ | `-` | 2 | 0 | 0.2 | **40** | copilot | — |
 | DOC-003 | Clear stale synthetic todos | `~` | 1 | 0 | 0.1 | **20** | — | — |
 | ~~CLI-001~~ | ~~agence help deep improvements~~ | `-` | 1 | 0 | 0.1 | **20** | copilot | — |
@@ -31,17 +31,17 @@
 | Metric | Value |
 |--------|-------|
 | Total tasks | 16 |
-| Runnable | 2 |
+| Runnable | 1 |
 | Blocked | 0 |
-| Completed | 14 |
+| Completed | 15 |
 | Failed | 0 |
 
 ## State Distribution
 
 | State | Symbol | Count |
 |-------|--------|-------|
-| Human-assigned | `~` | 2 |
-| Completed | `-` | 14 |
+| Human-assigned | `~` | 1 |
+| Completed | `-` | 15 |
 
 ---
 
@@ -71,7 +71,7 @@ INFRA-001 ✅ ──^──> INFRA-002 ✅ ──^──> SWARM-002 ✅
                                      ^
 SWARM-001 ─────────── ; ─────────────┘
 
-~~DOC-001~~ ✅ ──── ; ──> DOC-002
+~~DOC-001~~ ✅ ──── ; ──> ~~DOC-002~~ ✅
 
 CLI-003 ──── ; ──> TEST-001
 ```
