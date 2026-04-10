@@ -1,7 +1,21 @@
 # Agence: Agentic Engineering Collaborative Environment
 # Author : stephane Korning : stefusss@gmail.com
 
-l' Agence is a  distributed, multi-agent framework for collaborative engineering with built-in governance, knowledge management, and state coordination.*
+L'Agence is a distributed, multi-agent framework for collaborative engineering with built-in governance, knowledge management, and state coordination.
+
+---
+
+## 📊 Dashboards
+
+| View | Description |
+|------|-------------|
+| [**TASKS**](dashboards/TASKS.md) | All tasks — state, priority, score, agent |
+| [**WORKFLOWS**](dashboards/WORKFLOWS.md) | Workflow pipelines with completion % |
+| [**PROJECTS**](dashboards/PROJECTS.md) | Project-level rollup |
+| [**ISSUES**](dashboards/ISSUES.md) | Known problems and opportunities |
+| [**FAULTS**](dashboards/FAULTS.md) | Incident history and RCA |
+
+> *Hub: [DASHBOARDS.md](DASHBOARDS.md) — regenerate: `airun matrix dashboard`*
 
 ---
 
@@ -370,6 +384,6 @@ GG! Ready to collaborate. 🚀
 
 ---
 
-**Version**: 0.2.0 (alpha)  
-**Last Updated**: 2026-03-04  
+**Version**: 0.4.0 
+**Last Updated**: 2026-04-10  
 **Framework**: COGNOS (C-O-G-N-O-S)

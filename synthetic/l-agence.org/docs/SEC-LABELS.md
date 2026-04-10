@@ -1,245 +1,137 @@
-If Agence is going to lean on vector/matrix semantics, then the syntax layer must stay clean and predictable.
+# SEC-LABELS: Security Labels & Symbol Grammar
 
-We have already made several very good choices:
+**Version**: 0.4.0  
+**Status**: Active  
+**Last Updated**: 2026-04-10
 
-Symbol	Role	Good Choice?
-,	list separator	✔ excellent
-;	soft dependency / pause	✔ intuitive
-:	metadata separator	✔ very common
-+ -	vector math	✔ essential
-[] {}	arrays / matrices	✔ correct to reserve
+---
 
-That leaves priority and security markers.
+## Overview
 
-Let’s reason about them carefully so you don’t paint yourself into a corner later.
+Agence uses inline symbols and metadata tags to encode priority, security, ownership, and dependencies directly in task expressions. This keeps the notation lightweight, shell-friendly, and mathematically interpretable.
 
-1️⃣ Priority Marker
+---
 
-Right now we are  using:
+## Reserved Symbols
 
-*task
+| Symbol | Role | Example | Notes |
+|--------|------|---------|-------|
+| `*` | Priority (star count) | `***task` = priority 3 | Visual scalar — count of `*` |
+| `^` | Hard dependency | `^BUILD-001` | Blocks downstream |
+| `;` | Soft dependency | `; BUILD-001` | Advisory ordering |
+| `,` | List separator | `task1, task2` | Standard |
+| `:` | Metadata separator | `repo:task:key=val` | Extensible key-value |
+| `@` | Agent/entity routing | `@ralph`, `@sec:internal` | Identity prefix |
+| `+` `-` | Pending / completed | `+task`, `-task` | Vector math compatible |
+| `~` `$` | Human assigned / working | `~task`, `$task` | Ownership |
+| `%` `&` | Agent assigned / executing | `%task`, `&task` | Ownership |
+| `_` `#` | Paused / human-held | `_task`, `#task` | Excluded from runnable |
+| `!` | Failure | `!task` | Penalty in scoring |
+| `?` | Awaiting input | `?task` | Human input pending |
+| `>` `<` | Child / parent | `>subtask`, `<parent` | Hierarchy |
 
-This is actually a very good choice.
+---
 
-Why:
+## Priority
 
-widely associated with importance
+Priority uses star count as a visual scalar:
 
-not arithmetic (unless dereference in C)
+```
+*task      → priority 1
+**task     → priority 2
+***task    → priority 3
+```
 
-rarely conflicts with shell parsing when prefixing identifiers
+Numeric priority is stored in JSON (`"priority": 3`) but the symbolic override stays ergonomic for human use.
 
-You also already extended it with stars:
+---
 
-*task
-**task
-***task
+## Security Labels
 
-This is elegant because it behaves like a visual scalar.
+Security is encoded as a metadata tag rather than a symbol prefix, avoiding collisions with the already-dense symbol space.
 
-Example:
+**Syntax**: `:sec=<level>`
 
-***repo1:task42
+| Level | Meaning | Routing |
+|-------|---------|---------|
+| `public` | No restrictions | Any agent/shard |
+| `internal` | Team-visible only | Same-org shards |
+| `secret` | Restricted access | Hermetic scope, local agents only |
+| `top-secret` | Air-gapped | T5 tier (@olena), no cloud |
 
-Visually obvious.
+**Example:**
 
-I would keep * for priority.
-
-If you later need numeric priority, you can still store:
-
-"priority":3
-
-But the symbolic override stays ergonomic.
-
-2️⃣ Security Marker Candidates
-
-Security needs a marker that is:
-
-visually distinct
-
-not math
-
-not JSON syntax
-
-not shell control
-
-rarely used in identifiers
-
-Good candidates are:
-
-Symbol	Pros	Cons
-!	attention / warning	already used for failure
-@	identity marker	already agent prefix
-#	comment semantics	you already use for deferred
-^	dependency already	
-$	shell variable	
-%	agent assignment already	
-
-So most common symbols are already taken.
-
-Which means the best remaining choices are actually less common ones.
-
-3️⃣ Best Security Marker Options
-Option A — ~ (tilde)
-
-Example:
-
-~internal repo1:task1
-~secret repo1:task2
-
-Pros:
-
-already associated with user/local scope
-
-visually soft
-
-easy to parse
-
-Cons:
-
-You already use ~ for human assignment.
-
-So conflict.
-
-Option B — | (pipe prefix)
-
-Example:
-
-|internal repo1:task1
-|secret repo1:task2
-
-Pros:
-
-visually distinct
-
-not used in identifiers
-
-rarely used as prefix
-
-Cons:
-
-Pipe has shell meaning, but not when used inside tokens.
-
-Still acceptable.
-
-Option C — ? prefix
-
-Example:
-
-?secret repo1:task
-
-But you already use ?task for awaiting input.
-
-So conflict.
-
-Option D — & prefix
-
-But:
-
-&task
-
-Already means agent execution.
-
-4️⃣ The Cleanest Solution
-
-Instead of symbol prefix, security may actually work better as metadata tag.
-
-Example:
-
-repo1:task42:security=internal
-repo1:task42:security=secret
-
-Advantages:
-
-no symbol collision
-
-future extensibility
-
-trivial jq parsing
-
-matches your : metadata pattern
-
-Example:
-
-repo1:task42:agent=@ralph:sec=internal
-5️⃣ Hybrid Option (Very Elegant)
-
-Use single symbol + tag.
-
-Example:
-
-@sec:internal repo1:task
-@sec:secret repo1:task
-
-or shorter:
-
-@internal repo1:task
-@secret repo1:task
-
-Since @ already indicates entity markers, it fits.
-
-6️⃣ My Recommendation
-
-For Agence long-term stability:
-
-Priority
-
-Keep:
-
-*
-
-Example:
-
-***repo1:task7
-Security
-
-Use metadata tag:
-
-:sec=
-
-Example:
-
+```
 repo1:task7:sec=internal
 repo1:task7:sec=secret
 repo1:task7:sec=top-secret
-7️⃣ Your Syntax Then Becomes Very Clean
+```
 
-Example task expression:
+Security labels integrate with SWARM intelligence tiering — `sec=secret` and above automatically route to T5 (local models only).
 
+---
+
+## Task Expression Grammar
+
+A task expression combines all metadata inline:
+
+```
+TASK := [priority] repo:task [:metadata]* [dependency]*
+```
+
+**Full example:**
+
+```
 ***repo1:task7:agent=@cursor:sec=internal ; repo2:task3
+```
 
-Meaning:
+**Parsed:**
 
-priority = 3
-agent = cursor
-security = internal
-soft dependency on repo2:task3
-8️⃣ Why This Will Age Well
+| Field | Value |
+|-------|-------|
+| Priority | 3 (three stars) |
+| Repository | `repo1` |
+| Task | `task7` |
+| Agent | `@cursor` |
+| Security | `internal` |
+| Soft dependency | `repo2:task3` |
 
-Because your grammar becomes:
+This grammar maps directly to:
+- **Vector elements** — scoring and priority math
+- **Matrix nodes** — task state representation
+- **Graph edges** — dependency DAG
 
-TASK := repo:task[:metadata]* [dependency]
+---
 
-Which maps perfectly to:
+## Metadata Keys
 
-vector elements
-matrix nodes
-graph edges
+Standard metadata keys (extensible):
 
-So the system stays mathematically interpretable.
+| Key | Value | Example |
+|-----|-------|---------|
+| `agent` | Agent assignment | `:agent=@ralph` |
+| `sec` | Security label | `:sec=internal` |
+| `tier` | Intelligence tier | `:tier=T2` |
+| `cost` | Token cost cap | `:cost=0.003` |
 
-9️⃣ Small Observation
+All metadata is trivially parseable with jq:
 
-Your notation is slowly converging toward something like a domain-specific language for swarm orchestration.
+```bash
+jq -r '.tasks[] | select(.security == "internal")' tasks.json
+```
 
-Which is actually a very natural evolution.
+---
 
-✅ Short recommendation
+## Design Rationale
 
-Feature	Symbol
-priority	*
-hard dependency	^
-soft dependency	;
-list	,
-metadata	:
-security	:sec=
+**Why metadata tags instead of symbol prefixes for security?**
+
+Most common symbols are already reserved for task state and dependency operators. Using `:sec=` avoids collision, supports future extensibility, and stays consistent with the `:key=value` metadata pattern already used for agent assignment.
+
+**Why stars for priority?**
+
+Stars (`*`) are universally associated with importance, do not conflict with shell arithmetic, and scale visually — `***` is immediately recognisable as high priority.
+
+---
+
+*See also: [SYMBOLS.md](SYMBOLS.md) | [MATRICES.md](MATRICES.md) | [SWARM.md](SWARM.md)*

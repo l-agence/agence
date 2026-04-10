@@ -375,5 +375,5 @@ agence "What should I do next?"
 
 ---
 
-**Version**: 0.2.4
-**Last Updated**: 2026-04-01
+**Version**: 0.4.0
+**Last Updated**: 2026-04-10

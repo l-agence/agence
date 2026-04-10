@@ -311,9 +311,9 @@ organic/
 
 ## Version
 
-**Version**: 0.2.3.1  
+**Version**: 0.4.0  
 **Status**: In Effect  
-**Last Updated**: 2026-03-31  
+**Last Updated**: 2026-04-10  
 
 **References**:
 - [LAWS.md](LAWS.md) — Security & validation rules

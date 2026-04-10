@@ -1,8 +1,8 @@
 # Agence Development Roadmap (2026 Q1–Q2)
 
-**Updated**: 2026-04-09
-**Status**: v0.3.0 shipped, v0.3.1 in progress
-**Current**: main @ a73b2bf
+**Updated**: 2026-04-10
+**Status**: v0.3.2 shipped, v0.4.0 in progress
+**Current**: main @ ee8d15c
 
 ---
 
@@ -15,9 +15,11 @@ v0.2.5 (RELEASED)     ← Stabilization, model routing, 91/91 tests
     ↓
 v0.3.0 (RELEASED)     ← tmux, env, session.ts, .ailedger, pipe-pane
     ↓
-v0.3.1 (CURRENT)      ← router.ts, audit.ts, airun, CI, ledger IDs
+v0.3.1 (RELEASED)     ← router.ts, audit.ts, airun, CI, ledger IDs
     ↓
-v0.4.0                ← guard.ts, matrix-math compute, MLS enforcement
+v0.3.2 (RELEASED)     ← version strings, model routing, glossary
+    ↓
+v0.4.0 (CURRENT)      ← guard.ts, signal.ts, matrix.ts, MLS enforcement
     ↓
 v0.5.0+               ← Skupper multi-cloud distribution
 ```
@@ -32,8 +34,9 @@ v0.5.0+               ← Skupper multi-cloud distribution
 | **1.5** | v0.2.4 | Shell session fixes, test suite | 🟢 DONE |
 | **2** | v0.2.5 | Stabilization & release | 🟢 DONE |
 | **2.1** | v0.3.0 | tmux 1+1, env.sh, session.ts, .ailedger, pipe-pane | 🟢 DONE |
-| **2.2** | v0.3.1 | Bun extraction (router.ts, audit.ts), CI, airun | ⏳ CURRENT |
-| **3** | v0.4.0 | guard.ts, matrix-math compute, MLS enforcement | 📍 NEXT |
+| **2.2** | v0.3.1 | Bun extraction (router.ts, audit.ts), CI, airun | 🟢 DONE |
+| **2.3** | v0.3.2 | Version strings, model routing, glossary | 🟢 DONE |
+| **3** | v0.4.0 | guard.ts, signal.ts, matrix.ts, MLS enforcement | ⏳ CURRENT |
 | **4** | v0.5.0+ | Skupper multi-cloud | 📍 FUTURE |
 
 ---

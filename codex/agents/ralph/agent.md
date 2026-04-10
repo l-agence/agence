@@ -77,9 +77,9 @@ agence @ralph "How do APIs work?"                   # Default 4/10
 
 ---
 
-**Version**: 0.2.0 (alpha)  
-**Status**: Ready for integration  
-**Last Updated**: 2026-03-04
+**Version**: 0.4.0  
+**Status**: Active  
+**Last Updated**: 2026-04-10
 
 
 # agent system design 

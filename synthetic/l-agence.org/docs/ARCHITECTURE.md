@@ -264,9 +264,6 @@ codex/agents/
 ├─ @olena          # (ollama)  free & Secure guard-railed On-premises local Ollama sessions.
 ├─ @peers          # (3-peers) MIT style 3-peer LLM agent weighed consensus. Strategic planning, Unsolvable P1 problems, RCA reviews.
 └─ @pilot          # (copilot) Copilot agent session.  Code review, quality
-
- ... or you can roll your own !
-
 ```
 
 Each agent has:
@@ -495,6 +492,6 @@ nexus/sessions/
 
 ---
 
-**Document Version:** 0.2.0  
-**Last Updated:** 2026-03-05  
+**Document Version:** 0.4.0  
+**Last Updated:** 2026-04-10  
 **Status:** Active Development

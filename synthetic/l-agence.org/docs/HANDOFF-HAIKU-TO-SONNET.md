@@ -1,5 +1,7 @@
 # Handoff: Haiku → Sonnet (v0.2.3.1 → Phase 2)
 
+> **HISTORICAL** — This document records the v0.2.3.1 → v0.2.4 handoff (March 2026). Phase 2 deliverables have since been superseded by v0.4.0 architecture. Retained for project history.
+
 **Date**: 2026-03-31  
 **From**: Claude Haiku 4.5  
 **To**: Claude Sonnet 4 (or stronger)  

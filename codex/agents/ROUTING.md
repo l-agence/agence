@@ -179,6 +179,6 @@ When no provider is specified, first configured key wins:
 
 ---
 
-**Version**: 0.3.0  
-**Last Updated**: 2026-03-18  
-**Implementation**: `lib/router.sh` v0.4.0
+**Version**: 0.4.0  
+**Last Updated**: 2026-04-10  
+**Implementation**: `lib/router.ts`
