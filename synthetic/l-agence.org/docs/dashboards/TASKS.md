@@ -11,7 +11,7 @@
 |----|-------|-------|-----|-------|------|-------|-------|------------|
 | ~~INFRA-002~~ | ~~agentd skeleton: pid, socket, Docker spawn~~ | `-` | 4 | 2 | 0.8 | **170** | copilot | ~~INFRA-001~~ |
 | ~~INFRA-001~~ | ~~Pipe-pane: tmux-native PTY streaming~~ | `-` | 3 | 1 | 0.5 | **105** | copilot | — |
-| SWARM-001 | Gate = write access (not --safe flag) | `~` | 3 | 1 | 0.5 | **105** | — | — |
+| ~~SWARM-001~~ | ~~Gate = write access (not --safe flag)~~ | `-` | 3 | 1 | 0.5 | **105** | copilot | — |
 | SWARM-002 | agentd interface contract (Docker→Nomad) | `~` | 3 | 1 | 0.5 | **105** | — | ~~INFRA-002~~ |
 | INFRA-004 | .ailedger enhancements: AIPOLICY commit, prune | `~` | 3 | 1 | 0.4 | **95** | — | — |
 | INFRA-003 | Publish AIPOLICY.yaml schema | `~` | 2 | 1 | 0.3 | **75** | — | — |
@@ -30,16 +30,16 @@
 | Metric | Value |
 |--------|-------|
 | Total tasks | 15 |
-| Runnable | 13 |
+| Runnable | 12 |
 | Blocked | 0 |
-| Completed | 2 |
+| Completed | 3 |
 | Failed | 0 |
 
 ## State Distribution
 
 | State | Symbol | Count |
 |-------|--------|-------|
-| Human-assigned | `~` | 13 |
+| Human-assigned | `~` | 12 |
 | Human-working | `$` | 0 |
 | Agent-assigned | `%` | 0 |
 | Agent-executing | `&` | 0 |
@@ -47,7 +47,7 @@
 | Awaiting input | `?` | 0 |
 | Paused | `_` | 0 |
 | Held | `#` | 0 |
-| Completed | `-` | 2 |
+| Completed | `-` | 3 |
 | Failed | `!` | 0 |
 
 ---
@@ -60,7 +60,7 @@
 |------|----|-------|-------|
 | 1 | ~~INFRA-002~~ | 170 | `-` ✅ |
 | 2 | ~~INFRA-001~~ | 105 | `-` ✅ |
-| 3 | SWARM-001 | 105 | `~` |
+| 3 | ~~SWARM-001~~ | 105 | `-` ✅ |
 | 4 | SWARM-002 | 105 | `~` |
 | 5 | INFRA-004 | 95 | `~` |
 | 6 | INFRA-003 | 75 | `~` |
