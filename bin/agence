@@ -806,9 +806,16 @@ mode_external() {
         echo "Error: Commit message required" >&2
         return 1
       fi
+      # Detect AIPOLICY.yaml changes before commit (for ledger entry)
+      local _policy_changed=0
+      if git -C "$GIT_REPO" diff --cached --name-only | grep -q 'codex/AIPOLICY.yaml'; then
+        _policy_changed=1
+      fi
       git -C "$GIT_REPO" commit -m "$commit_msg"
       local _rc=$?
       [[ $_rc -eq 0 ]] && ailedger_append "commit" "slash-commit" "" "$commit_msg" "$_rc"
+      [[ $_rc -eq 0 && $_policy_changed -eq 1 ]] && \
+        ailedger_append "policy" "aipolicy-changed" "" "codex/AIPOLICY.yaml modified" "0"
       return $_rc
       ;;
     push)

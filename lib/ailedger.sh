@@ -191,3 +191,54 @@ ailedger_query() {
     [[ -f "$current" ]] && jq -c "$filter" "$current" || echo "[]"
   fi
 }
+
+# Prune old monthly ledger files beyond retention period
+# Usage: ailedger_prune [months] [--dry-run]
+# Default retention: 6 months. Only prunes LOCAL files, never the shard.
+ailedger_prune() {
+  local months=6 dry_run=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --dry-run) dry_run=1; shift ;;
+      [0-9]*)    months="$1"; shift ;;
+      *)         echo "Usage: ailedger_prune [months] [--dry-run]" >&2; return 1 ;;
+    esac
+  done
+
+  # Prefer Bun implementation
+  local _ts="${AGENCE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/lib/ailedger.ts"
+  if command -v bun &>/dev/null && [[ -f "$_ts" ]]; then
+    local _prune_args="--months $months"
+    [[ $dry_run -eq 1 ]] && _prune_args="$_prune_args --dry-run"
+    bun run "$_ts" prune $_prune_args
+    return $?
+  fi
+
+  # Bash fallback
+  if [[ ! -d "$_AILEDGER_DIR" ]]; then
+    echo "[ailedger] No local ledger directory." >&2
+    return 0
+  fi
+
+  local cutoff_y cutoff_m cutoff
+  cutoff_y=$(date -u -d "$months months ago" '+%Y' 2>/dev/null) || cutoff_y=$(date -u '+%Y')
+  cutoff_m=$(date -u -d "$months months ago" '+%m' 2>/dev/null) || cutoff_m=$(date -u '+%m')
+  cutoff="${cutoff_y}-${cutoff_m}"
+
+  local count=0
+  for f in "$_AILEDGER_DIR"/????-??.jsonl; do
+    [[ -f "$f" ]] || continue
+    local fname
+    fname="$(basename "$f" .jsonl)"
+    if [[ "$fname" < "$cutoff" ]]; then
+      if [[ $dry_run -eq 1 ]]; then
+        echo "[ailedger] Would remove: $(basename "$f") ($(wc -l < "$f") entries)" >&2
+      else
+        rm "$f"
+        echo "[ailedger] Removed: $(basename "$f")" >&2
+      fi
+      count=$((count + 1))
+    fi
+  done
+  [[ $count -eq 0 ]] && echo "[ailedger] Nothing to prune (all within ${months}-month retention)." >&2
+}

@@ -20,7 +20,7 @@
 //
 // Exit codes: 0 = success, 1 = error
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, readdirSync, unlinkSync } from "fs";
 import { join, dirname } from "path";
 import { createHash } from "crypto";
 import { execSync } from "child_process";
@@ -354,6 +354,54 @@ function status(): void {
   console.log(JSON.stringify(out, null, 2));
 }
 
+// ─── Prune ───────────────────────────────────────────────────────────────────
+// Remove local ledger files older than retention months.
+// Default retention: 6 months. Shard file is NEVER pruned (append-only public record).
+
+function prune(retentionMonths: number, dryRun: boolean): { removed: string[]; kept: string[] } {
+  const removed: string[] = [];
+  const kept: string[] = [];
+
+  if (!existsSync(LOCAL_DIR)) {
+    console.error("[ailedger] No local ledger directory.");
+    return { removed, kept };
+  }
+
+  const files = readdirSync(LOCAL_DIR).filter(f => /^\d{4}-\d{2}\.jsonl$/.test(f)).sort();
+  if (files.length === 0) {
+    console.error("[ailedger] No ledger files to prune.");
+    return { removed, kept };
+  }
+
+  // Compute cutoff: current month minus retentionMonths
+  const now = new Date();
+  const cutoff = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - retentionMonths, 1));
+  const cutoffStr = `${cutoff.getUTCFullYear()}-${String(cutoff.getUTCMonth() + 1).padStart(2, "0")}`;
+
+  for (const f of files) {
+    const monthStr = f.replace(".jsonl", "");
+    if (monthStr < cutoffStr) {
+      if (dryRun) {
+        console.error(`[ailedger] Would remove: ${f} (${countLines(join(LOCAL_DIR, f))} entries)`);
+      } else {
+        unlinkSync(join(LOCAL_DIR, f));
+        console.error(`[ailedger] Removed: ${f}`);
+      }
+      removed.push(f);
+    } else {
+      kept.push(f);
+    }
+  }
+
+  if (removed.length === 0) {
+    console.error(`[ailedger] Nothing to prune (all files within ${retentionMonths}-month retention).`);
+  } else if (!dryRun) {
+    console.error(`[ailedger] Pruned ${removed.length} file(s), kept ${kept.length}.`);
+  }
+
+  return { removed, kept };
+}
+
 // ─── CLI Dispatch ────────────────────────────────────────────────────────────
 
 const [subCmd, ...args] = process.argv.slice(2);
@@ -365,6 +413,7 @@ if (!subCmd) {
   console.error("  verify [--local|--shard]");
   console.error("  init                    Initialize nested git repo");
   console.error("  status                  Entry counts and chain health");
+  console.error("  prune [--months N] [--dry-run]  Remove old local ledger files");
   console.error("  filter-test <string>    Test security filter on a string");
   process.exit(1);
 }
@@ -422,6 +471,33 @@ switch (subCmd) {
 
   case "status": {
     status();
+    break;
+  }
+
+  case "prune": {
+    let months = 6;
+    let dryRun = false;
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === "--months" && args[i + 1]) {
+        months = parseInt(args[++i], 10);
+        if (isNaN(months) || months < 1) {
+          console.error("Error: --months must be a positive integer");
+          exitCode = 1;
+          break;
+        }
+      } else if (args[i] === "--dry-run") {
+        dryRun = true;
+      }
+    }
+    if (exitCode === 0) {
+      const result = prune(months, dryRun);
+      console.log(JSON.stringify({
+        action: dryRun ? "dry-run" : "prune",
+        retention_months: months,
+        removed: result.removed,
+        kept: result.kept,
+      }, null, 2));
+    }
     break;
   }
 
