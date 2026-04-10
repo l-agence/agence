@@ -18,7 +18,7 @@
 | ~~INFRA-005~~ | ~~Agent persona loading from registry.json~~ | `-` | 2 | 0 | 0.3 | **50** | copilot | — |
 | ~~TEST-001~~ | ~~Shellspec: ^ledger, ^audit, ^session prune~~ | `-` | 2 | 0 | 0.3 | **50** | copilot | — |
 | ~~CLI-003~~ | ~~Smoke tests: path validation rejects escapes~~ | `-` | 2 | 0 | 0.3 | **50** | copilot | — |
-| DOC-001 | Update docs for v0.3.2 | `~` | 2 | 0 | 0.2 | **40** | — | — |
+| ~~DOC-001~~ | ~~Update docs for v0.3.2~~ | `-` | 2 | 0 | 0.2 | **40** | copilot | — |
 | DOC-002 | Update show_help() with new commands | `~` | 2 | 0 | 0.2 | **40** | — | — |
 | ~~BUG-001~~ | ~~mnemonic prune + sessions prune~~ | `-` | 2 | 0 | 0.2 | **40** | copilot | — |
 | DOC-003 | Clear stale synthetic todos | `~` | 1 | 0 | 0.1 | **20** | — | — |
@@ -31,17 +31,17 @@
 | Metric | Value |
 |--------|-------|
 | Total tasks | 16 |
-| Runnable | 3 |
+| Runnable | 2 |
 | Blocked | 0 |
-| Completed | 13 |
+| Completed | 14 |
 | Failed | 0 |
 
 ## State Distribution
 
 | State | Symbol | Count |
 |-------|--------|-------|
-| Human-assigned | `~` | 3 |
-| Completed | `-` | 13 |
+| Human-assigned | `~` | 2 |
+| Completed | `-` | 14 |
 
 ---
 
@@ -58,9 +58,9 @@
 | 5 | ~~INFRA-004~~ | 95 | `-` ✅ |
 | 6 | ~~INFRA-003~~ | 75 | `-` ✅ |
 | 7 | ~~INFRA-005~~ | 50 | `-` ✅ |
-| 8 | TEST-001 | 50 | `~` |
+| 8 | ~~TEST-001~~ | 50 | `-` ✅ |
 | 9 | ~~CLI-003~~ | 50 | `-` ✅ |
-| 10 | DOC-001 | 40 | `~` |
+| 10 | ~~DOC-001~~ | 40 | `-` ✅ |
 
 ---
 
@@ -71,7 +71,7 @@ INFRA-001 ✅ ──^──> INFRA-002 ✅ ──^──> SWARM-002 ✅
                                      ^
 SWARM-001 ─────────── ; ─────────────┘
 
-DOC-001 ──── ; ──> DOC-002
+~~DOC-001~~ ✅ ──── ; ──> DOC-002
 
 CLI-003 ──── ; ──> TEST-001
 ```

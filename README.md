@@ -63,6 +63,7 @@ agence --help
 | `tmux` | For `agentd` swarm | `sudo apt install tmux` |
 | `script` (util-linux) | For session logging | `sudo apt install util-linux` |
 | `jq` | For JSON ledger queries | `sudo apt install jq` |
+| `bun` | For TypeScript modules | [bun.sh](https://bun.sh) |
 
 > **Windows**: Use WSL (Ubuntu recommended). All tools above available via `sudo apt install`.
 
@@ -128,12 +129,20 @@ YOUR REPO/
     │   └── l-agence.org/
     │       ├── todos/           # Personal task tracking
     │       └── brainstorms/     # Design notes, analysis
+    ├── globalcache/             # Cross-org shared knowledge (committed)
     ├── organic/                 # Swarm coordination (tasks, jobs, workflows)
     │   ├── tasks/               # In-progress agent work items
-    │   └── jobs/                # Scheduled background work
+    │   ├── jobs/                # Scheduled background work
+    │   └── workflows/           # Multi-step orchestration definitions
     └── lib/
+        ├── env.sh               # Canonical env bootstrap (sourced by all bin/)
         ├── router.sh            # LLM provider routing
-        └── format.sh            # Output formatting
+        ├── format.sh            # Output formatting
+        ├── shell-ui.sh          # PS1 state colors, tmux titles
+        ├── session.ts           # Session CRUD (Bun TS)
+        ├── guard.ts             # Non-bypassable command gate (Bun TS)
+        ├── signal.ts            # Human↔agent IPC + ^ask (Bun TS)
+        └── matrix.ts            # Task DAG + scoring engine (Bun TS)
 ```
 
 ### The `@` Symlink (Org Routing)

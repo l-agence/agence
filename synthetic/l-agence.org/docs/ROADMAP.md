@@ -2,7 +2,7 @@
 
 **Author**: Stephane Korning  
 **Status**: Living document — draft, not canonical  
-**Last updated**: 2026-04-02
+**Last updated**: 2026-04-08
 
 ---
 
@@ -76,13 +76,15 @@ OS boundary, and governed by immutable CODEX law.
 | v0.2.4 (patch) | rel_0.2.2_agence_swarm_sessions | ✅ **Released 2026-04-02** | aisession init fix, GIT_PAGER=cat, AIPOLICY→VSCode whitelist, shell-integrated profile, daily Copilot chat logs (commit 4aa6814) |
 | v0.2.4.1 | rel_0.2.2_agence_swarm_sessions | ✅ **Released 2026-04-03** | 91/91 tests passing, copilot auto-detect via gh auth token, AGENCE_TRACE mode, aido/aisession non-interactive bypass, /gh* shortcuts, ^session-restore (commit e06257b, pushed) |
 | v0.2.5 | main | ✅ **Released 2026-04-07** | Stabilization: model routing (!agent.model + AGENCE_MODEL), stale ref fixes, glossary + terminology normalization (ChunKing→chunk), .gitignore final review. Merge rel_0.2.2 → main. |
-| v0.3.0 | next | 📋 Planned | **tmux 1+1 tile model** + begin bash→TS split. See v0.3.0 deliverables below. |
-| v0.3.1 | future | 📋 Planned | Docker per-tangent isolation, agentd daemon, socat inject, git worktree per tangent |
-| v0.3.2 | future | 📋 Planned | .ailedger (append-only JSONL decision ledger), AIPOLICY.yaml EBNF governance schema, mnemonic 2-tier, hermetic/grimoire |
-| v0.3.3 | future | 📋 Planned | Multi-agent orchestrator (swarmd), tangent tournament + resultant selection, chunk indexer (Bun TS) |
-| v0.4.0 | future | 📋 Planned | Matrix math: complexity evaluator, priority DAG, agent routing table, cost tracking |
-| v0.5.0 | future | 📋 Planned | Flock tier: Nomad driver, ≤5 node SSH+docker-compose bootstrap |
-| v0.6.0+ | future | 📋 Planned | Style/preference model from .ailedger signal, trust ladder earned autonomy |
+| v0.3.0 | main | ✅ **Released** | env.sh extraction, first Bun TS module (session.ts), Merkle-chained ailedger, tmux pipe-pane |
+| v0.3.1 | main | ✅ **Released** | bin/airun wrapper, ^audit auto-resolve, ledger hex IDs + commit refs, pipe-pane completion |
+| v0.3.2 | main | ✅ **Released** | ^recall + ~recall, ^index/^reindex split, cross-shard handoff, ^session prune, ^ledger init |
+| v0.4.0 | main | ✅ **Released** | guard.ts (command gate), signal.ts (human↔agent IPC), matrix.ts (DAG + scoring), organic/ pillar, agentd skeleton, INFRA-001–005, SWARM-001–002, SHELL-001, CLI-001–003, TEST-001, BUG-001 |
+| v0.5.0 | future | 📋 Planned | Docker per-tangent isolation, agentd daemon, socat inject, git worktree per tangent |
+| v0.6.0 | future | 📋 Planned | Multi-agent orchestrator (swarmd), tangent tournament + resultant selection, chunk indexer (Bun TS) |
+| v0.7.0 | future | 📋 Planned | Matrix math: complexity evaluator, priority DAG, agent routing table, cost tracking |
+| v0.8.0 | future | 📋 Planned | Flock tier: Nomad driver, ≤5 node SSH+docker-compose bootstrap |
+| v0.9.0+ | future | 📋 Planned | Style/preference model from .ailedger signal, trust ladder earned autonomy |
 
 ### v0.3.0 Deliverables (priority order)
 

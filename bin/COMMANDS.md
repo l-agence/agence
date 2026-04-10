@@ -1182,6 +1182,81 @@ This grammar ensures all Agence commands and task expressions are robust, extens
 
 ---
 
+## Ledger & Audit Commands (v0.3.0+)
+
+### `agence ^ledger [append|verify|tail|count|list|init]`
+
+**Scope**: NEXUS (local, gitignored)
+**Storage**: `nexus/.ailedger` (append-only JSONL, Merkle-chained)
+
+Manage the decision audit ledger — every significant agent action recorded with SHA-256 chain.
+
+**Usage**:
+```bash
+agence ^ledger append "Deployed v0.4.0"     # Append entry (auto-chained)
+agence ^ledger verify                        # Verify Merkle chain integrity
+agence ^ledger tail 10                       # Show last 10 entries
+agence ^ledger count                         # Count total entries
+agence ^ledger list                          # List all entries
+agence ^ledger init                          # Initialize ledger + remote repo
+```
+
+**Requires**: `bun` + `lib/ailedger.sh` (bash fallback available)
+
+### `agence ^audit [show|list]`
+
+**Scope**: NEXUS (local)
+
+Query and display audit entries from the ledger with structured output.
+
+**Usage**:
+```bash
+agence ^audit show <id>                      # Show specific audit entry
+agence ^audit list                           # List audit trail
+```
+
+**Requires**: `bun` + `lib/session.ts`
+
+### `agence ^index`
+
+**Scope**: Read-only scan across all knowledge base directories.
+
+Scan all knowledge bases and report status (file counts, ✓/⚠ markers).
+
+**Usage**:
+```bash
+agence ^index                                # Scan + report all knowledge bases
+```
+
+### `agence ^recall <query>` / `agence ~recall <query>`
+
+**Scope**: `^recall` = SYNTHETIC (team-shared), `~recall` = HERMETIC (personal)
+
+Search knowledge bases for matching content.
+
+**Usage**:
+```bash
+agence ^recall "session prune"               # Search team knowledge
+agence ~recall "my notes on routing"         # Search personal knowledge
+```
+
+### `agence ^session prune [--days N] [--dry-run]`
+
+**Scope**: NEXUS (local)
+
+Archive and delete stale session files from both `nexus/.aisessions/` and `nexus/sessions/`.
+
+**Usage**:
+```bash
+agence ^session prune --dry-run              # Preview what would be pruned
+agence ^session prune --days 30              # Prune sessions older than 30 days
+agence ^session prune --days 0               # Prune ALL sessions
+```
+
+**Requires**: `bun` + `lib/session.ts`
+
+---
+
 ## Knowledge Management Commands (v0.2.3.2+)
 
 **Unified command family for managing team and personal knowledge across scopes.**
