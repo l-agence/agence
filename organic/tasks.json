@@ -78,13 +78,14 @@
       "id": "INFRA-003",
       "repo": "agence-master",
       "title": "Publish AIPOLICY.yaml schema as governance standard",
-      "state": "~",
+      "state": "-",
       "priority": 2,
       "stars": 1,
       "heat": 0.3,
-      "agent": null,
+      "agent": "copilot",
       "created": "2026-04-10T00:00:00Z",
-      "updated": "2026-04-10T00:00:00Z"
+      "updated": "2026-04-10T00:00:00Z",
+      "commit": "e9dc9d0"
     },
     {
       "id": "INFRA-004",
