@@ -21,7 +21,7 @@
 | ~~DOC-001~~ | ~~Update docs for v0.3.2~~ | `-` | 2 | 0 | 0.2 | **40** | copilot | — |
 | ~~DOC-002~~ | ~~Update show_help() with new commands~~ | `-` | 2 | 0 | 0.2 | **40** | copilot | — |
 | ~~BUG-001~~ | ~~mnemonic prune + sessions prune~~ | `-` | 2 | 0 | 0.2 | **40** | copilot | — |
-| DOC-003 | Clear stale synthetic todos | `~` | 1 | 0 | 0.1 | **20** | — | — |
+| ~~DOC-003~~ | ~~Clear stale synthetic todos~~ | `-` | 1 | 0 | 0.1 | **20** | copilot | — |
 | ~~CLI-001~~ | ~~agence help deep improvements~~ | `-` | 1 | 0 | 0.1 | **20** | copilot | — |
 | ~~CLI-002~~ | ~~.gitignore final review~~ | `-` | 1 | 0 | 0.1 | **20** | copilot | — |
 | ~~SHELL-001~~ | ~~Shell UI: state-colored PS1, tmux titles, shell economy~~ | `-` | 2 | 1 | 0.5 | **95** | copilot | — |
@@ -31,17 +31,17 @@
 | Metric | Value |
 |--------|-------|
 | Total tasks | 16 |
-| Runnable | 1 |
+| Runnable | 0 |
 | Blocked | 0 |
-| Completed | 15 |
+| Completed | 16 |
 | Failed | 0 |
 
 ## State Distribution
 
 | State | Symbol | Count |
 |-------|--------|-------|
-| Human-assigned | `~` | 1 |
-| Completed | `-` | 15 |
+| Human-assigned | `~` | 0 |
+| Completed | `-` | 16 |
 
 ---
 

@@ -28,11 +28,11 @@
       "id": "DOC-003",
       "repo": "agence-master",
       "title": "Clear stale synthetic todos (shellspec, v0.2.5 done)",
-      "state": "~",
+      "state": "-",
       "priority": 1,
       "stars": 0,
       "heat": 0.1,
-      "agent": null,
+      "agent": "copilot",
       "created": "2026-04-10T00:00:00Z",
       "updated": "2026-04-10T00:00:00Z"
     },
