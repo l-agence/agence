@@ -1,7 +1,7 @@
 # Tasks Dashboard
 
 > **Source**: `organic/tasks.json` | **Formula**: $\text{score} = 10P + 25S + 100H$  
-> **Generated**: 2026-04-11 | **Project**: PROJ-LAGENCE
+> **Generated**: 2026-04-12 | **Project**: PROJ-LAGENCE
 
 ---
 
@@ -15,7 +15,7 @@
 | ~~SWARM-002~~ | ~~agentd interface contract (Docker→Nomad)~~ | `-` | 3 | 1 | 0.5 | **105** | copilot | ~~INFRA-002~~ |
 | ~~INFRA-004~~ | ~~.ailedger enhancements: AIPOLICY commit, prune~~ | `-` | 3 | 1 | 0.4 | **95** | copilot | — |
 | ~~INFRA-003~~ | ~~Publish AIPOLICY.yaml schema~~ | `-` | 2 | 1 | 0.3 | **75** | copilot | — |
-| INFRA-005 | Agent persona loading from agent.md | `~` | 2 | 0 | 0.3 | **50** | — | — |
+| ~~INFRA-005~~ | ~~Agent persona loading from registry.json~~ | `-` | 2 | 0 | 0.3 | **50** | copilot | — |
 | TEST-001 | Shellspec: ^ledger, ^audit, ^session prune | `~` | 2 | 0 | 0.3 | **50** | — | — |
 | CLI-003 | Smoke tests: path validation rejects escapes | `~` | 2 | 0 | 0.3 | **50** | — | — |
 | DOC-001 | Update docs for v0.3.2 | `~` | 2 | 0 | 0.2 | **40** | — | — |
@@ -30,25 +30,17 @@
 | Metric | Value |
 |--------|-------|
 | Total tasks | 15 |
-| Runnable | 9 |
+| Runnable | 8 |
 | Blocked | 0 |
-| Completed | 6 |
+| Completed | 7 |
 | Failed | 0 |
 
 ## State Distribution
 
 | State | Symbol | Count |
 |-------|--------|-------|
-| Human-assigned | `~` | 9 |
-| Human-working | `$` | 0 |
-| Agent-assigned | `%` | 0 |
-| Agent-executing | `&` | 0 |
-| Pending | `+` | 0 |
-| Awaiting input | `?` | 0 |
-| Paused | `_` | 0 |
-| Held | `#` | 0 |
-| Completed | `-` | 6 |
-| Failed | `!` | 0 |
+| Human-assigned | `~` | 8 |
+| Completed | `-` | 7 |
 
 ---
 
@@ -64,7 +56,7 @@
 | 4 | ~~SWARM-002~~ | 105 | `-` ✅ |
 | 5 | ~~INFRA-004~~ | 95 | `-` ✅ |
 | 6 | ~~INFRA-003~~ | 75 | `-` ✅ |
-| 7 | INFRA-005 | 50 | `~` |
+| 7 | ~~INFRA-005~~ | 50 | `-` ✅ |
 | 8 | TEST-001 | 50 | `~` |
 | 9 | CLI-003 | 50 | `~` |
 | 10 | DOC-001 | 40 | `~` |

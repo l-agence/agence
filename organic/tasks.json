@@ -103,14 +103,15 @@
     {
       "id": "INFRA-005",
       "repo": "agence-master",
-      "title": "Agent persona loading from codex/agents/<name>/agent.md",
-      "state": "~",
+      "title": "Agent persona loading from codex/agents/registry.json",
+      "state": "-",
       "priority": 2,
       "stars": 0,
       "heat": 0.3,
       "agent": null,
       "created": "2026-04-10T00:00:00Z",
-      "updated": "2026-04-10T00:00:00Z"
+      "updated": "2026-04-12T00:00:00Z",
+      "commit": "9eb373c"
     },
     {
       "id": "CLI-001",
