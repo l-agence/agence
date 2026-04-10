@@ -175,13 +175,42 @@ function cmdValidate(argv: string[]): number {
       [airunPath, "guard", "check", ...argv],
       { cwd: AI_ROOT, env: process.env, stdout: "pipe", stderr: "pipe" },
     );
-    // Forward guard's shell exports to caller
+    // Parse guard's shell exports
     const stdout = result.stdout.toString();
-    if (stdout.trim()) console.log(stdout.trim());
-    // Forward guard's stderr (trace messages) to stderr
     const stderr = result.stderr.toString();
     if (stderr.trim()) process.stderr.write(stderr.trim() + "\n");
-    // Map guard exit → validation flag
+
+    // Extract tier from guard output
+    const tierMatch = stdout.match(/export _GUARD_TIER=(\S+)/);
+    const tier = tierMatch ? tierMatch[1] : "T3";
+
+    // T2 escalation: ask human via ^ask (quick boolean auth) before denying
+    if (result.exitCode !== 0 && tier === "T2") {
+      process.stderr.write(`[aibash] T2 escalation — requesting human approval via ^ask\n`);
+      const promptResult = Bun.spawnSync(
+        [airunPath, "signal", "ask", `${command}`],
+        { cwd: AI_ROOT, env: process.env, stdout: "pipe", stderr: "pipe" },
+      );
+      const promptOut = promptResult.stdout.toString();
+      const promptErr = promptResult.stderr.toString();
+      if (promptErr.trim()) process.stderr.write(promptErr.trim() + "\n");
+
+      if (promptResult.exitCode === 0) {
+        // Human approved — override guard denial
+        if (stdout.trim()) console.log(stdout.trim().replace(/_GUARD_APPROVED=0/, "_GUARD_APPROVED=1"));
+        if (promptOut.trim()) console.log(promptOut.trim());
+        console.log(`export _AIBASH_VALIDATED=1`);
+        return 0;
+      }
+      // Human denied or timeout — keep denial
+      if (stdout.trim()) console.log(stdout.trim());
+      if (promptOut.trim()) console.log(promptOut.trim());
+      console.log(`export _AIBASH_VALIDATED=0`);
+      return 1;
+    }
+
+    // T0/T1 (approved) or T3 (hard deny) — forward as-is
+    if (stdout.trim()) console.log(stdout.trim());
     const approved = result.exitCode === 0;
     console.log(`export _AIBASH_VALIDATED=${approved ? 1 : 0}`);
     return result.exitCode;
