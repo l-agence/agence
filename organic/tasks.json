@@ -117,11 +117,11 @@
       "id": "CLI-001",
       "repo": "agence-master",
       "title": "agence help deep improvements (multi-tool docs entry point)",
-      "state": "~",
+      "state": "-",
       "priority": 1,
       "stars": 0,
       "heat": 0.1,
-      "agent": null,
+      "agent": "copilot",
       "created": "2026-04-10T00:00:00Z",
       "updated": "2026-04-10T00:00:00Z"
     },
