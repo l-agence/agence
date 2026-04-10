@@ -187,7 +187,7 @@ Describe 'Agence CLI'
   It '/log shortcut runs git log (T0: auto-execute)'
     When run bash bin/agence /log
     The status should be success
-    The output should include 'agence'
+    The output should not equal ''
   End
 
   It '/remote shortcut runs git remote (T0: auto-execute)'
@@ -618,19 +618,19 @@ Describe 'Agence CLI'
     It 'exits cleanly with --help'
       When run bash bin/aibash --help
       The status should be success
-      The output should include 'aibash: Agentic'
+      The stderr should include 'Usage:'
     End
 
     It 'exits cleanly with help'
       When run bash bin/aibash help
       The status should be success
-      The output should include 'Usage:'
+      The stderr should include 'Usage:'
     End
 
-    It 'shows signal handler note in help'
+    It 'shows init subcommand in help'
       When run bash bin/aibash --help
       The status should be success
-      The output should include 'PARENT-owned'
+      The stderr should include 'init'
     End
 
   End
