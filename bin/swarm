@@ -215,6 +215,7 @@ _swarm_pipe_pane() {
   tmux set-environment -t "${pane_target%%.*}" "AGENCE_PIPE_PANE_LOG" "$typescript_file"
 
   echo "[swarm] pipe-pane: ${agent} → ${typescript_file##*/}"
+  ailedger_append "capture" "pipe-pane-start" "$sid" "pipe-pane ${agent} ${pane_target}" "0"
 }
 
 swarm_launch() {
@@ -350,6 +351,31 @@ swarm_kill() {
   for pane_id in $panes; do
     tmux pipe-pane -t "$pane_id" 2>/dev/null || true
   done
+
+  # Finalize typescript files: append exit marker + update session metadata
+  local session_dir="$AI_ROOT/nexus/.aisessions"
+  local sid_var
+  sid_var=$(tmux show-environment -t "$session_name" "AGENCE_PIPE_PANE_SID" 2>/dev/null | cut -d= -f2) || true
+  if [[ -n "${sid_var:-}" ]]; then
+    local ts_file="$session_dir/${sid_var}.typescript"
+    local meta_file="$session_dir/${sid_var}.meta.json"
+    if [[ -f "$ts_file" ]]; then
+      printf '\n=== SESSION_END: %s ===\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$ts_file"
+    fi
+    if [[ -f "$meta_file" ]]; then
+      # Mark session as completed in metadata (best-effort JSON update)
+      local tmp_meta="${meta_file}.tmp"
+      if command -v python3 &>/dev/null; then
+        python3 -c "
+import json, sys
+with open('$meta_file') as f: m = json.load(f)
+m['status'] = 'completed'
+m['ended'] = '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
+with open('$tmp_meta', 'w') as f: json.dump(m, f, indent=2)
+" 2>/dev/null && mv "$tmp_meta" "$meta_file" || rm -f "$tmp_meta"
+      fi
+    fi
+  fi
 
   tmux kill-session -t "$session_name" 2>/dev/null && {
     ailedger_append "kill" "swarm-kill" "" "swarm kill $session_name" "0"

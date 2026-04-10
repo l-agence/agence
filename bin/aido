@@ -74,9 +74,16 @@ run_with_session() {
 }
 INIT_META
 
-    # Run command inside PTY with 'script' capturing output
-    script --quiet --return --command "$full_command" "$typescript_file" 2>&1
-    local exit_code=$?
+    # Run command: pipe-pane captures if active, otherwise use script(1)
+    if [[ "${AGENCE_PIPE_PANE:-0}" == "1" ]]; then
+      # tmux pipe-pane already capturing — run directly, tee to typescript for metadata
+      eval "$full_command" 2>&1 | tee "$typescript_file"
+      local exit_code=${PIPESTATUS[0]:-$?}
+    else
+      # No pipe-pane — wrap in script(1) for PTY capture
+      script --quiet --return --command "$full_command" "$typescript_file" 2>&1
+      local exit_code=$?
+    fi
 
     # Log execution to ailedger
     ailedger_append "execute" "aido-run" "$session_id" "$full_command" "$exit_code"

@@ -136,6 +136,11 @@ notify_awaiting
 
 # Choose exec mode: pipe-pane > script(1) > direct
 if [[ "${_AIBASH_PIPE_PANE:-0}" == "1" ]]; then
+	# tmux pipe-pane already captures output — run bash with agencerc for full env
+	_bash_args=(--noprofile --rcfile "${AGENCE_ROOT}/.agencerc")
+	if [[ -n "${_AIBASH_COMMAND:-}" ]]; then
+		_bash_args+=("-c" "$_AIBASH_COMMAND")
+	fi
 	bash "${_bash_args[@]}" || echo "[AIBASH] ✗ pipe-pane session failed" >&2
 elif [[ $SESSION_LOGGING_ENABLED -eq 1 ]]; then
 	script --quiet --return --command "bash ${_bash_args[*]}" "$SESSION_LOG" \
