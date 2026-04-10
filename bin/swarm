@@ -12,6 +12,7 @@ set -uo pipefail
 # ---------- Resolve AGENCE_ROOT ----------
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/env.sh"
 source_if_exists "$AGENCE_LIB/ailedger.sh"
+source_if_exists "$AGENCE_LIB/shell-ui.sh"
 
 resolve_context() {
   local synthetic_dir="$AI_ROOT/synthetic"
@@ -170,6 +171,13 @@ Tmux Commands:
   kill [session]             Kill a swarm session
   list                       List active swarm sessions
 
+Shell Lifecycle:
+  shells                     List all agent panes with state/pid/command
+  reap                       Kill completed (-) panes to free resources
+  focus <agent>              Switch to an agent's pane
+  signal <agent> [SIG]       Send signal to agent pane (default: INT)
+  title <agent> <state>      Update an agent pane's title/state
+
 Task Commands:
   add-task '<JSON>'          Add a task
   list-tasks                 List all tasks
@@ -225,20 +233,42 @@ swarm_launch() {
     return 1
   fi
 
+  # ── ECONOMY: Reap before launch (clean completed/dead panes first) ──────
+  if declare -F agence_shell_reap &>/dev/null; then
+    agence_shell_reap 2>/dev/null
+  fi
+
   # Parse agents — default to "copilot" if none given
   local -a agents=("$@")
   [[ ${#agents[@]} -eq 0 ]] && agents=("copilot")
 
-  # Session name: agence-<first_agent> or agence-multi if >1
+  # ── ECONOMY: Max shell cap ──────────────────────────────────────────────
+  local max_shells="${AGENCE_MAX_SHELLS:-4}"
+  local current_shells=0
+  current_shells=$(tmux list-panes -a -F '#{pane_id}' 2>/dev/null | wc -l) || current_shells=0
+  local needed=$(( ${#agents[@]} * 2 ))  # each agent = 2 panes (human + agent)
+  if (( current_shells + needed > max_shells * 2 )); then
+    echo "[swarm] ⚠ Shell cap: ${current_shells} panes active, want +${needed}, cap=${max_shells} agents ($(( max_shells * 2 )) panes)" >&2
+    echo "[swarm] Run 'swarm reap' or 'swarm kill <session>' to free resources" >&2
+    return 1
+  fi
+
+  # ── ECONOMY: Reuse existing idle agent pane if available ────────────────
   local session_name
   if [[ ${#agents[@]} -eq 1 ]]; then
     session_name="${SWARM_SESSION_PREFIX}-${agents[0]}"
+    # Check if agent already has a running session — reuse it
+    if tmux has-session -t "$session_name" 2>/dev/null; then
+      echo "[swarm] Session '$session_name' already running. Attaching..." >&2
+      tmux attach-session -t "$session_name"
+      return $?
+    fi
   else
     session_name="${SWARM_SESSION_PREFIX}-multi"
   fi
 
-  # Abort if session already exists
-  if tmux has-session -t "$session_name" 2>/dev/null; then
+  # Abort if multi-session already exists
+  if [[ ${#agents[@]} -gt 1 ]] && tmux has-session -t "$session_name" 2>/dev/null; then
     echo "[swarm] Session '$session_name' already running. Use: swarm attach $session_name" >&2
     return 1
   fi
@@ -260,8 +290,8 @@ swarm_launch() {
     -e "AI_ROLE=interactive" \
     "bash --rcfile '$AGENCE_ROOT/bin/ibash'"
 
-  # Name the first window
-  tmux rename-window -t "$session_name:0" "$first_agent"
+  # Name the first window with state prefix
+  tmux rename-window -t "$session_name:0" "[~] $first_agent"
 
   # Split right: aibash pane (agent pane) for first agent
   tmux split-window -h -t "$session_name:0" \
@@ -271,6 +301,10 @@ swarm_launch() {
     -e "AI_ROLE=agentic" \
     -e "AGENCE_PIPE_PANE=1" \
     "bash '$AGENCE_ROOT/bin/aibash' --agent '$first_agent'"
+
+  # Set pane titles for border display
+  tmux select-pane -t "$session_name:0.0" -T "human@${first_agent}:~" 2>/dev/null || true
+  tmux select-pane -t "$session_name:0.1" -T "agent@${first_agent}:~" 2>/dev/null || true
 
   # Wire pipe-pane capture on the agent pane (pane .1 = right)
   _swarm_pipe_pane "$session_name:0.1" "$first_agent"
@@ -283,7 +317,7 @@ swarm_launch() {
   for (( i=1; i<${#agents[@]}; i++ )); do
     local agent="${agents[$i]}"
     # New window: ibash (left)
-    tmux new-window -t "$session_name" -n "$agent" \
+    tmux new-window -t "$session_name" -n "[~] $agent" \
       -e "GIT_ROOT=$git_repo" \
       -e "AI_ROOT=$AI_ROOT" \
       -e "AI_AGENT=$agent" \
@@ -299,6 +333,10 @@ swarm_launch() {
       -e "AGENCE_PIPE_PANE=1" \
       "bash '$AGENCE_ROOT/bin/aibash' --agent '$agent'"
 
+    # Set pane titles
+    tmux select-pane -t "$session_name:$i.0" -T "human@${agent}:~" 2>/dev/null || true
+    tmux select-pane -t "$session_name:$i.1" -T "agent@${agent}:~" 2>/dev/null || true
+
     # Wire pipe-pane capture on agent pane
     _swarm_pipe_pane "$session_name:$i.1" "$agent"
 
@@ -309,10 +347,15 @@ swarm_launch() {
   # Go back to first window
   tmux select-window -t "$session_name:0"
 
-  # Status bar: show session name + agent
-  tmux set-option -t "$session_name" status-left "[${session_name}] "
-  tmux set-option -t "$session_name" status-right "#W | %H:%M"
-  tmux set-option -t "$session_name" status-style "bg=black,fg=green"
+  # Apply agence status bar styling (colors, pane borders, titles)
+  if declare -F agence_tmux_status_bar &>/dev/null; then
+    agence_tmux_status_bar "$session_name"
+  else
+    # Fallback: basic status bar
+    tmux set-option -t "$session_name" status-left "[${session_name}] "
+    tmux set-option -t "$session_name" status-right "#W | %H:%M"
+    tmux set-option -t "$session_name" status-style "bg=black,fg=green"
+  fi
 
   echo "[swarm] ✓ Session '$session_name' ready (${#agents[@]} agent(s))"
   ailedger_append "launch" "swarm-launch" "" "swarm launch ${agents[*]}" "0"
@@ -405,6 +448,27 @@ case "$cmd" in
   attach) swarm_attach "$@" ;;
   kill) swarm_kill "$@" ;;
   list|ls) swarm_list ;;
+  # Shell lifecycle
+  shells) agence_shell_list ;;
+  reap) agence_shell_reap ;;
+  focus) agence_shell_focus "${1:?Usage: swarm focus <agent>}" ;;
+  signal) agence_shell_signal "${1:?Usage: swarm signal <agent> [SIG]}" "${2:-INT}" ;;
+  title)
+    _t_agent="${1:?Usage: swarm title <agent> <state>}"
+    _t_state="${2:?Usage: swarm title <agent> <state>}"
+    _prefix="${SWARM_SESSION_PREFIX}"
+    tmux list-panes -a -F '#{session_name}:#{window_index}.#{pane_index} #{pane_title}' 2>/dev/null \
+      | grep "^${_prefix}" \
+      | while IFS=' ' read -r _pane _title; do
+          if [[ "$_title" == *"@${_t_agent}:"* ]]; then
+            agence_tmux_title "$_pane" "${AI_SESSION:-????}" "$_t_agent" "$_t_state"
+            _win="${_pane%%.*}"
+            tmux rename-window -t "$_win" "[${_t_state}] ${_t_agent}" 2>/dev/null || true
+            echo "[swarm] Updated ${_t_agent} → state ${_t_state}"
+          fi
+        done
+    ;;
+  # Task commands
   add-task) add_task "$1" ;;
   list-tasks) list_tasks ;;
   update-task) update_task_status "$1" "$2" ;;

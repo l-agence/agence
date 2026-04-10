@@ -48,6 +48,9 @@ trap '' SIGINT SIGQUIT SIGTSTP SIGSTOP
 # Source format library
 [[ -f "$GIT_ROOT/lib/format.sh" ]] && source "$GIT_ROOT/lib/format.sh" && export _AGENCE_FMT="${_AGENCE_FMT:-text}"
 
+# Source shell UI (colors, PS1, titles, state rendering)
+[[ -f "$AGENCE_ROOT/lib/shell-ui.sh" ]] && source "$AGENCE_ROOT/lib/shell-ui.sh"
+
 # ── DELEGATE CONFIG TO BUN (airun aibash init) ───────────────────────────────
 # aibash.ts handles: arg parsing, defaults, session ID generation, metadata init.
 # Returns eval-safe shell exports to stdout. Human messages to stderr.
@@ -99,13 +102,21 @@ notify_awaiting() {
 	local marker="${GIT_ROOT}/nexus/sessions/${AI_SESSION}.awaiting"
 	mkdir -p "$(dirname "$marker")" 2>/dev/null || true
 	echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$marker"
-	printf '\033]0;⏳ %s | aibash WAITING\007' "${AI_AGENT}" 2>/dev/null || true
+	if declare -F agence_state_update &>/dev/null; then
+		agence_state_update "?"
+	else
+		printf '\033]0;⏳ %s | aibash WAITING\007' "${AI_AGENT}" 2>/dev/null || true
+	fi
 }
 
 clear_awaiting() {
 	local marker="${GIT_ROOT}/nexus/sessions/${AI_SESSION}.awaiting"
 	rm -f "$marker" 2>/dev/null || true
-	printf '\033]0;🤖 %s | aibash\007' "${AI_AGENT}" 2>/dev/null || true
+	if declare -F agence_state_update &>/dev/null; then
+		agence_state_update "%"
+	else
+		printf '\033]0;🤖 %s | aibash\007' "${AI_AGENT}" 2>/dev/null || true
+	fi
 }
 
 # ── DETECT script(1) (system boundary — stays in bash) ───────────────────────
@@ -123,13 +134,24 @@ fi
 
 cd "$GIT_ROOT" || { echo "[AIBASH] ✗ Failed to cd to $GIT_ROOT" >&2; exit 1; }
 
-printf '\033]0;🤖 %s | aibash\007' "${AI_AGENT}" 2>/dev/null || true
+# Set initial state: pending (~), title + PS1
+export AGENCE_TASK_STATE="~"
+if declare -F agence_state_update &>/dev/null; then
+	agence_state_update "~"
+else
+	printf '\033]0;🤖 %s | aibash\007' "${AI_AGENT}" 2>/dev/null || true
+fi
 echo "[aibash] agent=${AI_AGENT} session=${AI_SESSION:0:8} root=${GIT_ROOT}"
 
 # Build bash args
 _bash_args=(--noprofile --norc)
 if [[ -n "${_AIBASH_COMMAND:-}" ]]; then
 	_bash_args+=("-c" "$_AIBASH_COMMAND")
+fi
+
+# Export PS1 so child bash inherits the agence prompt
+if declare -F agence_ps1 &>/dev/null; then
+	export PS1="$(agence_ps1 "${AI_SESSION:-????}" "${AI_AGENT:-@}" "${AGENCE_TASK_STATE:-~}")"
 fi
 
 notify_awaiting
@@ -150,3 +172,10 @@ else
 fi
 
 clear_awaiting
+
+# ── ECONOMY: Mark completed + signal for reap ────────────────────────────────
+# On exit, mark state as completed so swarm reap can reclaim this pane.
+if declare -F agence_state_update &>/dev/null; then
+	agence_state_update "-"
+fi
+echo "[aibash] Session ${AI_SESSION:0:8} ended — pane eligible for reap"
