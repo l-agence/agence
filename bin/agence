@@ -383,9 +383,9 @@ EOF
 }
 
 show_version() {
-  echo "Agence version 0.3.2"
-  echo "[VERSION]: 0.3.2"
-  echo "[RELEASE]: v0.3.2"
+  echo "Agence version 0.4.1"
+  echo "[VERSION]: 0.4.1"
+  echo "[RELEASE]: v0.4.1"
 }
 
 # ============================================================================
@@ -1455,7 +1455,7 @@ EOF
 }
 
 mode_help() {
-  local version; version="0.3.0"
+  local version; version="0.4.1"
 
   cat << EOF
 ╔══════════════════════════════════════════════════════════════════╗
