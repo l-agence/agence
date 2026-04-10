@@ -159,13 +159,39 @@ function cmdInit(argv: string[]): number {
   return 0;
 }
 
-// ─── Validate: check policy before exec (stub for guard.ts) ──────────────────
+// ─── Validate: delegate to guard.ts for policy enforcement ───────────────────
 
 function cmdValidate(argv: string[]): number {
-  // Future: integrate with guard.ts for MLS enforcement
-  // For now: always allow, emit _AIBASH_VALIDATED=1
-  console.log('export _AIBASH_VALIDATED=1');
-  return 0;
+  const command = argv.join(" ").trim();
+  if (!command) {
+    console.log("export _AIBASH_VALIDATED=1");
+    return 0;
+  }
+
+  // Delegate to guard.ts (separate Bun process — non-bypassable gate)
+  try {
+    const airunPath = join(AI_ROOT, "bin", "airun");
+    const result = Bun.spawnSync(
+      [airunPath, "guard", "check", ...argv],
+      { cwd: AI_ROOT, env: process.env, stdout: "pipe", stderr: "pipe" },
+    );
+    // Forward guard's shell exports to caller
+    const stdout = result.stdout.toString();
+    if (stdout.trim()) console.log(stdout.trim());
+    // Forward guard's stderr (trace messages) to stderr
+    const stderr = result.stderr.toString();
+    if (stderr.trim()) process.stderr.write(stderr.trim() + "\n");
+    // Map guard exit → validation flag
+    const approved = result.exitCode === 0;
+    console.log(`export _AIBASH_VALIDATED=${approved ? 1 : 0}`);
+    return result.exitCode;
+  } catch (err) {
+    // If guard.ts fails to run, deny by default (fail-closed)
+    process.stderr.write(`[aibash] guard.ts unavailable — denying command\n`);
+    console.log("export _AIBASH_VALIDATED=0");
+    console.log('export _GUARD_REASON="guard.ts process failed"');
+    return 1;
+  }
 }
 
 // ─── CLI dispatch ────────────────────────────────────────────────────────────
@@ -183,7 +209,7 @@ switch (cmd) {
   case "help":
     console.error(`Usage: airun aibash <init|validate> [options...]
   init     Resolve config, create session, emit shell exports
-  validate Check policy (stub — always allow for now)
+  validate Check policy via guard.ts (fail-closed)
 
 Options (for init):
   --session <id>   Session ID (auto-generated if omitted)
