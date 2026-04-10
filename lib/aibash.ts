@@ -212,6 +212,15 @@ function cmdValidate(argv: string[]): number {
     // T0/T1 (approved) or T3 (hard deny) — forward as-is
     if (stdout.trim()) console.log(stdout.trim());
     const approved = result.exitCode === 0;
+
+    // T1 flag: approved but notify human for awareness
+    if (approved && tier === "T1") {
+      Bun.spawnSync(
+        [airunPath, "signal", "notify", `T1 flagged: ${command}`],
+        { cwd: AI_ROOT, env: process.env, stdout: "ignore", stderr: "ignore" },
+      );
+    }
+
     console.log(`export _AIBASH_VALIDATED=${approved ? 1 : 0}`);
     return result.exitCode;
   } catch (err) {

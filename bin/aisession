@@ -155,11 +155,35 @@ session_status() {
         echo "  Status: ? UNKNOWN (could not read exit code)"
     fi
 
-    # Non-interactive: skip verification prompt — trust the exit code
+    # Non-interactive: use ^ask to reach human via signal layer
     # Triggered by: AIDO_NO_VERIFY=1, no stdin TTY, or shellspec test runner
     if [[ "${AIDO_NO_VERIFY:-0}" == "1" ]] || \
        [[ -n "${SHELLSPEC_TMPDIR:-}" ]] || \
        [[ ! -t 0 ]]; then
+        # ShellSpec: always auto-pass (test harness)
+        if [[ -n "${SHELLSPEC_TMPDIR:-}" ]] || [[ "${AIDO_NO_VERIFY:-0}" == "1" ]]; then
+            echo "  [aisession] Non-interactive: verification auto-passed" >&2
+            local actual_exit
+            actual_exit=$(parse_exit_code_from_typescript "$typescript_file" 2>/dev/null || echo "0")
+            update_metadata_verified "$meta_file" "$actual_exit" 2>/dev/null || true
+            return 0
+        fi
+        # Agentic context: escalate to human via ^ask
+        if command -v airun &>/dev/null; then
+            echo "  [aisession] Agentic context: escalating verification via ^ask" >&2
+            local ask_summary="verify session ${sid:0:8} (exit $exit_code)"
+            if eval "$(airun signal ask "$ask_summary")"; then
+                if [[ "${_SIGNAL_APPROVED:-0}" == "1" ]]; then
+                    local actual_exit
+                    actual_exit=$(parse_exit_code_from_typescript "$typescript_file" 2>/dev/null || echo "0")
+                    update_metadata_verified "$meta_file" "$actual_exit" 2>/dev/null || true
+                    return 0
+                fi
+            fi
+            echo "  [aisession] ^ask denied or timed out — workflow blocked" >&2
+            return 254
+        fi
+        # Fallback: no airun available, auto-pass
         echo "  [aisession] Non-interactive: verification auto-passed" >&2
         local actual_exit
         actual_exit=$(parse_exit_code_from_typescript "$typescript_file" 2>/dev/null || echo "0")
