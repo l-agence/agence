@@ -65,13 +65,14 @@
       "id": "INFRA-002",
       "repo": "agence-master",
       "title": "agentd skeleton: pid file, socket per tangent, Docker spawn",
-      "state": "~",
+      "state": "-",
       "priority": 4,
       "stars": 2,
       "heat": 0.8,
-      "agent": null,
+      "agent": "copilot",
       "created": "2026-04-10T00:00:00Z",
-      "updated": "2026-04-10T00:00:00Z"
+      "updated": "2026-04-10T00:00:00Z",
+      "commit": "93f96d9"
     },
     {
       "id": "INFRA-003",
