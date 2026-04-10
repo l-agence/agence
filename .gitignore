@@ -12,6 +12,7 @@ nexus/agentd/sockets/*.sock
 nexus/agentd/worktrees/
 nexus/sessions/*.meta.json
 nexus/sessions/*.awaiting
+nexus/sessions/*.typescript
 hermetic/
 .ailedger-upstream/
 @
@@ -26,3 +27,10 @@ node_modules/
 package.json
 package-lock.json
 node_modules/
+
+# Bun build artifacts
+bun.lockb
+*.tsbuildinfo
+
+# Test runner temp files
+tests/_*.txt
