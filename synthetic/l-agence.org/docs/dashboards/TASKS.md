@@ -16,7 +16,7 @@
 | ~~INFRA-004~~ | ~~.ailedger enhancements: AIPOLICY commit, prune~~ | `-` | 3 | 1 | 0.4 | **95** | copilot | — |
 | ~~INFRA-003~~ | ~~Publish AIPOLICY.yaml schema~~ | `-` | 2 | 1 | 0.3 | **75** | copilot | — |
 | ~~INFRA-005~~ | ~~Agent persona loading from registry.json~~ | `-` | 2 | 0 | 0.3 | **50** | copilot | — |
-| TEST-001 | Shellspec: ^ledger, ^audit, ^session prune | `~` | 2 | 0 | 0.3 | **50** | — | — |
+| ~~TEST-001~~ | ~~Shellspec: ^ledger, ^audit, ^session prune~~ | `-` | 2 | 0 | 0.3 | **50** | copilot | — |
 | ~~CLI-003~~ | ~~Smoke tests: path validation rejects escapes~~ | `-` | 2 | 0 | 0.3 | **50** | copilot | — |
 | DOC-001 | Update docs for v0.3.2 | `~` | 2 | 0 | 0.2 | **40** | — | — |
 | DOC-002 | Update show_help() with new commands | `~` | 2 | 0 | 0.2 | **40** | — | — |
@@ -31,17 +31,17 @@
 | Metric | Value |
 |--------|-------|
 | Total tasks | 16 |
-| Runnable | 7 |
+| Runnable | 6 |
 | Blocked | 0 |
-| Completed | 9 |
+| Completed | 10 |
 | Failed | 0 |
 
 ## State Distribution
 
 | State | Symbol | Count |
 |-------|--------|-------|
-| Human-assigned | `~` | 7 |
-| Completed | `-` | 9 |
+| Human-assigned | `~` | 6 |
+| Completed | `-` | 10 |
 
 ---
 

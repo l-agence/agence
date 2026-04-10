@@ -40,11 +40,11 @@
       "id": "TEST-001",
       "repo": "agence-master",
       "title": "Shellspec tests for ^ledger, ^audit, ^session prune, ^index",
-      "state": "~",
+      "state": "-",
       "priority": 2,
       "stars": 0,
       "heat": 0.3,
-      "agent": null,
+      "agent": "copilot",
       "created": "2026-04-10T00:00:00Z",
       "updated": "2026-04-10T00:00:00Z"
     },
