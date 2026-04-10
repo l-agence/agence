@@ -180,11 +180,11 @@
       "id": "BUG-001",
       "repo": "agence-master",
       "title": "mnemonic prune + sessions prune (stale file cleanup)",
-      "state": "~",
+      "state": "-",
       "priority": 2,
       "stars": 0,
       "heat": 0.2,
-      "agent": null,
+      "agent": "copilot",
       "created": "2026-04-10T00:00:00Z",
       "updated": "2026-04-10T00:00:00Z"
     },
