@@ -42,7 +42,7 @@
 
 | ID | Title | State | Score | Blocked |
 |----|-------|-------|-------|---------|
-| CLI-003 | Smoke tests: path validation | `~` | 50 | — |
+| CLI-003 | Smoke tests: path validation | `-` | 50 | — |
 | TEST-001 | Shellspec: ^ledger, ^audit | `~` | 50 | ; CLI-003 |
 
 ### WF-CLI — CLI & Tools (2 tasks)

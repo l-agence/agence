@@ -141,13 +141,14 @@
       "id": "CLI-003",
       "repo": "agence-master",
       "title": "Smoke tests: path validation rejects escapes without junctions",
-      "state": "~",
+      "state": "-",
       "priority": 2,
       "stars": 0,
       "heat": 0.3,
       "agent": null,
       "created": "2026-04-10T00:00:00Z",
-      "updated": "2026-04-10T00:00:00Z"
+      "updated": "2026-04-12T00:00:00Z",
+      "commit": "f8250ff"
     },
     {
       "id": "SWARM-001",
