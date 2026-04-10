@@ -129,11 +129,11 @@
       "id": "CLI-002",
       "repo": "agence-master",
       "title": ".gitignore final review (local symlinks, build artifacts)",
-      "state": "~",
+      "state": "-",
       "priority": 1,
       "stars": 0,
       "heat": 0.1,
-      "agent": null,
+      "agent": "copilot",
       "created": "2026-04-10T00:00:00Z",
       "updated": "2026-04-10T00:00:00Z"
     },
