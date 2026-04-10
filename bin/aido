@@ -155,210 +155,145 @@ EOF
 }
 
 # ============================================================================
-# GIT WHITELIST
+# GUARD INTEGRATION — Write-Access Gate
 # ============================================================================
+# Instead of hardcoded whitelists, all commands flow through lib/guard.ts:
+#   T0 = auto-execute (read-only, safe)
+#   T1 = flag (unknown — allow but log)
+#   T2 = escalate (write ops — require human approval via signal)
+#   T3 = deny (destructive — blocked)
+#
+# The gate is WRITE ACCESS, not a --safe flag. Read ops pass instantly.
+# Write ops get human-gated via ^prompt. Destructive ops are denied.
 
-GIT_SAFE_COMMANDS=(
-    "status"
-    "log"
-    "diff"
-    "branch"
-    "tag"
-    "reflog"
-    "describe"
-    "shortlog"
-    "config.*--list"
-    "remote"
-    "rev-parse"
-    "show"
-    "ls-files"
-    "ls-tree"
-    "grep"
-    "cat-file"
-    "ls-remote"
-)
+_guard_check() {
+    local command="$1"
+    local airun="$AI_BIN/airun"
 
-# ============================================================================
-# AWS WHITELIST
-# ============================================================================
+    if [[ ! -x "$airun" ]]; then
+        echo "[AIDO] ⚠ Guard unavailable (airun not found) — falling back to deny" >&2
+        return 1
+    fi
 
-AWS_SAFE_PATTERNS=(
-    "describe-.*"
-    "get-.*"
-    "list-.*"
-    "head-.*"
-    "auth.*status"
-    "auth.*login"
-    "sts.*get.*session.*token"
-)
+    # Get guard decision as shell exports
+    local guard_output
+    guard_output=$("$airun" guard check "$command" 2>/dev/null)
+    local guard_exit=$?
 
-# ============================================================================
-# GITHUB CLI WHITELIST
-# ============================================================================
+    # Parse exports
+    eval "$guard_output" 2>/dev/null
 
-GH_SAFE_PATTERNS=(
-    # Repository commands
-    "repo view.*"
-    "repo list.*"
-    "repo search.*"
-    "repo clone.*--dry-run.*"
-    # Pull Request commands
-    "pr list.*"
-    "pr view.*"
-    "pr status.*"
-    "pr checks.*"
-    # Issue commands
-    "issue list.*"
-    "issue view.*"
-    # Actions commands
-    "run list.*"
-    "run view.*"
-    "run download.*"
-    "workflow list.*"
-    "workflow view.*"
-    # Auth commands
-    "auth status.*"
-    "org list.*"
-    # API commands (only GET method allowed)
-    "api GET.*"
-)
+    local tier="${_GUARD_TIER:-T3}"
+    local approved="${_GUARD_APPROVED:-0}"
+    local reason="${_GUARD_REASON:-unknown}"
 
-# ============================================================================
-# POWERSHELL WHITELIST
-# ============================================================================
+    [[ "${AIDO_DEBUG}" == "1" ]] && echo "[AIDO] Guard: tier=$tier approved=$approved reason=$reason" >&2
 
-POWERSHELL_SAFE_VERBS=(
-    "Get"
-    "Test"
-    "Measure"
-    "Select"
-    "Where"
-    "Sort"
-    "Group"
-    "Compare"
-)
-
-# ============================================================================
-# AIDO VALIDATION FUNCTIONS
-# ============================================================================
-
-validate_git_command() {
-    local git_cmd="$1"
-    
-    # Extract the git subcommand (first argument after 'git')
-    local subcommand="${git_cmd#git }"
-    subcommand="${subcommand%% *}"
-    
-    # Check if subcommand is in whitelist
-    for safe_cmd in "${GIT_SAFE_COMMANDS[@]}"; do
-        if [[ "$subcommand" =~ ^${safe_cmd}$ ]]; then
+    case "$tier" in
+        T0)
+            # Auto-execute — read-only, no delay
             return 0
-        fi
-    done
-    
-    return 1
+            ;;
+        T1)
+            # Flagged — allow but log
+            echo "[AIDO] ⚡ T1 flagged: $reason" >&2
+            return 0
+            ;;
+        T2)
+            # Escalate — requires human approval
+            echo "[AIDO] 🔒 T2 escalation: $reason" >&2
+            _gate_escalate "$command"
+            return $?
+            ;;
+        T3)
+            # Deny — blocked
+            echo "[AIDO] ✗ T3 DENIED: $reason" >&2
+            return 1
+            ;;
+        *)
+            echo "[AIDO] ✗ Unknown tier: $tier — denying" >&2
+            return 1
+            ;;
+    esac
 }
 
-validate_aws_command() {
-    local aws_cmd="$1"
-    
-    # Extract the operation (first argument after 'aws')
-    local operation="${aws_cmd#aws }"
-    
-    # Check if operation matches a safe pattern
-    for safe_pattern in "${AWS_SAFE_PATTERNS[@]}"; do
-        if [[ "$operation" =~ ^${safe_pattern} ]]; then
-            return 0
-        fi
-    done
-    
-    return 1
-}
+_gate_escalate() {
+    local command="$1"
+    local signal_tool="$AI_BIN/airun"
 
-validate_gh_command() {
-    local gh_cmd="$1"
-    
-    # Extract the operation (first argument after 'gh')
-    local operation="${gh_cmd#gh }"
-    
-    # Check if operation matches a safe pattern
-    for safe_pattern in "${GH_SAFE_PATTERNS[@]}"; do
-        if [[ "$operation" =~ ^${safe_pattern} ]]; then
+    # Try signal prompt for human approval (blocking, 60s timeout)
+    if [[ -x "$signal_tool" ]] && [[ -n "${TMUX:-}" ]]; then
+        local response
+        response=$("$signal_tool" signal prompt "AIDO T2 gate: approve '$command'? [yes/no]" 2>/dev/null)
+        if [[ "$response" == "yes" || "$response" == "y" ]]; then
+            echo "[AIDO] ✓ Human approved T2 command" >&2
             return 0
+        else
+            echo "[AIDO] ✗ Human denied T2 command (response: ${response:-timeout})" >&2
+            return 1
         fi
-    done
-    
-    return 1
-}
+    fi
 
-validate_powershell_command() {
-    local ps_cmd="$1"
-    
-    # Extract the verb (first word of command)
-    local verb="${ps_cmd%% *}"
-    
-    # Check if verb is in whitelist
-    for safe_verb in "${POWERSHELL_SAFE_VERBS[@]}"; do
-        if [[ "$verb" == "$safe_verb" ]] || [[ "$verb" == "${safe_verb}${safe_verb}" ]]; then
-            return 0
-        fi
-    done
-    
+    # No tmux / no signal — check if non-interactive
+    if [[ ! -t 0 && ! -t 1 ]]; then
+        echo "[AIDO] ✗ T2 command requires human approval (non-interactive, cannot prompt)" >&2
+        return 1
+    fi
+
+    # Fallback: direct TTY prompt
+    echo "[AIDO] 🔒 T2 gate: $command" >&2
+    echo -n "[AIDO] Approve? [y/N] " >&2
+    local answer
+    read -r -t 30 answer < /dev/tty 2>/dev/null || answer="n"
+    if [[ "$answer" == "y" || "$answer" == "Y" || "$answer" == "yes" ]]; then
+        echo "[AIDO] ✓ Approved" >&2
+        return 0
+    fi
+    echo "[AIDO] ✗ Denied" >&2
     return 1
 }
 
 # ============================================================================
-# MAIN AIDO ROUTER (with Session Capture)
+# MAIN AIDO ROUTER (Guard-Gated)
 # ============================================================================
 
 main() {
     local full_command="$*"
-    local first_word="${1,,}"  # Convert to lowercase for matching
     
     [[ -z "$full_command" ]] && {
         cat >&2 <<EOF
 AIDO: Allow IDempotent Operations + Session Persistence
-Whitelisted command executor with local session capture
+Guard-gated command executor with local session capture
 
 Usage: aido <command> [args...]
 
+All commands are classified by lib/guard.ts:
+  T0  Auto-execute (read-only, safe) — instant
+  T1  Flagged (unknown cmd) — allowed, logged
+  T2  Escalate (write ops) — requires human approval
+  T3  Deny (destructive) — blocked
+
 Examples:
-  aido git status
-  aido git log --oneline
-  aido aws describe-instances
-  aido aws sts get-session-token
-  aido gh repo list
-  aido gh pr view 42
-  aido gh issue list
-
-Whitelisted Git Commands:
-  status, log, diff, branch, tag, reflog, describe, shortlog
-  config --list, remote, rev-parse, show, ls-files, ls-tree
-  grep, cat-file, ls-remote
-
-Whitelisted AWS Patterns:
-  describe-*, get-*, list-*, head-*
-  auth status, auth login
-  sts get-session-token
-
-Whitelisted GitHub CLI Commands:
-  Repository: repo view, repo list, repo search, repo clone --dry-run
-  Pull Requests: pr list, pr view, pr status, pr checks
-  Issues: issue list, issue view
-  Actions: run list, run view, run download, workflow list, workflow view
-  Auth: auth status, org list
-  API: api GET ... (read-only)
-
-PowerShell Verbs (in PowerShell context):
-  Get, Test, Measure, Select, Where, Sort, Group, Compare
+  aido git status          # T0 — auto-execute
+  aido git log --oneline   # T0 — auto-execute
+  aido git push            # T2 — requires approval
+  aido rm -rf /            # T3 — denied
+  aido aws describe-*      # T0 — auto-execute
+  aido gh pr create        # T2 — requires approval
 
 Environment Variables:
-  AIDO_DEBUG=1          - Show execution trace
-  AIDO_SESSION_DIR      - Override session directory (default: ./.aisessions)
-  AIDO_AGENT            - Agent identifier for session tracking (default: ai-agent)
+  AIDO_DEBUG=1          Show execution trace + guard decisions
+  AIDO_SESSION_DIR      Override session directory
+  AI_AGENT              Agent identifier for session tracking
+  AIDO_NO_VERIFY=1      Skip post-execution verification
+
+Guard Policy:
+  Loaded from: codex/AIPOLICY.yaml
+  Check policy: airun guard policy
+  Classify:     airun guard classify <command>
 
 Session Data:
-  Sessions stored in: $AIDO_SESSION_DIR/
+  Sessions stored in: \$AIDO_SESSION_DIR/
   Raw output:    SESSION_ID.typescript
   Metadata:      SESSION_ID.meta.json
 
@@ -369,64 +304,19 @@ EOF
     # Initialize session directory
     session_init || return 1
     
-    # Generate unique session ID
+    # ── Guard gate: classify command tier ──
+    if ! _guard_check "$full_command"; then
+        # Guard denied or escalation failed
+        ailedger_append "guard" "aido-denied" "" "$full_command" "1"
+        return 1
+    fi
+    
+    # ── Approved — execute with session capture ──
     local session_id=$(generate_session_id)
     
-    case "$first_word" in
-        git)
-            if validate_git_command "git $2"; then
-                [[ "${AIDO_DEBUG}" == "1" ]] && echo "[AIDO] ✓ Validating: $full_command" >&2
-                run_with_session "$full_command" "$session_id"
-                return $?
-            else
-                echo "[AIDO] ✗ BLOCKED: Git command not whitelisted: $2" >&2
-                echo "" >&2
-                echo "Allowed git commands:" >&2
-                printf "  • %s\n" "${GIT_SAFE_COMMANDS[@]}" >&2
-                return 1
-            fi
-            ;;
-        aws)
-            if validate_aws_command "aws $2"; then
-                [[ "${AIDO_DEBUG:-0}" == "1" ]] && echo "[AIDO] ✓ Validating: $full_command" >&2
-                run_with_session "$full_command" "$session_id"
-                return $?
-            else
-                echo "[AIDO] ✗ BLOCKED: AWS operation not whitelisted: $2" >&2
-                echo "" >&2
-                echo "Allowed AWS patterns:" >&2
-                printf "  • %s\n" "${AWS_SAFE_PATTERNS[@]}" >&2
-                return 1
-            fi
-            ;;
-        gh)
-            if validate_gh_command "gh $2 $3 $4 $5"; then
-                [[ "${AIDO_DEBUG:-0}" == "1" ]] && echo "[AIDO] ✓ Validating: $full_command" >&2
-                run_with_session "$full_command" "$session_id"
-                return $?
-            else
-                echo "[AIDO] ✗ BLOCKED: GitHub CLI command not whitelisted: $2" >&2
-                echo "" >&2
-                echo "Allowed GitHub CLI patterns:" >&2
-                printf "  • %s\n" "${GH_SAFE_PATTERNS[@]}" >&2
-                return 1
-            fi
-            ;;
-        *)
-            # Check if it's a PowerShell command (if in PowerShell session)
-            if [[ -n "${PSVersionTable+x}" ]]; then
-                if validate_powershell_command "$first_word"; then
-                    [[ "${AIDO_DEBUG:-0}" == "1" ]] && echo "[AIDO] ✓ Validating: $full_command" >&2
-                    run_with_session "$full_command" "$session_id"
-                    return $?
-                fi
-            fi
-            
-            echo "[AIDO] ✗ BLOCKED: Command not whitelisted: $1" >&2
-            echo "Run 'aido' without arguments to see allowed commands" >&2
-            return 1
-            ;;
-    esac
+    [[ "${AIDO_DEBUG}" == "1" ]] && echo "[AIDO] ✓ Guard approved: $full_command" >&2
+    run_with_session "$full_command" "$session_id"
+    return $?
 }
 
 main "$@"
