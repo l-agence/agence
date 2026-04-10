@@ -1,7 +1,7 @@
 # Tasks Dashboard
 
 > **Source**: `organic/tasks.json` | **Formula**: $\text{score} = 10P + 25S + 100H$  
-> **Generated**: 2026-04-10 | **Project**: PROJ-LAGENCE
+> **Generated**: 2026-04-11 | **Project**: PROJ-LAGENCE
 
 ---
 
@@ -12,7 +12,7 @@
 | ~~INFRA-002~~ | ~~agentd skeleton: pid, socket, Docker spawn~~ | `-` | 4 | 2 | 0.8 | **170** | copilot | ~~INFRA-001~~ |
 | ~~INFRA-001~~ | ~~Pipe-pane: tmux-native PTY streaming~~ | `-` | 3 | 1 | 0.5 | **105** | copilot | — |
 | ~~SWARM-001~~ | ~~Gate = write access (not --safe flag)~~ | `-` | 3 | 1 | 0.5 | **105** | copilot | — |
-| SWARM-002 | agentd interface contract (Docker→Nomad) | `~` | 3 | 1 | 0.5 | **105** | — | ~~INFRA-002~~ |
+| ~~SWARM-002~~ | ~~agentd interface contract (Docker→Nomad)~~ | `-` | 3 | 1 | 0.5 | **105** | copilot | ~~INFRA-002~~ |
 | INFRA-004 | .ailedger enhancements: AIPOLICY commit, prune | `~` | 3 | 1 | 0.4 | **95** | — | — |
 | INFRA-003 | Publish AIPOLICY.yaml schema | `~` | 2 | 1 | 0.3 | **75** | — | — |
 | INFRA-005 | Agent persona loading from agent.md | `~` | 2 | 0 | 0.3 | **50** | — | — |
@@ -30,16 +30,16 @@
 | Metric | Value |
 |--------|-------|
 | Total tasks | 15 |
-| Runnable | 12 |
+| Runnable | 11 |
 | Blocked | 0 |
-| Completed | 3 |
+| Completed | 4 |
 | Failed | 0 |
 
 ## State Distribution
 
 | State | Symbol | Count |
 |-------|--------|-------|
-| Human-assigned | `~` | 12 |
+| Human-assigned | `~` | 11 |
 | Human-working | `$` | 0 |
 | Agent-assigned | `%` | 0 |
 | Agent-executing | `&` | 0 |
@@ -47,7 +47,7 @@
 | Awaiting input | `?` | 0 |
 | Paused | `_` | 0 |
 | Held | `#` | 0 |
-| Completed | `-` | 3 |
+| Completed | `-` | 4 |
 | Failed | `!` | 0 |
 
 ---
@@ -61,7 +61,7 @@
 | 1 | ~~INFRA-002~~ | 170 | `-` ✅ |
 | 2 | ~~INFRA-001~~ | 105 | `-` ✅ |
 | 3 | ~~SWARM-001~~ | 105 | `-` ✅ |
-| 4 | SWARM-002 | 105 | `~` |
+| 4 | ~~SWARM-002~~ | 105 | `-` ✅ |
 | 5 | INFRA-004 | 95 | `~` |
 | 6 | INFRA-003 | 75 | `~` |
 | 7 | INFRA-005 | 50 | `~` |
@@ -74,7 +74,7 @@
 ## Dependency Graph
 
 ```
-INFRA-001 ✅ ──^──> INFRA-002 ✅ ──^──> SWARM-002
+INFRA-001 ✅ ──^──> INFRA-002 ✅ ──^──> SWARM-002 ✅
                                      ^
 SWARM-001 ─────────── ; ─────────────┘
 

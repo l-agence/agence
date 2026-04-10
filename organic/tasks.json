@@ -163,13 +163,14 @@
       "id": "SWARM-002",
       "repo": "agence-master",
       "title": "agentd interface contract: abstract container-spawn (Docker now, Nomad later)",
-      "state": "~",
+      "state": "-",
       "priority": 3,
       "stars": 1,
       "heat": 0.5,
-      "agent": null,
+      "agent": "copilot",
       "created": "2026-04-10T00:00:00Z",
-      "updated": "2026-04-10T00:00:00Z"
+      "updated": "2026-04-11T00:00:00Z",
+      "commit": "67ad891"
     },
     {
       "id": "BUG-001",

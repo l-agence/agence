@@ -56,8 +56,8 @@
 
 | ID | Title | State | Score | Blocked |
 |----|-------|-------|-------|---------|
-| SWARM-001 | Gate = write access | `~` | 105 | — |
-| SWARM-002 | agentd interface contract | `~` | 105 | ⛔ INFRA-002 |
+| SWARM-001 | Gate = write access | `-` | 105 | — |
+| SWARM-002 | agentd interface contract | `-` | 105 | ~~INFRA-002~~ |
 
 ### WF-BUGS — Bug Fixes (1 task)
 
