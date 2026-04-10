@@ -1,0 +1,135 @@
+{
+  "$schema": "../AIPOLICY.schema.json",
+  "version": 1,
+  "description": "Agent registry: structured config for routing, launching, and model resolution. Source of truth for bin/agence dispatch.",
+
+  "models": {
+    "opus":    "claude-opus-4-5",
+    "sonnet":  "claude-sonnet-4-5",
+    "haiku":   "claude-haiku-3-5",
+    "gpt4":    "gpt-4-turbo",
+    "gpt4o":   "gpt-4o",
+    "mini":    "gpt-4o-mini",
+    "gemini":  "gemini-2-pro",
+    "flash":   "gemini-2-flash",
+    "o1":      "o1-pro",
+    "qwen":    "qwen-2.5-coder",
+    "deepseek":"deepseek-coder-v2",
+    "llama":   "llama-3.1-70b"
+  },
+
+  "agents": {
+    "aider": {
+      "type": "tool",
+      "binary": "aider",
+      "install": "pip install aider-chat",
+      "default_model": "sonnet",
+      "launch_flags": "--no-auto-commits",
+      "model_flag": "--model",
+      "description": "Offline code editor — git patches"
+    },
+    "claude": {
+      "type": "tool",
+      "binary": "claude",
+      "install": "npm install -g @anthropic-ai/claude-code",
+      "default_model": "sonnet",
+      "launch_flags": "",
+      "model_flag": "--model",
+      "description": "Claude Code CLI — agentic assistant"
+    },
+    "pilot": {
+      "type": "tool",
+      "binary": ["copilot", "gh copilot"],
+      "install": "gh extension install github/gh-copilot",
+      "default_model": null,
+      "launch_flags": "",
+      "model_flag": null,
+      "fallback_cmd": "gh copilot suggest",
+      "description": "GitHub Copilot CLI"
+    },
+    "aish": {
+      "type": "tool",
+      "binary": "aish",
+      "install": "winget install Microsoft.AIShell",
+      "default_model": null,
+      "launch_flags": "",
+      "model_flag": null,
+      "description": "Microsoft AI Shell"
+    },
+    "ralph": {
+      "type": "persona",
+      "provider": "anthropic",
+      "default_model": "sonnet",
+      "tier": "T1",
+      "description": "Learning + accountability harness"
+    },
+    "sonya": {
+      "type": "persona",
+      "provider": "anthropic",
+      "default_model": "sonnet",
+      "tier": "T1",
+      "description": "Full-stack engineer"
+    },
+    "claudia": {
+      "type": "persona",
+      "provider": "anthropic",
+      "default_model": "opus",
+      "tier": "T4",
+      "description": "Principal SRE/Architect"
+    },
+    "chad": {
+      "type": "persona",
+      "provider": "openai",
+      "default_model": "gpt4o",
+      "tier": "T2",
+      "description": "DevOps/CloudOps specialist"
+    },
+    "aiko": {
+      "type": "persona",
+      "provider": "anthropic",
+      "default_model": "haiku",
+      "tier": "T1",
+      "description": "Cloud architect/platform engineer"
+    },
+    "copilot": {
+      "type": "persona",
+      "provider": "copilot",
+      "default_model": null,
+      "tier": "T2",
+      "description": "GitHub Copilot chat agent"
+    },
+    "haiku": {
+      "type": "persona",
+      "provider": "anthropic",
+      "default_model": "haiku",
+      "tier": "T0",
+      "description": "Fast/cheap Claude Haiku"
+    },
+    "azure": {
+      "type": "persona",
+      "provider": "azure",
+      "default_model": null,
+      "tier": "T3",
+      "description": "Azure Copilot specialist"
+    },
+    "devops": {
+      "type": "persona",
+      "provider": null,
+      "default_model": null,
+      "tier": "T2",
+      "description": "Git DevOps assistant (auto-routed)"
+    },
+    "peers": {
+      "type": "ensemble",
+      "providers": ["anthropic", "openai", "gemini"],
+      "tier": "T4",
+      "flavors": {
+        "code":  ["opus", "gpt4", "gemini"],
+        "light": ["haiku", "mini", "flash"],
+        "heavy": ["opus", "gpt4", "o1"]
+      },
+      "default_flavor": "code",
+      "description": "3-agent consensus ensemble"
+    }
+  }
+}

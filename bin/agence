@@ -373,7 +373,8 @@ main() {
   fi
 
   # Parse @agent prefix first (sets AGENCE_AGENT_PARAM, strips from input)
-  input=$(parse_agent_prefix "$input")
+  parse_agent_prefix "$input"
+  input="$_PARSED_INPUT"
 
   # Early exits: local-only commands that NEVER need the LLM router
   case "$1" in
@@ -598,9 +599,36 @@ mode_chat() {
 
   [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Provider: $provider" >&2
 
+  # ── @peers ensemble: fan-out to multiple providers ────────────────────────
+  if [[ "$provider" == "peers" ]]; then
+    _peers_consensus "$query"
+    return $?
+  fi
+
+  # ── Persona agent routing: resolve to real provider ──────────────────────
+  # If provider is an agent name (ralph, sonya, etc.), look up its real provider
+  local _agent_type=""
+  _agent_type=$(_reg_lookup "$provider" "type" 2>/dev/null)
+  if [[ "$_agent_type" == "persona" ]]; then
+    local _real_provider
+    _real_provider=$(_reg_lookup "$provider" "provider" 2>/dev/null)
+    if [[ -n "$_real_provider" ]]; then
+      export AI_AGENT="$provider"
+      # Set model from registry default if not already overridden
+      if [[ -z "${AGENCE_LLM_MODEL:-}" ]]; then
+        local _default_model
+        _default_model=$(_reg_lookup "$provider" "default_model" 2>/dev/null)
+        if [[ -n "$_default_model" ]]; then
+          export AGENCE_LLM_MODEL="$(_resolve_model_alias "$_default_model")"
+        fi
+      fi
+      provider="$_real_provider"
+    fi
+  fi
+
   # Trace mode: print routing decision without calling LLM (for testing/CI)
   if [[ "${AGENCE_TRACE:-0}" == "1" ]]; then
-    echo "[router_chat] provider=${provider} query=${query}"
+    echo "[router_chat] provider=${provider} agent=${AI_AGENT:-@} model=${AGENCE_LLM_MODEL:-default} query=${query}"
     return 0
   fi
 
@@ -615,6 +643,146 @@ mode_chat() {
   }
 
   echo "$response"
+  return 0
+}
+
+# ============================================================================
+# PEERS: Multi-provider consensus ensemble
+# ============================================================================
+# Fan-out query to N providers in parallel, collect responses, synthesize.
+# Flavor (code/light/heavy) selects which models to call.
+# Output: per-agent results + synthesized consensus.
+
+_peers_consensus() {
+  local query="$1"
+  local flavor="${AGENCE_PEERS_FLAVOR:-code}"
+
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "  @peers consensus (flavor: $flavor)"
+  echo "  Query: ${query:0:80}${query:80:+...}"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+  # Trace mode shortcut
+  if [[ "${AGENCE_TRACE:-0}" == "1" ]]; then
+    echo "[peers_consensus] flavor=${flavor} query=${query}"
+    return 0
+  fi
+
+  # Resolve flavor → model list from registry
+  local models_csv=""
+  if [[ -f "$_AGENT_REGISTRY" ]]; then
+    models_csv=$(python3 -c "
+import json
+r=json.load(open('$_AGENT_REGISTRY'))
+f=r.get('agents',{}).get('peers',{}).get('flavors',{}).get('$flavor',[])
+m=r.get('models',{})
+print(','.join(m.get(a,a) for a in f))
+" 2>/dev/null)
+  fi
+
+  # Fallback defaults if registry unavailable
+  if [[ -z "$models_csv" ]]; then
+    case "$flavor" in
+      code)  models_csv="claude-opus-4-5,gpt-4-turbo,gemini-2-pro" ;;
+      light) models_csv="claude-haiku-3-5,gpt-4o-mini,gemini-2-flash" ;;
+      heavy) models_csv="claude-opus-4-5,gpt-4-turbo,o1-pro" ;;
+      *)     models_csv="claude-opus-4-5,gpt-4-turbo,gemini-2-pro" ;;
+    esac
+  fi
+
+  IFS=',' read -ra _peer_models <<< "$models_csv"
+  local _peer_count=${#_peer_models[@]}
+
+  # Map model → provider
+  _model_to_provider() {
+    case "$1" in
+      claude-*) echo "anthropic" ;;
+      gpt-*)    echo "openai" ;;
+      o1-*)     echo "openai" ;;
+      gemini-*) echo "gemini" ;;
+      *)        echo "openai" ;; # fallback
+    esac
+  }
+
+  echo ""
+  echo "Models: ${_peer_models[*]}"
+  echo ""
+
+  router_load_config
+
+  local system_prompt
+  system_prompt=$(router_build_system_prompt)
+
+  # Fan-out: call each provider in background, collect to temp files
+  local _tmpdir
+  _tmpdir=$(mktemp -d)
+  local _pids=()
+
+  for i in "${!_peer_models[@]}"; do
+    local _model="${_peer_models[$i]}"
+    local _provider
+    _provider=$(_model_to_provider "$_model")
+    (
+      export AGENCE_LLM_PROVIDER="$_provider"
+      export AGENCE_LLM_MODEL="$_model"
+      local _response
+      _response=$(router_chat "$query" 2>/dev/null) || _response="[ERROR: ${_provider}/${_model} failed]"
+      echo "$_response" > "$_tmpdir/peer_${i}.txt"
+    ) &
+    _pids+=($!)
+  done
+
+  # Wait for all peers
+  echo "Waiting for ${_peer_count} peers..."
+  for pid in "${_pids[@]}"; do
+    wait "$pid" 2>/dev/null
+  done
+
+  # Collect and display responses
+  echo ""
+  for i in "${!_peer_models[@]}"; do
+    local _model="${_peer_models[$i]}"
+    echo "┌─ Peer $((i+1)): $_model"
+    echo "│"
+    if [[ -f "$_tmpdir/peer_${i}.txt" ]]; then
+      sed 's/^/│  /' "$_tmpdir/peer_${i}.txt"
+    else
+      echo "│  [NO RESPONSE]"
+    fi
+    echo "│"
+    echo "└─────────────────────────────────────────────────────────────"
+    echo ""
+  done
+
+  # Synthesize consensus (use the first available provider)
+  if [[ $_peer_count -gt 1 ]]; then
+    echo "━━━ SYNTHESIS ━━━"
+    echo ""
+    local _synth_input="You are a consensus synthesizer. Below are ${_peer_count} independent responses to the same query. Identify common ground, highlight valuable disagreements, and produce a concise synthesized answer."
+    _synth_input="${_synth_input}\n\nOriginal query: ${query}\n"
+    for i in "${!_peer_models[@]}"; do
+      _synth_input="${_synth_input}\n--- Response from ${_peer_models[$i]} ---\n"
+      if [[ -f "$_tmpdir/peer_${i}.txt" ]]; then
+        _synth_input="${_synth_input}$(cat "$_tmpdir/peer_${i}.txt")\n"
+      fi
+    done
+
+    local _synth_provider="$(_model_to_provider "${_peer_models[0]}")"
+    export AGENCE_LLM_PROVIDER="$_synth_provider"
+    export AGENCE_LLM_MODEL="${_peer_models[0]}"
+    local _synthesis
+    _synthesis=$(router_chat "$(echo -e "$_synth_input")" 2>/dev/null) || _synthesis="[Synthesis unavailable]"
+    echo "$_synthesis"
+    echo ""
+  fi
+
+  # Cleanup
+  rm -rf "$_tmpdir"
+
+  # Log to ailedger
+  ailedger_append "route" "peers-consensus-${flavor}" "" "@peers ${_peer_count} models" "0"
+
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   return 0
 }
 
@@ -2129,72 +2297,147 @@ create_windows_symlink() {
 # TOOL LAUNCHER — !aider, !claude, !pilot
 # ============================================================================
 # Checks installation, sets env, execs the tool directly.
-# Called from mode_system for real CLI tools (not agence persona agents).
+# Data-driven from codex/agents/registry.json — reads type, binary, flags.
 # Usage: launch_tool <tool> [extra-args...]
+
+_AGENT_REGISTRY="${AGENCE_ROOT}/codex/agents/registry.json"
+
+# ── Unified Route Parser ───────────────────────────────────────────────────
+# EBNF: target ('.' qualifier)*
+# Normalizes @ → . inside qualifiers, splits base + tier + model string.
+# Sets: _ROUTE_BASE, _ROUTE_TIER, _ROUTE_QUALS, AGENCE_LLM_MODEL (if tier found)
+#
+# Examples:
+#   aider.opus       → base=aider  tier=opus   model=claude-opus-4-5
+#   ralph.haiku.3.5  → base=ralph  tier=haiku  model=claude-haiku-3-5
+#   aider@opus       → base=aider  tier=opus   model=claude-opus-4-5
+#   peers.light      → base=peers  tier=light  (flavor, not model)
+#   bash             → base=bash   tier=""     (no override)
+
+_parse_route() {
+  local input="$1"
+  # Normalize: treat @ as . inside route qualifiers
+  input="${input//@/.}"
+  _ROUTE_BASE="${input%%.*}"
+  _ROUTE_QUALS="${input#"$_ROUTE_BASE"}"
+  _ROUTE_QUALS="${_ROUTE_QUALS#.}"  # strip leading dot
+  _ROUTE_TIER="${_ROUTE_QUALS%%.*}" # first qualifier segment
+
+  # Resolve tier → full model name (via registry or known aliases)
+  if [[ -n "$_ROUTE_TIER" ]]; then
+    local _resolved=""
+    _resolved=$(_resolve_model_alias "$_ROUTE_TIER")
+    if [[ -n "$_resolved" ]]; then
+      export AGENCE_LLM_MODEL="${AGENCE_MODEL:-$_resolved}"
+      echo "[agence] Model override: AGENCE_LLM_MODEL=$AGENCE_LLM_MODEL" >&2
+    fi
+  elif [[ -n "${AGENCE_MODEL:-}" ]]; then
+    export AGENCE_LLM_MODEL="$AGENCE_MODEL"
+    echo "[agence] Model override: AGENCE_LLM_MODEL=$AGENCE_LLM_MODEL" >&2
+  fi
+}
+
+# Resolve short model alias → full model string
+# Reads from registry.json .models map, falls back to hardcoded essentials.
+_resolve_model_alias() {
+  local alias="$1"
+  # Try registry.json (fast jq or python3 lookup)
+  if [[ -f "$_AGENT_REGISTRY" ]]; then
+    local _reg_model=""
+    if command -v python3 &>/dev/null; then
+      _reg_model=$(python3 -c "
+import json,sys
+r=json.load(open('$_AGENT_REGISTRY'))
+a='$alias'
+print(r.get('models',{}).get(a,''))
+" 2>/dev/null)
+    fi
+    if [[ -n "$_reg_model" ]]; then
+      echo "$_reg_model"
+      return 0
+    fi
+  fi
+  # Hardcoded fallback (always works, even without registry)
+  case "$alias" in
+    opus)    echo "claude-opus-4-5" ;;
+    sonnet)  echo "claude-sonnet-4-5" ;;
+    haiku)   echo "claude-haiku-3-5" ;;
+    gpt4)    echo "gpt-4-turbo" ;;
+    gpt4o)   echo "gpt-4o" ;;
+    mini)    echo "gpt-4o-mini" ;;
+    gemini)  echo "gemini-2-pro" ;;
+    flash)   echo "gemini-2-flash" ;;
+    *)       echo "" ;;  # unknown alias — not a model name
+  esac
+}
+
+# ── Registry Lookup ────────────────────────────────────────────────────────
+# Read a field from an agent's registry entry.
+# Usage: _reg_lookup <agent> <field>  → prints value or ""
+_reg_lookup() {
+  local agent="$1" field="$2"
+  [[ -f "$_AGENT_REGISTRY" ]] || return 1
+  python3 -c "
+import json
+r=json.load(open('$_AGENT_REGISTRY'))
+a=r.get('agents',{}).get('$agent',{})
+v=a.get('$field','')
+if isinstance(v,list): print(v[0])
+elif v is None: print('')
+else: print(v)
+" 2>/dev/null
+}
+
+# ── Data-Driven Tool Launcher ─────────────────────────────────────────────
+# Replaces hardcoded case blocks. Reads binary, flags, model_flag from registry.
 
 launch_tool() {
   local tool="$1"; shift
   local extra_args="$*"
 
-  case "$tool" in
-    aider)
-      if ! command -v aider &>/dev/null; then
-        echo "✗ aider not installed." >&2
-        echo "  Install: pip install aider-chat" >&2
-        return 1
-      fi
-      echo "[agence] Launching aider (repo: ${GIT_REPO:-$(pwd)})"
-      export AI_AGENT="aider"
-      ailedger_append "launch" "tool-aider" ""
-      # --no-auto-commits: agence owns git, not aider
-      exec aider --no-auto-commits $extra_args
-      ;;
-    claude)
-      if ! command -v claude &>/dev/null; then
-        echo "✗ claude not installed." >&2
-        echo "  Install: npm install -g @anthropic-ai/claude-code" >&2
-        return 1
-      fi
-      echo "[agence] Launching claude code"
-      export AI_AGENT="claude"
-      ailedger_append "launch" "tool-claude" ""
-      exec claude $extra_args
-      ;;
-    pilot)
-      # Prefer standalone copilot CLI (~/.local/bin/copilot or snap)
-      if command -v copilot &>/dev/null; then
-        echo "[agence] Launching GitHub Copilot CLI"
-        export AI_AGENT="pilot"
-        ailedger_append "launch" "tool-pilot-standalone" ""
-        exec copilot $extra_args
-      elif command -v gh &>/dev/null && gh copilot --version &>/dev/null 2>&1; then
-        echo "[agence] Launching gh copilot extension"
-        export AI_AGENT="pilot"
-        ailedger_append "launch" "tool-pilot-gh" ""
-        exec gh copilot suggest $extra_args
+  local binary install_cmd launch_flags model_flag description
+  binary=$(_reg_lookup "$tool" "binary")
+  install_cmd=$(_reg_lookup "$tool" "install")
+  launch_flags=$(_reg_lookup "$tool" "launch_flags")
+  model_flag=$(_reg_lookup "$tool" "model_flag")
+  description=$(_reg_lookup "$tool" "description")
+
+  [[ -z "$binary" ]] && binary="$tool"
+
+  # Check installation
+  if ! command -v "$binary" &>/dev/null; then
+    # Fallback: check fallback_cmd (e.g. pilot → gh copilot)
+    local fallback
+    fallback=$(_reg_lookup "$tool" "fallback_cmd")
+    if [[ -n "$fallback" ]]; then
+      local fb_bin="${fallback%% *}"
+      if command -v "$fb_bin" &>/dev/null; then
+        binary="$fb_bin"
+        launch_flags="${fallback#"$fb_bin"} $launch_flags"
+        launch_flags="${launch_flags# }"
       else
-        echo "✗ copilot CLI not found." >&2
-        echo "  Install (snap): sudo snap install copilot" >&2
-        echo "  Install (gh):   gh extension install github/gh-copilot" >&2
+        echo "✗ $tool not installed." >&2
+        [[ -n "$install_cmd" ]] && echo "  Install: $install_cmd" >&2
         return 1
       fi
-      ;;
-    aish)
-      if ! command -v aish &>/dev/null; then
-        echo "✗ aish not installed." >&2
-        echo "  Install (Windows): winget install Microsoft.AIShell" >&2
-        return 1
-      fi
-      echo "[agence] Launching Microsoft AI Shell"
-      export AI_AGENT="aish"
-      ailedger_append "launch" "tool-aish" ""
-      exec aish $extra_args
-      ;;
-    *)
-      echo "✗ Unknown tool: $tool" >&2
+    else
+      echo "✗ $tool not installed." >&2
+      [[ -n "$install_cmd" ]] && echo "  Install: $install_cmd" >&2
       return 1
-      ;;
-  esac
+    fi
+  fi
+
+  echo "[agence] Launching ${tool}${description:+ — $description}"
+  export AI_AGENT="$tool"
+  ailedger_append "launch" "tool-${tool}" ""
+
+  # Build model argument if qualifier was set and tool accepts --model
+  local model_args=""
+  if [[ -n "${AGENCE_LLM_MODEL:-}" && -n "$model_flag" ]]; then
+    model_args="$model_flag $AGENCE_LLM_MODEL"
+  fi
+
+  exec $binary $launch_flags $model_args $extra_args
 }
 
 mode_system() {
@@ -2202,24 +2445,16 @@ mode_system() {
 
   [[ "$DEBUG" == "1" ]] && echo "[DEBUG] System mode: $sys_cmd" >&2
 
-  # ── @agent.model suffix parsing ──────────────────────────────────────────
-  # Syntax: !ralph.opus  !sonya.sonnet  !claude.haiku  !bash.opus
-  # Strips the suffix, exports AGENCE_LLM_MODEL, continues with base cmd.
-  # AGENCE_MODEL env override also honoured (takes precedence over agent.md).
-  if [[ "$sys_cmd" == *"."* ]] && [[ "$sys_cmd" != *"/"* ]]; then
-    local _base="${sys_cmd%%.*}"
-    local _tier="${sys_cmd#*.}"
-    case "$_tier" in
-      opus)   export AGENCE_LLM_MODEL="${AGENCE_MODEL:-claude-opus-4-5}" ;;
-      sonnet) export AGENCE_LLM_MODEL="${AGENCE_MODEL:-claude-sonnet-4-5}" ;;
-      haiku)  export AGENCE_LLM_MODEL="${AGENCE_MODEL:-claude-haiku-3-5}" ;;
-      *)      export AGENCE_LLM_MODEL="${AGENCE_MODEL:-$_tier}" ;;
-    esac
-    echo "[agence] Model override: AGENCE_LLM_MODEL=$AGENCE_LLM_MODEL"
-    sys_cmd="$_base"
-  elif [[ -n "${AGENCE_MODEL:-}" ]]; then
-    export AGENCE_LLM_MODEL="$AGENCE_MODEL"
-    echo "[agence] Model override: AGENCE_LLM_MODEL=$AGENCE_LLM_MODEL"
+  # ── Unified route parsing ────────────────────────────────────────────────
+  # EBNF: target ('.' qualifier)*  — @ normalised to . inside qualifiers
+  # !aider.opus  !ralph@haiku  !peers.light  !bash  !aider@opus.3.5
+  _parse_route "$sys_cmd"
+  sys_cmd="$_ROUTE_BASE"
+
+  # Trace mode: print routing decision without launching (for testing/CI)
+  if [[ "${AGENCE_TRACE:-0}" == "1" ]]; then
+    echo "[mode_system] base=${sys_cmd} tier=${_ROUTE_TIER:-@} quals=${_ROUTE_QUALS:-@} model=${AGENCE_LLM_MODEL:-default}"
+    return 0
   fi
 
   case "$sys_cmd" in
@@ -2248,31 +2483,54 @@ mode_system() {
     shell)
       shell_powershell_session
       ;;
-    # Real CLI tool launchers — check installed, exec directly
-    aider|claude|pilot|aish)
-      launch_tool "$sys_cmd" "${@:2}"
-      ;;
     # Swarm launcher — tmux 1+1 sessions
     swarm)
       "${AGENCE_BIN}/swarm" launch "${@:2}"
       ;;
-    # Persona agents — aibash session with AI_AGENT set
-    ralph|copilot|sonya|claudia|haiku|chad|aiko|kilo|peers|azure|devops)
-      local agent_name="$sys_cmd"
-      export AI_AGENT="$agent_name" AGENCE_AGENT_PARAM="$agent_name"
-      echo "[agence] Launching agent: @${agent_name}"
-      ailedger_append "route" "persona-${agent_name}" ""
-      shell_bash_session
-      ;;
     *)
-      # Fallback: try as a direct system command (pass-through)
-      if command -v "$sys_cmd" &>/dev/null; then
-        shift
-        "$sys_cmd" "$@"
-      else
-        echo "Unknown system command: $sys_cmd" >&2
-        return 1
-      fi
+      # ── Registry-driven dispatch ──────────────────────────────────────────
+      # Look up agent type from registry: tool → launch_tool, persona → aibash,
+      # ensemble → peers consensus, unknown → fallback to PATH check.
+      local _agent_type=""
+      _agent_type=$(_reg_lookup "$sys_cmd" "type" 2>/dev/null)
+
+      case "$_agent_type" in
+        tool)
+          launch_tool "$sys_cmd" "${@:2}"
+          ;;
+        persona)
+          local agent_name="$sys_cmd"
+          export AI_AGENT="$agent_name" AGENCE_AGENT_PARAM="$agent_name"
+          echo "[agence] Launching agent: @${agent_name}"
+          ailedger_append "route" "persona-${agent_name}" ""
+          shell_bash_session
+          ;;
+        ensemble)
+          local agent_name="$sys_cmd"
+          export AI_AGENT="$agent_name" AGENCE_AGENT_PARAM="$agent_name"
+          local _flavor="${_ROUTE_TIER:-$(_reg_lookup "$sys_cmd" "default_flavor" 2>/dev/null)}"
+          _flavor="${_flavor:-code}"
+          echo "[agence] Launching ensemble: @${agent_name} (flavor: $_flavor)"
+          ailedger_append "route" "ensemble-${agent_name}-${_flavor}" ""
+          export AGENCE_PEERS_FLAVOR="$_flavor"
+          shell_bash_session
+          ;;
+        "")
+          # Not in registry — try as a direct system command (pass-through)
+          if command -v "$sys_cmd" &>/dev/null; then
+            shift
+            "$sys_cmd" "$@"
+          else
+            echo "Unknown system command: $sys_cmd" >&2
+            echo "  Known agents: $(python3 -c "
+import json
+r=json.load(open('$_AGENT_REGISTRY'))
+print(' '.join(sorted(r.get('agents',{}).keys())))
+" 2>/dev/null || echo '(registry unavailable)')" >&2
+            return 1
+          fi
+          ;;
+      esac
       ;;
   esac
 }
@@ -2700,12 +2958,11 @@ parse_agent_prefix() {
   local input="$1"
   if [[ "$input" =~ ^@([A-Za-z0-9_-]*)[[:space:]]+(.*) ]]; then
     local agent_name="${BASH_REMATCH[1]}"
-    local remaining_cmd="${BASH_REMATCH[2]}"
+    _PARSED_INPUT="${BASH_REMATCH[2]}"
     [[ -z "$agent_name" ]] && export AGENCE_AGENT_PARAM="@" || export AGENCE_AGENT_PARAM="$agent_name"
-    echo "$remaining_cmd"
   else
     export AGENCE_AGENT_PARAM="@"
-    echo "$input"
+    _PARSED_INPUT="$input"
   fi
 }
 
