@@ -35,7 +35,7 @@ Describe 'Agence CLI'
     When run bash bin/agence help
     The status should be success
     The output should include 'USAGE:'
-    The output should include 'MODES:'
+    The output should include 'AGENT ROUTING:'
   End
 
   It 'shows version with --version'

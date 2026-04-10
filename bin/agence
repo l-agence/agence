@@ -273,83 +273,112 @@ Agence: Agentic Engineering Collaboration Environment
 
 USAGE:
   agence [COMMAND] [OPTIONS]
+  agence "<query>"               Chat with LLM (default mode)
+  agence +<request>              AI-routed autonomous action
+  agence /<cmd>                  External command (AIPOLICY tier gated)
+  agence !<tool>                 Launch system tool / agent shell
+  agence ^<cmd>                  Init, workflow, knowledge commands
+  agence ~recall <pattern>       Search grimoire (gated memory)
 
-EXECUTION CONTEXT:
-  Agence enforces strict execution context to prevent collisions when user 
-  and LLM share a shell window. The following must be true:
-  
-  - GIT_REPO (parent repo, auto-detected or set manually)
-  - AGENCE_REPO (always ~/.agence submodule)
-  - pwd must be within one of these repos
-  
-  If context mismatch detected: Agence aborts with error.
-  Set manually if needed: export GIT_REPO=/path/to/repo
+────────────────────────────────────────────────────────────────────────
 
-MODES:
-  help                         Show this help message
-  version                      Show Agence version
+AGENT ROUTING:
+  agence @ralph "query"          Route to specific agent
+  agence !aider.opus             Launch tool with model qualifier
+  agence @peers "query"          Fan-out to peer ensemble
+  Grammar: [prefix] target [.qualifier]* [payload]
 
-COMMAND MODES:
-  agence "<query>"             Chat with the LLM about your task
-  agence +<request>            Ask LLM to route/plan action (autonomous mode)
-  agence /<cmd>                Execute validated external command
-  agence !<sys_cmd>            System command (bash/powershell utilities)
-  agence ^<init_cmd>           Special initialization commands
+SYSTEM TOOLS (!):
+  !bash                          Agentic bash session (current agent)
+  !shell                         PowerShell session
+  !swarm [agent...]              Tmux 1+1 session (ibash + aibash)
+  !aider                         Aider CLI (pip install aider-chat)
+  !claude                        Claude Code CLI (npm i -g @anthropic-ai/claude-code)
+  !pilot                         GitHub Copilot CLI (gh copilot)
+  !aish                          Microsoft AI Shell
+  !peers                         Peer ensemble (multi-provider fan-out)
+  !ralph, !sonya, !copilot       Agent-specific aibash sessions
 
-EXAMPLES:
-  agence "How do I deploy this to AWS?"
-  agence +plan-vpc-infrastructure
-  agence /terraform-plan
-  agence !bash                     Open aibash session (current agent)
-  agence !shell                    Open PowerShell session
-  agence !aider                    Launch aider CLI (requires: pip install aider-chat)
-  agence !claude                   Launch Claude Code CLI (requires: npm i -g @anthropic-ai/claude-code)
-  agence !pilot                    Launch GitHub Copilot CLI (winget: GitHub.Copilot; or: gh extension install github/gh-copilot)
-  agence !aish                     Launch Microsoft AI Shell (winget: Microsoft.AIShell)
-  agence !swarm [agent...]         Launch tmux 1+1 session (ibash + aibash per agent)
-  agence !ralph                    Open aibash session as @ralph agent
-  agence !sonya                    Open aibash session as @sonya agent
-  agence ^install
-  agence ^learn
-  agence ^status
-  agence ^stash
-  agence ^fetch
-  agence ^rebase
-  agence ^push
-  agence ^sync
-  agence ^lesson list
-  agence ^plan add "Phase 3 roadmap"
-  agence ^todo list
-  agence ^task add "Implement feature" --assign @ralph
-  agence ^job list
-  agence ^ledger list               Show shard ledger entries
-  agence ^ledger init               Initialize upstream shard repo
-  agence ^audit trail                Show audit trail
-  agence ^session prune --days 3    Archive sessions older than 3 days
-  agence ^index                     Scan for missing INDEX.json files
-  agence ^reindex                   Regenerate all INDEX.json via bin/indexer
-  agence ^recall <pattern>          Search hermetic memory (notes, brainstorms)
-  agence ~recall <pattern>          Search grimoire (gated persistent memory)
-  airun <module> [args]             Run a Bun TS module (session, ledger, audit, etc.)
+WORKFLOW (^):
+  ^status                        Agence + repo status
+  ^save                          Checkpoint: commit + session snapshot
+  ^commit                        Stage + commit with message
+  ^push                          Push to remote
+  ^stash / ^fetch / ^rebase      Git workflow shortcuts
+  ^sync                          Fetch + rebase + push
+  ^handoff <agent>               Transfer session to another agent
+  ^pickup <session-id>           Resume a handed-off session
+  ^pause / ^resume               Session checkpoint / restore
+  ^install                       Install agence into a repo
+  ^init                          Initialize agence submodule
 
-ENVIRONMENT VARIABLES:
-  GIT_REPO=/path/to/repo       Parent repository (auto-detected if not set)
-  AGENCE_REPO                  Agence submodule root (auto-set to ~/.agence)
-  AGENCE_DEBUG=1               Enable debug output (shows GIT_REPO, AGENCE_REPO)
-  AGENCE_QUIET=1               Suppress non-essential output
-  AGENCE_LLM_PROVIDER=claude   LLM provider (anthropic, openai, ollama)
-  ANTHROPIC_API_KEY            API key for Claude
+KNOWLEDGE (^):
+  ^lesson list|add|show          Lesson management
+  ^plan list|add|show            Plan management
+  ^todo list|add|show            Todo management
+  ^task list|add|show            Organic task management
+  ^job list|add|show             Job/workflow management
+  ^fault list|add|show           Fault log management
+  ^issue list|add|show           Issue tracking
+  ^log list|show                 Session log viewer
+  ^learn                         Extract lesson from current context
+
+LEDGER & AUDIT (^):
+  ^ledger list|init|sync|status  Shared shard ledger (Merkle-chained)
+  ^audit trail|show|agent|stats  Decision audit trail
+  ^session list|view|prune       Session lifecycle
+  ^session prune --days 3        Archive + remove old sessions
+
+INDEX (^):
+  ^index                         Scan for missing INDEX.json files
+  ^reindex                       Regenerate INDEX.json via bin/indexer
+  ^recall <pattern>              Search hermetic memory
+
+GIT SHORTCUTS (/):                            Tier
+  /status  /log  /diff  /remote               T0 (auto)
+  /add  /stash  /branch                       T0
+  /commit  /fetch  /pull  /checkout            T2 (confirm)
+  /push  /rebase  /merge  /cherry-pick         T2
+  /reset  /clean                               T3 (blocked)
+
+GITHUB CLI SHORTCUTS (/):                     Tier
+  /ghremote  /ghpull  /ghlog  /ghrun           T0 (auto)
+  /ghflow  /ghissue  /ghorg  /ghauth           T0
+  /ghcommit  /ghpush  /ghmerge  /ghlogin       T2 (confirm)
+  /gh <subcmd> [args]                          Tier-routed
+
+TERRAFORM SHORTCUTS (/):                      Tier
+  /tfvalidate  /tfplan  /tfinit  /tflint       T0 (auto)
+  /tfauth  /precommit                          T0
+  /tfupgrade  /tfapply                         T2 (confirm)
+  /tfdestroy                                   T3 (blocked)
+  /tf <subcmd> [args]                          Tier-routed
+
+ENVIRONMENT:
+  GIT_REPO                       Parent repo (auto-detected)
+  AGENCE_REPO                    Agence submodule root
+  AGENCE_DEBUG=1                 Show routing decisions
+  AGENCE_TRACE=1                 Trace mode (no LLM call)
+  AGENCE_QUIET=1                 Suppress non-essential output
+  AGENCE_LLM_PROVIDER            LLM provider (anthropic, openai, ollama)
+  ANTHROPIC_API_KEY              API key for Claude
+
+TIER MODEL (AIPOLICY):
+  T0  Auto-execute               Read-only, non-destructive
+  T1  Soft-confirm               Show effect, single keypress
+  T2  Warn + confirm             State mutation, requires approval
+  T3  Blocked                    Destructive — must run manually
 
 CONFIG:
-  ~/.agence/config.yaml        Global Agence configuration
-  .agence/config.yaml          Project-specific configuration (if in repo)
+  ~/.agence/config.yaml          Global configuration
+  .agence/config.yaml            Project-specific overrides
 
 SEE ALSO:
-  agence config                Show current configuration
-  agence status                Show Agence status
-  agence logs                  Show recent logs
-
-For more info: https://github.com/l-agence/agence
+  agence ^status                 Current state overview
+  agence ^symbols                Show prefix/state symbol reference
+  bin/COMMANDS.md                Full command routing reference
+  codex/AIPOLICY.yaml            Policy tiers and guardrails
+  codex/agents/registry.json     Agent definitions and model map
 EOF
 }
 
