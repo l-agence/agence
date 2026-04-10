@@ -75,7 +75,7 @@ that ensures every decision flows through rules, references multiple knowledge b
 - (O) = ObjectCode    : Code-enabled KnowledgeBase - git integration. 
 - (G) - GlobalCache   : Semantic RAG KnowledgeBase - vector-like . 
 - (N) - Nexus         : Local State database - never shared.
-- (O) - Orchestrator  : matrix-based project management and worklows. 
+- (O) - Organic       : matrix-based project management and workflows (swarm orchestrates). 
 - (S) - Synthetic     : our Derived World Model - Human + AI Sentience.
 +
 - (H) - Hermetic      : Our Secret World Model. - Selectively Shared.
@@ -90,7 +90,7 @@ that ensures every decision flows through rules, references multiple knowledge b
 │ └──────────┘ └──────────────┘ └─────────────┘ └────────────┘ │
 │                                                              │
 ├──────────────────────────────────────────────────────────────┤
-│ ORCHESTRATOR (Workflow Engine) - Matrix Tasks & Projects     │
+│ ORGANIC (Workflow Engine) - Matrix Tasks & Projects          │
 ├──────────────────────────────────────────────────────────────┤
 │ NEXUS (State Database) - Session & Agent State               │
 └──────────────────────────────────────────────────────────────┘
@@ -143,8 +143,8 @@ Every user command (CLI or prompt) is validated against LAWS before execution. T
 
 Enables **distributed agent coordination** without losing context.
 
-### Layer 6: ORDINATOR (Workflow Engine)
-**ORDINATOR** is the task/project engine - coming soon:
+### Layer 6: ORGANIC (Workflow Engine)
+**ORGANIC** is the task/project engine (formerly Ordinator — swarm now orchestrates):
 - Matrix-based project management (linear algebra)
 - Task decomposition to agents
 - Deliverables & timeline tracking
@@ -281,44 +281,81 @@ This ensures **cost transparency** and **thoughtful agent choice**.
 .agence/
 ├── bin/
 │   ├── agence           ← Entry point (mode dispatch)
+│   ├── airun            ← Gated Bun TS module runner
+│   ├── swarm            ← tmux 1+1 launcher
 │   ├── indexer          ← Universal semantic indexer
 │   └── commands.json    ← Command mappings
 │
 ├── codex/
-│   ├── agents/
-│   │   ├── @             ← Symlink to default agent
-│   │   ├── aider/agent.md
-│   │   ├── chad/agent.md
-│   │   ├── aiko/agent.md
-│   │   ├── ralph/agent.md
-│   │   ├── claudia/agent.md
-│   │   ├── AGENTS.md     ← Quick reference
-│   │   └── ROUTING.md    ← Routing spec
-│   └── CODEX/
-│       ├── RULES.md      ← Do's (prescriptive)
-│       └── LAWS.md       ← DON'Ts (prohibitions)
+│   ├── PRINCIPLES.md    ← Philosophy & value system
+│   ├── RULES.md         ← Do's (prescriptive guidance)
+│   ├── LAWS.md          ← DON'Ts (immutable prohibitions)
+│   ├── AIPOLICY.md      ← AI governance policy (human-readable)
+│   ├── AIPOLICY.yaml    ← AI governance policy (machine-readable)
+│   ├── SAFEGUARDS.md    ← Safety constraints & guardrails
+│   ├── TAXONOMY.md      ← Data classification & scope model
+│   └── agents/
+│       ├── @             → symlink to default agent
+│       ├── AGENTS.md     ← Quick reference
+│       ├── ROUTING.md    ← Routing spec
+│       ├── ralph/agent.md
+│       ├── sonya/agent.md
+│       ├── claudia/agent.md
+│       ├── aider/agent.md
+│       ├── chad/agent.md
+│       ├── aiko/agent.md
+│       └── peers/agent.md
 │
 ├── lib/
+│   ├── guard.ts         ← Non-bypassable command gate (164 rules)
+│   ├── signal.ts        ← Human↔Agent IPC primitives
+│   ├── matrix.ts        ← Task scoring, DAG, workflows
+│   ├── session.ts       ← Session CRUD (Bun TS)
+│   ├── audit.ts         ← Audit trail
 │   ├── router.sh        ← Agent/model resolution
-│   └── llm_provider.py  ← LLM client (TBD)
+│   ├── env.sh           ← Canonical env bootstrap
+│   └── format.sh        ← Output formatting
 │
 ├── globalcache/         ← External RAG knowledge
-│   └── l-agence.org/
-│       └── INDEX.md     ← Semantic index (formtags + checksums)
+│   └── @                 → symlink to default org
 │
 ├── objectcode/          ← Code metadata (git-tracked)
-│   └── [TLD]/[repo]/    ← Module patterns & summaries
+│   └── @                 → symlink to default org
 │
-├── synthetic/           ← Derived knowledge (our analysis)
-│   └── [TLD]/[org]/
-│       └── INDEX.md     ← Analysis index
+├── synthetic/           ← Derived knowledge (shared DWM)
+│   └── @                 → symlink to default org
+│       └── docs/        ← Architecture, specs, dashboards
+│       └── plans/       ← Strategic roadmaps
+│       └── lessons/     ← Sanitized learning from faults
+│       └── issues/      ← Team-visible discoveries
 │
-├── nexus/               ← Session & agent state (TBD)
-│   └── sessions/        ← Persistent state
+├── hermetic/            ← Secret knowledge (private DWM)
+│   └── @                 → symlink to default org
+│       └── notes/       ← Personal research
+│       └── todos/       ← Personal task list
 │
-└── ordinator/           ← Task/project matrices (TBD)
-    └── projects/        ← Project definitions
+├── nexus/               ← Local state (never shared)
+│   ├── sessions/        ← Session metadata
+│   ├── faults/          ← Incident records
+│   ├── logs/            ← Operational logs
+│   ├── signals/         ← IPC signal queue
+│   └── .ailedger/       ← Merkle chain audit log
+│
+└── organic/             ← Team work (tasks, workflows, projects)
+    ├── @                 → symlink to default project
+    ├── tasks.json       ← Task matrix (scored, stateful)
+    ├── deps.json        ← Dependency DAG
+    ├── workflows.json   ← Workflow → task mapping
+    ├── projects.json    ← Project → workflow mapping
+    ├── agents.json      ← Agent capacity roster
+    ├── tasks/           ← Per-task detail records
+    ├── jobs/            ← Agent execution records
+    ├── workflows/       ← Workflow definitions
+    └── projects/
+        └── l-agence/    ← First project (PROJ-LAGENCE)
 ```
+
+`@` symlinks provide default routing — each scope resolves `@` to the active org/project context without hardcoding paths.
 
 ---
 
@@ -364,10 +401,10 @@ agence !ls "List agents"
 - [ ] **CODEX**: Implement LAWS pre-flight check in `bin/agence`
 - [ ] **NEXUS**: Build state database (JSON/SQLite backend)
 - [ ] **SYNTHESIS**: Index derived knowledge per org
-- [ ] **ORDINATOR**: Matrix-based task engine (linear algebra)
+- [ ] **ORGANIC**: Matrix-based task engine (linear algebra)
 - [ ] **LLM Client**: Connect agents to actual API calls
 - [ ] **Tests**: Add integration tests for agent routing
-- [ ] **JIRA**: Future integration for ORDINATOR
+- [ ] **JIRA**: Future integration for ORGANIC
 
 ---
 

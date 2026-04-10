@@ -91,7 +91,7 @@ nexus/sessions/
 ^log show ralph           # Ralph's logs only
 ^log add "Manual entry"
 
-# Sessions accessible via orchestrator (future)
+# Sessions accessible via swarm orchestrator (future)
 ```
 
 **Future (v0.3.2+)**: Publish sanitized faults to `synthetic/lessons/` only after human review.
@@ -210,7 +210,7 @@ organic/
 
 **Future (v0.3.1+)**:
 - Agents merge task state via Git + custom merge strategy
-- Orchestrator computes priority (blocking impact) + complexity
+- Swarm computes priority (blocking impact) + complexity
 - Cost-aware routing: expensive models for urgent/complex tasks
 
 ---
@@ -271,7 +271,7 @@ organic/
    ^task add "Implement matrix-math.ts" --assign ralph
    └─ organic/tasks/matrix-math.md
 
-2. Orchestrator evaluates complexity
+2. Swarm evaluates complexity
    - LOC estimate: 300
    - Modules: 5
    - Category: medium
@@ -285,7 +285,7 @@ organic/
 4. Ralph executes, commits to branch
    git commit -m "matrix-math: implemented priority routing"
 
-5. Orchestrator merges (Git-native coordination)
+5. Swarm merges (Git-native coordination)
    - Matrix state updated (task goes from +task to -task)
    - Git merge strategy applies agent priority rules
    - Result: organic/matrix-state.json updated, task marked complete
