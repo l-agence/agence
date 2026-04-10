@@ -170,101 +170,13 @@ json.dump(d, open(f,'w'), indent=2)
 
 # ── Container Driver Abstraction ───────────────────────────────────────────
 
-# Driver interface: spawn, destroy, exec, status
-# Drivers: stub (local, no isolation), docker (container isolation)
-# Future: nomad (Nomad job)
+# Load driver contract (validation + loader)
+source "$AGENCE_ROOT/lib/drivers/contract.sh"
 
-_driver_spawn() {
-  local tangent_id="$1" worktree_path="$2" agent="$3"
-  case "$DRIVER" in
-    stub)
-      # No container — tangent runs directly on host in worktree
-      echo "[agentd] stub driver: no container for $tangent_id"
-      return 0
-      ;;
-    docker)
-      _driver_docker_spawn "$tangent_id" "$worktree_path" "$agent"
-      ;;
-    *)
-      echo "✗ Unknown driver: $DRIVER" >&2
-      return 1
-      ;;
-  esac
-}
-
-_driver_destroy() {
-  local tangent_id="$1"
-  case "$DRIVER" in
-    stub)
-      return 0
-      ;;
-    docker)
-      _driver_docker_destroy "$tangent_id"
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
-
-_driver_exec() {
-  local tangent_id="$1"
-  shift
-  local cmd="$*"
-  case "$DRIVER" in
-    stub)
-      # Direct execution — no container boundary
-      eval "$cmd"
-      ;;
-    docker)
-      docker exec -i "agence-${tangent_id}" bash -c "$cmd"
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
-
-# ── Docker Driver ──────────────────────────────────────────────────────────
-
-_driver_docker_spawn() {
-  local tangent_id="$1" worktree_path="$2" agent="$3"
-  local container_name="agence-${tangent_id}"
-
-  if ! command -v docker &>/dev/null; then
-    echo "✗ docker not found" >&2
-    return 1
-  fi
-
-  # Read-only .git object store + writable worktree
-  # The worktree is already created on HOST by git worktree add
-  docker run -d \
-    --name "$container_name" \
-    --hostname "$tangent_id" \
-    -v "${AGENCE_ROOT}/.git:/repo/.git:ro" \
-    -v "${worktree_path}:/workspace" \
-    -e "AI_AGENT=${agent}" \
-    -e "AI_ROLE=agentic" \
-    -e "GIT_ROOT=/workspace" \
-    -e "AGENCE_ROOT=/workspace/.agence" \
-    -w /workspace \
-    --label "agence.tangent=${tangent_id}" \
-    --label "agence.agent=${agent}" \
-    "${AGENTD_IMAGE:-agence/agent:latest}" \
-    sleep infinity
-
-  if [[ $? -ne 0 ]]; then
-    echo "✗ Failed to spawn container for tangent $tangent_id" >&2
-    return 1
-  fi
-  echo "[agentd] docker: started $container_name"
-}
-
-_driver_docker_destroy() {
-  local tangent_id="$1"
-  local container_name="agence-${tangent_id}"
-  docker rm -f "$container_name" 2>/dev/null
-  echo "[agentd] docker: removed $container_name"
+# Load the selected driver (sets _driver_spawn, _driver_destroy, etc.)
+_driver_load "$DRIVER" || {
+  echo "✗ Failed to load driver: $DRIVER" >&2
+  exit 1
 }
 
 # ── Git Worktree Management ───────────────────────────────────────────────
@@ -395,6 +307,12 @@ cmd_start() {
   fi
 
   echo "[agentd] Starting swarm (session: $SESSION, driver: $DRIVER) — agents: ${agents[*]}"
+
+  # Validate driver prerequisites
+  _driver_validate "$DRIVER" || {
+    echo "✗ Driver validation failed. Cannot start." >&2
+    exit 1
+  }
 
   # Write PID file
   _write_pid
@@ -596,9 +514,9 @@ cmd_tangent_create() {
     tmux new-window -t "$SESSION" -n "$window" \
       "env AI_AGENT=${agent} AI_ROLE=agentic GIT_ROOT=${worktree_path} bash --rcfile ${AGENCE_ROOT}/bin/aibash"
   else
-    # Docker: attach to container logs in the pane
+    # Container driver: stream logs into tmux pane
     tmux new-window -t "$SESSION" -n "$window" \
-      "docker logs -f agence-${tangent_id}"
+      "${AGENCE_ROOT}/bin/agentd _driver_logs_pane ${tangent_id}"
   fi
 
   # 4. Socat socket listener
@@ -789,6 +707,9 @@ case "${1:-help}" in
     ;;
   inject)  shift; cmd_inject "$@" ;;
   _socket_handler) shift; cmd__socket_handler "$@" ;;
+  _driver_logs_pane)
+    # Internal: called by tmux new-window to stream driver logs
+    shift; _driver_logs "${1:-}" ;;
   help|-h|--help) cmd_help ;;
   *)
     echo "Unknown command: $1" >&2
