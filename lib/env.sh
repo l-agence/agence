@@ -43,6 +43,16 @@ export AGENCE_SESSION_DIR AGENCE_LEDGER_DIR
 AI_SHARD="${AI_SHARD:-}"
 export AI_SHARD
 
+# Shard ledger file: upstream submodule path if initialized, else legacy flat file
+if [[ -z "${AGENCE_SHARD_LEDGER:-}" ]]; then
+  if [[ -f "$AI_ROOT/.ailedger-upstream/ledger.jsonl" ]]; then
+    AGENCE_SHARD_LEDGER="$AI_ROOT/.ailedger-upstream/ledger.jsonl"
+  else
+    AGENCE_SHARD_LEDGER="$AI_ROOT/.ailedger"
+  fi
+fi
+export AGENCE_SHARD_LEDGER
+
 # Pager suppression: prevent gh/git/less from hanging agentic shells
 export GIT_PAGER=cat
 export GH_PAGER=cat

@@ -1410,8 +1410,19 @@ mode_session() {
       fi
       local meta="$sessions_dir/$sid.meta.json"
       if [[ -f "$meta" ]]; then
+        local from_agent; from_agent=$(jq -r '.agent // .agent_id // "unknown"' "$meta" 2>/dev/null)
         jq --arg a "$target" '.assigned = $a' "$meta" > "$meta.tmp" && mv "$meta.tmp" "$meta"
         echo "Session $sid handed off to $target."
+        # Record handoff in ledger (cross-shard ref)
+        if command -v bun &>/dev/null && [[ -f "$AGENCE_ROOT/lib/ailedger.ts" ]]; then
+          "$AGENCE_ROOT/bin/airun" ailedger append \
+            "handoff" \
+            "session-handoff:${from_agent}→${target}" \
+            "$sid" \
+            "handoff:${from_agent}→${target}:session:${sid}" \
+            "0" >/dev/null 2>&1 || true
+          echo "  ✓ Ledger entry recorded (handoff ${from_agent} → ${target})"
+        fi
       else
         echo "Session $sid not found." >&2; return 1
       fi

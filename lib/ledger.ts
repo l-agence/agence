@@ -251,6 +251,29 @@ function cmdAdd(args: string[]): number {
   }
 }
 
+// ─── handoff: cross-shard handoff entry ──────────────────────────────────────
+
+function cmdHandoff(args: string[]): number {
+  // ^ledger handoff <from> <to> [task_id] [note]
+  // Creates a handoff-type ledger entry with a cross-shard reference
+  const from = args[0];
+  const to = args[1];
+  const taskId = args[2] || "";
+  const note = args.slice(3).join(" ") || "";
+
+  if (!from || !to) {
+    stderr("Usage: airun ledger handoff <@from> <@to> [task_id] [note]");
+    stderr("  Creates a handoff ledger entry with cross-agent reference.");
+    stderr("  Example: airun ledger handoff @copilot @ralph session-abc 'Continue audit work'");
+    return 1;
+  }
+
+  const tag = `handoff:${from}→${to}${note ? ` ${note}` : ""}`;
+  const command = `handoff:${from}→${to}:task:${taskId || "(none)"}`;
+
+  return cmdAdd(["handoff", tag, taskId, command, "0"]);
+}
+
 // ─── sync: commit and push shard to upstream ─────────────────────────────────
 
 function cmdSync(_args: string[]): number {
@@ -341,6 +364,9 @@ switch (cmd) {
   case "add":
     process.exit(cmdAdd(args));
     break;
+  case "handoff":
+    process.exit(cmdHandoff(args));
+    break;
   case "sync":
   case "push":
     process.exit(cmdSync(args));
@@ -357,6 +383,8 @@ Commands:
   list [--last N] [--all] Show recent shard entries
   show <id|seq>           Show a specific entry
   add <type> <tag> ...    Append entry (delegates to ailedger.ts)
+  handoff <@from> <@to> [task_id] [note]
+                          Record cross-agent handoff in ledger
   sync                    Commit + push shard to upstream
   status                  Shard health check
 

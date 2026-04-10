@@ -10,6 +10,7 @@ nexus/agentd/
 nexus/sessions/*.meta.json
 nexus/sessions/*.awaiting
 hermetic/
+.ailedger-upstream/
 @
 ^
 .nogit
