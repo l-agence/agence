@@ -1,1 +1,34 @@
-{"workflows":[]}
+{
+  "workflows": [
+    {
+      "id": "WF-DOCS",
+      "title": "Documentation",
+      "tasks": ["DOC-001", "DOC-002", "DOC-003"]
+    },
+    {
+      "id": "WF-TEST",
+      "title": "Test Suite",
+      "tasks": ["TEST-001", "CLI-003"]
+    },
+    {
+      "id": "WF-INFRA",
+      "title": "Core Infrastructure",
+      "tasks": ["INFRA-001", "INFRA-002", "INFRA-003", "INFRA-004", "INFRA-005"]
+    },
+    {
+      "id": "WF-CLI",
+      "title": "CLI & Tools",
+      "tasks": ["CLI-001", "CLI-002"]
+    },
+    {
+      "id": "WF-SWARM",
+      "title": "Swarm Orchestration",
+      "tasks": ["SWARM-001", "SWARM-002"]
+    },
+    {
+      "id": "WF-BUGS",
+      "title": "Bug Fixes",
+      "tasks": ["BUG-001"]
+    }
+  ]
+}

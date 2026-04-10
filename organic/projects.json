@@ -1,1 +1,9 @@
-{"projects":[]}
+{
+  "projects": [
+    {
+      "id": "PROJ-LAGENCE",
+      "title": "l'Agence Framework",
+      "workflows": ["WF-INFRA", "WF-DOCS", "WF-TEST", "WF-CLI", "WF-SWARM", "WF-BUGS"]
+    }
+  ]
+}

@@ -1,1 +1,9 @@
-{"edges":[]}
+{
+  "edges": [
+    { "from": "INFRA-001", "to": "INFRA-002", "type": "^" },
+    { "from": "INFRA-002", "to": "SWARM-002", "type": "^" },
+    { "from": "SWARM-001", "to": "SWARM-002", "type": ";" },
+    { "from": "DOC-001", "to": "DOC-002", "type": ";" },
+    { "from": "CLI-003", "to": "TEST-001", "type": ";" }
+  ]
+}

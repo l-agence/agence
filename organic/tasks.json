@@ -1,1 +1,184 @@
-{"tasks":[]}
+{
+  "tasks": [
+    {
+      "id": "DOC-001",
+      "repo": "agence-master",
+      "title": "Update docs for v0.3.2 (plans INDEX, README, COMMANDS.md)",
+      "state": "~",
+      "priority": 2,
+      "stars": 0,
+      "heat": 0.2,
+      "agent": null,
+      "created": "2026-04-10T00:00:00Z",
+      "updated": "2026-04-10T00:00:00Z"
+    },
+    {
+      "id": "DOC-002",
+      "repo": "agence-master",
+      "title": "Update show_help() with new commands (^ledger, ^audit, airun)",
+      "state": "~",
+      "priority": 2,
+      "stars": 0,
+      "heat": 0.2,
+      "agent": null,
+      "created": "2026-04-10T00:00:00Z",
+      "updated": "2026-04-10T00:00:00Z"
+    },
+    {
+      "id": "DOC-003",
+      "repo": "agence-master",
+      "title": "Clear stale synthetic todos (shellspec, v0.2.5 done)",
+      "state": "~",
+      "priority": 1,
+      "stars": 0,
+      "heat": 0.1,
+      "agent": null,
+      "created": "2026-04-10T00:00:00Z",
+      "updated": "2026-04-10T00:00:00Z"
+    },
+    {
+      "id": "TEST-001",
+      "repo": "agence-master",
+      "title": "Shellspec tests for ^ledger, ^audit, ^session prune, ^index",
+      "state": "~",
+      "priority": 2,
+      "stars": 0,
+      "heat": 0.3,
+      "agent": null,
+      "created": "2026-04-10T00:00:00Z",
+      "updated": "2026-04-10T00:00:00Z"
+    },
+    {
+      "id": "INFRA-001",
+      "repo": "agence-master",
+      "title": "Pipe-pane: replace script(1) with tmux-native PTY streaming",
+      "state": "~",
+      "priority": 3,
+      "stars": 1,
+      "heat": 0.5,
+      "agent": null,
+      "created": "2026-04-10T00:00:00Z",
+      "updated": "2026-04-10T00:00:00Z"
+    },
+    {
+      "id": "INFRA-002",
+      "repo": "agence-master",
+      "title": "agentd skeleton: pid file, socket per tangent, Docker spawn",
+      "state": "~",
+      "priority": 4,
+      "stars": 2,
+      "heat": 0.8,
+      "agent": null,
+      "created": "2026-04-10T00:00:00Z",
+      "updated": "2026-04-10T00:00:00Z"
+    },
+    {
+      "id": "INFRA-003",
+      "repo": "agence-master",
+      "title": "Publish AIPOLICY.yaml schema as governance standard",
+      "state": "~",
+      "priority": 2,
+      "stars": 1,
+      "heat": 0.3,
+      "agent": null,
+      "created": "2026-04-10T00:00:00Z",
+      "updated": "2026-04-10T00:00:00Z"
+    },
+    {
+      "id": "INFRA-004",
+      "repo": "agence-master",
+      "title": ".ailedger enhancements: AIPOLICY.yaml commit, prune policy",
+      "state": "~",
+      "priority": 3,
+      "stars": 1,
+      "heat": 0.4,
+      "agent": null,
+      "created": "2026-04-10T00:00:00Z",
+      "updated": "2026-04-10T00:00:00Z"
+    },
+    {
+      "id": "INFRA-005",
+      "repo": "agence-master",
+      "title": "Agent persona loading from codex/agents/<name>/agent.md",
+      "state": "~",
+      "priority": 2,
+      "stars": 0,
+      "heat": 0.3,
+      "agent": null,
+      "created": "2026-04-10T00:00:00Z",
+      "updated": "2026-04-10T00:00:00Z"
+    },
+    {
+      "id": "CLI-001",
+      "repo": "agence-master",
+      "title": "agence help deep improvements (multi-tool docs entry point)",
+      "state": "~",
+      "priority": 1,
+      "stars": 0,
+      "heat": 0.1,
+      "agent": null,
+      "created": "2026-04-10T00:00:00Z",
+      "updated": "2026-04-10T00:00:00Z"
+    },
+    {
+      "id": "CLI-002",
+      "repo": "agence-master",
+      "title": ".gitignore final review (local symlinks, build artifacts)",
+      "state": "~",
+      "priority": 1,
+      "stars": 0,
+      "heat": 0.1,
+      "agent": null,
+      "created": "2026-04-10T00:00:00Z",
+      "updated": "2026-04-10T00:00:00Z"
+    },
+    {
+      "id": "CLI-003",
+      "repo": "agence-master",
+      "title": "Smoke tests: path validation rejects escapes without junctions",
+      "state": "~",
+      "priority": 2,
+      "stars": 0,
+      "heat": 0.3,
+      "agent": null,
+      "created": "2026-04-10T00:00:00Z",
+      "updated": "2026-04-10T00:00:00Z"
+    },
+    {
+      "id": "SWARM-001",
+      "repo": "agence-master",
+      "title": "Gate = write access (not --safe flag) — update aido tier routing",
+      "state": "~",
+      "priority": 3,
+      "stars": 1,
+      "heat": 0.5,
+      "agent": null,
+      "created": "2026-04-10T00:00:00Z",
+      "updated": "2026-04-10T00:00:00Z"
+    },
+    {
+      "id": "SWARM-002",
+      "repo": "agence-master",
+      "title": "agentd interface contract: abstract container-spawn (Docker now, Nomad later)",
+      "state": "~",
+      "priority": 3,
+      "stars": 1,
+      "heat": 0.5,
+      "agent": null,
+      "created": "2026-04-10T00:00:00Z",
+      "updated": "2026-04-10T00:00:00Z"
+    },
+    {
+      "id": "BUG-001",
+      "repo": "agence-master",
+      "title": "mnemonic prune + sessions prune (stale file cleanup)",
+      "state": "~",
+      "priority": 2,
+      "stars": 0,
+      "heat": 0.2,
+      "agent": null,
+      "created": "2026-04-10T00:00:00Z",
+      "updated": "2026-04-10T00:00:00Z"
+    }
+  ]
+}

@@ -7,9 +7,6 @@ Format: Syslog-style with creation date, assignee, task ID, category, and status
 ```
 DATE       | @ASSIGNED-TO    | ID    | CATEGORY           | STATUS      | DESCRIPTION
 ───────────┼─────────────────┼───────┼────────────────────┼─────────────┼──────────────────────
-2026-03-20 | @ralph          | T001  | implementation     | in-progress | Implement matrix-math.ts core
-2026-03-20 | @steff          | T002  | documentation      | assigned    | Write container architecture spec
-2026-03-15 | @claudia        | T003  | refactoring        | complete    | Rewrite PATH validation layer
 ```
 
 ---

@@ -7,9 +7,6 @@ Format: Syslog-style with creation date, assigned agent, job ID, category, and s
 ```
 DATE       | @AGENT          | ID    | CATEGORY           | STATUS      | TASK-LINK
 ───────────┼─────────────────┼───────┼────────────────────┼─────────────┼──────────
-2026-03-20 | @ralph          | J001  | code-gen           | in-progress | T001 (matrix-math)
-2026-03-19 | @claudia        | J002  | testing            | complete    | T003 (PATH validation)
-2026-03-20 | @aider          | J003  | documentation      | assigned    | T002 (container-spec)
 ```
 
 ---

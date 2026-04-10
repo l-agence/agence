@@ -1,0 +1,9 @@
+{
+  "agents": [
+    { "name": "@ralph",   "tier": "cheap",     "cost": 1,  "capacity": 5, "max_tokens": 2000 },
+    { "name": "@sonya",   "tier": "mid",       "cost": 5,  "capacity": 3, "max_tokens": 8000 },
+    { "name": "@claudia", "tier": "mid",       "cost": 5,  "capacity": 2, "max_tokens": 8000 },
+    { "name": "@aider",   "tier": "mid",       "cost": 5,  "capacity": 2, "max_tokens": 8000 },
+    { "name": "@peers",   "tier": "expensive", "cost": 20, "capacity": 1, "max_tokens": 32000 }
+  ]
+}
