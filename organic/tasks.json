@@ -187,6 +187,19 @@
       "agent": null,
       "created": "2026-04-10T00:00:00Z",
       "updated": "2026-04-10T00:00:00Z"
+    },
+    {
+      "id": "SHELL-001",
+      "repo": "agence-master",
+      "title": "Shell UI: state-colored PS1, tmux titles, shell economy + reap",
+      "state": "-",
+      "priority": 2,
+      "stars": 1,
+      "heat": 0.5,
+      "agent": "copilot",
+      "created": "2026-04-12T00:00:00Z",
+      "updated": "2026-04-12T00:00:00Z",
+      "commit": "90e4fe7"
     }
   ]
 }
