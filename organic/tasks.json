@@ -90,13 +90,14 @@
       "id": "INFRA-004",
       "repo": "agence-master",
       "title": ".ailedger enhancements: AIPOLICY.yaml commit, prune policy",
-      "state": "~",
+      "state": "-",
       "priority": 3,
       "stars": 1,
       "heat": 0.4,
-      "agent": null,
+      "agent": "copilot",
       "created": "2026-04-10T00:00:00Z",
-      "updated": "2026-04-10T00:00:00Z"
+      "updated": "2026-04-10T00:00:00Z",
+      "commit": "7ea36bd"
     },
     {
       "id": "INFRA-005",

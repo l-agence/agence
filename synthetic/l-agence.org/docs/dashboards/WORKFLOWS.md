@@ -27,7 +27,7 @@
 | INFRA-001 | Pipe-pane: tmux-native PTY streaming | `~` | 105 | — |
 | INFRA-002 | agentd skeleton: pid, socket, Docker | `~` | 170 | ⛔ INFRA-001 |
 | INFRA-003 | Publish AIPOLICY.yaml schema | `~` | 75 | — |
-| INFRA-004 | .ailedger enhancements | `~` | 95 | — |
+| INFRA-004 | .ailedger enhancements | `-` | 95 | — |
 | INFRA-005 | Agent persona loading | `~` | 50 | — |
 
 ### WF-DOCS — Documentation (3 tasks)
