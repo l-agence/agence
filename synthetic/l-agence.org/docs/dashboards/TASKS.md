@@ -1,7 +1,7 @@
 # Tasks Dashboard
 
 > **Source**: `organic/tasks.json` | **Formula**: $\text{score} = 10P + 25S + 100H$  
-> **Generated**: 2026-04-10 | **Project**: PROJ-LAGENCE
+> **Generated**: 2026-04-11 | **Project**: PROJ-LAGENCE
 
 ---
 
@@ -9,8 +9,8 @@
 
 | ID | Title | State | Pri | Stars | Heat | Score | Agent | Blocked By |
 |----|-------|-------|-----|-------|------|-------|-------|------------|
-| INFRA-002 | agentd skeleton: pid, socket, Docker spawn | `~` | 4 | 2 | 0.8 | **170** | — | INFRA-001 `^` |
-| INFRA-001 | Pipe-pane: tmux-native PTY streaming | `~` | 3 | 1 | 0.5 | **105** | — | — |
+| INFRA-002 | agentd skeleton: pid, socket, Docker spawn | `~` | 4 | 2 | 0.8 | **170** | — | ~~INFRA-001~~ |
+| ~~INFRA-001~~ | ~~Pipe-pane: tmux-native PTY streaming~~ | `-` | 3 | 1 | 0.5 | **105** | copilot | — |
 | SWARM-001 | Gate = write access (not --safe flag) | `~` | 3 | 1 | 0.5 | **105** | — | — |
 | SWARM-002 | agentd interface contract (Docker→Nomad) | `~` | 3 | 1 | 0.5 | **105** | — | INFRA-002 `^` |
 | INFRA-004 | .ailedger enhancements: AIPOLICY commit, prune | `~` | 3 | 1 | 0.4 | **95** | — | — |
@@ -31,15 +31,15 @@
 |--------|-------|
 | Total tasks | 15 |
 | Runnable | 13 |
-| Blocked | 2 |
-| Completed | 0 |
+| Blocked | 1 |
+| Completed | 1 |
 | Failed | 0 |
 
 ## State Distribution
 
 | State | Symbol | Count |
 |-------|--------|-------|
-| Human-assigned | `~` | 15 |
+| Human-assigned | `~` | 14 |
 | Human-working | `$` | 0 |
 | Agent-assigned | `%` | 0 |
 | Agent-executing | `&` | 0 |
@@ -47,7 +47,7 @@
 | Awaiting input | `?` | 0 |
 | Paused | `_` | 0 |
 | Held | `#` | 0 |
-| Completed | `-` | 0 |
+| Completed | `-` | 1 |
 | Failed | `!` | 0 |
 
 ---
@@ -59,7 +59,7 @@
 | Rank | ID | Score | State |
 |------|----|-------|-------|
 | 1 | INFRA-002 | 170 | `~` |
-| 2 | INFRA-001 | 105 | `~` |
+| 2 | ~~INFRA-001~~ | 105 | `-` ✅ |
 | 3 | SWARM-001 | 105 | `~` |
 | 4 | SWARM-002 | 105 | `~` ⛔ |
 | 5 | INFRA-004 | 95 | `~` |
@@ -74,7 +74,7 @@
 ## Dependency Graph
 
 ```
-INFRA-001 ──^──> INFRA-002 ──^──> SWARM-002
+INFRA-001 ✅ ──^──> INFRA-002 ──^──> SWARM-002
                                      ^
 SWARM-001 ─────────── ; ─────────────┘
 

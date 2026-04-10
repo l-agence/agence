@@ -52,13 +52,14 @@
       "id": "INFRA-001",
       "repo": "agence-master",
       "title": "Pipe-pane: replace script(1) with tmux-native PTY streaming",
-      "state": "~",
+      "state": "-",
       "priority": 3,
       "stars": 1,
       "heat": 0.5,
-      "agent": null,
+      "agent": "copilot",
       "created": "2026-04-10T00:00:00Z",
-      "updated": "2026-04-10T00:00:00Z"
+      "updated": "2026-04-11T00:00:00Z",
+      "commit": "ab08428"
     },
     {
       "id": "INFRA-002",
