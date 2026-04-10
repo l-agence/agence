@@ -6,11 +6,13 @@
 //   airun session status <session-id>
 //   airun session init <session-id> [role] [agent] [shell] [git-root]
 //   airun session resume <session-id>
+//   airun session prune [--days N] [--archive] [--dry-run]
 //
 // Exit codes: 0 = success, 1 = error
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync, copyFileSync, unlinkSync } from "fs";
 import { join, basename } from "path";
+import { execSync } from "child_process";
 
 // Resolve paths from env (set by lib/env.sh) or fallback
 const AI_ROOT = process.env.AI_ROOT || process.env.AGENCE_ROOT || join(import.meta.dir, "..");
@@ -216,6 +218,104 @@ function sessionResume(sid: string): number {
   return 0;
 }
 
+// ─── Prune ───────────────────────────────────────────────────────────────────
+
+function sessionPrune(args: string[]): number {
+  // Parse flags
+  let days = 7;
+  let archive = false;
+  let dryRun = false;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--days" && args[i + 1]) days = parseInt(args[++i], 10);
+    if (args[i] === "--archive") archive = true;
+    if (args[i] === "--dry-run") dryRun = true;
+  }
+
+  if (!existsSync(SESSION_DIR)) {
+    console.error(`[SESSION] No sessions directory: ${SESSION_DIR}`);
+    return 1;
+  }
+
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  const allFiles = readdirSync(SESSION_DIR);
+  const candidates: { file: string; mtime: Date }[] = [];
+
+  for (const f of allFiles) {
+    const full = join(SESSION_DIR, f);
+    try {
+      const st = statSync(full);
+      if (!st.isFile()) continue;  // skip symlinks, junctions, directories
+      if (st.mtimeMs < cutoff) {
+        candidates.push({ file: f, mtime: st.mtime });
+      }
+    } catch { /* skip */ }
+  }
+
+  if (candidates.length === 0) {
+    console.error(`[SESSION] Nothing to prune (cutoff: ${days} days, ${allFiles.length} total files)`);
+    return 0;
+  }
+
+  // Group by session ID (strip extension)
+  const sessionIds = new Set<string>();
+  for (const c of candidates) {
+    const sid = c.file.replace(/\.(meta\.json|typescript|awaiting)$/, "");
+    sessionIds.add(sid);
+  }
+
+  console.error(`[SESSION] Prune: ${candidates.length} files from ${sessionIds.size} sessions (older than ${days} days)`);
+
+  // Archive to hermetic if requested
+  const HERMETIC_DIR = join(AI_ROOT, "hermetic", "l-agence.org");
+  const ARCHIVE_DIR = join(HERMETIC_DIR, "sessions");
+  const hermeticHasGit = existsSync(join(HERMETIC_DIR, ".git"));
+
+  if (archive) {
+    mkdirSync(ARCHIVE_DIR, { recursive: true });
+    console.error(`  Archiving to: ${ARCHIVE_DIR}`);
+  }
+
+  let archived = 0;
+  let removed = 0;
+
+  for (const c of candidates) {
+    const src = join(SESSION_DIR, c.file);
+    if (dryRun) {
+      console.error(`  [dry-run] ${archive ? "archive + " : ""}remove: ${c.file}`);
+      removed++;
+      continue;
+    }
+
+    if (archive) {
+      const dst = join(ARCHIVE_DIR, c.file);
+      copyFileSync(src, dst);
+      archived++;
+    }
+
+    unlinkSync(src);
+    removed++;
+  }
+
+  // Commit archive to hermetic nested git if available
+  if (archive && !dryRun && hermeticHasGit && archived > 0) {
+    try {
+      execSync(`git add sessions/`, { cwd: HERMETIC_DIR, stdio: "pipe" });
+      execSync(
+        `git commit -m "archive: ${sessionIds.size} sessions (${archived} files, older than ${days}d)"`,
+        { cwd: HERMETIC_DIR, stdio: "pipe" }
+      );
+      console.error(`  ✓ Committed ${archived} files to hermetic git`);
+    } catch {
+      console.error(`  ⚠ Hermetic git commit failed — files copied but not committed`);
+    }
+  }
+
+  const remaining = allFiles.length - removed;
+  console.error(`  ${dryRun ? "[dry-run] " : ""}Removed: ${removed} files | ${archive ? `Archived: ${archived} | ` : ""}Remaining: ${remaining}`);
+
+  return 0;
+}
+
 // ─── Main Router ─────────────────────────────────────────────────────────────
 
 const [cmd, ...args] = process.argv.slice(2);
@@ -234,12 +334,15 @@ switch (cmd) {
   case "resume":
     exitCode = sessionResume(args[0]);
     break;
+  case "prune":
+    exitCode = sessionPrune(args);
+    break;
   default:
     // Treat unknown arg as session ID (backward compat)
     if (cmd) {
       exitCode = sessionStatus(cmd);
     } else {
-      console.error("Usage: airun session <list|init|status|resume> [args...]");
+      console.error("Usage: airun session <list|init|status|resume|prune> [args...]");
       exitCode = 1;
     }
 }

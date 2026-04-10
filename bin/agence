@@ -1504,9 +1504,18 @@ mode_session() {
         echo "Session $sid export not found after pull." >&2; return 1
       fi
       ;;
+    "prune")
+      # Delegate to session.ts prune — archive + remove old sessions
+      if command -v bun &>/dev/null && [[ -f "$AGENCE_ROOT/lib/session.ts" ]]; then
+        "$AGENCE_ROOT/bin/airun" session prune $args
+      else
+        echo "Error: ^session prune requires bun + lib/session.ts" >&2
+        return 1
+      fi
+      ;;
     *)
       echo "Error: Unknown session subcommand: $sub_cmd" >&2
-      echo "Available: list, view, handoff, assign, attach, export, import, push, pull" >&2
+      echo "Available: list, view, handoff, assign, attach, export, import, push, pull, prune" >&2
       return 1
       ;;
   esac
