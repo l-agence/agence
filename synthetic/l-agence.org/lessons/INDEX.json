@@ -1,56 +1,138 @@
 {
-  "index": "Lessons Learned Index",
-  "version": "1.0",
-  "description": "Structured index for lessons extracted from faults and experience. Each lesson is a JSON object with root cause, solution, and implementation details.",
-  "schema": {
-    "lesson_id": "Unique 8-char hex identifier (e.g., a3f7b2c1)",
-    "date_extracted": "ISO 8601 when lesson was extracted",
-    "agent": "Which agent(s) this applies to (or 'all-agents')",
-    "category": "Topic category (llm-behavior, state-management, performance, infrastructure, etc.)",
-    "title": "Short lesson title",
-    "description": "What we learned",
-    "root_cause": "Why the original fault occurred",
-    "solution": "How to solve/prevent it",
-    "code_pattern": "Code examples or patterns for implementation",
-    "references": "Links to related faults, code, documentation",
-    "status": "active|deprecated|superseded",
-    "applies_to": "Which agents/components this lesson affects",
-    "severity": "critical|high|medium|low"
+  "version": "0.1.0",
+  "source_type": "kb",
+  "entry_count": 5,
+  "formtag_hierarchy": {
+    "000": "Framework Core",
+    "001": "Project Specification",
+    "002": "Architecture Patterns",
+    "010": "Configuration & Setup",
+    "011": "LLM Configuration",
+    "012": "Agent Configuration",
+    "100": "Agents & Personas",
+    "110": "Agent Core Definitions",
+    "115": "Specialized Agent Patterns",
+    "120": "Agent Implementation",
+    "121": "Agent Personas",
+    "1211": "Ralph Wiggum (Principal Skinner)",
+    "1212": "Claude (Anthropic Base)",
+    "1213": "Chad (DevOps)",
+    "1214": "Aiko (Platform)",
+    "1215": "Claudia (SRE)",
+    "1216": "Aider (Code Editor)",
+    "200": "Infrastructure & Operations",
+    "210": "Git & Version Control",
+    "211": "Git Workflows",
+    "212": "Git Hooks",
+    "213": "Git Configuration",
+    "220": "CI/CD Pipelines",
+    "230": "Container Orchestration",
+    "240": "Deployment Strategies",
+    "300": "Knowledge Management & RAG",
+    "310": "Vector Databases",
+    "320": "Knowledge Capture",
+    "330": "Knowledge Retrieval",
+    "340": "Knowledge Propagation",
+    "400": "Domain Knowledge",
+    "410": "Git/VCS Domain",
+    "420": "IaC (Terraform, Bicep)",
+    "421": "Terraform Modules",
+    "422": "Bicep Templates",
+    "430": "Cloud Platforms (AWS, Azure, GCP)",
+    "431": "AWS Services",
+    "432": "Azure Services",
+    "433": "GCP Services",
+    "500": "Reliability & SRE",
+    "510": "Observability",
+    "511": "Logging",
+    "512": "Metrics",
+    "513": "Tracing",
+    "520": "Incident Management",
+    "530": "Cost Optimization",
+    "600": "Learning & Best Practices",
+    "610": "LLM Optimization",
+    "611": "Token Efficiency",
+    "612": "Cost Alignment",
+    "613": "Prompt Engineering",
+    "620": "Flavor & Personality",
+    "621": "Flavor Intensity",
+    "630": "Testing & Validation",
+    "700": "Codebase Structure",
+    "710": "Module Definitions",
+    "720": "Function Exports",
+    "730": "Type Definitions",
+    "740": "Test Coverage",
+    "800": "World Model",
+    "810": "Entity Definitions",
+    "820": "Relationships",
+    "830": "State & Transitions",
+    "840": "Integration Points"
   },
-  "lookup_fields": [
-    "category",
-    "agent",
-    "severity",
-    "status",
-    "date_extracted"
-  ],
-  "categories": [
-    "infrastructure",
-    "llm-hallucination",
-    "state-corruption",
-    "prompt-injection",
-    "token-overflow",
-    "cost-overrun",
-    "timeout-handling",
-    "api-integration",
-    "concurrency",
-    "data-integrity"
-  ],
   "entries": [
     {
-      "lesson_id": "a3f7b2c1",
-      "date_extracted": "2026-03-04T14:45:00Z",
-      "title": "Git symlinks (mode 120000) for cross-platform support",
-      "severity": "high",
-      "status": "active"
+      "source": "https://awesomeclaude.ai/ralph-wiggum",
+      "checksum": "8a586055d78b40a7",
+      "formtag": "1211",
+      "hierarchy": "Ralph Wiggum (Principal Skinner)",
+      "description": "Ralph Wiggum persona (AwesClaude)",
+      "source_type": "kb",
+      "cached": false,
+      "vector_id": null,
+      "metadata": {
+        "url_type": "persona"
+      }
     },
     {
-      "id": "1775746248_bashtobu",
-      "title": "bash-to-bun-router-extraction-pattern",
-      "date": "2026-04-09T14:50:48Z"
+      "source": "https://ralph-wiggum.ai/",
+      "checksum": "697e843f5cdf2b24",
+      "formtag": "1211",
+      "hierarchy": "Ralph Wiggum (Principal Skinner)",
+      "description": "Ralph Wiggum homepage",
+      "source_type": "kb",
+      "cached": false,
+      "vector_id": null,
+      "metadata": {
+        "url_type": "homepage"
+      }
+    },
+    {
+      "source": "https://ralphwiggum.org/",
+      "checksum": "ec16cc207c202d86",
+      "formtag": "1211",
+      "hierarchy": "Ralph Wiggum (Principal Skinner)",
+      "description": "Ralph Wiggum TLD",
+      "source_type": "kb",
+      "cached": false,
+      "vector_id": null,
+      "metadata": {
+        "url_type": "tld"
+      }
+    },
+    {
+      "source": "https://securetrajectories.substack.com/p/ralph-wiggum-principal-skinner-agent-reliability",
+      "checksum": "81b955ed6a91c4c8",
+      "formtag": "500",
+      "hierarchy": "Reliability & SRE",
+      "description": "Ralph + Principal Skinner reliability patterns",
+      "source_type": "kb",
+      "cached": false,
+      "vector_id": null,
+      "metadata": {
+        "url_type": "article"
+      }
+    },
+    {
+      "source": "https://github.com/ghuntley/how-to-ralph-wiggum",
+      "checksum": "2657df1d722c6a42",
+      "formtag": "120",
+      "hierarchy": "Agent Implementation",
+      "description": "Ralph Wiggum implementation guide",
+      "source_type": "kb",
+      "cached": false,
+      "vector_id": null,
+      "metadata": {
+        "url_type": "repo"
+      }
     }
-  ],
-  "total_lessons": 1,
-  "last_updated": "2026-03-04T14:45:00Z",
-  "note": "INDEX.md is human-readable. For automation, query JSON entries directly by lesson_id."
+  ]
 }

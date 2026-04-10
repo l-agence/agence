@@ -1,54 +1,138 @@
 {
-  "index": "Issues Index",
-  "version": "1.0",
-  "description": "Team-discovered problems, technical debt, and opportunities. Shared knowledge base for visibility.",
-  "schema": {
-    "issue_id": "Unique identifier (e.g., I001, path-normalization, bash-compat)",
-    "date_discovered": "ISO 8601 when issue was discovered",
-    "reporter": "@agent or @user who discovered it",
-    "category": "Topic area (llm-behavior, infrastructure, performance, compatibility, etc.)",
-    "title": "Short issue title",
-    "description": "Detailed description of the problem",
-    "impact": "Who/what is affected, severity",
-    "root_cause": "Why it exists (if known)",
-    "proposed_solution": "Suggested fix (if any)",
-    "references": "Links to related code, faults, lessons, tasks",
-    "status": "open|in-progress|resolved|deferred|duplicate",
-    "priority": "critical|high|medium|low",
-    "assigned_task": "If converted to task, link here (e.g., T042)",
-    "created_by": "Original discoverer",
-    "last_updated": "ISO 8601 when last modified",
-    "notes": "Additional context or discussion"
+  "version": "0.1.0",
+  "source_type": "kb",
+  "entry_count": 5,
+  "formtag_hierarchy": {
+    "000": "Framework Core",
+    "001": "Project Specification",
+    "002": "Architecture Patterns",
+    "010": "Configuration & Setup",
+    "011": "LLM Configuration",
+    "012": "Agent Configuration",
+    "100": "Agents & Personas",
+    "110": "Agent Core Definitions",
+    "115": "Specialized Agent Patterns",
+    "120": "Agent Implementation",
+    "121": "Agent Personas",
+    "1211": "Ralph Wiggum (Principal Skinner)",
+    "1212": "Claude (Anthropic Base)",
+    "1213": "Chad (DevOps)",
+    "1214": "Aiko (Platform)",
+    "1215": "Claudia (SRE)",
+    "1216": "Aider (Code Editor)",
+    "200": "Infrastructure & Operations",
+    "210": "Git & Version Control",
+    "211": "Git Workflows",
+    "212": "Git Hooks",
+    "213": "Git Configuration",
+    "220": "CI/CD Pipelines",
+    "230": "Container Orchestration",
+    "240": "Deployment Strategies",
+    "300": "Knowledge Management & RAG",
+    "310": "Vector Databases",
+    "320": "Knowledge Capture",
+    "330": "Knowledge Retrieval",
+    "340": "Knowledge Propagation",
+    "400": "Domain Knowledge",
+    "410": "Git/VCS Domain",
+    "420": "IaC (Terraform, Bicep)",
+    "421": "Terraform Modules",
+    "422": "Bicep Templates",
+    "430": "Cloud Platforms (AWS, Azure, GCP)",
+    "431": "AWS Services",
+    "432": "Azure Services",
+    "433": "GCP Services",
+    "500": "Reliability & SRE",
+    "510": "Observability",
+    "511": "Logging",
+    "512": "Metrics",
+    "513": "Tracing",
+    "520": "Incident Management",
+    "530": "Cost Optimization",
+    "600": "Learning & Best Practices",
+    "610": "LLM Optimization",
+    "611": "Token Efficiency",
+    "612": "Cost Alignment",
+    "613": "Prompt Engineering",
+    "620": "Flavor & Personality",
+    "621": "Flavor Intensity",
+    "630": "Testing & Validation",
+    "700": "Codebase Structure",
+    "710": "Module Definitions",
+    "720": "Function Exports",
+    "730": "Type Definitions",
+    "740": "Test Coverage",
+    "800": "World Model",
+    "810": "Entity Definitions",
+    "820": "Relationships",
+    "830": "State & Transitions",
+    "840": "Integration Points"
   },
-  "lookup_fields": ["category", "reporter", "status", "priority", "date_discovered"],
-  "categories": [
-    "performance",
-    "infrastructure",
-    "compatibility",
-    "security",
-    "documentation",
-    "api-design",
-    "user-experience",
-    "technical-debt",
-    "architecture",
-    "integration"
-  ],
-  "statuses": [
-    "open",
-    "in-progress",
-    "resolved",
-    "deferred",
-    "duplicate"
-  ],
-  "priority_levels": [
-    "critical",
-    "high",
-    "medium",
-    "low"
-  ],
-  "distinction_from_tasks": {
-    "issues": "Discoveries, problems, tech debt. NOT assigned. Team visibility.",
-    "tasks": "Work assignments. Assigned to human or agent. Routable.",
-    "conversion_flow": "Issue (open) → Investigation → Task (assign to worker)"
-  }
+  "entries": [
+    {
+      "source": "https://awesomeclaude.ai/ralph-wiggum",
+      "checksum": "8a586055d78b40a7",
+      "formtag": "1211",
+      "hierarchy": "Ralph Wiggum (Principal Skinner)",
+      "description": "Ralph Wiggum persona (AwesClaude)",
+      "source_type": "kb",
+      "cached": false,
+      "vector_id": null,
+      "metadata": {
+        "url_type": "persona"
+      }
+    },
+    {
+      "source": "https://ralph-wiggum.ai/",
+      "checksum": "697e843f5cdf2b24",
+      "formtag": "1211",
+      "hierarchy": "Ralph Wiggum (Principal Skinner)",
+      "description": "Ralph Wiggum homepage",
+      "source_type": "kb",
+      "cached": false,
+      "vector_id": null,
+      "metadata": {
+        "url_type": "homepage"
+      }
+    },
+    {
+      "source": "https://ralphwiggum.org/",
+      "checksum": "ec16cc207c202d86",
+      "formtag": "1211",
+      "hierarchy": "Ralph Wiggum (Principal Skinner)",
+      "description": "Ralph Wiggum TLD",
+      "source_type": "kb",
+      "cached": false,
+      "vector_id": null,
+      "metadata": {
+        "url_type": "tld"
+      }
+    },
+    {
+      "source": "https://securetrajectories.substack.com/p/ralph-wiggum-principal-skinner-agent-reliability",
+      "checksum": "81b955ed6a91c4c8",
+      "formtag": "500",
+      "hierarchy": "Reliability & SRE",
+      "description": "Ralph + Principal Skinner reliability patterns",
+      "source_type": "kb",
+      "cached": false,
+      "vector_id": null,
+      "metadata": {
+        "url_type": "article"
+      }
+    },
+    {
+      "source": "https://github.com/ghuntley/how-to-ralph-wiggum",
+      "checksum": "2657df1d722c6a42",
+      "formtag": "120",
+      "hierarchy": "Agent Implementation",
+      "description": "Ralph Wiggum implementation guide",
+      "source_type": "kb",
+      "cached": false,
+      "vector_id": null,
+      "metadata": {
+        "url_type": "repo"
+      }
+    }
+  ]
 }

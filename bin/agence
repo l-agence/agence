@@ -322,6 +322,15 @@ EXAMPLES:
   agence ^todo list
   agence ^task add "Implement feature" --assign @ralph
   agence ^job list
+  agence ^ledger list               Show shard ledger entries
+  agence ^ledger init               Initialize upstream shard repo
+  agence ^audit trail                Show audit trail
+  agence ^session prune --days 3    Archive sessions older than 3 days
+  agence ^index                     Scan for missing INDEX.json files
+  agence ^reindex                   Regenerate all INDEX.json via bin/indexer
+  agence ^recall <pattern>          Search hermetic memory (notes, brainstorms)
+  agence ~recall <pattern>          Search grimoire (gated persistent memory)
+  airun <module> [args]             Run a Bun TS module (session, ledger, audit, etc.)
 
 ENVIRONMENT VARIABLES:
   GIT_REPO=/path/to/repo       Parent repository (auto-detected if not set)
@@ -345,9 +354,9 @@ EOF
 }
 
 show_version() {
-  echo "Agence version 0.3.0"
-  echo "[VERSION]: 0.3.0"
-  echo "[RELEASE]: v0.3.0"
+  echo "Agence version 0.3.2"
+  echo "[VERSION]: 0.3.2"
+  echo "[RELEASE]: v0.3.2"
 }
 
 # ============================================================================
@@ -474,6 +483,28 @@ main() {
     "^")
       # Special initialization commands
       mode_init "${input:1}"
+      ;;
+    "~")
+      # Human-scoped recall: search grimoire (gated persistent memory)
+      local _tilde_cmd="${input:1}"
+      local _tilde_verb="${_tilde_cmd%% *}"
+      local _tilde_args="${_tilde_cmd#$_tilde_verb}"
+      _tilde_args="${_tilde_args# }"
+      case "$_tilde_verb" in
+        "recall")
+          if [[ -z "$_tilde_args" ]]; then
+            echo "Usage: agence ~recall <pattern> [grep-options...]" >&2
+            echo "Searches: hermetic/grimoire/ (gated persistent memory)" >&2
+            return 1
+          fi
+          "$AGENCE_BIN/figrep" "$AGENCE_ROOT/hermetic/grimoire" $_tilde_args
+          ;;
+        *)
+          echo "Error: Unknown ~ command: $_tilde_verb" >&2
+          echo "Available: ~recall" >&2
+          return 1
+          ;;
+      esac
       ;;
     *)
       # Default: chat mode
@@ -1074,6 +1105,18 @@ mode_init() {
       reindex_knowledge_bases $init_args
       return $?
       ;;
+    "recall")
+      # Search hermetic memory (personal notes, brainstorms, design docs)
+      # Usage: agence ^recall <pattern> [grep-options...]
+      if [[ -z "$init_args" ]]; then
+        echo "Usage: agence ^recall <pattern> [grep-options...]" >&2
+        echo "Searches: hermetic/ (personal memory)" >&2
+        return 1
+      fi
+      # Use canonical path (not @ symlink — may point to /mnt/c/ in WSL)
+      "$AGENCE_BIN/figrep" "$AGENCE_ROOT/hermetic" $init_args
+      return $?
+      ;;
     "session-restore")
       # Restore a session from a snapshot: ^session-restore <session_id> <snapshot_dir>
       local restore_session_id="${init_args%% *}"
@@ -1089,7 +1132,7 @@ mode_init() {
     *)
       echo "Error: Unknown init command: $init_cmd" >&2
       echo "Available: help, init, reload, install, save, learn, commit, push, session," >&2
-      echo "           lesson, log, plan, todo, fault, issue, task, job, audit," >&2
+      echo "           lesson, log, plan, todo, fault, issue, task, job, audit, recall," >&2
       echo "           handoff, pickup, pause, resume, index, reindex, session-restore" >&2
       return 1
       ;;
@@ -1283,7 +1326,7 @@ _agence_completion() {
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  local caret_commands="help symbols init reload install save learn commit push stash sync session lesson log plan todo fault issue task job audit ledger handoff pickup pause resume index reindex"
+  local caret_commands="help symbols init reload install save learn commit push stash sync session lesson log plan todo fault issue task job audit ledger handoff pickup pause resume index reindex recall"
   local knowledge_subcmds="list show add"
 
   case "${COMP_WORDS[1]}" in
@@ -1353,6 +1396,9 @@ _agence_completion() {
         COMPREPLY=( $(compgen -W "--source --input --output --print" -- "$cur") )
       fi
       ;;
+    "^recall"|"~recall")
+      COMPREPLY=()
+      ;;
     "^session")
       if [[ $COMP_CWORD -eq 2 ]]; then
         COMPREPLY=( $(compgen -W "list view handoff assign attach export import push pull" -- "$cur") )
@@ -1365,6 +1411,7 @@ _agence_completion() {
         for cmd in $caret_commands; do
           suggestions="$suggestions ^$cmd"
         done
+        suggestions="$suggestions ~recall"
         COMPREPLY=( $(compgen -W "$suggestions" -- "$cur") )
       fi
       ;;
