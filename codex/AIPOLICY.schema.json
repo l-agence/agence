@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://l-agence.org/schemas/aipolicy/v1.json",
+  "title": "AIPOLICY — AI Command Execution Policy",
+  "description": "Schema for AIPOLICY.yaml: a tiered capability model for agentic shell command execution. Defines whitelist/blacklist rules, global safety constraints, and per-tool command classification across T0–T3 risk tiers.",
+  "type": "object",
+  "required": ["version", "policy"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Schema version number. Increment on breaking changes."
+    },
+    "policy": {
+      "type": "string",
+      "description": "Policy identifier slug (e.g. AI_COMMAND_EXECUTION_POLICY)."
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of what this policy governs."
+    },
+    "global_rules": {
+      "$ref": "#/$defs/GlobalRules"
+    },
+    "whitelist": {
+      "$ref": "#/$defs/Whitelist"
+    },
+    "blacklist": {
+      "$ref": "#/$defs/Blacklist"
+    }
+  },
+  "$defs": {
+    "GlobalRules": {
+      "type": "object",
+      "description": "Cross-cutting safety rules applied before any whitelist/blacklist matching.",
+      "additionalProperties": false,
+      "properties": {
+        "shell_safety": {
+          "type": "object",
+          "description": "Shell metacharacter and privilege escalation blocks.",
+          "additionalProperties": false,
+          "properties": {
+            "block_operators": {
+              "$ref": "#/$defs/StringList",
+              "description": "Shell operators that are always blocked (pipes, redirects, chaining)."
+            },
+            "block_privilege_escalation": {
+              "$ref": "#/$defs/StringList",
+              "description": "Privilege escalation commands (sudo, doas, runas)."
+            },
+            "block_background_execution": {
+              "$ref": "#/$defs/StringList",
+              "description": "Background execution operators (&)."
+            },
+            "block_interpreters": {
+              "$ref": "#/$defs/StringList",
+              "description": "Inline code execution via interpreters (bash -c, python -c, etc.)."
+            }
+          }
+        },
+        "environment_protection": {
+          "type": "object",
+          "description": "Rules protecting environment variable exposure.",
+          "properties": {
+            "block_env_exposure": {
+              "$ref": "#/$defs/StringList",
+              "description": "Commands that reveal environment variables."
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "Whitelist": {
+      "type": "object",
+      "description": "Commands and patterns considered safe for auto-execution (T0/T1).",
+      "additionalProperties": {
+        "$ref": "#/$defs/ToolSection"
+      }
+    },
+    "Blacklist": {
+      "type": "object",
+      "description": "Commands and patterns requiring confirmation or blocked entirely (T2/T3).",
+      "additionalProperties": {
+        "$ref": "#/$defs/ToolSection"
+      }
+    },
+    "ToolSection": {
+      "type": "object",
+      "description": "Policy section for a specific tool or environment (git_cli, aws_cli, etc.).",
+      "properties": {
+        "allowed_commands": {
+          "$ref": "#/$defs/StringList",
+          "description": "Exact command strings permitted."
+        },
+        "allowed_prefixes": {
+          "$ref": "#/$defs/StringList",
+          "description": "Command prefixes that match (e.g. 'describe-' for AWS)."
+        },
+        "allowed_verbs": {
+          "$ref": "#/$defs/StringList",
+          "description": "PowerShell-style verb prefixes considered safe."
+        },
+        "unsafe_commands": {
+          "$ref": "#/$defs/StringList",
+          "description": "Exact command strings that are blocked or require escalation."
+        },
+        "blocked_prefixes": {
+          "$ref": "#/$defs/StringList",
+          "description": "Command prefixes that are blocked (e.g. 'delete-' for AWS)."
+        },
+        "blocked_verbs": {
+          "$ref": "#/$defs/StringList",
+          "description": "PowerShell-style verb prefixes that are blocked."
+        },
+        "dangerous_cmdlets": {
+          "$ref": "#/$defs/StringList",
+          "description": "Specific cmdlets that are always blocked."
+        },
+        "restrictions": {
+          "type": "object",
+          "description": "Per-command restrictions (flag blocklists, notes).",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "forbid_flags": {
+                "$ref": "#/$defs/StringList"
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "examples": {
+          "description": "Illustrative examples grouped by service or category.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/StringList"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/StringList"
+              }
+            }
+          ]
+        },
+        "example_cmdlets": {
+          "type": "object",
+          "description": "Illustrative cmdlet examples grouped by category.",
+          "additionalProperties": {
+            "$ref": "#/$defs/StringList"
+          }
+        },
+        "note": {
+          "type": "string",
+          "description": "Human-readable note about this section."
+        }
+      },
+      "additionalProperties": {
+        "description": "Category-grouped command lists (e.g. filesystem_read, text_processing).",
+        "$ref": "#/$defs/StringList"
+      }
+    },
+    "StringList": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of string values (commands, prefixes, operators, etc.)."
+    }
+  }
+}

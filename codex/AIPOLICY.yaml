@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=AIPOLICY.schema.json
 version: 1
 policy: AI_COMMAND_EXECUTION_POLICY
 
