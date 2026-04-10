@@ -6,7 +6,10 @@
 .aisecrets/
 nexus/.ai*/
 nexus/.ailedger
-nexus/agentd/
+nexus/agentd/*.pid
+nexus/agentd/*.json
+nexus/agentd/sockets/*.sock
+nexus/agentd/worktrees/
 nexus/sessions/*.meta.json
 nexus/sessions/*.awaiting
 hermetic/

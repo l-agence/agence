@@ -1,20 +1,26 @@
 #!/usr/bin/env bash
 ################################################################################
-# agentd — tmux-based agence swarm orchestrator
+# agentd — Agence daemon: tangent lifecycle + container orchestration
 #
-# Manages a named tmux session ("agence") with one window per agent.
-# Each window runs an aibash Agent Plane shell with AI_AGENT set.
+# Session management:
+#   agentd start [agent1 agent2 ...]   Start swarm + write PID file
+#   agentd stop                        Kill session + cleanup all tangents
+#   agentd status                      Show daemon + tangent state
+#   agentd attach [agent]              Attach to tmux session
+#   agentd add <agent>                 Add agent window to running session
 #
-# Usage:
-#   agentd start [agent1 agent2 ...]   Start swarm (default: copilot ralph sonya aider)
-#   agentd stop                        Kill the tmux session
-#   agentd status                      Show running windows
-#   agentd attach [agent]              Attach to session (or jump to agent window)
-#   agentd add <agent>                 Add a new agent window to a running session
+# Tangent management:
+#   agentd tangent create <id> [agent] Create tangent (worktree + socket + pane)
+#   agentd tangent destroy <id>        Tear down tangent + cleanup
+#   agentd tangent list                List active tangents
+#
+# Inject:
+#   agentd inject <tangent> <cmd...>   Send command to tangent via socat
 #
 # Environment:
 #   AGENTD_SESSION   tmux session name (default: agence)
-#   AGENTD_AGENTS    space-separated agent list (default: copilot ralph sonya aider)
+#   AGENTD_AGENTS    space-separated default agent list
+#   AGENTD_DRIVER    container driver: stub|docker (default: stub)
 ################################################################################
 
 set -u
@@ -22,6 +28,19 @@ set -u
 AGENCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SESSION="${AGENTD_SESSION:-agence}"
 DEFAULT_AGENTS="copilot ralph sonya aider"
+DRIVER="${AGENTD_DRIVER:-stub}"
+
+# ── Directories ─────────────────────────────────────────────────────────────
+
+AGENTD_DIR="$AGENCE_ROOT/nexus/agentd"
+AGENTD_PID_FILE="$AGENTD_DIR/agentd.pid"
+AGENTD_SOCKETS="$AGENTD_DIR/sockets"
+AGENTD_WORKTREES="$AGENTD_DIR/worktrees"
+AGENTD_TANGENTS_FILE="$AGENTD_DIR/tangents.json"
+
+_ensure_dirs() {
+  mkdir -p "$AGENTD_DIR" "$AGENTD_SOCKETS" "$AGENTD_WORKTREES"
+}
 
 _require_tmux() {
   if ! command -v tmux &>/dev/null; then
@@ -30,6 +49,43 @@ _require_tmux() {
     exit 1
   fi
 }
+
+_require_socat() {
+  if ! command -v socat &>/dev/null; then
+    echo "✗ socat not installed (needed for tangent sockets)." >&2
+    echo "  Install: sudo apt-get install socat" >&2
+    exit 1
+  fi
+}
+
+# ── PID File Management ────────────────────────────────────────────────────
+
+_write_pid() {
+  _ensure_dirs
+  echo $$ > "$AGENTD_PID_FILE"
+}
+
+_read_pid() {
+  [[ -f "$AGENTD_PID_FILE" ]] && cat "$AGENTD_PID_FILE" || echo ""
+}
+
+_check_pid() {
+  local pid
+  pid=$(_read_pid)
+  if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+    echo "$pid"
+    return 0
+  fi
+  # Stale PID file — clean up
+  rm -f "$AGENTD_PID_FILE"
+  return 1
+}
+
+_remove_pid() {
+  rm -f "$AGENTD_PID_FILE"
+}
+
+# ── Agent Command Builders ──────────────────────────────────────────────────
 
 # Returns the shell command to run in a tmux window for the given agent.
 # CLI tools (claude, aider, pilot) run their binary directly.
@@ -52,7 +108,7 @@ _agent_cmd() {
         echo "env AI_AGENT=pilot GIT_ROOT=${AGENCE_ROOT} bash"
       fi
       ;;
-    aish)\n      echo \"env AI_AGENT=aish GIT_ROOT=${AGENCE_ROOT} aish\"\n      ;;\n    *)
+    *)
       echo "env AI_AGENT=${agent} AI_ROLE=agentic GIT_ROOT=${AGENCE_ROOT} bash --rcfile ${AGENCE_ROOT}/bin/aibash"
       ;;
   esac
@@ -63,19 +119,288 @@ _agent_window() {
   _agent_cmd "$agent"
 }
 
+# ── Tangent Registry ───────────────────────────────────────────────────────
+
+_tangent_registry_init() {
+  if [[ ! -f "$AGENTD_TANGENTS_FILE" ]]; then
+    echo '{"tangents":{}}' > "$AGENTD_TANGENTS_FILE"
+  fi
+}
+
+_tangent_exists() {
+  local id="$1"
+  _tangent_registry_init
+  python3 -c "
+import json, sys
+d = json.load(open('$AGENTD_TANGENTS_FILE'))
+sys.exit(0 if '$id' in d.get('tangents',{}) else 1)
+" 2>/dev/null
+}
+
+_tangent_register() {
+  local id="$1" agent="$2" worktree="$3" socket="$4" pid="$5"
+  _tangent_registry_init
+  python3 -c "
+import json
+f = '$AGENTD_TANGENTS_FILE'
+d = json.load(open(f))
+d.setdefault('tangents',{})['$id'] = {
+    'agent': '$agent',
+    'worktree': '$worktree',
+    'socket': '$socket',
+    'pid': int('$pid'),
+    'driver': '$DRIVER',
+    'created': __import__('datetime').datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+}
+json.dump(d, open(f,'w'), indent=2)
+"
+}
+
+_tangent_unregister() {
+  local id="$1"
+  _tangent_registry_init
+  python3 -c "
+import json
+f = '$AGENTD_TANGENTS_FILE'
+d = json.load(open(f))
+d.get('tangents',{}).pop('$id', None)
+json.dump(d, open(f,'w'), indent=2)
+"
+}
+
+# ── Container Driver Abstraction ───────────────────────────────────────────
+
+# Driver interface: spawn, destroy, exec, status
+# Drivers: stub (local, no isolation), docker (container isolation)
+# Future: nomad (Nomad job)
+
+_driver_spawn() {
+  local tangent_id="$1" worktree_path="$2" agent="$3"
+  case "$DRIVER" in
+    stub)
+      # No container — tangent runs directly on host in worktree
+      echo "[agentd] stub driver: no container for $tangent_id"
+      return 0
+      ;;
+    docker)
+      _driver_docker_spawn "$tangent_id" "$worktree_path" "$agent"
+      ;;
+    *)
+      echo "✗ Unknown driver: $DRIVER" >&2
+      return 1
+      ;;
+  esac
+}
+
+_driver_destroy() {
+  local tangent_id="$1"
+  case "$DRIVER" in
+    stub)
+      return 0
+      ;;
+    docker)
+      _driver_docker_destroy "$tangent_id"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+_driver_exec() {
+  local tangent_id="$1"
+  shift
+  local cmd="$*"
+  case "$DRIVER" in
+    stub)
+      # Direct execution — no container boundary
+      eval "$cmd"
+      ;;
+    docker)
+      docker exec -i "agence-${tangent_id}" bash -c "$cmd"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+# ── Docker Driver ──────────────────────────────────────────────────────────
+
+_driver_docker_spawn() {
+  local tangent_id="$1" worktree_path="$2" agent="$3"
+  local container_name="agence-${tangent_id}"
+
+  if ! command -v docker &>/dev/null; then
+    echo "✗ docker not found" >&2
+    return 1
+  fi
+
+  # Read-only .git object store + writable worktree
+  # The worktree is already created on HOST by git worktree add
+  docker run -d \
+    --name "$container_name" \
+    --hostname "$tangent_id" \
+    -v "${AGENCE_ROOT}/.git:/repo/.git:ro" \
+    -v "${worktree_path}:/workspace" \
+    -e "AI_AGENT=${agent}" \
+    -e "AI_ROLE=agentic" \
+    -e "GIT_ROOT=/workspace" \
+    -e "AGENCE_ROOT=/workspace/.agence" \
+    -w /workspace \
+    --label "agence.tangent=${tangent_id}" \
+    --label "agence.agent=${agent}" \
+    "${AGENTD_IMAGE:-agence/agent:latest}" \
+    sleep infinity
+
+  if [[ $? -ne 0 ]]; then
+    echo "✗ Failed to spawn container for tangent $tangent_id" >&2
+    return 1
+  fi
+  echo "[agentd] docker: started $container_name"
+}
+
+_driver_docker_destroy() {
+  local tangent_id="$1"
+  local container_name="agence-${tangent_id}"
+  docker rm -f "$container_name" 2>/dev/null
+  echo "[agentd] docker: removed $container_name"
+}
+
+# ── Git Worktree Management ───────────────────────────────────────────────
+
+_worktree_create() {
+  local tangent_id="$1"
+  local worktree_path="$AGENTD_WORKTREES/$tangent_id"
+
+  if [[ -d "$worktree_path" ]]; then
+    echo "[agentd] worktree already exists: $worktree_path" >&2
+    return 0
+  fi
+
+  # Create worktree from current HEAD
+  git -C "$AGENCE_ROOT" worktree add "$worktree_path" HEAD --detach 2>/dev/null
+  if [[ $? -ne 0 ]]; then
+    echo "✗ Failed to create worktree for tangent $tangent_id" >&2
+    return 1
+  fi
+  echo "[agentd] worktree: created $worktree_path"
+}
+
+_worktree_destroy() {
+  local tangent_id="$1"
+  local worktree_path="$AGENTD_WORKTREES/$tangent_id"
+
+  if [[ -d "$worktree_path" ]]; then
+    git -C "$AGENCE_ROOT" worktree remove "$worktree_path" --force 2>/dev/null
+    # Fallback: manual cleanup if git worktree remove fails
+    if [[ -d "$worktree_path" ]]; then
+      rm -rf "$worktree_path"
+      git -C "$AGENCE_ROOT" worktree prune 2>/dev/null
+    fi
+    echo "[agentd] worktree: removed $worktree_path"
+  fi
+}
+
+# ── Socat Socket Listener ─────────────────────────────────────────────────
+
+_socket_path() {
+  local tangent_id="$1"
+  echo "$AGENTD_SOCKETS/${tangent_id}.sock"
+}
+
+_socket_start() {
+  local tangent_id="$1"
+  local sock
+  sock=$(_socket_path "$tangent_id")
+
+  # Remove stale socket
+  rm -f "$sock"
+
+  # Start socat listener: receives commands, routes to tmux send-keys
+  socat UNIX-LISTEN:"$sock",fork \
+    EXEC:"${AGENCE_ROOT}/bin/agentd _socket_handler $tangent_id" &
+  local socat_pid=$!
+
+  # Verify socat started
+  if ! kill -0 "$socat_pid" 2>/dev/null; then
+    echo "✗ Failed to start socat listener for $tangent_id" >&2
+    return 1
+  fi
+
+  echo "$socat_pid"
+}
+
+_socket_stop() {
+  local tangent_id="$1" pid="${2:-}"
+  local sock
+  sock=$(_socket_path "$tangent_id")
+
+  # Kill socat process
+  if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null
+  fi
+
+  # Remove socket file
+  rm -f "$sock"
+}
+
+# Socket handler — reads command from stdin, sends to tmux pane
+cmd__socket_handler() {
+  local tangent_id="${1:-}"
+  if [[ -z "$tangent_id" ]]; then
+    echo "✗ No tangent ID" >&2
+    exit 1
+  fi
+
+  # Read one line (command)
+  local cmd
+  read -r cmd
+
+  if [[ -z "$cmd" ]]; then
+    exit 0
+  fi
+
+  # Route: tmux send-keys to the tangent's pane
+  local window="@${tangent_id}"
+  if tmux has-session -t "$SESSION" 2>/dev/null; then
+    tmux send-keys -t "${SESSION}:${window}" "$cmd" Enter
+    echo "OK: sent to ${SESSION}:${window}"
+  else
+    echo "✗ Session $SESSION not running" >&2
+    exit 1
+  fi
+}
+
 cmd_start() {
   _require_tmux
+  _ensure_dirs
   local agents=("${@:-$DEFAULT_AGENTS}")
   [[ ${#agents[@]} -eq 1 && "${agents[0]}" == "$DEFAULT_AGENTS" ]] && \
     IFS=' ' read -ra agents <<< "$DEFAULT_AGENTS"
 
-  if tmux has-session -t "$SESSION" 2>/dev/null; then
-    echo "[agentd] Session '$SESSION' already running."
+  # Check for existing daemon
+  if _check_pid >/dev/null 2>&1; then
+    local existing_pid
+    existing_pid=$(_read_pid)
+    echo "[agentd] Already running (PID $existing_pid)."
     echo "  Attach: agentd attach   |   Stop: agentd stop"
     exit 0
   fi
 
-  echo "[agentd] Starting swarm (session: $SESSION) — agents: ${agents[*]}"
+  if tmux has-session -t "$SESSION" 2>/dev/null; then
+    echo "[agentd] Session '$SESSION' already running (no PID file — adopting)."
+    _write_pid
+    exit 0
+  fi
+
+  echo "[agentd] Starting swarm (session: $SESSION, driver: $DRIVER) — agents: ${agents[*]}"
+
+  # Write PID file
+  _write_pid
+
+  # Initialize tangent registry
+  _tangent_registry_init
 
   # Create session detached with first agent as first window
   local first="${agents[0]}"
@@ -91,30 +416,98 @@ cmd_start() {
   # Select first window
   tmux select-window -t "$SESSION:@${first}"
 
-  echo "[agentd] Started."
+  echo "[agentd] Started (PID $$)."
   echo "  Attach:     agentd attach"
-  echo "  Jump to:    agentd attach <agent>"
+  echo "  Tangent:    agentd tangent create <id> [agent]"
+  echo "  Inject:     agentd inject <tangent> <cmd>"
   echo "  tmux cmd:   tmux attach -t $SESSION"
 }
 
 cmd_stop() {
   _require_tmux
+
+  # Destroy all active tangents
+  if [[ -f "$AGENTD_TANGENTS_FILE" ]]; then
+    local ids
+    ids=$(python3 -c "
+import json
+d = json.load(open('$AGENTD_TANGENTS_FILE'))
+for tid in d.get('tangents',{}):
+    print(tid)
+" 2>/dev/null)
+    for tid in $ids; do
+      cmd_tangent_destroy "$tid" 2>/dev/null
+    done
+  fi
+
+  # Kill tmux session
   if tmux kill-session -t "$SESSION" 2>/dev/null; then
     echo "[agentd] Session '$SESSION' stopped."
   else
-    echo "[agentd] Not running."
+    echo "[agentd] Session not running."
   fi
+
+  # Clean up PID file
+  _remove_pid
+
+  # Clean stale sockets
+  rm -f "$AGENTD_SOCKETS"/*.sock 2>/dev/null
+
+  echo "[agentd] Cleanup complete."
 }
 
 cmd_status() {
   _require_tmux
-  if tmux has-session -t "$SESSION" 2>/dev/null; then
-    echo "[agentd] Session: $SESSION (running)"
-    echo ""
-    tmux list-windows -t "$SESSION" -F "  #{window_index}  #{window_name}  #{?window_active,(active),}"
+
+  # Daemon PID
+  local pid
+  if _check_pid >/dev/null 2>&1; then
+    pid=$(_read_pid)
+    echo "[agentd] Daemon PID: $pid (running)"
   else
-    echo "[agentd] Not running. Start with: agentd start"
+    echo "[agentd] Daemon PID: not running"
   fi
+
+  # tmux session
+  if tmux has-session -t "$SESSION" 2>/dev/null; then
+    echo "[agentd] Session: $SESSION (active)"
+    echo ""
+    echo "  Windows:"
+    tmux list-windows -t "$SESSION" -F "    #{window_index}  #{window_name}  #{?window_active,(active),}"
+  else
+    echo "[agentd] Session: not running"
+  fi
+
+  # Tangent registry
+  if [[ -f "$AGENTD_TANGENTS_FILE" ]]; then
+    local count
+    count=$(python3 -c "
+import json
+d = json.load(open('$AGENTD_TANGENTS_FILE'))
+t = d.get('tangents',{})
+print(len(t))
+" 2>/dev/null)
+    if [[ "${count:-0}" -gt 0 ]]; then
+      echo ""
+      echo "  Tangents ($count):"
+      python3 -c "
+import json
+d = json.load(open('$AGENTD_TANGENTS_FILE'))
+for tid, info in d.get('tangents',{}).items():
+    agent = info.get('agent','?')
+    driver = info.get('driver','?')
+    print(f'    {tid}  agent={agent}  driver={driver}')
+" 2>/dev/null
+    fi
+  fi
+
+  # Socket count
+  local sock_count=0
+  if [[ -d "$AGENTD_SOCKETS" ]]; then
+    sock_count=$(find "$AGENTD_SOCKETS" -name '*.sock' 2>/dev/null | wc -l)
+  fi
+  echo ""
+  echo "  Sockets: $sock_count  |  Driver: $DRIVER"
 }
 
 cmd_attach() {
@@ -156,36 +549,221 @@ cmd_add() {
   fi
 }
 
+# ── Tangent Lifecycle ──────────────────────────────────────────────────────
+
+cmd_tangent_create() {
+  local tangent_id="${1:-}"
+  local agent="${2:-copilot}"
+
+  if [[ -z "$tangent_id" ]]; then
+    echo "Usage: agentd tangent create <id> [agent]" >&2
+    exit 1
+  fi
+
+  _require_tmux
+  _require_socat
+  _ensure_dirs
+
+  if _tangent_exists "$tangent_id"; then
+    echo "✗ Tangent '$tangent_id' already exists." >&2
+    echo "  Destroy first: agentd tangent destroy $tangent_id" >&2
+    exit 1
+  fi
+
+  if ! tmux has-session -t "$SESSION" 2>/dev/null; then
+    echo "✗ Session '$SESSION' not running. Start first: agentd start" >&2
+    exit 1
+  fi
+
+  echo "[agentd] Creating tangent: $tangent_id (agent=$agent, driver=$DRIVER)"
+
+  # 1. Git worktree (on HOST — never inside container)
+  if ! _worktree_create "$tangent_id"; then
+    exit 1
+  fi
+  local worktree_path="$AGENTD_WORKTREES/$tangent_id"
+
+  # 2. Container (via driver)
+  if ! _driver_spawn "$tangent_id" "$worktree_path" "$agent"; then
+    _worktree_destroy "$tangent_id"
+    exit 1
+  fi
+
+  # 3. tmux window for the tangent
+  local window="@${tangent_id}"
+  if [[ "$DRIVER" == "stub" ]]; then
+    # Stub: run aibash in the worktree directly
+    tmux new-window -t "$SESSION" -n "$window" \
+      "env AI_AGENT=${agent} AI_ROLE=agentic GIT_ROOT=${worktree_path} bash --rcfile ${AGENCE_ROOT}/bin/aibash"
+  else
+    # Docker: attach to container logs in the pane
+    tmux new-window -t "$SESSION" -n "$window" \
+      "docker logs -f agence-${tangent_id}"
+  fi
+
+  # 4. Socat socket listener
+  local socat_pid
+  socat_pid=$(_socket_start "$tangent_id")
+  if [[ $? -ne 0 ]]; then
+    echo "✗ Socket failed — rolling back tangent $tangent_id" >&2
+    tmux kill-window -t "${SESSION}:${window}" 2>/dev/null
+    _driver_destroy "$tangent_id"
+    _worktree_destroy "$tangent_id"
+    exit 1
+  fi
+
+  # 5. Register in tangent registry
+  local sock
+  sock=$(_socket_path "$tangent_id")
+  _tangent_register "$tangent_id" "$agent" "$worktree_path" "$sock" "$socat_pid"
+
+  echo "[agentd] Tangent '$tangent_id' ready."
+  echo "  Window:   ${SESSION}:${window}"
+  echo "  Socket:   $sock"
+  echo "  Worktree: $worktree_path"
+  echo "  Inject:   agentd inject $tangent_id <command>"
+}
+
+cmd_tangent_destroy() {
+  local tangent_id="${1:-}"
+
+  if [[ -z "$tangent_id" ]]; then
+    echo "Usage: agentd tangent destroy <id>" >&2
+    exit 1
+  fi
+
+  echo "[agentd] Destroying tangent: $tangent_id"
+
+  # Read socket PID from registry before unregistering
+  local socat_pid=""
+  if [[ -f "$AGENTD_TANGENTS_FILE" ]]; then
+    socat_pid=$(python3 -c "
+import json
+d = json.load(open('$AGENTD_TANGENTS_FILE'))
+t = d.get('tangents',{}).get('$tangent_id',{})
+print(t.get('pid',''))
+" 2>/dev/null)
+  fi
+
+  # 1. Kill socat listener
+  _socket_stop "$tangent_id" "$socat_pid"
+
+  # 2. Kill tmux window
+  local window="@${tangent_id}"
+  tmux kill-window -t "${SESSION}:${window}" 2>/dev/null
+
+  # 3. Destroy container (via driver)
+  _driver_destroy "$tangent_id"
+
+  # 4. Remove git worktree
+  _worktree_destroy "$tangent_id"
+
+  # 5. Unregister
+  _tangent_unregister "$tangent_id"
+
+  echo "[agentd] Tangent '$tangent_id' destroyed."
+}
+
+cmd_tangent_list() {
+  _ensure_dirs
+  _tangent_registry_init
+
+  python3 -c "
+import json, os
+f = '$AGENTD_TANGENTS_FILE'
+d = json.load(open(f))
+tangents = d.get('tangents', {})
+if not tangents:
+    print('[agentd] No active tangents.')
+else:
+    print(f'[agentd] Active tangents ({len(tangents)}):')
+    print()
+    fmt = '  {:<16} {:<12} {:<8} {:<8} {}'
+    print(fmt.format('ID', 'AGENT', 'DRIVER', 'PID', 'SOCKET'))
+    print(fmt.format('—'*16, '—'*12, '—'*8, '—'*8, '—'*30))
+    for tid, info in tangents.items():
+        sock = os.path.basename(info.get('socket','?'))
+        pid = str(info.get('pid','?'))
+        print(fmt.format(tid, info.get('agent','?'), info.get('driver','?'), pid, sock))
+"
+}
+
+# ── Inject ─────────────────────────────────────────────────────────────────
+
+cmd_inject() {
+  local tangent_id="${1:-}"
+  shift 2>/dev/null || true
+  local cmd="$*"
+
+  if [[ -z "$tangent_id" || -z "$cmd" ]]; then
+    echo "Usage: agentd inject <tangent-id> <command...>" >&2
+    exit 1
+  fi
+
+  _require_socat
+
+  local sock
+  sock=$(_socket_path "$tangent_id")
+
+  if [[ ! -S "$sock" ]]; then
+    echo "✗ No socket for tangent '$tangent_id'" >&2
+    echo "  Expected: $sock" >&2
+    echo "  Active tangents: $(ls "$AGENTD_SOCKETS"/*.sock 2>/dev/null | xargs -I{} basename {} .sock | tr '\n' ' ')" >&2
+    exit 1
+  fi
+
+  # Send command through socat socket
+  echo "$cmd" | socat - UNIX-CONNECT:"$sock"
+}
+
 cmd_help() {
   cat << 'EOF'
-agentd — tmux swarm orchestrator for agence
+agentd — Agence daemon: tangent lifecycle + container orchestration
 
 USAGE:
-  agentd start [agent ...]   Start swarm (default agents: copilot ralph sonya aider)
-  agentd stop                Stop the swarm (kills tmux session)
-  agentd status              Show running windows
-  agentd attach [agent]      Attach to session; jump to agent window if given
-  agentd add <agent>         Add agent window to running session
+  agentd start [agent ...]          Start swarm + write PID file
+  agentd stop                       Stop swarm + destroy all tangents
+  agentd status                     Show daemon, session, and tangent state
+  agentd attach [agent]             Attach to tmux session (jump to agent window)
+  agentd add <agent>                Add agent window to running session
+
+  agentd tangent create <id> [agent]  Create tangent (worktree + socket + pane)
+  agentd tangent destroy <id>         Tear down tangent + cleanup
+  agentd tangent list                 List active tangents
+
+  agentd inject <tangent> <cmd...>  Send command to tangent via socat socket
 
 AGENT TYPES:
   CLI tools (run binary directly):   claude  aider  pilot
   Persona agents (run via aibash):   ralph  sonya  copilot  claudia  haiku  chad
 
-EXAMPLES:
-  agentd start                        # Start 4-agent default swarm
-  agentd start claude aider ralph     # Start tool + persona swarm
-  agentd attach ralph                 # Attach and jump to @ralph window
-  agentd add pilot                    # Add @pilot (copilot CLI) to running session
-  agentd stop                         # Kill everything
+DRIVERS:
+  stub     No container isolation (for development)
+  docker   Docker container per tangent (production)
+  Set via AGENTD_DRIVER env var (default: stub)
+
+TANGENT LIFECYCLE:
+  1. agentd start                        # Start tmux session
+  2. agentd tangent create t1 ralph      # Create tangent t1 with @ralph
+  3. agentd inject t1 "git status"       # Send command to t1
+  4. agentd tangent destroy t1           # Tear down t1
+  5. agentd stop                         # Kill everything
+
+ARCHITECTURE:
+  Each tangent gets:
+    - git worktree (detached HEAD, on HOST)
+    - socat Unix socket (nexus/agentd/sockets/<id>.sock)
+    - tmux window in the agentd session
+    - container (if driver=docker)
+
+  Inject routing:
+    agentd inject t1 "cmd" -> socat -> socket handler -> tmux send-keys
 
 ENVIRONMENT:
   AGENTD_SESSION=agence               # tmux session name
   AGENTD_AGENTS="copilot ralph"       # override default agent list
-
-VSCODE INTEGRATION:
-  Add to tasks.json:
-    { "label": "🐙 agentd start", "command": "agentd", "args": ["start"],
-      "type": "shell", "isBackground": true, "problemMatcher": [] }
+  AGENTD_DRIVER=stub                  # container driver: stub|docker
+  AGENTD_IMAGE=agence/agent:latest    # Docker image (when driver=docker)
 EOF
 }
 
@@ -196,6 +774,21 @@ case "${1:-help}" in
   status)  cmd_status ;;
   attach)  shift; cmd_attach "${1:-}" ;;
   add)     shift; cmd_add "${1:-}" ;;
+  tangent)
+    shift
+    case "${1:-list}" in
+      create)  shift; cmd_tangent_create "$@" ;;
+      destroy) shift; cmd_tangent_destroy "$@" ;;
+      list)    cmd_tangent_list ;;
+      *)
+        echo "Unknown tangent command: $1" >&2
+        echo "Usage: agentd tangent {create|destroy|list}" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+  inject)  shift; cmd_inject "$@" ;;
+  _socket_handler) shift; cmd__socket_handler "$@" ;;
   help|-h|--help) cmd_help ;;
   *)
     echo "Unknown command: $1" >&2
