@@ -424,8 +424,12 @@ main() {
       mode_session "${*:2}"
       exit $?
       ;;
+    index)
+      scan_knowledge_bases
+      exit $?
+      ;;
     reindex)
-      reindex_knowledge_bases
+      reindex_knowledge_bases "${*:2}"
       exit $?
       ;;
     handoff)
@@ -1060,9 +1064,14 @@ mode_init() {
       resume_session $init_args
       return $?
       ;;
+    "index")
+      # Scan for INDEX.md / INDEX.json pairs
+      scan_knowledge_bases
+      return $?
+      ;;
     "reindex")
-      # Refresh all knowledge base indices
-      reindex_knowledge_bases
+      # Run bin/indexer (formtag + checksum) on knowledge bases
+      reindex_knowledge_bases $init_args
       return $?
       ;;
     "session-restore")
@@ -1081,7 +1090,7 @@ mode_init() {
       echo "Error: Unknown init command: $init_cmd" >&2
       echo "Available: help, init, reload, install, save, learn, commit, push, session," >&2
       echo "           lesson, log, plan, todo, fault, issue, task, job, audit," >&2
-      echo "           handoff, pickup, pause, resume, reindex, session-restore" >&2
+      echo "           handoff, pickup, pause, resume, index, reindex, session-restore" >&2
       return 1
       ;;
   esac
@@ -1274,7 +1283,7 @@ _agence_completion() {
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  local caret_commands="help symbols init reload install save learn commit push stash sync session lesson log plan todo fault issue task job audit ledger handoff pickup pause resume reindex"
+  local caret_commands="help symbols init reload install save learn commit push stash sync session lesson log plan todo fault issue task job audit ledger handoff pickup pause resume index reindex"
   local knowledge_subcmds="list show add"
 
   case "${COMP_WORDS[1]}" in
@@ -1336,8 +1345,13 @@ _agence_completion() {
         COMPREPLY=( $(compgen -W "$(ls "$dir" 2>/dev/null | sed 's/\.json$//')" -- "$cur") )
       fi
       ;;
-    "^pause"|"^reindex")
+    "^pause"|"^index")
       COMPREPLY=()
+      ;;
+    "^reindex")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "--source --input --output --print" -- "$cur") )
+      fi
       ;;
     "^session")
       if [[ $COMP_CWORD -eq 2 ]]; then
@@ -2733,15 +2747,16 @@ EOF
 }
 
 # ============================================================================
-# REINDEX: Refresh all knowledge base indices
+# INDEX: Scan for knowledge base INDEX.md / INDEX.json pairs
 # ============================================================================
 
-reindex_knowledge_bases() {
+scan_knowledge_bases() {
   echo ""; echo "══════════════════════════════════════════════"
-  echo "  AGENCE REINDEX (^reindex)"
+  echo "  AGENCE INDEX SCAN (^index)"
   echo "══════════════════════════════════════════════"; echo ""
   local dirs=("synthetic" "nexus" "globalcache" "organic")
-  local reindexed=0
+  local scanned=0
+  local missing=0
   for dir in "${dirs[@]}"; do
     local d="${AGENCE_ROOT}/$dir"
     [[ -d "$d" ]] || continue
@@ -2751,16 +2766,59 @@ reindex_knowledge_bases() {
       local json="${base}/INDEX.json"
       if [[ ! -f "$json" ]]; then
         echo "    ⚠ Missing INDEX.json: ${base#$AGENCE_ROOT/}"
+        ((missing++))
       else
         echo "    ✓ ${base#$AGENCE_ROOT/}"
       fi
-      ((reindexed++))
+      ((scanned++))
     done < <(find "$d" -name "INDEX.md" -type f 2>/dev/null | sort)
   done
   echo ""
-  echo "  Directories scanned: $reindexed INDEX.md files"
+  echo "  Scanned: $scanned INDEX.md files ($missing missing INDEX.json)"
   echo ""; echo "══════════════════════════════════════════════"
-  echo "  REINDEX COMPLETE"; echo ""
+  echo "  INDEX SCAN COMPLETE"; echo ""
+}
+
+# ============================================================================
+# REINDEX: Run bin/indexer (formtag + checksum) on knowledge bases
+# ============================================================================
+
+reindex_knowledge_bases() {
+  local indexer="${AGENCE_ROOT}/bin/indexer"
+  if [[ ! -f "$indexer" ]]; then
+    echo "Error: bin/indexer not found" >&2; return 1
+  fi
+  if ! command -v python3 &>/dev/null; then
+    echo "Error: python3 required for bin/indexer" >&2; return 1
+  fi
+
+  local args=("$@")
+  # Default: reindex all knowledge bases
+  if [[ ${#args[@]} -eq 0 ]]; then
+    echo ""; echo "══════════════════════════════════════════════"
+    echo "  AGENCE REINDEX (^reindex)"
+    echo "══════════════════════════════════════════════"; echo ""
+    local dirs=("synthetic" "globalcache" "organic")
+    local count=0
+    for dir in "${dirs[@]}"; do
+      local d="${AGENCE_ROOT}/$dir"
+      [[ -d "$d" ]] || continue
+      while IFS= read -r md; do
+        local base; base=$(dirname "$md")
+        local json="${base}/INDEX.json"
+        echo "  Indexing: ${base#$AGENCE_ROOT/}"
+        python3 "$indexer" --source kb --input "$md" --output "$json" 2>&1 | sed 's/^/    /'
+        ((count++))
+      done < <(find "$d" -name "INDEX.md" -type f 2>/dev/null | sort)
+    done
+    echo ""
+    echo "  Reindexed: $count knowledge bases"
+    echo ""; echo "══════════════════════════════════════════════"
+    echo "  REINDEX COMPLETE"; echo ""
+  else
+    # Pass args through to indexer directly
+    python3 "$indexer" "${args[@]}"
+  fi
 }
 
 # ============================================================================
