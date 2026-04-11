@@ -1,8 +1,8 @@
-# 🤖 l'Agence (^) — Multi-Agent Engineering Framework
+# 🤖 l'Agence (^) —  Agentic Engineering Collaboration Environment
 
 **Author**: Stephane Korning · 2026 · [MIT + Commons Clause](LICENSE.md)
 
-> *The first git-native, governed multi-agent swarm for software engineering.*
+> *The first git-native and governed, multi-agent swarm for software engineering.*
 
 ---
 
