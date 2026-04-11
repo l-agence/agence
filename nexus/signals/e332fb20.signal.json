@@ -1,8 +1,0 @@
-{
-  "type": "notify",
-  "from": "@ralph",
-  "to": "human",
-  "payload": "T1 flagged: bun test",
-  "timestamp": "2026-04-10T14:02:24Z",
-  "id": "e332fb20"
-}
