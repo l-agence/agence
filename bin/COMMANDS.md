@@ -787,7 +787,7 @@ agence /push
 # Writing objects: 100% (2/2), 500 bytes | 500.00 KiB/s, done.
 # Total 2 (delta 1), reused 0 (delta 0), reused 1 (delta 0)
 # remote: Resolving deltas: 100% (1/1), done.
-# To github.com:l-agence/agence-master.git
+# To github.com:l-agence/agence.git
 #    abc1234..def5678  master -> main
 ```
 
@@ -822,14 +822,14 @@ agence /ghstatus
 
 # Output:
 # [INFO] Repository status:
-# name:             agence-master
+# name:             agence
 # owner:            l-agence
 # description:      Agence AI Agentic Engineering Toolkit
-# url:              https://github.com/l-agence/agence-master
+# url:              https://github.com/l-agence/agence
 # fork:             false
 # 
 # [INFO] Pull requests:
-# Showing 5 of 0 pull requests in l-agence/agence-master
+# Showing 5 of 0 pull requests in l-agence/agence
 ```
 
 **Requirements**:
@@ -1009,7 +1009,7 @@ agence /ghpush
 # Writing objects: 100% (3/3), 256 bytes | 256.00 KiB/s, done.
 # Total 3 (delta 2), reused 0 (delta 0), reused 1 (delta 0)
 # remote: Resolving deltas: 100% (2/2), done.
-# To github.com:l-agence/agence-master.git
+# To github.com:l-agence/agence.git
 #    5b7c8a9..8f4a2c1  main -> main
 # branch 'main' set up to track 'origin/main'.
 ```

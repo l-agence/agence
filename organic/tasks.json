@@ -2,7 +2,7 @@
   "tasks": [
     {
       "id": "DOC-001",
-      "repo": "agence-master",
+      "repo": "agence",
       "title": "Update docs for v0.3.2 (plans INDEX, README, COMMANDS.md)",
       "state": "~",
       "priority": 2,
@@ -14,7 +14,7 @@
     },
     {
       "id": "DOC-002",
-      "repo": "agence-master",
+      "repo": "agence",
       "title": "Update show_help() with new commands (^ledger, ^audit, airun)",
       "state": "~",
       "priority": 2,
@@ -26,7 +26,7 @@
     },
     {
       "id": "DOC-003",
-      "repo": "agence-master",
+      "repo": "agence",
       "title": "Clear stale synthetic todos (shellspec, v0.2.5 done)",
       "state": "-",
       "priority": 1,
@@ -38,7 +38,7 @@
     },
     {
       "id": "TEST-001",
-      "repo": "agence-master",
+      "repo": "agence",
       "title": "Shellspec tests for ^ledger, ^audit, ^session prune, ^index",
       "state": "-",
       "priority": 2,
@@ -50,7 +50,7 @@
     },
     {
       "id": "INFRA-001",
-      "repo": "agence-master",
+      "repo": "agence",
       "title": "Pipe-pane: replace script(1) with tmux-native PTY streaming",
       "state": "-",
       "priority": 3,
@@ -63,7 +63,7 @@
     },
     {
       "id": "INFRA-002",
-      "repo": "agence-master",
+      "repo": "agence",
       "title": "agentd skeleton: pid file, socket per tangent, Docker spawn",
       "state": "-",
       "priority": 4,
@@ -76,7 +76,7 @@
     },
     {
       "id": "INFRA-003",
-      "repo": "agence-master",
+      "repo": "agence",
       "title": "Publish AIPOLICY.yaml schema as governance standard",
       "state": "-",
       "priority": 2,
@@ -89,7 +89,7 @@
     },
     {
       "id": "INFRA-004",
-      "repo": "agence-master",
+      "repo": "agence",
       "title": ".ailedger enhancements: AIPOLICY.yaml commit, prune policy",
       "state": "-",
       "priority": 3,
@@ -102,7 +102,7 @@
     },
     {
       "id": "INFRA-005",
-      "repo": "agence-master",
+      "repo": "agence",
       "title": "Agent persona loading from codex/agents/registry.json",
       "state": "-",
       "priority": 2,
@@ -115,7 +115,7 @@
     },
     {
       "id": "CLI-001",
-      "repo": "agence-master",
+      "repo": "agence",
       "title": "agence help deep improvements (multi-tool docs entry point)",
       "state": "-",
       "priority": 1,
@@ -127,7 +127,7 @@
     },
     {
       "id": "CLI-002",
-      "repo": "agence-master",
+      "repo": "agence",
       "title": ".gitignore final review (local symlinks, build artifacts)",
       "state": "-",
       "priority": 1,
@@ -139,7 +139,7 @@
     },
     {
       "id": "CLI-003",
-      "repo": "agence-master",
+      "repo": "agence",
       "title": "Smoke tests: path validation rejects escapes without junctions",
       "state": "-",
       "priority": 2,
@@ -152,7 +152,7 @@
     },
     {
       "id": "SWARM-001",
-      "repo": "agence-master",
+      "repo": "agence",
       "title": "Gate = write access (not --safe flag) — update aido tier routing",
       "state": "-",
       "priority": 3,
@@ -165,7 +165,7 @@
     },
     {
       "id": "SWARM-002",
-      "repo": "agence-master",
+      "repo": "agence",
       "title": "agentd interface contract: abstract container-spawn (Docker now, Nomad later)",
       "state": "-",
       "priority": 3,
@@ -178,7 +178,7 @@
     },
     {
       "id": "BUG-001",
-      "repo": "agence-master",
+      "repo": "agence",
       "title": "mnemonic prune + sessions prune (stale file cleanup)",
       "state": "-",
       "priority": 2,
@@ -190,7 +190,7 @@
     },
     {
       "id": "SHELL-001",
-      "repo": "agence-master",
+      "repo": "agence",
       "title": "Shell UI: state-colored PS1, tmux titles, shell economy + reap",
       "state": "-",
       "priority": 2,

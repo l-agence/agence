@@ -95,7 +95,7 @@ All files live under `organic/`:
   "tasks": [
     {
       "id": "DOC-001",
-      "repo": "agence-master",
+      "repo": "agence",
       "title": "Update documentation",
       "state": "~",
       "priority": 2,

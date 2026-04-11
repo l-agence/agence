@@ -1,4 +1,4 @@
-# 🤖 l'Agence (^) —  Agentic Engineering Collaboration Environment
+# 🤖 l'Agence (^) —  Agentic Engineering Code Environment
 
 **Author**: Stephane Korning · 2026 · [MIT + Commons Clause](LICENSE.md)
 
@@ -31,7 +31,7 @@ Unlike single-agent tools (Claude Code, Copilot, aider), agence coordinates **mu
 
 ```bash
 # 1. Add agence to your repo
-git submodule add https://github.com/l-agence/agence-master .agence
+git submodule add https://github.com/l-agence/agence .agence
 
 # 2. Initialize
 git submodule update --init --recursive
@@ -49,7 +49,7 @@ git add .gitmodules .agence && git commit -m "Add agence agent framework"
 ### Or: run directly (no install, no submodule)
 
 ```bash
-git clone https://github.com/l-agence/agence-master .agence
+git clone https://github.com/l-agence/agence .agence
 export PATH="$PWD/.agence/bin:$PATH"
 agence --help
 ```
