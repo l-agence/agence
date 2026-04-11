@@ -1,4 +1,4 @@
-# 🤖 l'Agence (^) —  Agentic Engineering Code Environment
+# 🤖 l'Agence (^) —  Agentic Engineering Collaboration Environment
 
 **Author**: Stephane Korning · 2026 · [MIT + Commons Clause](LICENSE.md)
 
@@ -240,7 +240,6 @@ All decisions are logged to `nexus/.ailedger` (local, gitignored, append-only).
 | [Principles](codex/PRINCIPLES.md) | Core maxims (why) |
 | [Laws](codex/LAWS.md) | Hard constraints (must not) |
 | [Rules](codex/RULES.md) | Best practices (should) |
-| [Roadmap](synthetic/l-agence.org/docs/ROADMAP.md) | What's next |
 
 ---
 
