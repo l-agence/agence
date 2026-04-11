@@ -13,6 +13,7 @@ DATE       | @AGENT          | HEX-ID   | FORMTAG        | SEVERITY | LESSON
 2026-03-05 | @agence         | d7a3c8b1 | process        | high     | ADHD scope creep safeguards: hard stops prevent hyperflow
 2026-03-29 | @pilot          | e1c4a9f2 | competitive-intelligence | high | Agence vs AutoGen/CrewAI/MetaGPT/LangGraph/OpenHands/Cursor/Copilot — unique strengths, gap analysis, verdict
 2026-03-31 | @haiku          | f3d2a8e5 | security       | critical | Catastrophic failure root cause: auto-healing in security layer = sandbox escape; fix: realpath() validation, no junction creation, WSL-Ubuntu shell standardization
+2026-04-10 | @copilot        | 10f65942 | process        | high     | 16/16 backlog execution: sequential task queue with dashboard-driven scoring beats ad-hoc; version discipline (bump+tag+push as atomic) prevents stale version strings; pre-existing test failures must be gated behind Skip-if or they erode CI trust
 ```
 
 ---

@@ -1,0 +1,24 @@
+{
+  "id": "10f65942",
+  "date": "2026-04-10",
+  "agent": "@copilot",
+  "formtag": "process",
+  "severity": "high",
+  "title": "Backlog execution discipline: sequential queue, version atomicity, test gate hygiene",
+  "context": "v0.4.0→v0.4.1 session: 16 tasks (INFRA×5, SWARM×2, CLI×3, TEST×1, BUG×1, SHELL×1, DOC×3) completed in ~3 sessions with dashboard-driven scoring and sequential pick-off.",
+  "findings": [
+    "Sequential task queue with heat-scored priority (score = 10P + 25S + 100H) consistently picks the right next task — no context-switching waste",
+    "Dashboard-as-commit-trail (each task completion = 2 commits: work + dashboard) creates auditable progress and prevents stale tracking",
+    "Version bump + tag + push must be atomic — stale version strings (0.3.2 displayed when v0.4.0 was tagged) confuse downstream and erode trust",
+    "Pre-existing test failures (12 gh-auth / aibash-help) are environmental, not code bugs, but they erode CI confidence — must be gated behind Skip-if conditions",
+    "DOC-002 was auto-resolved by CLI-001 (show_help rewrite) — task system correctly identifies when upstream work subsumes downstream tasks",
+    "Session prune bug (BUG-001) was only caught because test001_spec exercised the code path — tests find real bugs even in utility scripts"
+  ],
+  "recommendations": [
+    "Gate environmental test failures behind Skip-if before v0.5",
+    "Add CHANGELOG.md to capture version-to-version deltas",
+    "Continue dashboard-driven execution for v0.5 backlog",
+    "Version bump should be the LAST commit before tag, not mixed with other work"
+  ],
+  "related": ["e1c4a9f2", "f3d2a8e5"]
+}
