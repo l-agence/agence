@@ -2,9 +2,6 @@
 
 
 ## Introduction
-
-
-## Introduction
 The Agence CLI allows for powerful command routing functionalities, enabling seamless interactions with various operations.
 ---
 
