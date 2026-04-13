@@ -32,11 +32,23 @@
     "resource-exhaustion",
     "catastrophic"
   ],
-  "lookup_fields": ["category", "severity", "timestamp", "status"],
+  "lookup_fields": [
+    "category",
+    "severity",
+    "timestamp",
+    "status"
+  ],
   "privacy_rules": {
     "never_share_raw": "Raw faults contain secrets, stack traces, failed credentials",
     "sanitization_process": "Extract root cause + solution → create lesson → sanitize before sharing",
     "storage": "nexus/faults/ (local machine only)",
     "future": "ailedger will segregate secrets and allow controlled disclosure"
-  }
+  },
+  "entries": [
+    {
+      "id": "1776092719_Incorrec",
+      "title": "Incorrect merge strategy guidance: previously suggested --strategy-option=theirs (keep remote) instead of -X ours (keep local). This could cause unintended data loss. User caught and corrected before merge. Log as critical guidance error.",
+      "date": "2026-04-13T15:05:19Z"
+    }
+  ]
 }
