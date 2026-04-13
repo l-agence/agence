@@ -10,11 +10,11 @@
 
 | Dashboard | Source | Description |
 |-----------|--------|-------------|
-| [**TASKS**](dashboards/TASKS.md) | `organic/tasks.json` | All tasks with state, priority, score, agent assignment |
-| [**WORKFLOWS**](dashboards/WORKFLOWS.md) | `organic/workflows.json` | Workflow pipelines with completion % |
-| [**PROJECTS**](dashboards/PROJECTS.md) | `organic/projects.json` | Project-level rollup across workflows |
-| [**ISSUES**](dashboards/ISSUES.md) | `synthetic/*/issues/` | Known problems and opportunities |
-| [**FAULTS**](dashboards/FAULTS.md) | `nexus/faults/` | Incident history and root cause analysis |
+| [**TASKS**](../../organic/dashboards/TASKS.md) | `organic/tasks.json` | All tasks with state, priority, score, agent assignment |
+| [**WORKFLOWS**](../../organic/dashboards/WORKFLOWS.md) | `organic/workflows.json` | Workflow pipelines with completion % |
+| [**PROJECTS**](../../organic/dashboards/PROJECTS.md) | `organic/projects.json` | Project-level rollup across workflows |
+| [**ISSUES**](../../organic/dashboards/ISSUES.md) | `synthetic/*/issues/` | Known problems and opportunities |
+| [**FAULTS**](../../organic/dashboards/FAULTS.md) | `nexus/faults/` | Incident history and root cause analysis |
 
 ---
 

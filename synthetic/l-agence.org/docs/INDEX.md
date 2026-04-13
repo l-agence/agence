@@ -9,11 +9,11 @@ L'Agence is a distributed, multi-agent framework for collaborative engineering w
 
 | View | Description |
 |------|-------------|
-| [**TASKS**](dashboards/TASKS.md) | All tasks — state, priority, score, agent |
-| [**WORKFLOWS**](dashboards/WORKFLOWS.md) | Workflow pipelines with completion % |
-| [**PROJECTS**](dashboards/PROJECTS.md) | Project-level rollup |
-| [**ISSUES**](dashboards/ISSUES.md) | Known problems and opportunities |
-| [**FAULTS**](dashboards/FAULTS.md) | Incident history and RCA |
+| [**TASKS**](../../organic/dashboards/TASKS.md) | All tasks — state, priority, score, agent |
+| [**WORKFLOWS**](../../organic/dashboards/WORKFLOWS.md) | Workflow pipelines with completion % |
+| [**PROJECTS**](../../organic/dashboards/PROJECTS.md) | Project-level rollup |
+| [**ISSUES**](../../organic/dashboards/ISSUES.md) | Known problems and opportunities |
+| [**FAULTS**](../../organic/dashboards/FAULTS.md) | Incident history and RCA |
 
 > *Hub: [DASHBOARDS.md](DASHBOARDS.md) — regenerate: `airun matrix dashboard`*
 
