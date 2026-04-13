@@ -6,9 +6,9 @@
 
 ---
 
-## What is l'Agence?
+## Introduction 
 
-**l'Agence** is a framework that turns your git repo into a **collaborative agent workspace** — with audit trails, session persistence, and safe multi-agent coordination built in from the start.
+**l'Agence** is a framework that turns your git repo into a **collaborative agent workspace** — with audit trails, session persistence, and safe multi-agent coordination and governance built in from the start.
 
 Unlike single-agent tools (Claude Code, Copilot, aider), agence coordinates **multiple agents in parallel**, each isolated, observable, and governed by the same CODEX rules.
 
@@ -22,6 +22,38 @@ Unlike single-agent tools (Claude Code, Copilot, aider), agence coordinates **mu
 | Tool-agnostic | Works with claude, copilot, aider, aish, or your own agent |
 | LLM-agnostic | Anthropic, OpenAI, GitHub Copilot, OpenRouter, Ollama, and more |
 | Git-native | No DB, no server — just git worktrees and flat files |
+
+
+---
+
+## What is l'Agence?
+
+Welcome to **Agence**, an agentic engineering collaboration environment.
+L'agence is a tool and model agnostic framework for humnan/agentic and multi-agentic development & collaboration. L'agence achieves this with the unix design philosophy of minimal simplicity. For exampe in agence there is no vectored database, no state machines. Where posisble,  Everything including swarm and task states,  workflows, RAG and DWM are managed based on git . L'agence scales and remembers  using **Git-based sharding**. 
+
+L'agence is deployed both as a portable git submodule (.agence) living in any projetc's repo, and one or more 'team shards' existing as that .agence submodule origin repo. This way agence achives both active context for your existing project code , but can selectively route and share knowledge, RAG, DWM, Task states and workflows upstream to the team shard. 
+
+Unlike other agentic models that aim for full AI autonomy, L'agence is human gated first by design. It incorporates strong Explicit and immutable  safeguards via the CODEX:  laws, principles, rules, and most importantly an EBNFgrammar based universal tiered AI access policy.
+
+Governance is a central concept in L'agence. Agence is teh firts such system with a full audit trail based on immutable append only merkle ailedger. The ledger is implemented as a sister repository to each shard. 
+
+l 'agence implements a human control plane with multiple agent shells as needed. But full agent sessions must always be accesible via terminal panes or session replay or audits. 
+
+In agence, state is local but knowledge is selectively sharded. Full local agent session states are preserved, allowing for local session save, resume and even handoff to other agents. L'agence does automatic full session capture of stdout, stdin, stderr, exit codes and everythimng via tmux pipe with a unix script based typescript fallback. 
+
+This allows for full agentic access to the entire session, bypassing VScode 16kb buffer limits and reducing hallucinations and token wastage. 
+
+Full session data is never shared verbatim to the shard but metadata is. This gated such that we do not leak unless a human asks . 
+
+
+As well, agence's knowledge bases are tiered and segregated between both hermetic (private local user knowledge in this repo) and sytnthetic ( team based Derived World Knowledge).
+
+L'agence uses an innovative and deterministic routing system that is flexible and secure. It allows uses to selec where knowledge and lessons are shared. Efforts have been made to gate guard your data from unecessary discolsure. 
+
+BY design l'agence is tooling agnostic. It already comes pre-loaded with multiple agentic personas and agents and encourages uses to use agents of their choice be it 'aider, claude-code, aishell, copilot-cli,...'. In fact rolling your own agent is trivial , althout it already comes with native abilty to support other 13 agents. In fact l'agence also comes with ollama routing allowing you to integrate your own 'gated' and secure ollmama clusters. 
+
+L' agence makes use of a strong linear algrebra matrix-based task and workflow model which allows for atomic and idempotent task and state management . This means swarms instantly recompute task states. As well , this enables deterministic  task scheduling which is selected on needs, LLM capabilities and  LLM token costs . Where possible agence will always try to select the lowest cost LLM whih is appropriate to teh task.
+
 
 ---
 
@@ -227,6 +259,42 @@ Agence uses a 5-tier command policy (`codex/AIPOLICY.yaml`):
 All decisions are logged to `nexus/.ailedger` (local, gitignored, append-only).
 
 ---
+
+### AIPOLICY.yml 
+Agence implements a universal tiered agentic security policy by design.  This uses EBNF grammar rules and presets to determine safe (whitelist) , unsafe (blacklist), and nuanced (greylist) commands needing human approval. 
+
+
+### aido 
+While I now know that the aido name is not unique, in agence it is something different. at its base in agence aido is like the oppposite of sudo . Where sudo aims to execute with privilege , aido aims to execute with the least privilege.  It allows command whitelists, block command blacklists, and implements a human prompt escalation for greylists where human permission is required. 
+
+--- 
+## The Agence Lexicon
+
+### COGGNOS foundation
+Agence is built on a 6-pillar foundation the acronym for which is COGNOS: 
+
+CODEX: This forms the stronng and immutable governance layer of agence. It contains the Laws of Agentic : Laws, principles rules, as well as the AIPOLICY.
+
+OBJECTCODE: in Agence this a RAG meant exclusively for your organization's code bases. Eg it should contain .md and json files describing your git repos. These are handled differently than other RAG sources (eg they can use an AST Chunking memory index. ) 
+
+It may also contain  architecture docs, Solutions and patterns specific to your organzation. 
+
+GLOBALCACHE: is the main RAG 'database' . It consists of .md and json files that can fast indexed via a Dwey-Decimal like formtag. Global cache is distinct from DWM derived world model so we don't assume truth unless gated by a human. 
+
+NEXUS:  This is the local state machine. It is intentionally not shared to the shard.  Agenst states are preserved vi a mix of tmux pipe-pan and script typescript as fallback. This allows for full agentic session view, session audits and vene session replay. 
+
+ORGANIC:  This is the SWARM or Orchestration layer. This contains our unique matrix-based task and workflow and project system. It also includes the Shard based team shared dahsboards to view these. In time this will be more sophisticated. But the general idea is that each shard head becomes a git based dashboard into the state of all the tasks, workflows, projects. 
+
+SYNTHETHIC: This is the Derived World Model. Whereas tasks, projects and workflows are team shared (the states of them) actual knowledge is gated by our routing rules. So Synthetic knowledge is only shared where you decide. This tries to enforce a compromise between sharing and data leakage. 
+
+
+### Other layers: 
+
+HERMETIC: BY design this is an intentionally private local only Derived World Model. It is quite useful to put strategic vision, personal todos and personal notes .
+
+MNEMONIC: This is a "fast access, ephemeral memory cache' It is intended to be an index that can be regenreated on the fly from canonical and persistent knowledge. This bit is still in development and not fully tested but as our datasets grow this will become important. 
+
+
 
 ## 📚 Documentation
 
