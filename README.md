@@ -29,25 +29,23 @@ Unlike single-agent tools (Claude Code, Copilot, aider), agence coordinates **mu
 ## What is l'Agence?
 
 Welcome to **Agence**, an agentic engineering collaboration environment.
-L'agence is a tool and model agnostic framework for humnan/agentic and multi-agentic development & collaboration. L'agence achieves this with aphilosophy of simplicity. For example in agence there is no vectored database, no state machines. Where posisble, everything including swarm and task states, workflows, RAG and DWM, are managed based on git. L'agence scales and remembers  using **Git-based sharding**. 
+L'agence is a tool and model agnostic framework for humnan/agentic and multi-agentic development & collaboration. L'agence achieves this with a philosophy of simplicity. For example in agence there is no vectored database, no state machines. Where posisble, everything including swarm and task states, workflows, RAG and DWM, are managed based on git. L'agence scales and remembers  using **Git-based sharding**. 
 
-L'agence is deployed both as a portable git submodule (.agence) living in any project's repo, and one or more 'team shards' existing as that .agence submodule origin. This way agence lives in an active context inside each project, but also shares upstream to it's team based shard. However L'agence gates all knowledge, and so it allows you to selectively route and share. YOU DECIDE where and how to share. 
+L'agence is deployed both as a portable git submodule (.agence) living in any project's repo, and one or more 'team shards' existing as that .agence submodule origin. This way agence lives in an active context inside each project, but also shares upstream to a team based shard. However L'agence gates all knowledge, and so it allows you to selectively route and share. YOU DECIDE where and how to share. 
 
-Unlike other agentic models that aim for full AI autonomy, L'agence aims for human supervised workflows. It is human gated first by design. It incorporates strong Explicit and immutable  safeguards via the CODEX:  laws, principles, rules, and most importantly an EBNFgrammar based universal tiered AI access policy.
+Unlike other agentic models that aim for full AI autonomy, L'agence aims for human supervised workflows. It is human gated first by design. It incorporates strong, explicit and immutable safeguards via its CODEX: the laws, principles, rules, and most importantly an EBNF grammar-based universal tiered access AIpolicy.
 
-Governance is a central concept in L'agence. Agence is the firts such system with a full agentic audit trail based on immutable append only merkle ailedger. The ledger is implemented as a sister repository to each shard. AI commands are logges , auditable and replayable for RCA or accountability. 
+Governance is a central concept in L'agence. Agence is the first such system with a full agentic audit trail based on immutable append only merkle ailedger. The ailedger is implemented as a sister repository to each shard. AI commands are logged , auditable and replayable for RCA or accountability. 
 
 l 'agence implements a human control plane with multiple agent shells as needed. But full agent sessions must always be accesible via terminal panes or session replay or audits. 
 
-In agence, state is local but knowledge and metadata is selectively sharded. Full local agent session states are preserved, allowing for local session save, resume and even handoff to other agents. L'agence does automatic full session capture of stdout, stdin, stderr, exit codes and everythimng via tmux pipe with a unix script based typescript fallback. 
-
+In agence, agent state is local, but knowledge and metadata is selectively sharded. Full local agent session states are preserved, allowing for local session save, resume and even handoff to other agents. L'agence does automatic full session capture of stdout, stdin, stderr, exit codes and everythimng via tmux pipe with a unix script based typescript fallback. 
 This allows for full agentic access to the entire session, bypassing VScode 16kb buffer limits and reducing hallucinations and token wastage. 
 
 Full session data is never shared verbatim to the shard.  This is gated such that we do not leak unless a human asks. 
-
 As well, agence's knowledge bases are tiered and segregated between both hermetic (private local user knowledge in this repo) and sytnthetic ( team based Derived World Knowledge).
 
-L'agence uses an innovative and deterministic routing system that is flexible and secure. It allows uses to select where knowledge and lessons are shared. Efforts have been made to gate guard your data from unecessary discolsure. 
+L'agence uses an innovative and deterministic routing system that is flexible and secure. It allows uses to select where knowledge and lessons are shared. Efforts have been made to gate guard your data from unecessary disclosure. 
 
 By design l'agence is tooling agnostic. It already comes pre-loaded with multiple agentic personas and external agent support and encourages these such as: 'aider, claude-code, aishell, copilot-cli, local ollama cluster,etc'. In fact out-of-the-box we support 13 other agents but rolling your own agent is also encouraged.
 
