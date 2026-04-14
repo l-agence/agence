@@ -2860,8 +2860,8 @@ install_agence_packages() {
 install_windows_packages() {
   echo "Installing AI tools via winget..."
   echo ""
-  echo "  Required:"
-  local -a winget_required=("GitHub.cli" "Anthropic.ClaudeCode" "GitHub.Copilot" "Microsoft.AIShell")
+  echo "  Core (required):"
+  local -a winget_required=("GitHub.cli" "jqlang.jq" "Oven-sh.Bun" "Anthropic.ClaudeCode" "GitHub.Copilot" "Microsoft.AIShell")
   for pkg in "${winget_required[@]}"; do
     echo -n "  [$pkg] "
     if winget list --id "$pkg" &>/dev/null 2>&1; then
@@ -2893,12 +2893,23 @@ install_macos_packages() {
     return 1
   fi
   local -a brew_pkgs=("gh" "jq" "tmux")
+  echo "  Core (required):"
   for pkg in "${brew_pkgs[@]}"; do
     echo -n "  [$pkg] "
     if brew list "$pkg" &>/dev/null 2>&1; then echo "✓ already installed"
     elif brew install "$pkg" &>/dev/null 2>&1; then echo "✓ installed"
     else echo "✗ failed"; fi
   done
+  echo -n "  [bun] "
+  if command -v bun &>/dev/null; then
+    echo "✓ already installed ($(bun --version 2>/dev/null))"
+  elif brew tap oven-sh/bun &>/dev/null 2>&1 && brew install bun &>/dev/null 2>&1; then
+    echo "✓ installed"
+  elif curl -fsSL https://bun.sh/install | bash &>/dev/null 2>&1; then
+    echo "✓ installed (via bun.sh)"
+  else
+    echo "✗ failed (try: curl -fsSL https://bun.sh/install | bash)"
+  fi
   echo ""
   echo "  Optional (npm):"
   if command -v npm &>/dev/null; then
@@ -2940,6 +2951,17 @@ install_linux_packages() {
     fi
   done
   echo ""
+  # bun — TypeScript runtime (core dependency for airun/aibash session management)
+  echo "  Core (script installer):"
+  echo -n "  [bun] "
+  if command -v bun &>/dev/null; then
+    echo "✓ already installed ($(bun --version 2>/dev/null))"
+  elif curl -fsSL https://bun.sh/install | bash &>/dev/null 2>&1; then
+    echo "✓ installed"
+  else
+    echo "✗ failed (try: curl -fsSL https://bun.sh/install | bash)"
+  fi
+  echo ""
   # npm claude
   echo "  Optional (npm — Claude Code CLI):"
   if command -v npm &>/dev/null; then
@@ -2967,15 +2989,6 @@ install_linux_packages() {
   else
     echo "  [aider] not installed"
     echo "    Install: pip install aider-chat"
-  fi
-  echo ""
-  # bun
-  echo "  Optional (Bun — TypeScript runtime):"
-  if command -v bun &>/dev/null; then
-    echo "  [bun] ✓ already installed ($(bun --version 2>/dev/null))"
-  else
-    echo "  [bun] not installed"
-    echo "    Install: curl -fsSL https://bun.sh/install | bash"
   fi
 }
 

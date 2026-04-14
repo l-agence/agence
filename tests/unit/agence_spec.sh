@@ -101,7 +101,7 @@ Describe 'Agence CLI'
   # ===========================================================================
 
   It 'handles ghauth external command'
-    Skip if 'gh not authenticated' ! gh auth status >/dev/null 2>&1
+    Skip if 'gh not authenticated' bash -c '! gh auth status >/dev/null 2>&1'
     When run bash bin/agence /ghauth
     The status should be success
     The output should include 'github.com'
@@ -120,7 +120,7 @@ Describe 'Agence CLI'
   End
 
   It 'handles ghstatus external command'
-    Skip if 'gh not authenticated' ! gh auth status >/dev/null 2>&1
+    Skip if 'gh not authenticated' bash -c '! gh auth status >/dev/null 2>&1'
     When run bash bin/agence /ghstatus
     The status should be success
     The output should include 'l-agence'
@@ -222,63 +222,63 @@ Describe 'Agence CLI'
   End
 
   It '/gh --help passes through to gh help'
-    Skip if 'gh not authenticated' ! gh auth status >/dev/null 2>&1
+    Skip if 'gh not authenticated' bash -c '! gh auth status >/dev/null 2>&1'
     When run bash bin/agence /gh --help
     The status should be success
     The output should include 'USAGE'
   End
 
   It '/gh auth status runs gh auth status (T0: auto-execute)'
-    Skip if 'gh not authenticated' ! gh auth status >/dev/null 2>&1
+    Skip if 'gh not authenticated' bash -c '! gh auth status >/dev/null 2>&1'
     When run bash bin/agence /gh auth status
     The status should be success
     The output should include 'github.com'
   End
 
   It '/gh repo view runs gh repo view (T0: auto-execute)'
-    Skip if 'gh not authenticated' ! gh auth status >/dev/null 2>&1
+    Skip if 'gh not authenticated' bash -c '! gh auth status >/dev/null 2>&1'
     When run bash bin/agence /gh repo view
     The status should be success
     The output should include 'agence'
   End
 
   It '/ghremote shortcut runs gh repo view (T0: auto-execute)'
-    Skip if 'gh not authenticated' ! gh auth status >/dev/null 2>&1
+    Skip if 'gh not authenticated' bash -c '! gh auth status >/dev/null 2>&1'
     When run bash bin/agence /ghremote
     The status should be success
     The output should include 'agence'
   End
 
   It '/ghpull shortcut lists PRs by default (T0: auto-execute)'
-    Skip if 'gh not authenticated' ! gh auth status >/dev/null 2>&1
+    Skip if 'gh not authenticated' bash -c '! gh auth status >/dev/null 2>&1'
     When run bash bin/agence /ghpull
     The status should be success
     The output should not be blank
   End
 
   It '/ghlog shortcut lists run history (T0: auto-execute)'
-    Skip if 'gh not authenticated' ! gh auth status >/dev/null 2>&1
+    Skip if 'gh not authenticated' bash -c '! gh auth status >/dev/null 2>&1'
     When run bash bin/agence /ghlog
     The status should be success
     The output should not be blank
   End
 
   It '/ghrun lists runs by default (T0: auto-execute)'
-    Skip if 'gh not authenticated' ! gh auth status >/dev/null 2>&1
+    Skip if 'gh not authenticated' bash -c '! gh auth status >/dev/null 2>&1'
     When run bash bin/agence /ghrun
     The status should be success
     The output should not be blank
   End
 
   It '/ghflow lists workflows by default (T0: auto-execute)'
-    Skip if 'gh not authenticated' ! gh auth status >/dev/null 2>&1
+    Skip if 'gh not authenticated' bash -c '! gh auth status >/dev/null 2>&1'
     When run bash bin/agence /ghflow
     The status should be success
     The output should not be blank
   End
 
   It '/ghissue lists issues by default (T0: auto-execute)'
-    Skip if 'gh not authenticated' ! gh auth status >/dev/null 2>&1
+    Skip if 'gh not authenticated' bash -c '! gh auth status >/dev/null 2>&1'
     When run bash bin/agence /ghissue
     The status should be success
     The output should not be blank

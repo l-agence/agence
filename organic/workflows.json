@@ -3,32 +3,50 @@
     {
       "id": "WF-DOCS",
       "title": "Documentation",
-      "tasks": ["DOC-001", "DOC-002", "DOC-003"]
+      "tasks": ["DOC-001", "DOC-002", "DOC-003"],
+      "completed": 1,
+      "total": 3,
+      "completion_pct": 33
     },
     {
       "id": "WF-TEST",
       "title": "Test Suite",
-      "tasks": ["TEST-001", "CLI-003"]
+      "tasks": ["TEST-001", "CLI-003"],
+      "completed": 2,
+      "total": 2,
+      "completion_pct": 100
     },
     {
       "id": "WF-INFRA",
       "title": "Core Infrastructure",
-      "tasks": ["INFRA-001", "INFRA-002", "INFRA-003", "INFRA-004", "INFRA-005"]
+      "tasks": ["INFRA-001", "INFRA-002", "INFRA-003", "INFRA-004", "INFRA-005"],
+      "completed": 5,
+      "total": 5,
+      "completion_pct": 100
     },
     {
       "id": "WF-CLI",
       "title": "CLI & Tools",
-      "tasks": ["CLI-001", "CLI-002"]
+      "tasks": ["CLI-001", "CLI-002"],
+      "completed": 2,
+      "total": 2,
+      "completion_pct": 100
     },
     {
       "id": "WF-SWARM",
       "title": "Swarm Orchestration",
-      "tasks": ["SWARM-001", "SWARM-002"]
+      "tasks": ["SWARM-001", "SWARM-002"],
+      "completed": 2,
+      "total": 2,
+      "completion_pct": 100
     },
     {
       "id": "WF-BUGS",
       "title": "Bug Fixes",
-      "tasks": ["BUG-001"]
+      "tasks": ["BUG-001"],
+      "completed": 1,
+      "total": 1,
+      "completion_pct": 100
     }
   ]
 }

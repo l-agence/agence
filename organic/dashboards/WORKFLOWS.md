@@ -1,7 +1,7 @@
 # Workflows Dashboard
 
 > **Source**: `organic/workflows.json` + `organic/tasks.json`  
-> **Generated**: 2026-04-10 | **Project**: PROJ-LAGENCE
+> **Generated**: 2026-04-14 | **Project**: PROJ-LAGENCE
 
 ---
 
@@ -9,12 +9,12 @@
 
 | ID | Title | Tasks | Completed | Remaining | Completion % | Status |
 |----|-------|-------|-----------|-----------|-------------|--------|
-| WF-INFRA | Core Infrastructure | 5 | 0 | 5 | 0% | 🔴 Not started |
-| WF-DOCS | Documentation | 3 | 0 | 3 | 0% | 🔴 Not started |
-| WF-TEST | Test Suite | 2 | 0 | 2 | 0% | 🔴 Not started |
-| WF-CLI | CLI & Tools | 2 | 0 | 2 | 0% | 🔴 Not started |
-| WF-SWARM | Swarm Orchestration | 2 | 0 | 2 | 0% | 🔴 Not started |
-| WF-BUGS | Bug Fixes | 1 | 0 | 1 | 0% | 🔴 Not started |
+| WF-INFRA | Core Infrastructure | 5 | 5 | 0 | 100% | ✅ Done |
+| WF-DOCS | Documentation | 3 | 1 | 2 | 33% | 🟡 In progress |
+| WF-TEST | Test Suite | 2 | 2 | 0 | 100% | ✅ Done |
+| WF-CLI | CLI & Tools | 2 | 2 | 0 | 100% | ✅ Done |
+| WF-SWARM | Swarm Orchestration | 2 | 2 | 0 | 100% | ✅ Done |
+| WF-BUGS | Bug Fixes | 1 | 1 | 0 | 100% | ✅ Done |
 
 ---
 
@@ -35,22 +35,22 @@
 | ID | Title | State | Score | Blocked |
 |----|-------|-------|-------|---------|
 | DOC-001 | Update docs for v0.3.2 | `~` | 40 | — |
-| DOC-002 | Update show_help() | `~` | 40 | ; DOC-001 |
-| DOC-003 | Clear stale synthetic todos | `~` | 20 | — |
+| DOC-002 | Update show_help() | `~` | 40 | DOC-001 |
+| DOC-003 | Clear stale synthetic todos | `-` | 20 | — |
 
 ### WF-TEST — Test Suite (2 tasks)
 
 | ID | Title | State | Score | Blocked |
 |----|-------|-------|-------|---------|
 | CLI-003 | Smoke tests: path validation | `-` | 50 | — |
-| TEST-001 | Shellspec: ^ledger, ^audit | `~` | 50 | ; CLI-003 |
+| TEST-001 | Shellspec: ^ledger, ^audit | `-` | 50 | — |
 
 ### WF-CLI — CLI & Tools (2 tasks)
 
 | ID | Title | State | Score | Blocked |
 |----|-------|-------|-------|---------|
-| CLI-001 | agence help deep improvements | `~` | 20 | — |
-| CLI-002 | .gitignore final review | `~` | 20 | — |
+| CLI-001 | agence help deep improvements | `-` | 20 | — |
+| CLI-002 | .gitignore final review | `-` | 20 | — |
 
 ### WF-SWARM — Swarm Orchestration (2 tasks)
 
@@ -63,7 +63,7 @@
 
 | ID | Title | State | Score | Blocked |
 |----|-------|-------|-------|---------|
-| BUG-001 | mnemonic + sessions prune | `~` | 40 | — |
+| BUG-001 | mnemonic + sessions prune | `-` | 40 | — |
 
 ---
 
