@@ -120,7 +120,14 @@ agence /git-status
 agence /git-log
 
 # Record a decision in the audit ledger
-agence ^fault add "Missed nil check in router"
+agence ^ledger append "Deployed v0.4.0"
+agence ^ledger verify            # Verify Merkle chain integrity
+agence ^audit trail              # View full decision audit trail
+
+# Run a Bun TypeScript module directly (router, audit, ledger, etc.)
+airun audit trail
+airun router resolve-route
+airun --list                     # List all available modules
 
 # See all commands
 agence --help

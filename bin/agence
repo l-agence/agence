@@ -324,8 +324,8 @@ KNOWLEDGE (^):
   ^learn                         Extract lesson from current context
 
 LEDGER & AUDIT (^):
-  ^ledger list|init|sync|status  Shared shard ledger (Merkle-chained)
-  ^audit trail|show|agent|stats  Decision audit trail
+  ^ledger append|verify|tail|count|list|init  Merkle-chained decision ledger
+  ^audit trail|show|agent|session|diff|stats  Decision audit trail
   ^session list|view|prune       Session lifecycle
   ^session prune --days 3        Archive + remove old sessions
 
@@ -333,6 +333,12 @@ INDEX (^):
   ^index                         Scan for missing INDEX.json files
   ^reindex                       Regenerate INDEX.json via bin/indexer
   ^recall <pattern>              Search hermetic memory
+
+TOOLS (bin/):
+  airun <module> [args...]       Run a Bun TypeScript module by name
+  airun audit trail              → bun run lib/audit.ts trail
+  airun ledger list              → bun run lib/ledger.ts list
+  airun --list                   List all available modules
 
 GIT SHORTCUTS (/):                            Tier
   /status  /log  /diff  /remote               T0 (auto)
@@ -377,6 +383,7 @@ SEE ALSO:
   agence ^status                 Current state overview
   agence ^symbols                Show prefix/state symbol reference
   bin/COMMANDS.md                Full command routing reference
+  bin/airun --list               List Bun TypeScript modules
   codex/AIPOLICY.yaml            Policy tiers and guardrails
   codex/agents/registry.json     Agent definitions and model map
 EOF
