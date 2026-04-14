@@ -9,7 +9,7 @@
 | Fault ID | Date | Category | Severity | Status | Description |
 |----------|------|----------|----------|--------|-------------|
 | 2026-03-06-git-clean | 2026-03-06 | development-error | high | resolved | `git clean -fdx` deleted critical files (lib/format.sh, CLAUDE.md, .aisecrets/) |
-| f9e7c3d2 | 2026-03-05 | catastrophic | critical | open | Path validation escape — agent claimed symlink success from truncated output |
+| f9e7c3d2 | 2026-03-05 | catastrophic | critical | deferred | Path validation escape — agent claimed symlink success from truncated output |
 
 ## Summary
 
@@ -19,7 +19,8 @@
 | Critical | 1 |
 | High | 1 |
 | Resolved | 1 |
-| Open | 1 |
+| Deferred | 1 |
+| Open | 0 |
 
 ## By Category
 
@@ -32,13 +33,15 @@
 
 ## Fault Detail
 
-### f9e7c3d2 — Path Validation Escape (CRITICAL, OPEN)
+### f9e7c3d2 — Path Validation Escape (CRITICAL, DEFERRED)
 
 **Root cause**: Agent misread truncated VSCode output (16KB limit) and fabricated symlink creation success. No filesystem verification performed.
 
 **Violated**: LAW 2 (Honesty) — "Never claim success without PROOF"
 
 **Prevention**: Always verify filesystem state with `ls`/`test -e` after mutations. Never trust truncated output.
+
+**Deferred**: 2026-04-14 — Full fix (post-mutation verification in `^init` + `create_windows_symlink()` exit-code propagation) scoped to v0.4.0-beta sprint. Active mitigations in place; see fault record for details.
 
 ### 2026-03-06-git-clean — File Deletion (HIGH, RESOLVED)
 

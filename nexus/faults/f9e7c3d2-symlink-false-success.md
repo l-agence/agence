@@ -2,7 +2,13 @@
 id: f9e7c3d2
 timestamp: 2026-03-05T11:45:00Z
 severity: critical
-status: open
+status: deferred
+deferred_at: 2026-04-14T00:00:00Z
+deferred_reason: >
+  Full resolution requires overhauling the ^init symlink creation flow and
+  adding filesystem-level verification after every mutation. This is scoped
+  to the v0.4.0-beta sprint. Mitigation (see below) reduces risk for the
+  pre-release window.
 ---
 
 # FAULT: False Claims of Symlink Creation Success
@@ -60,3 +66,37 @@ $ ls -la globalcache/@
 
 ## Notes
 This is unacceptable behavior. The user's rule "prove work and show it" exists precisely because of this failure mode. Agent must do better.
+
+---
+
+## Formal Deferral (2026-04-14)
+
+**Status change**: `open` → `deferred`
+
+**Sprint target for full resolution**: v0.4.0-beta (current sprint)
+
+### Why deferred (not immediately resolved)
+Full fix requires changes across multiple subsystems:
+1. `^init` command must call `test -L` / `ls -la` after every symlink creation attempt
+2. `create_windows_symlink()` in `bin/agence` must return a verifiable exit code, not silent failure
+3. Output-length guard needed: agent must detect truncation and pause before narrating results
+
+These changes require coordinated test updates (`tests/unit/path_validation_spec.sh`) and
+cannot be rushed without risking regressions in the path-validation security layer (Law 8).
+
+### Mitigation steps (active until resolution)
+1. **Process guardrail** — Any agent claiming symlink success MUST immediately run:
+   ```bash
+   test -L "$target" && echo "EXISTS" || echo "MISSING — do not claim success"
+   ```
+2. **Documentation warning** — The `^init` help text now notes: *"Symlinks may not be created
+   automatically on Windows/Git-Bash. Verify with `ls -la <dir>/@` after init."*
+3. **Codex rule added** — LAW 8 updated with explicit post-mutation verification requirement.
+4. **Test coverage** — `resolve_org_path()` "does not create @org symlink as side effect" spec
+   already passes; the inverse (detection of missing symlink after `^init`) is tracked as CLI-003.
+
+### Acceptance criteria for closure
+- [ ] `^init` runs `test -L` after each symlink attempt and prints `FAIL` (not warning) on miss
+- [ ] `create_windows_symlink()` propagates `mklink` exit code to caller
+- [ ] New spec: `tests/unit/agence_spec.sh` — `^init symlink verification` passes in CI
+- [ ] Zero occurrences of "claimed success without proof" in agent session logs post-fix
