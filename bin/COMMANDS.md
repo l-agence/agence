@@ -1150,8 +1150,6 @@ agence ^init
 - [RULES.md](../codex/RULES.md) - Best practices
 - [bin/agence](./agence) - Main script
 
-test commit at Wed, Mar  4, 2026  7:23:14 PM
-
 ---
 
 ## Agence Command Grammar (EBNF)
@@ -1254,6 +1252,39 @@ agence ^session prune --days 0               # Prune ALL sessions
 ```
 
 **Requires**: `bun` + `lib/session.ts`
+
+### `airun <module> [args...]`
+
+**Scope**: Local (Bun TypeScript module runner)
+
+Run any Agence TypeScript module directly by short name, without needing the full `bun run lib/<module>.ts` path.
+
+**Usage**:
+```bash
+airun audit trail                    # Equivalent to: bun run lib/audit.ts trail
+airun audit trail --shard            # With optional flags
+airun router resolve-route           # Router module
+airun ailedger status                # Ledger status
+airun session list                   # Session management
+airun ledger list                    # Shared shard ledger
+airun --list                         # List all available modules
+airun --help                         # Show usage
+```
+
+**Available modules** (`lib/`):
+| Module | Description |
+|--------|-------------|
+| `audit` | Decision audit trail (reads `.ailedger`) |
+| `ailedger` | Append-only Merkle-chained ledger |
+| `ledger` | Shared shard ledger management |
+| `router` | Command routing and resolution |
+| `session` | Session lifecycle (list, view, prune) |
+| `aibash` | Agentic bash session manager |
+| `guard` | Security guard runtime (v0.4.0) |
+| `signal` | Inter-agent signalling (v0.4.0) |
+| `matrix` | Priority matrix computation (v0.4.0) |
+
+**Requires**: `bun` installed and `AGENCE_ROOT` set (auto-detected from script location)
 
 ---
 

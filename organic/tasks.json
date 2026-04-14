@@ -4,25 +4,25 @@
       "id": "DOC-001",
       "repo": "agence",
       "title": "Update docs for v0.3.2 (plans INDEX, README, COMMANDS.md)",
-      "state": "~",
+      "state": "-",
       "priority": 2,
       "stars": 0,
       "heat": 0.2,
-      "agent": null,
+      "agent": "copilot",
       "created": "2026-04-10T00:00:00Z",
-      "updated": "2026-04-10T00:00:00Z"
+      "updated": "2026-04-14T20:00:00Z"
     },
     {
       "id": "DOC-002",
       "repo": "agence",
       "title": "Update show_help() with new commands (^ledger, ^audit, airun)",
-      "state": "~",
+      "state": "-",
       "priority": 2,
       "stars": 0,
       "heat": 0.2,
-      "agent": null,
+      "agent": "copilot",
       "created": "2026-04-10T00:00:00Z",
-      "updated": "2026-04-10T00:00:00Z"
+      "updated": "2026-04-14T20:00:00Z"
     },
     {
       "id": "DOC-003",
@@ -153,7 +153,7 @@
     {
       "id": "SWARM-001",
       "repo": "agence",
-      "title": "Gate = write access (not --safe flag) — update aido tier routing",
+      "title": "Gate = write access (not --safe flag) \u2014 update aido tier routing",
       "state": "-",
       "priority": 3,
       "stars": 1,

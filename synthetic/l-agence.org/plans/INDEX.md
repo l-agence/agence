@@ -1,8 +1,8 @@
 # Agence Development Roadmap (2026 Q1–Q2)
 
-**Updated**: 2026-04-10
+**Updated**: 2026-04-14
 **Status**: v0.3.2 shipped, v0.4.0 in progress
-**Current**: main @ ee8d15c
+**Current**: main @ 5397e35
 
 ---
 
@@ -80,7 +80,7 @@ $task           swarm coordinating
 - **[v0.2.4-docker-matrix.md](v0.2.4-docker-matrix.md)** — Container isolation + priority routing
 - **[v0.3.0-tiles.md](v0.3.0-tiles.md)** — Real-time observability + control  
 - **[v0.3.1-orchestrator.md](v0.3.1-orchestrator.md)** — Multi-agent scheduling
-- **[v0.3.2-skupper.md](v0.3.2-skupper.md)** — Multi-cloud distribution
+- **[v0.3.2-skupper.md](v0.3.2-skupper.md)** — Multi-cloud distribution (future spec)
 - **[phases.json](phases.json)** — Structured phase data
 
 ---
@@ -123,6 +123,6 @@ $task           swarm coordinating
 
 ---
 
-**Last Updated**: 2026-03-31  
+**Last Updated**: 2026-04-14  
 **Owner**: l-agence team  
-**Next Review**: After Phase 1.5 completion
+**Next Review**: After v0.4.0 release

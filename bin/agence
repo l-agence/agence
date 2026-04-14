@@ -291,13 +291,20 @@ AGENT ROUTING:
 SYSTEM TOOLS (!):
   !bash                          Agentic bash session (current agent)
   !shell                         PowerShell session
-  !swarm [agent...]              Tmux 1+1 session (ibash + aibash)
+  !swarm [agent...]              Tmux 1+1 swarm session (via bin/swarm)
   !aider                         Aider CLI (pip install aider-chat)
   !claude                        Claude Code CLI (npm i -g @anthropic-ai/claude-code)
   !pilot                         GitHub Copilot CLI (gh copilot)
   !aish                          Microsoft AI Shell
   !peers                         Peer ensemble (multi-provider fan-out)
   !ralph, !sonya, !copilot       Agent-specific aibash sessions
+
+DAEMON (agentd — call directly):
+  agentd start [agent...]        Start swarm + write PID file
+  agentd stop                    Kill session + cleanup tangents
+  agentd status                  Show daemon + tangent state
+  agentd attach [agent]          Attach to tmux session
+  agentd tangent create|destroy|list  Manage agent worktrees + sockets
 
 WORKFLOW (^):
   ^status                        Agence + repo status
@@ -311,6 +318,7 @@ WORKFLOW (^):
   ^pause / ^resume               Session checkpoint / restore
   ^install                       Install agence into a repo
   ^init                          Initialize agence submodule
+  ^aido <tool> [args...]         Safe whitelisted command executor (read-only)
 
 KNOWLEDGE (^):
   ^lesson list|add|show          Lesson management
@@ -324,8 +332,8 @@ KNOWLEDGE (^):
   ^learn                         Extract lesson from current context
 
 LEDGER & AUDIT (^):
-  ^ledger list|init|sync|status  Shared shard ledger (Merkle-chained)
-  ^audit trail|show|agent|stats  Decision audit trail
+  ^ledger append|verify|tail|count|list|init  Merkle-chained decision ledger
+  ^audit trail|show|agent|session|diff|stats  Decision audit trail
   ^session list|view|prune       Session lifecycle
   ^session prune --days 3        Archive + remove old sessions
 
@@ -333,6 +341,12 @@ INDEX (^):
   ^index                         Scan for missing INDEX.json files
   ^reindex                       Regenerate INDEX.json via bin/indexer
   ^recall <pattern>              Search hermetic memory
+
+TOOLS (bin/):
+  airun <module> [args...]       Run a Bun TypeScript module by name
+  airun audit trail              → bun run lib/audit.ts trail
+  airun ledger list              → bun run lib/ledger.ts list
+  airun --list                   List all available modules
 
 GIT SHORTCUTS (/):                            Tier
   /status  /log  /diff  /remote               T0 (auto)
@@ -377,6 +391,8 @@ SEE ALSO:
   agence ^status                 Current state overview
   agence ^symbols                Show prefix/state symbol reference
   bin/COMMANDS.md                Full command routing reference
+  bin/airun --list               List Bun TypeScript modules
+  agentd --help                  Swarm daemon help (start/stop/status)
   codex/AIPOLICY.yaml            Policy tiers and guardrails
   codex/agents/registry.json     Agent definitions and model map
 EOF
@@ -1333,11 +1349,24 @@ mode_init() {
       bash "$AGENCE_ROOT/bin/aisession" resume "$restore_session_id"
       return $?
       ;;
+    "aido")
+      # Safe whitelisted command executor: agence ^aido <tool> [args...]
+      # Allows only read-only / idempotent operations (git, gh, aws, tf)
+      if [[ -z "$init_args" ]]; then
+        echo "Usage: agence ^aido <tool> [args...]" >&2
+        echo "  e.g. agence ^aido git status" >&2
+        echo "  e.g. agence ^aido gh pr list" >&2
+        echo "See bin/COMMANDS.md §aido for full allowlist." >&2
+        return 1
+      fi
+      bash "$AGENCE_ROOT/bin/aido" $init_args
+      return $?
+      ;;
     *)
       echo "Error: Unknown init command: $init_cmd" >&2
       echo "Available: help, init, reload, install, save, learn, commit, push, session," >&2
       echo "           lesson, log, plan, todo, fault, issue, task, job, audit, recall," >&2
-      echo "           handoff, pickup, pause, resume, index, reindex, session-restore" >&2
+      echo "           handoff, pickup, pause, resume, index, reindex, session-restore, aido" >&2
       return 1
       ;;
   esac
