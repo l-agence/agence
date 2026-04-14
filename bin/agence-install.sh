@@ -8,8 +8,8 @@
 
 set -euo pipefail
 
-WINDOWS_PKGS=(GitHub.cli jqland.jq MSYS2.MSYS2 HashiCorp.Terraform JFrog.jfrog-cli tflint awscli azure-cli)
-MAC_PKGS=(gh jq terraform jfrog-cli tflint awscli azure-cli)
+WINDOWS_PKGS=(GitHub.cli jqlang.jq Oven-sh.Bun MSYS2.MSYS2 HashiCorp.Terraform JFrog.jfrog-cli tflint awscli azure-cli)
+MAC_PKGS=(gh jq bun terraform jfrog-cli tflint awscli azure-cli)
 LINUX_PKGS=(gh jq terraform jfrog-cli tflint awscli azure-cli)
 
 prompt_install() {
@@ -93,7 +93,21 @@ install_linux_packages() {
       echo "Skipped $pkg"
     fi
   done
-  echo "Installation summary: $installed/${#LINUX_PKGS[@]} installed"
+  # bun — not in apt/dnf/yum; use official installer
+  echo -n "[bun] "
+  if command -v bun &>/dev/null; then
+    echo "✓ already installed ($(bun --version 2>/dev/null))"
+  elif prompt_install "bun (TypeScript runtime)"; then
+    if curl -fsSL https://bun.sh/install | bash &>/dev/null 2>&1; then
+      echo "✓ bun (installed)"
+      ((installed++))
+    else
+      echo "✗ bun (failed — try: curl -fsSL https://bun.sh/install | bash)"
+    fi
+  else
+    echo "Skipped"
+  fi
+  echo "Installation summary: $installed/$((${#LINUX_PKGS[@]} + 1)) installed"
 }
 
 main() {

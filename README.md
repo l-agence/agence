@@ -318,7 +318,8 @@ AIDO_NO_VERIFY=1 tests/lib/shellspec/shellspec --shell bash tests/unit/agence_sp
 
 > ✅ **Current status (v0.4.0-beta)**: 91 examples, **0 failures**, 17 skips, 1 warning — all blocking failures resolved.
 > Skip categories (expected in CI):
-> - `gh` CLI integration tests — skipped when `gh auth status` returns unauthenticated
+> - `gh` CLI integration tests — skipped when `gh auth status` returns unauthenticated.
+>   To run these locally, authenticate first: `agence /ghlogin`
 > - TTY-interactive commands (`T2`/`fetch`/`pull`/`merge`) — skipped headless CI
 >
 > Warning: `gitstatus` emits a guard-unavailable notice to stderr (bun runtime absent in CI); test passes.
