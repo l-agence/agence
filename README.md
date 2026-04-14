@@ -1,6 +1,7 @@
 # 🤖 l'Agence (^) —  Agentic Engineering Collaboration Environment
 
-**Author**: Stephane Korning · 2026 · [MIT + Commons Clause](LICENSE.md)
+**Author**: Stephane Korning · 2026 · [MIT + Commons Clause](LICENSE.md)  
+**Version**: v0.4.0-beta · *Pre-release — not yet production-ready*
 
 > *The first git-native and governed, multi-agent swarm for software engineering.*
 
@@ -311,9 +312,16 @@ MNEMONIC: This is a "fast access, ephemeral memory cache' It is intended to be a
 ## 🧪 Tests
 
 ```bash
-# Run full suite (91 examples, 0 failures)
+# Run full suite
 AIDO_NO_VERIFY=1 tests/lib/shellspec/shellspec --shell bash tests/unit/agence_spec.sh
 ```
+
+> ⚠️ **Current status (v0.4.0-beta)**: 91 examples, **14 failures** — temporary until resolved.
+> Known failure categories:
+> - `gh` CLI integration tests (gh not available in CI environment)
+> - `aibash` shell permission issues (`airun` lacks execute permission in test env)
+>
+> Tracking issue: fix targeted for v0.4.0 release. See [ISSUES.md](organic/dashboards/ISSUES.md).
 
 ---
 
