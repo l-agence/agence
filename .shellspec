@@ -3,6 +3,6 @@
 --shell /bin/bash
 # Run examples from project root so validate_execution_context passes
 --execdir @project
-# Pre-set GIT_ROOT/AI_ROOT so When run subprocesses bypass slow WSL git detection
---env GIT_ROOT=/mnt/c/Users/steff/git/.agence
---env AI_ROOT=/mnt/c/Users/steff/git/.agence
+# GIT_ROOT / AI_ROOT are resolved dynamically from the script's own location
+# by lib/env.sh — do NOT hardcode them here (breaks on any machine but the
+# original author's WSL path).

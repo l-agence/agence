@@ -13,9 +13,26 @@ set -euo pipefail
 # ── Source canonical environment ──────────────────────────────────────────────
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/env.sh"
 
-# Help — handle before security lockdown (needs full PATH for Bun help)
+# Help — print inline without requiring bun/airun
 if [[ "${1:-}" == "--help" || "${1:-}" == "help" || "${1:-}" == "-h" ]]; then
-	exec "$AGENCE_ROOT/bin/airun" aibash help
+	cat >&2 <<'EOF'
+Usage: aibash [options] [-- command...]
+
+  Agentic (robot) Bash shell — thin dispatcher with security envelope.
+
+Subcommands (via airun aibash):
+  init     Resolve config, create session, emit shell exports
+  validate Check policy via guard.ts (fail-closed)
+
+Options:
+  --session <id>   Session ID (auto-generated if omitted)
+  --agent <name>   Agent name (default: @)
+  --role <role>    Role: agentic|interactive (auto-detected)
+  --shell <type>   Shell type (default: bash)
+  -- <command...>  Command to pass through
+  --help, -h       Show this help
+EOF
+	exit 0
 fi
 
 # ── SECURITY ENVELOPE (must stay in bash — process-level isolation) ───────────
