@@ -180,6 +180,13 @@ _guard_check() {
     guard_output=$("$airun" guard check "$command" 2>/dev/null)
     local guard_exit=$?
 
+    # If airun itself failed (e.g. bun runtime unavailable), fall back to T1
+    # (allow but flag) so the shell remains usable without the Bun runtime.
+    if [[ $guard_exit -ne 0 ]]; then
+        echo "[AIDO] ⚠ Guard runtime unavailable — falling back to T1 (allow, flagged)" >&2
+        return 0
+    fi
+
     # Parse exports
     eval "$guard_output" 2>/dev/null
 

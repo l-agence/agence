@@ -22,7 +22,8 @@ export SHELL="${SHELL:-bash}"
 export SESSION="${SESSION:-unknown}"
 
 # Set default internal agence docs as an environment variable (synthetic DWM for agence itself)
-export AI_DOCS="C:\Users\steff\git\.agence\synthetic\l-agence.org\docs"
+# Falls back to the repo-relative synthetic docs path; override by setting AI_DOCS before sourcing
+export AI_DOCS="${AI_DOCS:-${AGENCE_REPO:-$(git rev-parse --show-toplevel 2>/dev/null)}/.agence/synthetic/l-agence.org/docs}"
 
 # ============================================================================
 # PROMPT
