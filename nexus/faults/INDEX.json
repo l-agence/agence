@@ -46,6 +46,11 @@
   },
   "entries": [
     {
+      "id": "2026-04-15-destructive-replace-install",
+      "title": "Destructive file replace instead of merge: agent replaced agence-install.sh content dropping macOS installer, terraform, azure-cli, awscli, jfrog-cli, tflint packages. Violated Laws 3,4,6 and Rule 8. User caught immediately.",
+      "date": "2026-04-15T14:30:00Z"
+    },
+    {
       "id": "1776092719_Incorrec",
       "title": "Incorrect merge strategy guidance: previously suggested --strategy-option=theirs (keep remote) instead of -X ours (keep local). This could cause unintended data loss. User caught and corrected before merge. Log as critical guidance error.",
       "date": "2026-04-13T15:05:19Z"

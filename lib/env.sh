@@ -33,6 +33,12 @@ GIT_ROOT="${GIT_ROOT:-$AGENCE_ROOT}"
 
 export AGENCE_ROOT AGENCE_BIN AGENCE_LIB AI_ROOT AI_BIN GIT_ROOT
 
+# Ensure AI_BIN is on PATH (idempotent — only add if not already present)
+case ":${PATH}:" in
+  *":${AI_BIN}:"*) ;;  # already on PATH
+  *) export PATH="${AI_BIN}:${PATH}" ;;
+esac
+
 # Standard directories
 AGENCE_SESSION_DIR="${AGENCE_SESSION_DIR:-$AI_ROOT/nexus/.aisessions}"
 AGENCE_LEDGER_DIR="${AGENCE_LEDGER_DIR:-$AI_ROOT/nexus/.ailedger}"

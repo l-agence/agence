@@ -105,12 +105,17 @@ export AGENCE_BIN="$AI_BIN"
 # We can also verify this via git or gh CLI
 
 compute_git_root() {
-    # Method 1: Git-based (always works if in git repo)
+    # Method 1: Git superproject (detects submodule parent)
     local git_root=$(git -C "$AI_ROOT" rev-parse --show-superproject-working-tree 2>/dev/null)
     
     if [[ -z "$git_root" ]]; then
-        # Method 2: Parent directory (AI_ROOT is a submodule, parent is GIT_ROOT)
-        git_root=$(dirname "$AI_ROOT")
+        # Method 2: Git toplevel (standalone mode — agence IS the repo)
+        git_root=$(git -C "$AI_ROOT" rev-parse --show-toplevel 2>/dev/null)
+    fi
+
+    if [[ -z "$git_root" ]]; then
+        # Method 3: Fallback — assume AI_ROOT is the repo root
+        git_root="$AI_ROOT"
     fi
     
     echo "$git_root"

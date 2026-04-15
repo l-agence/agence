@@ -96,9 +96,25 @@ See [SESSION-PERSISTENCE.md](../synthetic/l-agence.org/docs/SESSION-PERSISTENCE.
 
 ---
 
-## Law 6: Edit Only With Versioning
+## Law 6: Edit Only With Versioning — Never Destroy Without Consent
 
 - Never edit a file unless it is versioned and backed up (commit or stash).
+- Never replace file content when the intent is to add or modify. Merge, don't overwrite.
+- Deletions require explicit human consent — enumerate what will be removed before proceeding.
+
+```bash
+# ✅ LEGAL: Surgical edit (add to existing list)
+APT_CORE+=("gawk" "npm" "curl")
+
+# ❌ ILLEGAL: Replace entire list (drops existing entries)
+APT_CORE=("gawk" "npm" "curl")  # Where did jq, gh, tmux go?
+
+# ✅ LEGAL: Ask before removing
+# "This will remove terraform, azure-cli, awscli. Proceed? [y/N]"
+
+# ❌ ILLEGAL: Silent removal
+# Rewrite file without mentioning dropped content
+```
 
 ## Law 7: Upstream Actions Require Review
 

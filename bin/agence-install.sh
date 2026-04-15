@@ -1,130 +1,268 @@
 #!/usr/bin/env bash
 
 # agence-install.sh: Cross-platform package installer for Agence dependencies
-# Restores and updates ^install logic from git history
-# Installs required packages for Windows (winget), macOS (brew), Linux (apt/yum/dnf)
-# Does not exit on failure for any package; prints summary at end
-
+# Installs minimum core packages on both Windows (winget) and WSL-bash (apt)
+# When run from Git Bash / MSYS on Windows, installs BOTH winget + WSL packages
+# When run from WSL/Linux, installs apt packages only
 
 set -euo pipefail
 
-WINDOWS_PKGS=(GitHub.cli jqlang.jq Oven-sh.Bun MSYS2.MSYS2 HashiCorp.Terraform JFrog.jfrog-cli tflint awscli azure-cli)
-MAC_PKGS=(gh jq bun terraform jfrog-cli tflint awscli azure-cli)
-LINUX_PKGS=(gh jq terraform jfrog-cli tflint awscli azure-cli)
+# Source env.sh if available (sets AGENCE_ROOT, AI_BIN, etc.)
+_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_env_sh="$(cd "$_script_dir/.." && pwd)/lib/env.sh"
+if [[ -f "$_env_sh" ]]; then
+  source "$_env_sh"
+fi
 
-prompt_install() {
-  local pkg="$1"
-  read -p "Install $pkg? [y/N]: " yn
-  case $yn in
-    [Yy]*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
+# ============================================================================
+# Package lists
+# ============================================================================
 
-install_windows_packages() {
-  echo "Installing packages via winget..."
-  local installed=0
-  for pkg in "${WINDOWS_PKGS[@]}"; do
-    if winget list --id "$pkg" &>/dev/null; then
-      echo "✓ $pkg (already installed)"
-    elif prompt_install "$pkg"; then
-      if winget install -e --id "$pkg" --accept-package-agreements --accept-source-agreements &>/dev/null; then
-        echo "✓ $pkg (installed)"
-        ((installed++))
-      else
-        echo "✗ $pkg (failed to install)"
-      fi
-    else
-      echo "Skipped $pkg"
-    fi
-  done
-  echo "Installation summary: $installed/${#WINDOWS_PKGS[@]} installed"
-}
+# Windows (winget IDs) — core + existing packages
+WINGET_CORE=(
+  "jqlang.jq"
+  "GitHub.cli"
+  "GitHub.Copilot"
+  "GnuWin32.Gawk"
+  "Oven-sh.Bun"
+  "MSYS2.MSYS2"
+  "HashiCorp.Terraform"
+  "JFrog.jfrog-cli"
+  "tflint"
+  "Amazon.AWSCLI"
+  "Microsoft.AzureCLI"
+)
 
-install_macos_packages() {
-  echo "Installing packages via Homebrew..."
-  local installed=0
-  if ! command -v brew &>/dev/null; then
-    echo "[ERROR] Homebrew not found. Install from: https://brew.sh"
+# macOS (brew) — core + existing packages
+BREW_CORE=(
+  "gh"
+  "jq"
+  "gawk"
+  "tmux"
+  "npm"
+  "bun"
+  "terraform"
+  "jfrog-cli"
+  "tflint"
+  "awscli"
+  "azure-cli"
+)
+
+# WSL / Linux (apt package names) — core + existing packages
+APT_CORE=(
+  "jq"
+  "gh"
+  "gawk"
+  "tmux"
+  "npm"
+  "curl"
+  "terraform"
+  "jfrog-cli"
+  "tflint"
+  "awscli"
+  "azure-cli"
+)
+
+# ============================================================================
+# Helpers
+# ============================================================================
+
+info()  { echo "  $*"; }
+ok()    { echo "  ✓ $*"; }
+fail()  { echo "  ✗ $*" >&2; }
+warn()  { echo "  ⚠ $*"; }
+
+# ============================================================================
+# Windows (winget) installer
+# ============================================================================
+
+install_winget_packages() {
+  echo ""
+  echo "── Windows packages (winget) ──────────────────"
+  echo ""
+
+  if ! command -v winget.exe &>/dev/null && ! command -v winget &>/dev/null; then
+    fail "winget not found — skip Windows packages"
     return 1
   fi
-  for pkg in "${MAC_PKGS[@]}"; do
-    if brew list "$pkg" &>/dev/null; then
-      echo "✓ $pkg (already installed)"
-    elif prompt_install "$pkg"; then
-      if brew install "$pkg" &>/dev/null; then
-        echo "✓ $pkg (installed)"
-        ((installed++))
-      else
-        echo "✗ $pkg (failed to install)"
-      fi
+
+  local winget_cmd="winget"
+  command -v winget.exe &>/dev/null && winget_cmd="winget.exe"
+
+  local installed=0 skipped=0 failed=0
+
+  for pkg in "${WINGET_CORE[@]}"; do
+    echo -n "  [$pkg] "
+    if $winget_cmd list --id "$pkg" &>/dev/null 2>&1; then
+      echo "✓ already installed"; ((skipped++))
+    elif $winget_cmd install -e --id "$pkg" --accept-package-agreements --accept-source-agreements &>/dev/null 2>&1; then
+      echo "✓ installed"; ((installed++))
     else
-      echo "Skipped $pkg"
+      echo "✗ failed"; ((failed++))
     fi
   done
-  echo "Installation summary: $installed/${#MAC_PKGS[@]} installed"
-}
 
-install_linux_packages() {
-  echo "Installing packages via system package manager..."
-  local installed=0
-  local pkg_manager=""
-  if command -v apt &>/dev/null; then
-    pkg_manager="apt"
-  elif command -v dnf &>/dev/null; then
-    pkg_manager="dnf"
-  elif command -v yum &>/dev/null; then
-    pkg_manager="yum"
+  # bun — use PowerShell installer on Windows
+  echo -n "  [bun] "
+  if command -v bun &>/dev/null || command -v bun.exe &>/dev/null; then
+    echo "✓ already installed"
+  elif powershell.exe -c 'irm bun.sh/install.ps1 | iex' &>/dev/null 2>&1; then
+    echo "✓ installed (PowerShell)"
+  elif $winget_cmd install -e --id Oven-sh.Bun --accept-package-agreements --accept-source-agreements &>/dev/null 2>&1; then
+    echo "✓ installed (winget fallback)"
   else
-    echo "[ERROR] No supported package manager found (apt, dnf, yum)"
-    return 1
+    echo "✗ failed (try: powershell -c \"irm bun.sh/install.ps1 | iex\")"
   fi
-  for pkg in "${LINUX_PKGS[@]}"; do
-    if dpkg -l | grep -qw "$pkg" || rpm -q "$pkg" &>/dev/null; then
-      echo "✓ $pkg (already installed)"
-    elif prompt_install "$pkg"; then
-      if sudo $pkg_manager install -y "$pkg" &>/dev/null; then
-        echo "✓ $pkg (installed)"
-        ((installed++))
-      else
-        echo "✗ $pkg (failed to install)"
-      fi
+
+  echo ""
+  echo "  Summary: $installed installed, $skipped already present, $failed failed"
+}
+
+# ============================================================================
+# WSL / Linux (apt) installer
+# ============================================================================
+
+install_apt_packages() {
+  echo ""
+  echo "── WSL/Linux packages (apt) ───────────────────"
+  echo ""
+
+  local sudo_cmd="sudo"
+  # If already root, don't use sudo
+  [[ "$(id -u)" == "0" ]] && sudo_cmd=""
+
+  # apt update first
+  info "Updating package lists..."
+  if $sudo_cmd apt-get update -qq &>/dev/null 2>&1; then
+    ok "apt-get update completed"
+  else
+    warn "apt-get update failed (continuing anyway)"
+  fi
+  echo ""
+
+  local installed=0 skipped=0 failed=0
+
+  for pkg in "${APT_CORE[@]}"; do
+    echo -n "  [$pkg] "
+    if command -v "$pkg" &>/dev/null || dpkg -l "$pkg" &>/dev/null 2>&1; then
+      echo "✓ already installed"; ((skipped++))
+    elif $sudo_cmd apt-get install -y "$pkg" &>/dev/null 2>&1; then
+      echo "✓ installed"; ((installed++))
     else
-      echo "Skipped $pkg"
+      echo "✗ failed (try: sudo apt-get install $pkg)"; ((failed++))
     fi
   done
-  # bun — not in apt/dnf/yum; use official installer
-  echo -n "[bun] "
+
+  # tmux — check separately since it may not be in command -v path
+  # (already in APT_CORE above)
+
+  # bun — use curl installer on Linux/WSL
+  echo -n "  [bun] "
   if command -v bun &>/dev/null; then
     echo "✓ already installed ($(bun --version 2>/dev/null))"
-  elif prompt_install "bun (TypeScript runtime)"; then
-    if curl -fsSL https://bun.sh/install | bash &>/dev/null 2>&1; then
-      echo "✓ bun (installed)"
-      ((installed++))
-    else
-      echo "✗ bun (failed — try: curl -fsSL https://bun.sh/install | bash)"
-    fi
+  elif curl -fsSL https://bun.sh/install | bash &>/dev/null 2>&1; then
+    echo "✓ installed"; ((installed++))
   else
-    echo "Skipped"
+    echo "✗ failed (try: curl -fsSL https://bun.sh/install | bash)"; ((failed++))
   fi
-  echo "Installation summary: $installed/$((${#LINUX_PKGS[@]} + 1)) installed"
+
+  echo ""
+  echo "  Summary: $installed installed, $skipped already present, $failed failed"
+}
+
+# ============================================================================
+# macOS (brew) installer
+# ============================================================================
+
+install_macos_packages() {
+  echo ""
+  echo "── macOS packages (Homebrew) ──────────────────"
+  echo ""
+
+  if ! command -v brew &>/dev/null; then
+    fail "Homebrew not found — install from: https://brew.sh"
+    return 1
+  fi
+
+  local installed=0 skipped=0 failed=0
+
+  for pkg in "${BREW_CORE[@]}"; do
+    echo -n "  [$pkg] "
+    if brew list "$pkg" &>/dev/null 2>&1; then
+      echo "✓ already installed"; ((skipped++))
+    elif brew install "$pkg" &>/dev/null 2>&1; then
+      echo "✓ installed"; ((installed++))
+    else
+      echo "✗ failed"; ((failed++))
+    fi
+  done
+
+  echo ""
+  echo "  Summary: $installed installed, $skipped already present, $failed failed"
+}
+
+# ============================================================================
+# Platform detection and main
+# ============================================================================
+
+detect_platform() {
+  if [[ -f /proc/version ]] && grep -qi microsoft /proc/version 2>/dev/null; then
+    echo "wsl"
+  elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "mingw"* || "$OSTYPE" == "cygwin"* ]]; then
+    echo "windows"
+  elif [[ "$OSTYPE" == "darwin"* ]]; then
+    echo "macos"
+  elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    echo "linux"
+  else
+    echo "unknown"
+  fi
 }
 
 main() {
-  case "$(uname -s)" in
-    Linux)
-      install_linux_packages
+  local platform
+  platform="$(detect_platform)"
+
+  echo "=============================================="
+  echo "  AGENCE INSTALL"
+  echo "=============================================="
+  echo "  Platform: $platform"
+  echo "  AGENCE_ROOT: ${AGENCE_ROOT:-<not set>}"
+  echo "=============================================="
+
+  case "$platform" in
+    wsl)
+      # WSL: install BOTH Windows (winget) and Linux (apt) packages
+      install_winget_packages
+      install_apt_packages
       ;;
-    Darwin)
+    windows)
+      # Git Bash / MSYS / Cygwin: install Windows packages
+      # Also try to install WSL packages if wsl.exe is available
+      install_winget_packages
+      if command -v wsl.exe &>/dev/null; then
+        echo ""
+        echo "── Also installing in WSL ────────────────────"
+        wsl.exe bash -c "$(cat "$_script_dir/agence-install.sh")" 2>/dev/null || \
+          warn "WSL package install skipped (WSL not available or failed)"
+      fi
+      ;;
+    linux)
+      install_apt_packages
+      ;;
+    macos)
       install_macos_packages
       ;;
-    MINGW*|MSYS*|CYGWIN*)
-      install_windows_packages
-      ;;
     *)
-      echo "[ERROR] Unsupported OS: $(uname -s)"
+      fail "Unsupported platform: $platform ($OSTYPE)"
+      exit 1
       ;;
   esac
+
+  echo ""
+  echo "=============================================="
+  echo "  Done. Run 'agence ^init' to verify setup."
+  echo "=============================================="
 }
 
 main "$@"

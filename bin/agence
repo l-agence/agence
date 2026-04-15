@@ -2177,11 +2177,17 @@ AGENCERC
 
   # ── Step 5: Emit PATH hint ───────────────────────────────────────────────
   echo "Step 5/6: PATH setup..."
+  # Ensure AI_BIN is on PATH for this session (idempotent)
+  case ":${PATH}:" in
+    *":${AI_BIN}:"*) ;;
+    *) export PATH="${AI_BIN}:${PATH}" ;;
+  esac
   if command -v agence &>/dev/null; then
     echo "  ✓ agence is on PATH ($(command -v agence))"
     ((ok++))
   else
-    echo "  ⚠ agence not found on PATH. Add this to your .bashrc / .zshrc:"
+    echo "  + Added ${AI_BIN} to PATH for this session"
+    echo "  ⚠ To persist, add to your .bashrc / .zshrc:"
     echo "      export PATH=\"${AGENCE_ROOT}/bin:\$PATH\""
     ((warn++))
   fi
@@ -2890,7 +2896,7 @@ install_windows_packages() {
   echo "Installing AI tools via winget..."
   echo ""
   echo "  Core (required):"
-  local -a winget_required=("GitHub.cli" "jqlang.jq" "Oven-sh.Bun" "Anthropic.ClaudeCode" "GitHub.Copilot" "Microsoft.AIShell")
+  local -a winget_required=("GitHub.cli" "jqlang.jq" "GnuWin32.Gawk" "Anthropic.ClaudeCode" "GitHub.Copilot" "Microsoft.AIShell")
   for pkg in "${winget_required[@]}"; do
     echo -n "  [$pkg] "
     if winget list --id "$pkg" &>/dev/null 2>&1; then
@@ -2901,6 +2907,18 @@ install_windows_packages() {
       echo "✗ failed (try manually: winget install $pkg)"
     fi
   done
+  echo ""
+  echo "  Core (script installer):"
+  echo -n "  [bun] "
+  if command -v bun &>/dev/null; then
+    echo "✓ already installed ($(bun --version 2>/dev/null))"
+  elif powershell -c 'irm bun.sh/install.ps1 | iex' &>/dev/null 2>&1; then
+    echo "✓ installed (via PowerShell)"
+  elif winget install -e --id Oven-sh.Bun --accept-package-agreements --accept-source-agreements &>/dev/null 2>&1; then
+    echo "✓ installed (via winget fallback)"
+  else
+    echo "✗ failed (try: powershell -c \"irm bun.sh/install.ps1 | iex\")"
+  fi
   echo ""
   echo "  Optional (Python):"
   if command -v pip &>/dev/null || command -v pip3 &>/dev/null; then
@@ -2965,8 +2983,16 @@ install_macos_packages() {
 install_linux_packages() {
   echo "Installing AI tools (Linux/WSL)..."
   echo ""
+  # Update package lists first (required before first install)
+  echo "  Updating package lists..."
+  if sudo apt-get update -qq &>/dev/null 2>&1; then
+    echo "  ✓ apt-get update completed"
+  else
+    echo "  ⚠ apt-get update failed (continuing anyway)" >&2
+  fi
+  echo ""
   # System packages
-  local -a apt_pkgs=("git" "jq" "tmux" "util-linux" "gh")
+  local -a apt_pkgs=("git" "jq" "gawk" "tmux" "util-linux" "gh" "npm" "curl")
   local pkg_ok=0 pkg_fail=0
   echo "  System (apt):"
   for pkg in "${apt_pkgs[@]}"; do

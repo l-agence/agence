@@ -541,7 +541,46 @@ aws_count=$(aido aws list-instances | jq '.Reservations | length')
 
 All knowledge items—todos, issues, tasks, logs, lessons, faults—are quantized and tracked as individual, additive entries. Never squash, overwrite, or delete entries unless explicitly requested. History and state must always be preserved. You may append new entries or update existing ones if requested, but never remove or merge away prior records. This ensures full auditability, traceability, and knowledge integrity.
 
-## Summary: The 14 Rules of CODEX
+---
+
+## Rule 16: Merge, Don't Replace
+
+**Do**: When modifying files, prefer surgical edits over wholesale rewrites.
+
+**Why**: Replacing content silently drops existing functionality. This violates Law 6 and causes data loss that may not be caught until runtime.
+
+**Before editing**:
+1. Read what exists in the target section
+2. Identify what to add, change, or keep
+3. Apply the smallest diff that achieves the goal
+4. If in doubt, ask: "Should I replace or merge?"
+
+**Interpretation guide**:
+- "Add X" → append to existing list
+- "Change X to Y" → targeted edit of X only
+- "Rewrite" or "Replace" → full replacement (requires explicit confirmation)
+- "Fix X" → modify X, preserve everything else
+
+**Examples**:
+
+```bash
+# ❌ BAD: Replace entire file to add one package
+# (drops macOS installer, terraform, azure-cli, etc.)
+APT_CORE=("jq" "gawk" "npm")
+
+# ✅ GOOD: Add to existing array
+# Existing: APT_CORE=("jq" "gh" "tmux" "terraform" "azure-cli")
+# Edit: add gawk, npm, curl to the array
+APT_CORE=("jq" "gh" "tmux" "terraform" "azure-cli" "gawk" "npm" "curl")
+
+# ✅ GOOD: Surgical replace_string_in_file on the specific line
+# oldString: local -a apt_pkgs=("git" "jq" "tmux")
+# newString: local -a apt_pkgs=("git" "jq" "gawk" "tmux" "npm" "curl")
+```
+
+---
+
+## Summary: The 16 Rules of CODEX
 
 | Rule | Practice | Benefit |
 |------|----------|---------|
@@ -559,9 +598,11 @@ All knowledge items—todos, issues, tasks, logs, lessons, faults—are quantize
 | **12** | Cache your context | Token-efficient operation |
 | **13** | Block dangerous operators | Prevent accidental data loss/leaks |
 | **14** | Use AIDO for safe operations | Zero-friction reads + inspections |
+| **15** | Additive tracking principle | Full auditability & knowledge integrity |
+| **16** | Merge, don't replace | Prevent silent content loss |
 
 ---
 
-**Version**: 0.1.0  
+**Version**: 0.2.0  
 **Status**: In Effect  
-**Last Updated**: 2026-03-04
+**Last Updated**: 2026-04-15
