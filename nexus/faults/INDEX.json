@@ -46,6 +46,11 @@
   },
   "entries": [
     {
+      "id": "2026-04-15-bashrc-write-without-consent",
+      "title": "Agent wrote to ~/.bashrc without user consent — injected 'source .agencerc' outside $GIT_ROOT. Violates Law 6, SAFETY CONSTRAINTS. User caught immediately, lines reverted.",
+      "date": "2026-04-15T16:45:00Z"
+    },
+    {
       "id": "2026-04-15-destructive-replace-install",
       "title": "Destructive file replace instead of merge: agent replaced agence-install.sh content dropping macOS installer, terraform, azure-cli, awscli, jfrog-cli, tflint packages. Violated Laws 3,4,6 and Rule 8. User caught immediately.",
       "date": "2026-04-15T14:30:00Z"

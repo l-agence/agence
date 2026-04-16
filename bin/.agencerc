@@ -91,12 +91,18 @@ compute_agence_root() {
 
 export AI_ROOT=$(compute_agence_root)
 
-# Export AI_BIN (before OS-specific profiles add it to PATH)
+# Export AI_BIN and add to PATH (idempotent)
 export AI_BIN="$AI_ROOT/bin"
 
 # Legacy aliases for backwards compatibility
 export AGENCE_ROOT="$AI_ROOT"
 export AGENCE_BIN="$AI_BIN"
+
+# Ensure AI_BIN is on PATH (idempotent — only add if not already present)
+case ":${PATH}:" in
+  *":${AI_BIN}:"*) ;;
+  *) export PATH="${AI_BIN}:${PATH}" ;;
+esac
 
 # ============================================================================
 # STEP 3: Compute REPO_ROOT Dynamically

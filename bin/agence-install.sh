@@ -56,6 +56,7 @@ APT_CORE=(
   "tmux"
   "npm"
   "curl"
+  "wslu"
   "terraform"
   "jfrog-cli"
   "tflint"

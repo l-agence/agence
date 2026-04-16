@@ -7,7 +7,7 @@
     "terminal.integrated.profiles.windows": {
         "Ubuntu (WSL)": {
             "path": "C:\\Windows\\System32\\wsl.exe",
-            "args": ["--distribution", "Ubuntu"],
+            "args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/stefu/git/agence/bin/.agencerc"],
             "icon": "terminal-ubuntu",
             "color": "terminal.ansiGreen"
         },
@@ -16,7 +16,7 @@
             // injection + agence env setup. Workaround for wsl.exe integration
             // warning: "Shell integration cannot be enabled for wsl.exe"
             "path": "C:\\Windows\\System32\\wsl.exe",
-            "args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/steff/git/.agence/bin/.agencerc"],
+            "args": ["--distribution", "Ubuntu", "--exec", "bash", "--rcfile", "/mnt/c/Users/stefu/git/agence/bin/.agencerc"],
             "icon": "terminal-ubuntu",
             "color": "terminal.ansiCyan"
         },

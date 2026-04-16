@@ -2175,20 +2175,23 @@ AGENCERC
   done
   echo ""
 
-  # ── Step 5: Emit PATH hint ───────────────────────────────────────────────
+  # ── Step 5: PATH setup ────────────────────────────────────────────────────
   echo "Step 5/6: PATH setup..."
   # Ensure AI_BIN is on PATH for this session (idempotent)
   case ":${PATH}:" in
     *":${AI_BIN}:"*) ;;
     *) export PATH="${AI_BIN}:${PATH}" ;;
   esac
+
   if command -v agence &>/dev/null; then
     echo "  ✓ agence is on PATH ($(command -v agence))"
     ((ok++))
   else
-    echo "  + Added ${AI_BIN} to PATH for this session"
-    echo "  ⚠ To persist, add to your .bashrc / .zshrc:"
-    echo "      export PATH=\"${AGENCE_ROOT}/bin:\$PATH\""
+    echo "  ⚠ agence is not on PATH in your current shell."
+    echo "    To activate, run:"
+    echo "      source ${AGENCE_ROOT}/bin/.agencerc"
+    echo "    Or launch with:"
+    echo "      bash --rcfile ${AGENCE_ROOT}/bin/.agencerc"
     ((warn++))
   fi
   echo ""
@@ -2992,7 +2995,7 @@ install_linux_packages() {
   fi
   echo ""
   # System packages
-  local -a apt_pkgs=("git" "jq" "gawk" "tmux" "util-linux" "gh" "npm" "curl")
+  local -a apt_pkgs=("git" "jq" "gawk" "tmux" "util-linux" "gh" "npm" "curl" "wslu")
   local pkg_ok=0 pkg_fail=0
   echo "  System (apt):"
   for pkg in "${apt_pkgs[@]}"; do
