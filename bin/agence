@@ -2540,10 +2540,13 @@ init_agence_environment() {
   # ── Step 2: Create required directories ───────────────────────────────────
   echo "Step 2/7: Creating directory structure..."
   local -a required_dirs=(
-    "nexus/sessions"
+    "nexus"
+    "nexus/.aisessions"
+    "nexus/.airuns"
     "nexus/faults"
     "nexus/logs"
     "organic/tasks"
+    "organic/workflows"
     "organic/jobs"
     "globalcache"
     "objectcode"

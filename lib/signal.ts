@@ -36,7 +36,8 @@ const AGENCE_ROOT = process.env.AGENCE_ROOT
   || join(import.meta.dir, "..");
 
 const SIGNAL_DIR = join(AGENCE_ROOT, "nexus", "signals");
-const SESSION_DIR = join(AGENCE_ROOT, "nexus", "sessions");
+const SESSION_BASE = join(AGENCE_ROOT, "nexus", ".aisessions");
+const SESSION_DIR = SESSION_BASE;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
