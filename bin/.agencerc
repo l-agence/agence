@@ -112,6 +112,9 @@ if [[ -d "$HOME/.bun/bin" ]]; then
   esac
 fi
 
+# Alias: 'ag' (Silver — Ag) → agence
+alias ag="${AI_BIN}/agence" 2>/dev/null || true
+
 # ============================================================================
 # STEP 3: Compute REPO_ROOT Dynamically
 # ============================================================================

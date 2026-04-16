@@ -326,10 +326,28 @@ KNOWLEDGE (^):
   ^todo list|add|show            Todo management
   ^task list|add|show            Organic task management
   ^job list|add|show             Job/workflow management
+  ^workflow list|add|show        Workflow management (organic)
+  ^project list|add|show         Project management (organic)
   ^fault list|add|show           Fault log management
   ^issue list|add|show           Issue tracking
   ^log list|show                 Session log viewer
   ^learn                         Extract lesson from current context
+
+LIST SHORTCUTS (^):
+  ^tasks                         → task list
+  ^projects                      → project list
+  ^workflows                     → workflow list
+  ^faults                        → fault list
+  ^issues                        → issue list
+  ^sessions                      → session list
+  ^swarms                        → swarm list
+  ^jobs                          → job list
+  ^logs                          → log list
+
+OUTPUT FLAGS (any list command):
+  -j, --json                     JSON output
+  -y, --yaml                     YAML output (requires yq)
+  -t, --table                    Tabular output (default for TTY)
 
 LEDGER & AUDIT (^):
   ^ledger append|verify|tail|count|list|init  Merkle-chained decision ledger
@@ -341,6 +359,18 @@ INDEX (^):
   ^index                         Scan for missing INDEX.json files
   ^reindex                       Regenerate INDEX.json via bin/indexer
   ^recall <pattern>              Search hermetic memory
+
+SWARM (agentd + !swarm):
+  !swarm [agent...]              Launch tmux 1+1 swarm tiles
+  agentd start [agent...]        Start swarm daemon + PID file
+  agentd stop                    Kill session + cleanup tangents
+  agentd status                  Show daemon + tangent state
+  agentd attach [agent]          Attach to tmux session
+  agentd tangent create|destroy|list  Manage agent worktrees + sockets
+  ^swarms                        List running swarm sessions (alias)
+
+ALIAS:
+  ag                             Shell alias for agence (Silver — Ag)
 
 TOOLS (bin/):
   airun <module> [args...]       Run a Bun TypeScript module by name
@@ -449,7 +479,7 @@ main() {
       ;;
     # Knowledge commands: never need LLM router
     # Supports both: 'agence plan list' AND 'agence ^plan list'
-    lesson|log|plan|todo|fault|issue|task|job)
+    lesson|log|plan|todo|fault|issue|task|job|workflow|project)
       mode_knowledge "$1" "${*:2}"
       exit $?
       ;;
@@ -1282,6 +1312,18 @@ mode_init() {
       mode_knowledge "job" "$init_args"
       return $?
       ;;
+    "workflow")
+      # Workflows (shared, organic)
+      # Usage: agence ^workflow [list|show|add]
+      mode_knowledge "workflow" "$init_args"
+      return $?
+      ;;
+    "project")
+      # Projects (shared, organic)
+      # Usage: agence ^project [list|show|add]
+      mode_knowledge "project" "$init_args"
+      return $?
+      ;;
     "audit")
       # Ledger audit & decision review
       # Usage: agence ^audit trail|show|agent|session|diff|stats [args]
@@ -1362,11 +1404,24 @@ mode_init() {
       bash "$AGENCE_ROOT/bin/aido" $init_args
       return $?
       ;;
+    # ── Plural list shortcuts ──────────────────────────────────────────────
+    "tasks")      mode_knowledge "task" "list $init_args"; return $? ;;
+    "projects")   mode_knowledge "project" "list $init_args"; return $? ;;
+    "workflows")  mode_knowledge "workflow" "list $init_args"; return $? ;;
+    "faults")     mode_knowledge "fault" "list $init_args"; return $? ;;
+    "issues")     mode_knowledge "issue" "list $init_args"; return $? ;;
+    "sessions")   mode_session "list $init_args"; return $? ;;
+    "swarms")     bash "$AGENCE_ROOT/bin/swarm" list $init_args 2>/dev/null || echo "(swarm list not yet implemented)"; return $? ;;
+    "jobs")       mode_knowledge "job" "list $init_args"; return $? ;;
+    "logs")       mode_knowledge "log" "list $init_args"; return $? ;;
+    "lessons")    mode_knowledge "lesson" "list $init_args"; return $? ;;
+    "plans")      mode_knowledge "plan" "list $init_args"; return $? ;;
+    "todos")      mode_knowledge "todo" "list $init_args"; return $? ;;
     *)
       echo "Error: Unknown init command: $init_cmd" >&2
       echo "Available: help, init, reload, install, save, learn, commit, push, session," >&2
-      echo "           lesson, log, plan, todo, fault, issue, task, job, audit, recall," >&2
-      echo "           handoff, pickup, pause, resume, index, reindex, session-restore, aido" >&2
+      echo "           lesson, log, plan, todo, fault, issue, task, job, workflow, project," >&2
+      echo "           audit, recall, handoff, pickup, pause, resume, index, reindex, aido" >&2
       return 1
       ;;
   esac
@@ -1838,7 +1893,7 @@ mode_session() {
 # Example: agence ^todo list
 
 mode_knowledge() {
-  local cmd_type="$1"    # lesson, log, plan, todo, fault, issue, task, job
+  local cmd_type="$1"    # lesson, log, plan, todo, fault, issue, task, job, workflow, project
   local input="$2"       # Remaining arguments
   
   local sub_cmd="${input%% *}"     # list, show, add
@@ -1846,8 +1901,12 @@ mode_knowledge() {
   
   local args="${input#$sub_cmd}"
   args="${args# }"  # Trim leading space
+
+  # Parse output format flags (-j/--json, -y/--yaml, -t/--table) from args
+  agence_detect_format
+  args=$(agence_parse_format_flags $args)
   
-  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Knowledge mode: $cmd_type/$sub_cmd args='$args'" >&2
+  [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Knowledge mode: $cmd_type/$sub_cmd args='$args' fmt=$_AGENCE_FMT" >&2
   
   # Delegate to Bun when available (lib/commands.ts)
   local _bun
@@ -1892,7 +1951,7 @@ mode_knowledge() {
       # Use @ symlink if present in hermetic
       base_path=$(resolve_org_path "$AGENCE_ROOT/hermetic" "$default_org")
       ;;
-    "task"|"job")
+    "task"|"job"|"workflow"|"project")
       # ORGANIC scope (team-assigned work)
       scope_type="ORGANIC"
       if [[ "$args" == *"--org"* ]]; then
@@ -1968,13 +2027,68 @@ knowledge_list() {
   local index_file="$3"
   local args="$4"
   
+  # ── Structured output: json/yaml/table via INDEX.json or root .json ──────
+  # Check for root-level organic data files (tasks.json, workflows.json, etc.)
+  local root_json="${AGENCE_ROOT}/organic/${cmd_type}s.json"
+  local index_json="${data_dir}/INDEX.json"
+  local json_source=""
+
+  if [[ -f "$root_json" ]] && command -v jq &>/dev/null; then
+    json_source="$root_json"
+  elif [[ -f "$index_json" ]] && command -v jq &>/dev/null; then
+    json_source="$index_json"
+  fi
+
+  # For machine-readable formats, emit structured data and return
+  case "${_AGENCE_FMT:-text}" in
+    json)
+      if [[ -n "$json_source" ]]; then
+        agence_format_json "$(cat "$json_source")"
+      else
+        echo "[]"
+      fi
+      return 0
+      ;;
+    yaml)
+      if [[ -n "$json_source" ]]; then
+        agence_format_yaml "$(cat "$json_source")"
+      else
+        echo "# (no data)"
+      fi
+      return 0
+      ;;
+    table)
+      if [[ -n "$json_source" ]]; then
+        local _json_content
+        _json_content=$(cat "$json_source")
+        # Auto-detect columns based on cmd_type
+        case "$cmd_type" in
+          task)     agence_format_table "$_json_content" "id,title,state,agent,priority" "12,40,6,12,8" ;;
+          job)      agence_format_table "$_json_content" "id,title,state,agent" "12,40,6,12" ;;
+          workflow) agence_format_table "$_json_content" "id,title,completed,total,completion_pct" "12,35,10,8,12" ;;
+          project)  agence_format_table "$_json_content" "id,title,status,completion_pct" "16,35,14,12" ;;
+          fault)    agence_format_table "$(jq '.entries' "$json_source" 2>/dev/null || echo '[]')" "fault_id,title,severity,status" "12,40,10,10" ;;
+          lesson)   agence_format_table "$(jq '.entries' "$json_source" 2>/dev/null || echo '[]')" "id,title,date" "12,45,12" ;;
+          *)        agence_format_table "$(jq 'if type == "array" then . elif .entries then .entries else [.] end' "$json_source" 2>/dev/null || echo '[]')" "id,title" "16,50" ;;
+        esac
+      else
+        echo "(no structured data for table output)"
+      fi
+      return 0
+      ;;
+  esac
+
+  # ── Default text output ──────────────────────────────────────────────────
   echo "[${cmd_type}]"
   
   # If jq is available, try to parse JSON files
-  # Handles multiple schema variants (id/lesson_id, date/date_extracted)
-  if [[ -f "${data_dir}/INDEX.json" ]] && command -v jq &>/dev/null; then
+  if [[ -n "$json_source" ]]; then
     local parsed
-    parsed=$(jq -r '.entries[]? | [(.id // .lesson_id // "?"), (.title // "(untitled)"), (.date // .date_extracted // "")] | "\(.[0]): \(.[1])\(if .[2] != "" then " (\(.[2]))" else "" end)"' "${data_dir}/INDEX.json" 2>/dev/null)
+    parsed=$(jq -r '
+      (if type == "array" then . elif .entries then .entries else [.] end)[]
+      | [(.id // .lesson_id // .fault_id // "?"), (.title // "(untitled)"), (.date // .date_extracted // .timestamp // "")]
+      | "\(.[0]): \(.[1])\(if .[2] != "" then " (\(.[2]))" else "" end)"
+    ' "$json_source" 2>/dev/null)
     if [[ -n "$parsed" ]]; then
       echo "$parsed" | sed 's/^/  /'
       return 0
@@ -2175,8 +2289,8 @@ AGENCERC
   done
   echo ""
 
-  # ── Step 5: PATH setup ────────────────────────────────────────────────────
-  echo "Step 5/7: PATH setup..."
+  # ── Step 5: PATH + ag alias ─────────────────────────────────────────────
+  echo "Step 5/7: PATH + ag alias..."
   # Ensure AI_BIN is on PATH for this session (idempotent)
   case ":${PATH}:" in
     *":${AI_BIN}:"*) ;;
@@ -2194,6 +2308,10 @@ AGENCERC
     echo "      bash --rcfile ${AGENCE_ROOT}/bin/.agencerc"
     ((warn++))
   fi
+
+  # Set up 'ag' alias (Silver — Ag) for the current shell
+  alias ag="${AI_BIN}/agence" 2>/dev/null || true
+  echo "  ✓ alias ag=${AI_BIN}/agence"
   echo ""
 
   # ── Step 6: Check key dependencies ───────────────────────────────────────

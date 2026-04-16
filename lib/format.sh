@@ -124,3 +124,89 @@ agence_format_json() {
     printf '%s\n' "$json"
   fi
 }
+
+# -- YAML output ---------------------------------------------------------------
+
+# agence_format_yaml "json_string"
+# Converts JSON to YAML via yq, falls back to JSON if yq unavailable.
+agence_format_yaml() {
+  local json="$1"
+  if command -v yq &>/dev/null; then
+    printf '%s\n' "$json" | yq -P .
+  elif command -v python3 &>/dev/null; then
+    printf '%s\n' "$json" | python3 -c 'import sys,json,yaml; yaml.dump(json.load(sys.stdin),sys.stdout,default_flow_style=False)' 2>/dev/null || printf '%s\n' "$json"
+  else
+    echo "# yq not installed — showing JSON" >&2
+    agence_format_json "$json"
+  fi
+}
+
+# -- Table output ---------------------------------------------------------------
+
+# agence_format_table "json_array" "col1,col2,col3" [widths]
+# Renders a JSON array of objects as a fixed-width text table.
+# Columns are comma-separated field names. Widths are optional comma-separated ints.
+agence_format_table() {
+  local json="$1"
+  local cols="$2"
+  local widths="${3:-}"
+
+  if ! command -v jq &>/dev/null; then
+    echo "(jq required for table output)" >&2
+    printf '%s\n' "$json"
+    return
+  fi
+
+  # Build header + separator
+  IFS=',' read -ra _cols <<< "$cols"
+  IFS=',' read -ra _widths <<< "$widths"
+  local header="" sep=""
+  for i in "${!_cols[@]}"; do
+    local w="${_widths[$i]:-20}"
+    local col="${_cols[$i]}"
+    local upper; upper=$(echo "$col" | tr '[:lower:]' '[:upper:]')
+    header+="$(printf "%-${w}s " "$upper")"
+    sep+="$(printf '%-*s ' "$w" '' | tr ' ' '-')"
+  done
+
+  case "$_AGENCE_FMT" in
+    text)  printf '\033[1m%s\033[0m\n' "$header" ;;
+    *)     printf '%s\n' "$header" ;;
+  esac
+  printf '%s\n' "$sep"
+
+  # Build jq expression for each row
+  local jq_expr='(.[] | ['
+  for i in "${!_cols[@]}"; do
+    [[ $i -gt 0 ]] && jq_expr+=','
+    jq_expr+="(.${_cols[$i]} // \"\")"
+  done
+  jq_expr+='] | @tsv)'
+
+  printf '%s\n' "$json" | jq -r "$jq_expr" | while IFS=$'\t' read -r -a vals; do
+    local row=""
+    for i in "${!_cols[@]}"; do
+      local w="${_widths[$i]:-20}"
+      row+="$(printf "%-${w}s " "${vals[$i]:-}")"
+    done
+    printf '%s\n' "$row"
+  done
+}
+
+# -- Format flag parser --------------------------------------------------------
+
+# agence_parse_format_flags args...
+# Extracts -j/--json, -y/--yaml, -t/--table from args.
+# Sets _AGENCE_FMT and prints remaining args (with flags stripped).
+agence_parse_format_flags() {
+  local remaining=()
+  for arg in "$@"; do
+    case "$arg" in
+      -j|--json)  _AGENCE_FMT="json" ;;
+      -y|--yaml)  _AGENCE_FMT="yaml" ;;
+      -t|--table) _AGENCE_FMT="table" ;;
+      *)          remaining+=("$arg") ;;
+    esac
+  done
+  echo "${remaining[*]}"
+}
