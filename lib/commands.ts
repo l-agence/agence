@@ -21,7 +21,7 @@ const AGENCE_ROOT = process.env.AGENCE_ROOT || AI_ROOT;
 
 // ─── Scope Resolution ────────────────────────────────────────────────────────
 
-type CmdType = "lesson" | "plan" | "issue" | "log" | "fault" | "todo" | "task" | "job";
+type CmdType = "lesson" | "plan" | "issue" | "log" | "fault" | "todo" | "task" | "job" | "workflow" | "project";
 type SubCmd = "list" | "show" | "add";
 type Scope = "SYNTHETIC" | "NEXUS" | "HERMETIC" | "ORGANIC";
 
@@ -66,6 +66,8 @@ function resolveScope(cmdType: CmdType, org: string): ScopeInfo {
       break;
     case "task":
     case "job":
+    case "workflow":
+    case "project":
       scope = "ORGANIC";
       baseDir = join(AGENCE_ROOT, "organic");
       break;
@@ -104,7 +106,28 @@ Last Updated: ${new Date().toISOString().replace(/\.\d{3}Z$/, "Z")}
 function knowledgeList(cmdType: string, dataDir: string): number {
   console.log(`[${cmdType}]`);
 
-  // Try JSON index first
+  // Try root-level organic JSON (e.g. organic/tasks.json, organic/workflows.json)
+  const rootJson = join(AGENCE_ROOT, "organic", `${cmdType}s.json`);
+  if (existsSync(rootJson)) {
+    try {
+      const data = JSON.parse(readFileSync(rootJson, "utf-8"));
+      // Root JSON may be: array, {entries:[...]}, or {<plural>:[...]} (e.g. {workflows:[...]})
+      const plural = `${cmdType}s`;
+      const entries = Array.isArray(data) ? data : (data[plural] || data.entries || []);
+      if (entries.length > 0) {
+        for (const e of entries) {
+          const id = e.id || e.fault_id || e.lesson_id || "?";
+          const title = e.title || "(untitled)";
+          const extra = e.state ? ` [${e.state}]` : (e.status ? ` [${e.status}]` : "");
+          const date = e.date || e.date_extracted || e.timestamp || "";
+          console.log(`  ${id}: ${title}${extra}${date ? ` (${date})` : ""}`);
+        }
+        return 0;
+      }
+    } catch { /* fall through */ }
+  }
+
+  // Try JSON index in data dir
   const jsonIndex = join(dataDir, "INDEX.json");
   if (existsSync(jsonIndex)) {
     try {
@@ -221,11 +244,11 @@ const [cmdType, subCmd, ...rest] = process.argv.slice(2);
 
 if (!cmdType) {
   console.error("Usage: airun commands <type> <list|show|add> [args...]");
-  console.error("Types: lesson, plan, todo, fault, issue, task, job, log");
+  console.error("Types: lesson, plan, todo, fault, issue, task, job, log, workflow, project");
   process.exit(1);
 }
 
-const validTypes = ["lesson", "plan", "issue", "log", "fault", "todo", "task", "job"];
+const validTypes = ["lesson", "plan", "issue", "log", "fault", "todo", "task", "job", "workflow", "project"];
 if (!validTypes.includes(cmdType)) {
   console.error(`Error: Unknown command type: ${cmdType}`);
   process.exit(1);

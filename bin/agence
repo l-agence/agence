@@ -129,6 +129,7 @@ AGENCE_CONFIG="${HOME}/.agence/config.yaml"
 source_if_exists "$AGENCE_LIB/utils.sh"
 source_if_exists "$AGENCE_LIB/logging.sh"
 source_if_exists "$AGENCE_LIB/safeguards.sh"
+source_if_exists "$AGENCE_LIB/format.sh"
 source_if_exists "$AGENCE_LIB/router.sh"
 source_if_exists "$AGENCE_LIB/ailedger.sh"
 
