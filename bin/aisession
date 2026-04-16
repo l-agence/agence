@@ -88,13 +88,16 @@ session_status() {
         return 1
     fi
     
-    local typescript_file="$SESSION_DIR/${sid}.typescript"
-    local meta_file="$SESSION_DIR/${sid}.meta.json"
+    local typescript_file
+    local meta_file
+    # Search day-sharded subdirs and flat (legacy) for the session
+    typescript_file=$(find "$SESSION_DIR" -name "${sid}.typescript" -type f 2>/dev/null | head -1)
+    meta_file=$(find "$SESSION_DIR" -name "${sid}.meta.json" -type f 2>/dev/null | head -1)
     
     # Validation
-    if [[ ! -f "$typescript_file" ]]; then
+    if [[ -z "$typescript_file" || ! -f "$typescript_file" ]]; then
         echo "[SESSION] ✗ Session not found: $sid" >&2
-        echo "[SESSION]   Expected: $typescript_file" >&2
+        echo "[SESSION]   Searched: $SESSION_DIR/*/" >&2
         return 1
     fi
     
@@ -384,12 +387,14 @@ session_handoff() {
         return 1
     fi
 
-    local meta_file="$SESSION_DIR/${sid}.meta.json"
-    local typescript_file="$SESSION_DIR/${sid}.typescript"
+    local meta_file
+    local typescript_file
+    meta_file=$(find "$SESSION_DIR" -name "${sid}.meta.json" -type f 2>/dev/null | head -1)
+    typescript_file=$(find "$SESSION_DIR" -name "${sid}.typescript" -type f 2>/dev/null | head -1)
     local target_dir="$SESSION_DIR/$agent"
     mkdir -p "$target_dir"
 
-    if [[ ! -f "$meta_file" || ! -f "$typescript_file" ]]; then
+    if [[ -z "$meta_file" || ! -f "$meta_file" || -z "$typescript_file" || ! -f "$typescript_file" ]]; then
         echo "[SESSION] ✗ Session or metadata not found: $sid" >&2
         return 1
     fi
@@ -420,12 +425,12 @@ session_init() {
         return 1
     fi
 
-    # Create per-agent subdirectory (used by handoff and grouping)
-    local agent_dir="$SESSION_DIR/$agent"
-    mkdir -p "$agent_dir" "$SESSION_DIR"
+    # Create day-sharded session directory
+    local day_dir
+    day_dir="$(agence_session_day_dir)"
 
-    local meta_file="$SESSION_DIR/${sid}.meta.json"
-    local typescript_file="$SESSION_DIR/${sid}.typescript"
+    local meta_file="$day_dir/${sid}.meta.json"
+    local typescript_file="$day_dir/${sid}.typescript"
     local ts
     ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 

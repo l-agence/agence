@@ -12,13 +12,12 @@ source "$AI_ROOT/lib/aicmd-lib.sh"
 # Universal agentic wrapper logic
 set -e
 
-# Generate unique session ID
-session_id="aicmd-$(date +%Y%m%d_%H%M%S)-$$-$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-session_dir="$AI_ROOT/nexus/.aisessions"
+# Generate unique session ID with agent prefix
+_agent="${AI_AGENT:-copilot}"
+session_id="${_agent}-$(date +%H%M%S)-$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+session_dir="$(agence_session_day_dir)"
 typescript_file="$session_dir/${session_id}.typescript"
 meta_file="$session_dir/${session_id}.meta.json"
-
-mkdir -p "$session_dir"
 
 # Run command under script for full I/O capture (skip if pipe-pane active)
 if [[ "${AGENCE_PIPE_PANE:-0}" == "1" ]]; then

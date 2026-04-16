@@ -76,16 +76,19 @@ trap '' SIGINT SIGQUIT SIGTSTP SIGSTOP
 
 _bun_config="$("$AGENCE_ROOT/bin/airun" aibash init "$@" 2>/dev/null)" || {
 	# Bun not available — fall back to minimal bash defaults
-	AI_AGENT="${AI_AGENT:-@}"
+	AI_AGENT="${AI_AGENT:-copilot}"
 	AI_ROLE="${AI_ROLE:-agentic}"
-	AI_SESSION="${AI_SESSION:-robo$$}"
+	_hhmmss=$(date +%H%M%S)
+	_hex=$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')
+	AI_SESSION="${AI_SESSION:-${AI_AGENT}-${_hhmmss}-${_hex}}"
 	SHELL_TYPE="${SHELL_TYPE:-bash}"
-	SESSION_LOG="${GIT_ROOT}/nexus/.aisessions/${AI_SESSION}.typescript"
-	SESSION_META="${GIT_ROOT}/nexus/.aisessions/${AI_SESSION}.meta.json"
+	_day_dir="$(agence_session_day_dir)"
+	SESSION_LOG="${_day_dir}/${AI_SESSION}.typescript"
+	SESSION_META="${_day_dir}/${AI_SESSION}.meta.json"
 	_AIBASH_PIPE_PANE=0
 	_AIBASH_COMMAND=""
 	export AI_AGENT AI_ROLE AI_SESSION SHELL_TYPE SESSION_LOG SESSION_META
-	mkdir -p "${GIT_ROOT}/nexus/.aisessions" 2>/dev/null || true
+	unset _hhmmss _hex _day_dir
 	echo "[aibash] Bun unavailable, using bash fallback" >&2
 }
 

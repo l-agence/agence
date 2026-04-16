@@ -21,7 +21,33 @@ import { join } from "path";
 import { randomBytes, createHash } from "crypto";
 
 const AI_ROOT = process.env.AI_ROOT || process.env.AGENCE_ROOT || join(import.meta.dir, "..");
-const SESSION_DIR = join(AI_ROOT, "nexus", ".aisessions");
+const SESSION_BASE = join(AI_ROOT, "nexus", ".aisessions");
+
+/** Return day-sharded session dir (DD/) with monthly recycling */
+function sessionDayDir(): string {
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, "0");
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const dayDir = join(SESSION_BASE, day);
+  mkdirSync(dayDir, { recursive: true });
+
+  const marker = join(dayDir, ".month");
+  if (existsSync(marker)) {
+    const stored = require("fs").readFileSync(marker, "utf-8").trim();
+    if (stored !== currentMonth) {
+      // Recycle: delete old session files from previous month
+      for (const f of require("fs").readdirSync(dayDir)) {
+        if (f.endsWith(".typescript") || f.endsWith(".meta.json")) {
+          require("fs").unlinkSync(join(dayDir, f));
+        }
+      }
+      writeFileSync(marker, currentMonth + "\n");
+    }
+  } else {
+    writeFileSync(marker, currentMonth + "\n");
+  }
+  return dayDir;
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -42,9 +68,13 @@ function isoNow(): string {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
-function generateSessionId(role: string): string {
-  const hex = randomBytes(4).toString("hex");
-  return role === "agentic" ? `robo${hex}` : `term${hex}`;
+function generateSessionId(agent: string): string {
+  const time = new Date();
+  const hhmmss = String(time.getHours()).padStart(2, "0")
+    + String(time.getMinutes()).padStart(2, "0")
+    + String(time.getSeconds()).padStart(2, "0");
+  const hex = randomBytes(4).toString("hex").slice(0, 8);
+  return `${agent}-${hhmmss}-${hex}`;
 }
 
 /** Emit eval-safe shell variable. Values are single-quoted to prevent injection. */
@@ -100,20 +130,16 @@ function cmdInit(argv: string[]): number {
   // Resolve defaults
   const isTTY = process.stdin.isTTY && process.stdout.isTTY;
   const role = parsed.role || process.env.AI_ROLE || (isTTY ? "interactive" : "agentic");
-  const agent = parsed.agent || process.env.AI_AGENT || "@";
+  const agent = parsed.agent || process.env.AI_AGENT || "copilot";
   const shell = parsed.shell || "bash";
   const gitRoot = process.env.GIT_ROOT || AI_ROOT;
-  const sessionId = parsed.session || process.env.AI_SESSION || generateSessionId(role);
+  const sessionId = parsed.session || process.env.AI_SESSION || generateSessionId(agent);
   const pipePane = process.env.AGENCE_PIPE_PANE === "1" && !!process.env.TMUX;
 
-  // Derive paths
-  const sessionLog = join(SESSION_DIR, `${sessionId}.typescript`);
-  const sessionMeta = join(SESSION_DIR, `${sessionId}.meta.json`);
-
-  // Ensure session directory exists
-  if (!existsSync(SESSION_DIR)) {
-    mkdirSync(SESSION_DIR, { recursive: true });
-  }
+  // Derive paths — use day-sharded session dir
+  const dayDir = sessionDayDir();
+  const sessionLog = join(dayDir, `${sessionId}.typescript`);
+  const sessionMeta = join(dayDir, `${sessionId}.meta.json`);
 
   // Write session metadata (same schema as session.ts init)
   if (!existsSync(sessionMeta)) {

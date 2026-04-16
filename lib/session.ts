@@ -16,7 +16,28 @@ import { execSync } from "child_process";
 
 // Resolve paths from env (set by lib/env.sh) or fallback
 const AI_ROOT = process.env.AI_ROOT || process.env.AGENCE_ROOT || join(import.meta.dir, "..");
-const SESSION_DIR = join(AI_ROOT, "nexus", ".aisessions");
+const SESSION_BASE = join(AI_ROOT, "nexus", ".aisessions");
+
+/** Recursively find all files matching a predicate under a directory */
+function findFiles(dir: string, predicate: (name: string) => boolean): string[] {
+  if (!existsSync(dir)) return [];
+  const results: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...findFiles(full, predicate));
+    } else if (predicate(entry.name)) {
+      results.push(full);
+    }
+  }
+  return results;
+}
+
+/** Find a meta.json file for a session ID across day-sharded subdirs */
+function findMetaPath(sid: string): string | null {
+  const paths = findFiles(SESSION_BASE, (name) => name === `${sid}.meta.json`);
+  return paths.length > 0 ? paths[0] : null;
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -37,8 +58,8 @@ interface SessionMeta {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function readMeta(sid: string): SessionMeta | null {
-  const metaFile = join(SESSION_DIR, `${sid}.meta.json`);
-  if (!existsSync(metaFile)) return null;
+  const metaFile = findMetaPath(sid);
+  if (!metaFile) return null;
   try {
     return JSON.parse(readFileSync(metaFile, "utf-8"));
   } catch {
@@ -50,21 +71,43 @@ function isoNow(): string {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
+/** Return day-sharded session dir (DD/) with monthly recycling */
+function sessionDayDir(): string {
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, "0");
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const dayDir = join(SESSION_BASE, day);
+  mkdirSync(dayDir, { recursive: true });
+
+  const marker = join(dayDir, ".month");
+  if (existsSync(marker)) {
+    const stored = readFileSync(marker, "utf-8").trim();
+    if (stored !== currentMonth) {
+      for (const f of readdirSync(dayDir)) {
+        if (f.endsWith(".typescript") || f.endsWith(".meta.json")) {
+          unlinkSync(join(dayDir, f));
+        }
+      }
+      writeFileSync(marker, currentMonth + "\n");
+    }
+  } else {
+    writeFileSync(marker, currentMonth + "\n");
+  }
+  return dayDir;
+}
+
 // ─── Commands ────────────────────────────────────────────────────────────────
 
 function sessionList(): number {
-  if (!existsSync(SESSION_DIR)) {
-    console.error(`[SESSION] ✗ No sessions directory: ${SESSION_DIR}`);
+  if (!existsSync(SESSION_BASE)) {
+    console.error(`[SESSION] ✗ No sessions directory: ${SESSION_BASE}`);
     return 1;
   }
 
-  const metaFiles = readdirSync(SESSION_DIR)
-    .filter((f) => f.endsWith(".meta.json"))
-    .sort()
-    .reverse();
+  const metaFiles = findFiles(SESSION_BASE, (f) => f.endsWith(".meta.json")).sort().reverse();
 
   if (metaFiles.length === 0) {
-    console.log(`No sessions found in ${SESSION_DIR}`);
+    console.log(`No sessions found in ${SESSION_BASE}`);
     return 0;
   }
 
@@ -109,12 +152,10 @@ function sessionInit(
     return 1;
   }
 
-  const agentDir = join(SESSION_DIR, agent);
-  mkdirSync(agentDir, { recursive: true });
-  mkdirSync(SESSION_DIR, { recursive: true });
+  const dayDir = sessionDayDir();
 
-  const metaFile = join(SESSION_DIR, `${sid}.meta.json`);
-  const typescriptFile = join(SESSION_DIR, `${sid}.typescript`);
+  const metaFile = join(dayDir, `${sid}.meta.json`);
+  const typescriptFile = join(dayDir, `${sid}.typescript`);
 
   const meta: SessionMeta = {
     session_id: sid,
@@ -143,12 +184,14 @@ function sessionStatus(sid: string): number {
     return 1;
   }
 
-  const typescriptFile = join(SESSION_DIR, `${sid}.typescript`);
+  // Search day-sharded subdirs for typescript file
+  const tsFiles = findFiles(SESSION_BASE, (name) => name === `${sid}.typescript`);
+  const typescriptFile = tsFiles.length > 0 ? tsFiles[0] : null;
   const meta = readMeta(sid);
 
-  if (!existsSync(typescriptFile)) {
+  if (!typescriptFile || !existsSync(typescriptFile)) {
     console.error(`[SESSION] ✗ Session not found: ${sid}`);
-    console.error(`[SESSION]   Expected: ${typescriptFile}`);
+    console.error(`[SESSION]   Searched: ${SESSION_BASE}/*/`);
     return 1;
   }
 
@@ -235,7 +278,7 @@ function sessionPrune(args: string[]): number {
   //   nexus/.aisessions/ — aisession-created .meta.json + .typescript files
   //   nexus/sessions/    — aibash/signal .awaiting markers + legacy .meta.json
   const LEGACY_SESSION_DIR = join(AI_ROOT, "nexus", "sessions");
-  const sessionDirs = [SESSION_DIR, LEGACY_SESSION_DIR].filter(d => existsSync(d));
+  const sessionDirs = [SESSION_BASE, LEGACY_SESSION_DIR].filter(d => existsSync(d));
 
   if (sessionDirs.length === 0) {
     console.error(`[SESSION] No sessions directory found`);

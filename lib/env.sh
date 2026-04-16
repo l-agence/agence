@@ -44,6 +44,38 @@ AGENCE_SESSION_DIR="${AGENCE_SESSION_DIR:-$AI_ROOT/nexus/.aisessions}"
 AGENCE_LEDGER_DIR="${AGENCE_LEDGER_DIR:-$AI_ROOT/nexus/.ailedger}"
 export AGENCE_SESSION_DIR AGENCE_LEDGER_DIR
 
+# ── Day-sharded session directory ──────────────────────────────────────────
+# Returns the day-of-month subdir (01-31) under AGENCE_SESSION_DIR.
+# Creates the dir and recycles stale files from a previous month if needed.
+#   Usage: dir=$(agence_session_day_dir)
+agence_session_day_dir() {
+  local base="${AGENCE_SESSION_DIR}"
+  local day
+  day=$(date +%d)                          # 01-31
+  local day_dir="${base}/${day}"
+  mkdir -p "$day_dir" 2>/dev/null || true
+
+  # Recycle: if oldest file in this day dir is from a different month, wipe it
+  local marker="${day_dir}/.month"
+  local current_month
+  current_month=$(date +%Y-%m)
+  if [[ -f "$marker" ]]; then
+    local stored_month
+    stored_month=$(cat "$marker" 2>/dev/null)
+    if [[ "$stored_month" != "$current_month" ]]; then
+      # Different month — recycle: remove old session files
+      find "$day_dir" -maxdepth 1 -type f -name "*.typescript" -delete 2>/dev/null || true
+      find "$day_dir" -maxdepth 1 -type f -name "*.meta.json" -delete 2>/dev/null || true
+      echo "$current_month" > "$marker"
+    fi
+  else
+    echo "$current_month" > "$marker"
+  fi
+
+  echo "$day_dir"
+}
+export -f agence_session_day_dir
+
 # Shard: shared upstream ledger remote URL
 # Override: AI_SHARD env var > ~/.agence/config.yaml shard: field
 AI_SHARD="${AI_SHARD:-}"
