@@ -510,6 +510,10 @@ main() {
       mode_session "${*:2}"
       exit $?
       ;;
+    swarm)
+      bash "$AGENCE_ROOT/bin/swarm" ${*:2}
+      exit $?
+      ;;
     index)
       scan_knowledge_bases
       exit $?
@@ -1413,6 +1417,21 @@ mode_init() {
     "issues")     mode_knowledge "issue" "list $init_args"; return $? ;;
     "sessions")   mode_session "list $init_args"; return $? ;;
     "swarms")     bash "$AGENCE_ROOT/bin/swarm" list $init_args 2>/dev/null || echo "(swarm list not yet implemented)"; return $? ;;
+    "swarm")
+      # Swarm management: agence ^swarm [launch|list|status|shells|...]
+      local _swarm_sub="${init_args%% *}"
+      local _swarm_rest="${init_args#$_swarm_sub}"
+      _swarm_rest="${_swarm_rest# }"
+      case "${_swarm_sub:-list}" in
+        "status"|"list"|"shells"|"launch"|"attach"|"kill"|"reap"|"focus"|"signal"|"title")
+          bash "$AGENCE_ROOT/bin/swarm" "${_swarm_sub:-list}" $_swarm_rest
+          ;;
+        *)
+          bash "$AGENCE_ROOT/bin/swarm" ${init_args}
+          ;;
+      esac
+      return $?
+      ;;
     "jobs")       mode_knowledge "job" "list $init_args"; return $? ;;
     "logs")       mode_knowledge "log" "list $init_args"; return $? ;;
     "lessons")    mode_knowledge "lesson" "list $init_args"; return $? ;;
@@ -1422,7 +1441,7 @@ mode_init() {
       echo "Error: Unknown init command: $init_cmd" >&2
       echo "Available: help, init, reload, install, save, learn, commit, push, session," >&2
       echo "           lesson, log, plan, todo, fault, issue, task, job, workflow, project," >&2
-      echo "           audit, recall, handoff, pickup, pause, resume, index, reindex, aido" >&2
+      echo "           swarm, audit, recall, handoff, pickup, pause, resume, index, reindex, aido" >&2
       return 1
       ;;
   esac
@@ -1992,6 +2011,9 @@ EOF
     "list")
       knowledge_list "$cmd_type" "$data_dir" "$index_file" "$args"
       ;;
+    "status")
+      knowledge_status "$cmd_type" "$args"
+      ;;
     "show")
       local item; item=$(echo "$args" | awk '{print $1}')
       if [[ -z "$item" ]]; then
@@ -2010,7 +2032,7 @@ EOF
       ;;
     *)
       echo "Error: Unknown subcommand: $sub_cmd" >&2
-      echo "Available subcommands: list, show, add" >&2
+      echo "Available subcommands: list, status, show, add" >&2
       return 1
       ;;
   esac
@@ -2172,6 +2194,211 @@ EOF
   fi
   
   return 0
+}
+
+# ============================================================================
+# KNOWLEDGE STATUS VIEWS
+# ============================================================================
+# Rich status display for task, workflow, project
+# Uses state symbols from shell-ui.sh and organic/*.json data
+
+# Helper: convert priority int to star string
+_prio_stars() {
+  local p="${1:-0}"
+  case "$p" in
+    1) echo "★" ;;
+    2) echo "★★" ;;
+    3) echo "★★★" ;;
+    4) echo "★★★★" ;;
+    5) echo "★★★★★" ;;
+    *) echo "-" ;;
+  esac
+}
+
+# Helper: state symbol with ANSI color (if TTY)
+_colored_state() {
+  local s="${1:--}"
+  if [[ "${_AGENCE_FMT:-text}" == "text" ]] && type -t _state_color &>/dev/null; then
+    printf '%s%s\033[0m' "$(_state_color "$s")" "$s"
+  else
+    printf '%s' "$s"
+  fi
+}
+
+# task status
+# Format: [state] [prio] [id.repo<@agent>] [title]
+knowledge_status_task() {
+  local tasks_json="${AGENCE_ROOT}/organic/tasks.json"
+  if [[ ! -f "$tasks_json" ]] || ! command -v jq &>/dev/null; then
+    echo "[task status] No data or jq unavailable" >&2
+    return 1
+  fi
+
+  local count
+  count=$(jq '.tasks | length' "$tasks_json")
+  echo "[task status] ($count tasks)"
+  echo ""
+
+  # Parse each task and render
+  local i=0
+  while [[ $i -lt $count ]]; do
+    local state id repo agent title prio
+    state=$(jq -r ".tasks[$i].state // \"~\"" "$tasks_json")
+    id=$(jq -r ".tasks[$i].id // \"?\"" "$tasks_json")
+    repo=$(jq -r ".tasks[$i].repo // \"\"" "$tasks_json")
+    agent=$(jq -r ".tasks[$i].agent // \"\"" "$tasks_json")
+    title=$(jq -r ".tasks[$i].title // \"\"" "$tasks_json")
+    prio=$(jq -r ".tasks[$i].priority // 0" "$tasks_json")
+
+    local prio_str; prio_str=$(_prio_stars "$prio")
+    local ref="${id}"
+    [[ -n "$repo" ]] && ref="${id}.${repo}"
+    [[ -n "$agent" ]] && ref="${ref}<@${agent}>"
+
+    printf '  %s %-5s %-35s %s\n' \
+      "$(_colored_state "$state")" "$prio_str" "$ref" "$title"
+    ((i++))
+  done
+  echo ""
+  return 0
+}
+
+# workflow status
+# Format: [wf-state]: [wf-id] = [taskstate]:[taskid.repo@agent] + ...
+knowledge_status_workflow() {
+  local wf_json="${AGENCE_ROOT}/organic/workflows.json"
+  local tasks_json="${AGENCE_ROOT}/organic/tasks.json"
+  if [[ ! -f "$wf_json" ]] || ! command -v jq &>/dev/null; then
+    echo "[workflow status] No data or jq unavailable" >&2
+    return 1
+  fi
+
+  local wf_count
+  wf_count=$(jq '.workflows | length' "$wf_json")
+  echo "[workflow status] ($wf_count workflows)"
+  echo ""
+
+  local wi=0
+  while [[ $wi -lt $wf_count ]]; do
+    local wf_id wf_title completed total pct
+    wf_id=$(jq -r ".workflows[$wi].id" "$wf_json")
+    wf_title=$(jq -r ".workflows[$wi].title" "$wf_json")
+    completed=$(jq -r ".workflows[$wi].completed" "$wf_json")
+    total=$(jq -r ".workflows[$wi].total" "$wf_json")
+    pct=$(jq -r ".workflows[$wi].completion_pct" "$wf_json")
+
+    # Determine workflow-level state from completion
+    local wf_state
+    if [[ "$pct" == "100" ]]; then wf_state="-"
+    elif [[ "$completed" -gt 0 ]]; then wf_state="%"
+    else wf_state="~"
+    fi
+
+    # Build task chain: [state]:[id.repo@agent]
+    local task_chain=""
+    local task_ids
+    task_ids=$(jq -r ".workflows[$wi].tasks[]" "$wf_json" 2>/dev/null)
+    for tid in $task_ids; do
+      local ts ta tr
+      if [[ -f "$tasks_json" ]]; then
+        ts=$(jq -r ".tasks[] | select(.id==\"$tid\") | .state // \"~\"" "$tasks_json" 2>/dev/null)
+        ta=$(jq -r ".tasks[] | select(.id==\"$tid\") | .agent // \"\"" "$tasks_json" 2>/dev/null)
+        tr=$(jq -r ".tasks[] | select(.id==\"$tid\") | .repo // \"\"" "$tasks_json" 2>/dev/null)
+      fi
+      ts="${ts:-~}"
+      local tref="$tid"
+      [[ -n "$tr" ]] && tref="${tid}.${tr}"
+      [[ -n "$ta" ]] && tref="${tref}@${ta}"
+      [[ -n "$task_chain" ]] && task_chain+=" + "
+      task_chain+="$(_colored_state "$ts"):${tref}"
+    done
+
+    printf '  %s %s (%s) [%s/%s %s%%] = %s\n' \
+      "$(_colored_state "$wf_state")" "$wf_id" "$wf_title" \
+      "$completed" "$total" "$pct" "$task_chain"
+    ((wi++))
+  done
+  echo ""
+  return 0
+}
+
+# project status
+# Format: [proj-state] PROJ-ID (title) [completed/total pct%]
+#   [wf-state] WF-ID (title) [completed/total pct%]
+knowledge_status_project() {
+  local proj_json="${AGENCE_ROOT}/organic/projects.json"
+  local wf_json="${AGENCE_ROOT}/organic/workflows.json"
+  if [[ ! -f "$proj_json" ]] || ! command -v jq &>/dev/null; then
+    echo "[project status] No data or jq unavailable" >&2
+    return 1
+  fi
+
+  local proj_count
+  proj_count=$(jq '.projects | length' "$proj_json")
+  echo "[project status] ($proj_count projects)"
+  echo ""
+
+  local pi=0
+  while [[ $pi -lt $proj_count ]]; do
+    local p_id p_title p_status p_completed p_total p_pct
+    p_id=$(jq -r ".projects[$pi].id" "$proj_json")
+    p_title=$(jq -r ".projects[$pi].title" "$proj_json")
+    p_status=$(jq -r ".projects[$pi].status // \"unknown\"" "$proj_json")
+    p_completed=$(jq -r ".projects[$pi].completed_tasks // 0" "$proj_json")
+    p_total=$(jq -r ".projects[$pi].total_tasks // 0" "$proj_json")
+    p_pct=$(jq -r ".projects[$pi].completion_pct // 0" "$proj_json")
+
+    # Determine project-level state
+    local p_state
+    if [[ "$p_pct" == "100" ]]; then p_state="-"
+    elif [[ "$p_completed" -gt 0 ]]; then p_state="%"
+    else p_state="~"
+    fi
+
+    printf '  %s %s (%s) [%s/%s %s%%] status=%s\n' \
+      "$(_colored_state "$p_state")" "$p_id" "$p_title" \
+      "$p_completed" "$p_total" "$p_pct" "$p_status"
+
+    # List child workflows
+    local wf_ids
+    wf_ids=$(jq -r ".projects[$pi].workflows[]" "$proj_json" 2>/dev/null)
+    for wfid in $wf_ids; do
+      if [[ -f "$wf_json" ]]; then
+        local wc wt wpct wf_state_sym
+        wc=$(jq -r ".workflows[] | select(.id==\"$wfid\") | .completed // 0" "$wf_json" 2>/dev/null)
+        wt=$(jq -r ".workflows[] | select(.id==\"$wfid\") | .total // 0" "$wf_json" 2>/dev/null)
+        wpct=$(jq -r ".workflows[] | select(.id==\"$wfid\") | .completion_pct // 0" "$wf_json" 2>/dev/null)
+        if [[ "$wpct" == "100" ]]; then wf_state_sym="-"
+        elif [[ "${wc:-0}" -gt 0 ]]; then wf_state_sym="%"
+        else wf_state_sym="~"
+        fi
+        printf '    %s %s [%s/%s %s%%]\n' \
+          "$(_colored_state "$wf_state_sym")" "$wfid" "${wc:-0}" "${wt:-0}" "${wpct:-0}"
+      else
+        printf '    ~ %s (no workflow data)\n' "$wfid"
+      fi
+    done
+    ((pi++))
+  done
+  echo ""
+  return 0
+}
+
+# Router: knowledge_status
+knowledge_status() {
+  local cmd_type="$1"
+  local args="$2"
+
+  case "$cmd_type" in
+    "task")     knowledge_status_task "$args" ;;
+    "workflow") knowledge_status_workflow "$args" ;;
+    "project")  knowledge_status_project "$args" ;;
+    *)
+      echo "Error: 'status' subcommand not supported for $cmd_type" >&2
+      echo "Supported: task status, workflow status, project status" >&2
+      return 1
+      ;;
+  esac
 }
 
 init_agence_environment() {

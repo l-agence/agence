@@ -238,6 +238,104 @@ Add your content here.
   return 0;
 }
 
+// ─── Status Views ────────────────────────────────────────────────────────────
+
+function prioStars(p: number): string {
+  return "★".repeat(Math.min(Math.max(p, 0), 5)) || "-";
+}
+
+interface Task {
+  id: string; repo?: string; title?: string; state?: string;
+  priority?: number; agent?: string; stars?: number; heat?: number;
+}
+
+interface Workflow {
+  id: string; title?: string; tasks: string[];
+  completed?: number; total?: number; completion_pct?: number;
+}
+
+interface Project {
+  id: string; title?: string; workflows: string[]; status?: string;
+  completed_tasks?: number; total_tasks?: number; completion_pct?: number;
+}
+
+function loadJson<T>(path: string): T | null {
+  if (!existsSync(path)) return null;
+  try { return JSON.parse(readFileSync(path, "utf-8")); } catch { return null; }
+}
+
+function knowledgeStatus(cmdType: string): number {
+  const tasksData = loadJson<{ tasks: Task[] }>(join(AGENCE_ROOT, "organic", "tasks.json"));
+  const wfData = loadJson<{ workflows: Workflow[] }>(join(AGENCE_ROOT, "organic", "workflows.json"));
+  const projData = loadJson<{ projects: Project[] }>(join(AGENCE_ROOT, "organic", "projects.json"));
+
+  const taskMap = new Map<string, Task>();
+  if (tasksData?.tasks) {
+    for (const t of tasksData.tasks) taskMap.set(t.id, t);
+  }
+
+  switch (cmdType) {
+    case "task": {
+      const tasks = tasksData?.tasks || [];
+      console.log(`[task status] (${tasks.length} tasks)\n`);
+      for (const t of tasks) {
+        const s = t.state || "~";
+        const prio = prioStars(t.priority || 0);
+        let ref = t.id;
+        if (t.repo) ref += `.${t.repo}`;
+        if (t.agent) ref += `<@${t.agent}>`;
+        console.log(`  ${s} ${prio.padEnd(5)} ${ref.padEnd(35)} ${t.title || ""}`);
+      }
+      console.log("");
+      return 0;
+    }
+    case "workflow": {
+      const wfs = wfData?.workflows || [];
+      console.log(`[workflow status] (${wfs.length} workflows)\n`);
+      for (const wf of wfs) {
+        const pct = wf.completion_pct ?? 0;
+        const ws = pct === 100 ? "-" : (wf.completed ?? 0) > 0 ? "%" : "~";
+        const chain = wf.tasks.map(tid => {
+          const t = taskMap.get(tid);
+          const ts = t?.state || "~";
+          let tref = tid;
+          if (t?.repo) tref += `.${t.repo}`;
+          if (t?.agent) tref += `@${t.agent}`;
+          return `${ts}:${tref}`;
+        }).join(" + ");
+        console.log(`  ${ws} ${wf.id} (${wf.title || ""}) [${wf.completed ?? 0}/${wf.total ?? 0} ${pct}%] = ${chain}`);
+      }
+      console.log("");
+      return 0;
+    }
+    case "project": {
+      const projs = projData?.projects || [];
+      console.log(`[project status] (${projs.length} projects)\n`);
+      for (const p of projs) {
+        const pct = p.completion_pct ?? 0;
+        const ps = pct === 100 ? "-" : (p.completed_tasks ?? 0) > 0 ? "%" : "~";
+        console.log(`  ${ps} ${p.id} (${p.title || ""}) [${p.completed_tasks ?? 0}/${p.total_tasks ?? 0} ${pct}%] status=${p.status || "unknown"}`);
+        for (const wfid of p.workflows) {
+          const wf = wfData?.workflows?.find(w => w.id === wfid);
+          if (wf) {
+            const wpct = wf.completion_pct ?? 0;
+            const wfs = wpct === 100 ? "-" : (wf.completed ?? 0) > 0 ? "%" : "~";
+            console.log(`    ${wfs} ${wf.id} [${wf.completed ?? 0}/${wf.total ?? 0} ${wpct}%]`);
+          } else {
+            console.log(`    ~ ${wfid} (no data)`);
+          }
+        }
+      }
+      console.log("");
+      return 0;
+    }
+    default:
+      console.error(`Error: 'status' subcommand not supported for ${cmdType}`);
+      console.error("Supported: task status, workflow status, project status");
+      return 1;
+  }
+}
+
 // ─── Main Router ─────────────────────────────────────────────────────────────
 
 const [cmdType, subCmd, ...rest] = process.argv.slice(2);
@@ -264,12 +362,15 @@ if (orgIdx >= 0 && rest[orgIdx + 1]) {
 const { scope, dataDir } = resolveScope(cmdType as CmdType, org);
 ensureIndex(dataDir, cmdType, scope, org);
 
-const sub = (subCmd || "list") as SubCmd;
+const sub = (subCmd || "list") as SubCmd | "status";
 let exitCode = 0;
 
 switch (sub) {
   case "list":
     exitCode = knowledgeList(cmdType, dataDir);
+    break;
+  case "status":
+    exitCode = knowledgeStatus(cmdType);
     break;
   case "show":
     exitCode = knowledgeShow(cmdType, dataDir, rest[0]);
@@ -281,7 +382,7 @@ switch (sub) {
   }
   default:
     console.error(`Error: Unknown subcommand: ${sub}`);
-    console.error("Available: list, show, add");
+    console.error("Available: list, status, show, add");
     exitCode = 1;
 }
 
