@@ -2071,7 +2071,7 @@ init_agence_environment() {
   local ok=0 warn=0 created=0
 
   # ── Step 1: Verify agence root ────────────────────────────────────────────
-  echo "Step 1/6: Verifying agence root..."
+  echo "Step 1/7: Verifying agence root..."
   if [[ -f "${AGENCE_ROOT}/bin/agence" ]]; then
     echo "  ✓ AGENCE_ROOT=${AGENCE_ROOT}"
     ((ok++))
@@ -2082,7 +2082,7 @@ init_agence_environment() {
   echo ""
 
   # ── Step 2: Create required directories ───────────────────────────────────
-  echo "Step 2/6: Creating directory structure..."
+  echo "Step 2/7: Creating directory structure..."
   local -a required_dirs=(
     "nexus/sessions"
     "nexus/faults"
@@ -2109,7 +2109,7 @@ init_agence_environment() {
   echo ""
 
   # ── Step 3: Create .agencerc in parent repo if submodule ──────────────────
-  echo "Step 3/6: Checking .agencerc..."
+  echo "Step 3/7: Checking .agencerc..."
   if [[ -n "$GIT_REPO" && "$GIT_REPO" != "$AGENCE_ROOT" ]]; then
     # Submodule mode — parent repo needs .agencerc
     local rc_path="$GIT_REPO/.agencerc"
@@ -2143,7 +2143,7 @@ AGENCERC
   echo ""
 
   # ── Step 4: Set up @ symlink routing ──────────────────────────────────────
-  echo "Step 4/6: Checking @ symlink routing..."
+  echo "Step 4/7: Checking @ symlink routing..."
   echo "  The '@' symlink inside synthetic/ and hermetic/ points to the"
   echo "  active org directory (e.g. hermetic/@ → hermetic/l-agence.org)."
   echo "  This lets commands resolve paths without hardcoding org names."
@@ -2176,7 +2176,7 @@ AGENCERC
   echo ""
 
   # ── Step 5: PATH setup ────────────────────────────────────────────────────
-  echo "Step 5/6: PATH setup..."
+  echo "Step 5/7: PATH setup..."
   # Ensure AI_BIN is on PATH for this session (idempotent)
   case ":${PATH}:" in
     *":${AI_BIN}:"*) ;;
@@ -2197,7 +2197,7 @@ AGENCERC
   echo ""
 
   # ── Step 6: Check key dependencies ───────────────────────────────────────
-  echo "Step 6/6: Checking dependencies..."
+  echo "Step 6/7: Checking dependencies..."
   local deps=(git bash tmux jq)
   local optional_deps=("script:session-logging" "bun:typescript-modules")
   for dep in "${deps[@]}"; do
@@ -2232,13 +2232,58 @@ AGENCERC
   echo "=============================================="
   echo ""
 
-  # ── Init .ailedger nested repo (two-tier: local + shard) ─────────────────
+  # ── Step 7: Upstream shard & ledger repo ─────────────────────────────────
+  echo "Step 7/7: Upstream shard & ledger repos..."
+
+  # Detect current git remote as default shard origin
+  local _current_remote=""
+  _current_remote=$(git -C "${AGENCE_ROOT}" remote get-url origin 2>/dev/null || true)
+
+  # Infer defaults from git remote (e.g. github.com/l-agence/agence → l-agence)
+  local _default_org=""
+  if [[ "$_current_remote" =~ github\.com[:/]([^/]+)/ ]]; then
+    _default_org="${BASH_REMATCH[1]}"
+  fi
+  local _default_shard="${_current_remote:-https://github.com/l-agence/agence.git}"
+  local _default_ledger=""
+  if [[ -n "$_default_org" ]]; then
+    _default_ledger="https://github.com/${_default_org}/ailedger.git"
+  else
+    _default_ledger="https://github.com/l-agence/ailedger.git"
+  fi
+
+  echo "  Agence uses two upstream repos:"
+  echo "    1. Shard repo  — the agence framework origin (this repo's remote)"
+  echo "    2. Ledger repo — shared .ailedger for cross-shard audit trail"
+  echo ""
+
+  # Prompt for shard origin (Enter = accept default)
+  local _shard_repo=""
+  read -r -p "  Shard repo [${_default_shard}]: " _shard_repo </dev/tty 2>/dev/null || true
+  _shard_repo="${_shard_repo:-$_default_shard}"
+  echo "  → shard: ${_shard_repo}"
+
+  # Prompt for ledger repo (Enter = accept default)
+  local _ledger_repo=""
+  read -r -p "  Ledger repo [${_default_ledger}]: " _ledger_repo </dev/tty 2>/dev/null || true
+  _ledger_repo="${_ledger_repo:-$_default_ledger}"
+  echo "  → ledger: ${_ledger_repo}"
+  echo ""
+
+  # Export AI_SHARD for ailedger.ts to use
+  export AI_SHARD="${_ledger_repo}"
+
+  # Init .ailedger nested repo (two-tier: local + shard)
   local _ailedger_ts="${AGENCE_ROOT}/lib/ailedger.ts"
   if command -v bun &>/dev/null && [[ -f "$_ailedger_ts" ]]; then
-    echo "Initializing .ailedger (two-tier Merkle ledger)..."
+    echo "  Initializing .ailedger (two-tier Merkle ledger)..."
     bun run "$_ailedger_ts" init 2>&1
-    echo ""
+  else
+    echo "  ⚠ bun not found — skipping .ailedger init"
+    echo "    Run 'agence ^install' first, then 'agence ^init' again"
+    ((warn++))
   fi
+  echo ""
 
   return 0
 }
@@ -2995,7 +3040,7 @@ install_linux_packages() {
   fi
   echo ""
   # System packages
-  local -a apt_pkgs=("git" "jq" "gawk" "tmux" "util-linux" "gh" "npm" "curl" "wslu")
+  local -a apt_pkgs=("git" "jq" "gawk" "tmux" "util-linux" "gh" "npm" "curl" "unzip" "wslu")
   local pkg_ok=0 pkg_fail=0
   echo "  System (apt):"
   for pkg in "${apt_pkgs[@]}"; do
@@ -3014,10 +3059,14 @@ install_linux_packages() {
   echo -n "  [bun] "
   if command -v bun &>/dev/null; then
     echo "✓ already installed ($(bun --version 2>/dev/null))"
+  elif command -v npm &>/dev/null && npm install -g bun &>/dev/null 2>&1; then
+    echo "✓ installed (via npm)"
+  elif command -v snap &>/dev/null && sudo snap install bun-js &>/dev/null 2>&1; then
+    echo "✓ installed (via snap)"
   elif curl -fsSL https://bun.sh/install | bash &>/dev/null 2>&1; then
-    echo "✓ installed"
+    echo "✓ installed (via bun.sh)"
   else
-    echo "✗ failed (try: curl -fsSL https://bun.sh/install | bash)"
+    echo "✗ failed (try: npm install -g bun)"
   fi
   echo ""
   # npm claude

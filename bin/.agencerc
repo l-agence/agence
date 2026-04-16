@@ -104,6 +104,14 @@ case ":${PATH}:" in
   *) export PATH="${AI_BIN}:${PATH}" ;;
 esac
 
+# Ensure ~/.bun/bin is on PATH (bun installs here by default)
+if [[ -d "$HOME/.bun/bin" ]]; then
+  case ":${PATH}:" in
+    *":$HOME/.bun/bin:"*) ;;
+    *) export PATH="$HOME/.bun/bin:${PATH}" ;;
+  esac
+fi
+
 # ============================================================================
 # STEP 3: Compute REPO_ROOT Dynamically
 # ============================================================================
