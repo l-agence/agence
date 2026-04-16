@@ -457,11 +457,15 @@ function checkCommand(command: string): GuardDecision {
 }
 
 // ─── Ledger Integration ──────────────────────────────────────────────────────
+// Only T2 (escalate) and T3 (deny) are security-relevant enough for ailedger.
+// T0/T1 are captured in session typescripts via aicmd — no need to double-log.
 
 function logDecision(decision: GuardDecision): void {
+  if (decision.tier !== "T2" && decision.tier !== "T3") return;
+
   try {
     const airunPath = join(AGENCE_ROOT, "bin", "airun");
-    const tag = decision.approved ? "guard-approved" : "guard-denied";
+    const tag = decision.tier === "T3" ? "guard:deny" : "guard:escalate";
     const exitCode = decision.approved ? 0 : 1;
     // Truncate command for ledger (avoid bloating entries)
     const cmd = decision.command.length > 120

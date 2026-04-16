@@ -59,14 +59,17 @@ RUN ARCH=$(dpkg --print-architecture) \
 WORKDIR /agence
 
 # Copy only what the container needs — no hermetic, no synthetic, no nexus
+COPY bin/.agencerc   bin/.agencerc
 COPY bin/agence      bin/agence
 COPY bin/aibash      bin/aibash
+COPY bin/aicmd       bin/aicmd
 COPY bin/aido        bin/aido
 COPY bin/airun       bin/airun
 COPY bin/aipolicy    bin/aipolicy
 COPY bin/aisession   bin/aisession
 COPY bin/figrep      bin/figrep
 
+COPY lib/aicmd-lib.sh  lib/aicmd-lib.sh
 COPY lib/env.sh        lib/env.sh
 COPY lib/format.sh     lib/format.sh
 COPY lib/shell-ui.sh   lib/shell-ui.sh
