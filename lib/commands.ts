@@ -21,7 +21,7 @@ const AGENCE_ROOT = process.env.AGENCE_ROOT || AI_ROOT;
 
 // ─── Scope Resolution ────────────────────────────────────────────────────────
 
-type CmdType = "lesson" | "plan" | "issue" | "log" | "fault" | "todo" | "task" | "job" | "workflow" | "project";
+type CmdType = "lesson" | "plan" | "issue" | "log" | "fault" | "todo" | "note" | "task" | "job" | "workflow" | "project";
 type SubCmd = "list" | "show" | "add";
 type Scope = "SYNTHETIC" | "NEXUS" | "HERMETIC" | "ORGANIC";
 
@@ -61,6 +61,7 @@ function resolveScope(cmdType: CmdType, org: string): ScopeInfo {
       baseDir = join(AGENCE_ROOT, "nexus");
       break;
     case "todo":
+    case "note":
       scope = "HERMETIC";
       baseDir = resolveOrgPath(join(AGENCE_ROOT, "hermetic"), org);
       break;
@@ -264,7 +265,81 @@ function loadJson<T>(path: string): T | null {
   try { return JSON.parse(readFileSync(path, "utf-8")); } catch { return null; }
 }
 
-function knowledgeStatus(cmdType: string): number {
+interface IndexEntry {
+  id?: string; title?: string; source?: string; description?: string; date?: string;
+}
+
+interface Phase {
+  id: string | number; name?: string; version?: string; status?: string;
+}
+
+function statusSymbol(status: string): string {
+  switch (status) {
+    case "complete": case "done": return "-";
+    case "in-progress": case "active": return "%";
+    case "queued": case "pending": return "~";
+    case "blocked": case "failed": return "!";
+    default: return "~";
+  }
+}
+
+function knowledgeStatusIndex(cmdType: string, dataDir: string): number {
+  const indexPath = join(dataDir, "INDEX.json");
+  if (existsSync(indexPath)) {
+    const data = loadJson<{ entries?: IndexEntry[] }>(indexPath);
+    const entries = data?.entries || [];
+    console.log(`[${cmdType} status] (${entries.length} entries)\n`);
+    if (entries.length > 0) {
+      for (const e of entries) {
+        const label = e.id || e.title || e.source || "?";
+        const desc = e.title || e.description || e.date || "";
+        console.log(`  ~ ${label}  ${desc}`);
+      }
+    } else {
+      console.log("  (no entries)");
+    }
+  } else {
+    // Count .md files
+    const { readdirSync } = require("fs");
+    try {
+      const files = readdirSync(dataDir).filter((f: string) => f.endsWith(".md") && f !== "INDEX.md");
+      console.log(`[${cmdType} status] (${files.length} entries)\n`);
+      if (files.length > 0) {
+        for (const f of files) {
+          const name = f.replace(/\.md$/, "");
+          console.log(`  ~ ${name}`);
+        }
+      } else {
+        console.log("  (no entries)");
+      }
+    } catch {
+      console.log(`[${cmdType} status] (0 entries)\n`);
+      console.log("  (no entries)");
+    }
+  }
+  console.log("");
+  return 0;
+}
+
+function knowledgeStatusPlan(dataDir: string): number {
+  const phasesPath = join(dataDir, "phases.json");
+  const data = loadJson<{ phases?: Phase[] }>(phasesPath);
+  if (data?.phases) {
+    console.log(`[plan status] (${data.phases.length} phases)\n`);
+    for (const p of data.phases) {
+      const sym = statusSymbol(p.status || "unknown");
+      const ver = (p.version || "").padEnd(6);
+      const name = (p.name || "").padEnd(30);
+      console.log(`  ${sym} ${ver} ${name} [${p.status || "unknown"}] (phase ${p.id})`);
+    }
+  } else {
+    return knowledgeStatusIndex("plan", dataDir);
+  }
+  console.log("");
+  return 0;
+}
+
+function knowledgeStatus(cmdType: string, dataDir: string): number {
   const tasksData = loadJson<{ tasks: Task[] }>(join(AGENCE_ROOT, "organic", "tasks.json"));
   const wfData = loadJson<{ workflows: Workflow[] }>(join(AGENCE_ROOT, "organic", "workflows.json"));
   const projData = loadJson<{ projects: Project[] }>(join(AGENCE_ROOT, "organic", "projects.json"));
@@ -329,9 +404,16 @@ function knowledgeStatus(cmdType: string): number {
       console.log("");
       return 0;
     }
+    case "plan":
+      return knowledgeStatusPlan(dataDir);
+    case "todo":
+    case "note":
+    case "job":
+    case "issue":
+      return knowledgeStatusIndex(cmdType, dataDir);
     default:
       console.error(`Error: 'status' subcommand not supported for ${cmdType}`);
-      console.error("Supported: task status, workflow status, project status");
+      console.error("Supported: task, workflow, project, todo, job, issue, plan, session");
       return 1;
   }
 }
@@ -341,12 +423,12 @@ function knowledgeStatus(cmdType: string): number {
 const [cmdType, subCmd, ...rest] = process.argv.slice(2);
 
 if (!cmdType) {
-  console.error("Usage: airun commands <type> <list|show|add> [args...]");
-  console.error("Types: lesson, plan, todo, fault, issue, task, job, log, workflow, project");
+  console.error("Usage: airun commands <type> <list|show|add|status> [args...]");
+  console.error("Types: lesson, plan, todo, note, fault, issue, task, job, log, workflow, project");
   process.exit(1);
 }
 
-const validTypes = ["lesson", "plan", "issue", "log", "fault", "todo", "task", "job", "workflow", "project"];
+const validTypes = ["lesson", "plan", "issue", "log", "fault", "todo", "note", "task", "job", "workflow", "project"];
 if (!validTypes.includes(cmdType)) {
   console.error(`Error: Unknown command type: ${cmdType}`);
   process.exit(1);
@@ -370,7 +452,7 @@ switch (sub) {
     exitCode = knowledgeList(cmdType, dataDir);
     break;
   case "status":
-    exitCode = knowledgeStatus(cmdType);
+    exitCode = knowledgeStatus(cmdType, dataDir);
     break;
   case "show":
     exitCode = knowledgeShow(cmdType, dataDir, rest[0]);

@@ -480,7 +480,7 @@ main() {
       ;;
     # Knowledge commands: never need LLM router
     # Supports both: 'agence plan list' AND 'agence ^plan list'
-    lesson|log|plan|todo|fault|issue|task|job|workflow|project)
+    lesson|log|plan|todo|note|fault|issue|task|job|workflow|project)
       mode_knowledge "$1" "${*:2}"
       exit $?
       ;;
@@ -580,9 +580,21 @@ main() {
           fi
           "$AGENCE_BIN/figrep" "$AGENCE_ROOT/hermetic/grimoire" $_tilde_args
           ;;
+        "todo"|"todos")
+          # ~todo → ^todo (hermetic shortcut)
+          local _sub="${_tilde_args%% *}"
+          [[ "$_tilde_verb" == "todos" && -z "$_sub" ]] && _sub="status"
+          mode_knowledge "todo" "${_sub:-list} ${_tilde_args#$_sub}"
+          ;;
+        "note"|"notes")
+          # ~note → ^note (hermetic shortcut)
+          local _sub="${_tilde_args%% *}"
+          [[ "$_tilde_verb" == "notes" && -z "$_sub" ]] && _sub="status"
+          mode_knowledge "note" "${_sub:-list} ${_tilde_args#$_sub}"
+          ;;
         *)
           echo "Error: Unknown ~ command: $_tilde_verb" >&2
-          echo "Available: ~recall" >&2
+          echo "Available: ~recall, ~todo, ~todos, ~note, ~notes" >&2
           return 1
           ;;
       esac
@@ -1409,14 +1421,22 @@ mode_init() {
       bash "$AGENCE_ROOT/bin/aido" $init_args
       return $?
       ;;
-    # ── Plural list shortcuts ──────────────────────────────────────────────
-    "tasks")      mode_knowledge "task" "list $init_args"; return $? ;;
-    "projects")   mode_knowledge "project" "list $init_args"; return $? ;;
-    "workflows")  mode_knowledge "workflow" "list $init_args"; return $? ;;
+    # ── Plural shortcuts ───────────────────────────────────────────────────
+    # Status-bearing types: plural → status
+    "tasks")      mode_knowledge "task" "status $init_args"; return $? ;;
+    "projects")   mode_knowledge "project" "status $init_args"; return $? ;;
+    "workflows")  mode_knowledge "workflow" "status $init_args"; return $? ;;
+    "todos")      mode_knowledge "todo" "status $init_args"; return $? ;;
+    "notes")      mode_knowledge "note" "status $init_args"; return $? ;;
+    "jobs")       mode_knowledge "job" "status $init_args"; return $? ;;
+    "issues")     mode_knowledge "issue" "status $init_args"; return $? ;;
+    "plans")      mode_knowledge "plan" "status $init_args"; return $? ;;
+    "sessions")   mode_session "status $init_args"; return $? ;;
+    "swarms")     bash "$AGENCE_ROOT/bin/swarm" status $init_args 2>/dev/null || echo "(swarm status not yet implemented)"; return $? ;;
+    # List-only types: plural → list
     "faults")     mode_knowledge "fault" "list $init_args"; return $? ;;
-    "issues")     mode_knowledge "issue" "list $init_args"; return $? ;;
-    "sessions")   mode_session "list $init_args"; return $? ;;
-    "swarms")     bash "$AGENCE_ROOT/bin/swarm" list $init_args 2>/dev/null || echo "(swarm list not yet implemented)"; return $? ;;
+    "logs")       mode_knowledge "log" "list $init_args"; return $? ;;
+    "lessons")    mode_knowledge "lesson" "list $init_args"; return $? ;;
     "swarm")
       # Swarm management: agence ^swarm [launch|list|status|shells|...]
       local _swarm_sub="${init_args%% *}"
@@ -1432,15 +1452,10 @@ mode_init() {
       esac
       return $?
       ;;
-    "jobs")       mode_knowledge "job" "list $init_args"; return $? ;;
-    "logs")       mode_knowledge "log" "list $init_args"; return $? ;;
-    "lessons")    mode_knowledge "lesson" "list $init_args"; return $? ;;
-    "plans")      mode_knowledge "plan" "list $init_args"; return $? ;;
-    "todos")      mode_knowledge "todo" "list $init_args"; return $? ;;
     *)
       echo "Error: Unknown init command: $init_cmd" >&2
       echo "Available: help, init, reload, install, save, learn, commit, push, session," >&2
-      echo "           lesson, log, plan, todo, fault, issue, task, job, workflow, project," >&2
+      echo "           lesson, log, plan, todo, note, fault, issue, task, job, workflow, project," >&2
       echo "           swarm, audit, recall, handoff, pickup, pause, resume, index, reindex, aido" >&2
       return 1
       ;;
@@ -1548,7 +1563,7 @@ COMPLETION MATH  (signed addition)
   %done      = done / (done + remaining)
 
 SCOPES
-  hermetic/   personal, never committed    ^todo, ^notes
+  hermetic/   personal, never committed    ^todo, ^note (~todo, ~note)
   nexus/      local-only, sensitive        ^fault, ^log, ^session
   synthetic/  team-shared, git-committed   ^plan, ^lesson, ^issue
   organic/    team work, agent-routable    ^task, ^job
@@ -1576,7 +1591,8 @@ KNOWLEDGE COMMANDS (^ prefix)
 
   HERMETIC — Local only, never committed (personal)
   ─────────────────────────────────────────────────
-  ^todo  [list|show|add]              Personal todos     → hermetic/@/todos/
+  ^todo  [list|status|show|add]       Personal todos     → hermetic/@/todos/
+  ^note  [list|status|show|add]       Personal notes     → hermetic/@/notes/
 
   NEXUS — Local only (sensitive: faults, logs, sessions)
   ───────────────────────────────────────────────────────
@@ -1744,6 +1760,24 @@ mode_session() {
   mkdir -p "$sessions_dir" 2>/dev/null
 
   case "$sub_cmd" in
+    "status")
+      echo "[session status]"
+      local s_total=0
+      for meta in "$sessions_dir"/*.meta.json; do
+        [[ ! -f "$meta" ]] && continue
+        local sid; sid=$(jq -r '.session_id // .sessionID // "unknown"' "$meta" 2>/dev/null)
+        local agent; agent=$(jq -r '.agent // .agent_id // .agentID // "unknown"' "$meta" 2>/dev/null)
+        local role; role=$(jq -r '.role // "unknown"' "$meta" 2>/dev/null)
+        local ts; ts=$(jq -r '.timestamp // "unknown"' "$meta" 2>/dev/null)
+        printf '  %s %s  agent=%s  role=%s  started=%s\n' \
+          "$(_colored_state "%")" "$sid" "$agent" "$role" "$ts"
+        ((s_total++)) || true
+      done
+      echo ""
+      echo "  $s_total session(s)"
+      [[ $s_total -eq 0 ]] && echo "  (no sessions found)"
+      return 0
+      ;;
     "list"|"")
       echo "[SESSION LIST] Active sessions:"
       local count=0
@@ -1895,7 +1929,7 @@ mode_session() {
       ;;
     *)
       echo "Error: Unknown session subcommand: $sub_cmd" >&2
-      echo "Available: list, view, handoff, assign, attach, export, import, push, pull, prune" >&2
+      echo "Available: status, list, view, handoff, assign, attach, export, import, push, pull, prune" >&2
       return 1
       ;;
   esac
@@ -1965,7 +1999,7 @@ mode_knowledge() {
       scope_type="NEXUS"
       base_path="$AGENCE_ROOT/nexus"
       ;;
-    "todo")
+    "todo"|"note")
       # HERMETIC scope (local, personal)
       scope_type="HERMETIC"
       # Use @ symlink if present in hermetic
@@ -2012,7 +2046,7 @@ EOF
       knowledge_list "$cmd_type" "$data_dir" "$index_file" "$args"
       ;;
     "status")
-      knowledge_status "$cmd_type" "$args"
+      knowledge_status "$cmd_type" "$args" "$data_dir"
       ;;
     "show")
       local item; item=$(echo "$args" | awk '{print $1}')
@@ -2384,18 +2418,98 @@ knowledge_status_project() {
   return 0
 }
 
+# Generic INDEX-based status (for types without rich root JSON)
+knowledge_status_index() {
+  local cmd_type="$1"
+  local data_dir="$2"
+
+  local index_json="$data_dir/INDEX.json"
+  local count=0
+
+  if [[ -f "$index_json" ]] && command -v jq &>/dev/null; then
+    # Try .entries[] first (standard INDEX.json), fall back to other keys
+    count=$(jq '(.entries // []) | length' "$index_json" 2>/dev/null || echo 0)
+    echo "[$cmd_type status] ($count entries)"
+    echo ""
+    if [[ $count -gt 0 ]]; then
+      jq -r '(.entries // [])[] | "  ~ \(.id // .title // .source // "?")  \(.title // .description // .date // "")"' "$index_json" 2>/dev/null
+    else
+      echo "  (no entries)"
+    fi
+  else
+    # Count .md files (exclude INDEX.md)
+    count=$(find "$data_dir" -maxdepth 1 -name "*.md" ! -name "INDEX.md" 2>/dev/null | wc -l)
+    echo "[$cmd_type status] ($count entries)"
+    echo ""
+    if [[ $count -gt 0 ]]; then
+      for f in "$data_dir"/*.md; do
+        [[ "$(basename "$f")" == "INDEX.md" ]] && continue
+        local name; name=$(basename "$f" .md)
+        local title; title=$(head -1 "$f" | sed 's/^#\s*//')
+        echo "  ~ $name  $title"
+      done
+    else
+      echo "  (no entries)"
+    fi
+  fi
+  echo ""
+  return 0
+}
+
+# plan status — reads phases.json for roadmap phase tracking
+knowledge_status_plan() {
+  local data_dir="$1"
+  local phases_json="$data_dir/phases.json"
+
+  if [[ -f "$phases_json" ]] && command -v jq &>/dev/null; then
+    local phase_count
+    phase_count=$(jq '.phases | length' "$phases_json" 2>/dev/null || echo 0)
+    echo "[plan status] ($phase_count phases)"
+    echo ""
+    local i=0
+    while [[ $i -lt $phase_count ]]; do
+      local p_id p_name p_status p_ver
+      p_id=$(jq -r ".phases[$i].id" "$phases_json")
+      p_name=$(jq -r ".phases[$i].name" "$phases_json")
+      p_status=$(jq -r ".phases[$i].status // \"unknown\"" "$phases_json")
+      p_ver=$(jq -r ".phases[$i].version // \"\"" "$phases_json")
+      local sym="~"
+      case "$p_status" in
+        complete|done) sym="-" ;;
+        in-progress|active) sym="%" ;;
+        queued|pending) sym="~" ;;
+        blocked|failed) sym="!" ;;
+      esac
+      printf '  %s %-6s %-30s %s (%s)\n' \
+        "$(_colored_state "$sym")" "$p_ver" "$p_name" "[$p_status]" "phase $p_id"
+      ((i++))
+    done
+  else
+    # Fall back to generic index
+    knowledge_status_index "plan" "$data_dir"
+    return $?
+  fi
+  echo ""
+  return 0
+}
+
 # Router: knowledge_status
 knowledge_status() {
   local cmd_type="$1"
   local args="$2"
+  local data_dir="$3"
 
   case "$cmd_type" in
     "task")     knowledge_status_task "$args" ;;
     "workflow") knowledge_status_workflow "$args" ;;
     "project")  knowledge_status_project "$args" ;;
+    "plan")     knowledge_status_plan "$data_dir" ;;
+    "todo"|"note"|"job"|"issue")
+      knowledge_status_index "$cmd_type" "$data_dir"
+      ;;
     *)
       echo "Error: 'status' subcommand not supported for $cmd_type" >&2
-      echo "Supported: task status, workflow status, project status" >&2
+      echo "Supported: task, workflow, project, todo, job, issue, plan, session" >&2
       return 1
       ;;
   esac
