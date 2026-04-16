@@ -1,0 +1,22 @@
+# .dockerignore — Agence agent container
+# Only ship bin/, lib/, codex/ into the image.
+# Everything else is mounted at runtime or not needed.
+
+.git
+hermetic/
+synthetic/
+organic/
+nexus/
+objectcode/
+globalcache/
+mnemonic/
+tests/
+docs/
+.vscode/
+.devcontainer/
+node_modules/
+*.md
+!bin/COMMANDS.md
+LICENSE.md
+package.json
+config.yaml.example

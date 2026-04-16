@@ -1,0 +1,21 @@
+// Agence dev container — builds from repo Dockerfile + dev extras
+// https://aka.ms/devcontainer.json
+{
+	"name": "Agence",
+	"build": {
+		"dockerfile": "../Dockerfile",
+		"context": ".."
+	},
+	"features": {
+		"ghcr.io/devcontainers-extra/features/tmux-apt-get:1": {}
+	},
+	"postCreateCommand": "bin/agence-start.sh",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"MS-DAW-TCA.ado-productivity-copilot"
+			]
+		}
+	},
+	"remoteUser": "root"
+}

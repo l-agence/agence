@@ -279,7 +279,7 @@ USAGE:
   agence /<cmd>                  External command (AIPOLICY tier gated)
   agence !<tool>                 Launch system tool / agent shell
   agence ^<cmd>                  Init, workflow, knowledge commands
-  agence ~recall <pattern>       Search grimoire (gated memory)
+  agence ~recall <pattern>       Search masonic (gated memory)
 
 ────────────────────────────────────────────────────────────────────────
 
@@ -430,9 +430,9 @@ EOF
 }
 
 show_version() {
-  echo "Agence version 0.4.1"
-  echo "[VERSION]: 0.4.1"
-  echo "[RELEASE]: v0.4.1"
+  echo "Agence version 0.4.2"
+  echo "[VERSION]: 0.4.2"
+  echo "[RELEASE]: v0.4.2"
 }
 
 # ============================================================================
@@ -566,7 +566,7 @@ main() {
       mode_init "${input:1}"
       ;;
     "~")
-      # Human-scoped recall: search grimoire (gated persistent memory)
+      # Human-scoped recall: search masonic (gated persistent memory)
       local _tilde_cmd="${input:1}"
       local _tilde_verb="${_tilde_cmd%% *}"
       local _tilde_args="${_tilde_cmd#$_tilde_verb}"
@@ -575,10 +575,10 @@ main() {
         "recall")
           if [[ -z "$_tilde_args" ]]; then
             echo "Usage: agence ~recall <pattern> [grep-options...]" >&2
-            echo "Searches: hermetic/grimoire/ (gated persistent memory)" >&2
+            echo "Searches: hermetic/masonic/ (gated persistent memory)" >&2
             return 1
           fi
-          "$AGENCE_BIN/figrep" "$AGENCE_ROOT/hermetic/grimoire" $_tilde_args
+          "$AGENCE_BIN/figrep" "$AGENCE_ROOT/hermetic/masonic" $_tilde_args
           ;;
         "todo"|"todos")
           # ~todo → ^todo (hermetic shortcut)
@@ -963,7 +963,41 @@ mode_external() {
 
   [[ "$DEBUG" == "1" ]] && echo "[DEBUG] External mode: $cmd_request" >&2
 
-  # Validate command for dangerous operators
+  # ── Guard gate (TCB boundary) ──────────────────────────────────────────
+  # If guard.ts is available, classify the command FIRST.
+  # T3 = deny, T2 = escalate (prompt), T0/T1 = pass through.
+  local _guard_ts="${AGENCE_ROOT}/lib/guard.ts"
+  if command -v bun &>/dev/null && [[ -f "$_guard_ts" ]]; then
+    local _guard_json
+    _guard_json=$(bun run "$_guard_ts" classify $cmd_request 2>/dev/null) || true
+    if [[ -n "$_guard_json" ]] && command -v jq &>/dev/null; then
+      local _guard_tier _guard_action
+      _guard_tier=$(echo "$_guard_json" | jq -r '.tier // "T1"')
+      _guard_action=$(echo "$_guard_json" | jq -r '.action // "allow"')
+      case "$_guard_action" in
+        deny)
+          echo "Error: BLOCKED by guard (${_guard_tier}) — $cmd_request" >&2
+          echo "  $(echo "$_guard_json" | jq -r '.reason // ""')" >&2
+          return 1
+          ;;
+        escalate)
+          echo "[GUARD ${_guard_tier}] Requires approval: $cmd_request" >&2
+          echo "  $(echo "$_guard_json" | jq -r '.reason // ""')" >&2
+          if [[ -t 0 ]]; then
+            read -p "Approve? [y/N] " _approve
+            [[ "$_approve" != "y" && "$_approve" != "Y" ]] && { echo "[CANCELLED]" >&2; return 1; }
+          else
+            echo "Error: Non-interactive — cannot escalate" >&2
+            return 1
+          fi
+          ;;
+        # allow|flag → proceed
+      esac
+      [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Guard: ${_guard_tier}/${_guard_action} for $cmd_request" >&2
+    fi
+  fi
+
+  # Validate command for dangerous operators (legacy fallback if guard unavailable)
   if ! validate_command "$cmd_request"; then
     return 1
   fi

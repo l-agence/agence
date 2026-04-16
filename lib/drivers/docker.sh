@@ -48,7 +48,8 @@ _driver_spawn() {
     -e "AI_AGENT=${agent}" \
     -e "AI_ROLE=agentic" \
     -e "GIT_ROOT=/workspace" \
-    -e "AGENCE_ROOT=/workspace/.agence" \
+    -e "AGENCE_ROOT=/agence" \
+    -e "AI_ROOT=/workspace" \
     -w /workspace \
     --label "agence.tangent=${tangent_id}" \
     --label "agence.agent=${agent}" \
@@ -79,7 +80,9 @@ _driver_exec() {
   local cmd="$*"
   local container_name="agence-${tangent_id}"
 
-  docker exec -i "$container_name" bash -c "$cmd"
+  # All commands inside the container are gated by guard.ts
+  docker exec -i "$container_name" \
+    bash -c 'eval "$(/agence/bin/airun guard check "$@")" && [ "$_GUARD_APPROVED" = "1" ] && eval "$@" || echo "[guard] ✗ Denied: $*" >&2' _ "$cmd"
 }
 
 _driver_status() {

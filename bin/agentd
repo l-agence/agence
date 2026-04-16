@@ -630,6 +630,17 @@ cmd_inject() {
     exit 1
   fi
 
+  # Gate through guard.ts before injection (host-side TCB check)
+  local _guard_ts="${AGENCE_ROOT}/lib/guard.ts"
+  if command -v bun &>/dev/null && [[ -f "$_guard_ts" ]]; then
+    eval "$(bun run "$_guard_ts" check $cmd 2>/dev/null)" || true
+    if [[ "${_GUARD_APPROVED:-1}" == "0" ]]; then
+      echo "✗ Guard denied: $cmd" >&2
+      echo "  Tier: ${_GUARD_TIER:-?}  Reason: ${_GUARD_REASON:-unknown}" >&2
+      exit 1
+    fi
+  fi
+
   # Send command through socat socket
   echo "$cmd" | socat - UNIX-CONNECT:"$sock"
 }
