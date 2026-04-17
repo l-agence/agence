@@ -40,13 +40,21 @@ _driver_spawn() {
     docker rm -f "$container_name" &>/dev/null
   fi
 
+  # Worktree-specific git dir (index, HEAD, refs) — needs rw for commits
+  # fuse-overlayfs in entrypoint merges .git-lower (ro) + upper (ephemeral rw) → /repo/.git
+  local wt_gitdir="${AGENCE_ROOT}/.git/worktrees/${tangent_id}"
+
   docker run -d \
     --name "$container_name" \
     --hostname "$tangent_id" \
-    -v "${AGENCE_ROOT}/.git:/repo/.git:ro" \
+    --device /dev/fuse \
+    --security-opt apparmor:unconfined \
+    -v "${AGENCE_ROOT}/.git:/repo/.git-lower:ro" \
+    -v "${wt_gitdir}:/repo/.git-lower/worktrees/${tangent_id}" \
     -v "${worktree_path}:/workspace" \
     -e "AI_AGENT=${agent}" \
     -e "AI_ROLE=agentic" \
+    -e "AGENCE_TANGENT_ID=${tangent_id}" \
     -e "GIT_ROOT=/workspace" \
     -e "AGENCE_ROOT=/agence" \
     -e "AI_ROOT=/workspace" \
@@ -61,7 +69,8 @@ _driver_spawn() {
     echo "✗ Failed to start container for tangent $tangent_id" >&2
     return 1
   fi
-  echo "[agentd:docker] started $container_name"
+
+  echo "[agentd:docker] started $container_name (overlay .git)"
 }
 
 _driver_destroy() {

@@ -6,7 +6,8 @@
 #   - aibash provides restricted shell (PATH, env, sandbox)
 #   - aido wraps whitelisted commands with session capture
 #   - No tmux inside container (host-side agentd handles IPC)
-#   - Read-only .git mount, writable /workspace volume
+#   - Read-only .git mount + fuse-overlayfs for writable git operations
+#   - Writes (git add/commit) go to ephemeral upper layer, host .git untouched
 #
 # Build:
 #   docker build -t agence/agent:latest .
@@ -27,6 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     ca-certificates \
     curl \
+    fuse-overlayfs \
     gawk \
     git \
     jq \
@@ -59,6 +61,7 @@ RUN ARCH=$(dpkg --print-architecture) \
 WORKDIR /agence
 
 # Copy only what the container needs — no hermetic, no synthetic, no nexus
+COPY bin/agent-entrypoint.sh  bin/agent-entrypoint.sh
 COPY bin/.agencerc   bin/.agencerc
 COPY bin/agence      bin/agence
 COPY bin/aibash      bin/aibash
@@ -108,7 +111,9 @@ ENV AGENCE_ROOT=/agence \
     TERM=xterm-256color
 
 # ── Entrypoint ───────────────────────────────────────────────────────────
-# Default: sleep infinity (agentd sends commands via docker exec)
+# agent-entrypoint.sh sets up fuse-overlayfs for .git, then exec's CMD.
+# Default CMD: sleep infinity (agentd sends commands via docker exec)
 # Override: docker run agence/agent:latest bash --rcfile /agence/bin/aibash
 
+ENTRYPOINT ["/agence/bin/agent-entrypoint.sh"]
 CMD ["sleep", "infinity"]

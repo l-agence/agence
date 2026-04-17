@@ -5,6 +5,9 @@
 # Source Agence environment
 source "$(dirname "$0")/.agencerc"
 
+# Source core functions (agence_session_day_dir, etc.)
+source "$AI_ROOT/lib/env.sh"
+
 # Source command validation library
 source "$AI_ROOT/lib/aicmd-lib.sh"
 
