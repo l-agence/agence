@@ -79,7 +79,30 @@
         "agence*", "bash bin/agence*", "bash bin/aisession list*",
         "bash bin/aisession status*", "bash bin/aisession show*",
 
+        // ── agentd orchestrator ──
+        "bin/agentd *", "AGENTD_DRIVER=* bin/agentd *",
+
+        // ── navigation ──
+        "cd *",
+
+        // ── tmux read-only ──
+        "tmux list-sessions*", "tmux list-windows*", "tmux capture-pane*",
+        "tmux display-message*", "tmux show-option*", "tmux has-session*",
+        "tmux send-keys*",
+
+        // ── docker read-only ──
+        "docker ps*", "docker inspect*", "docker logs*", "docker images*",
+        "docker stats*", "docker top*",
+
+        // ── docker lifecycle (agentd needs) ──
+        "docker build*", "docker run*", "docker exec*",
+        "docker rm*", "docker stop*",
+
         // ── package query ──
-        "apt list*", "dpkg -l*", "which*", "command -v*"
+        "apt list*", "dpkg -l*", "which*", "command -v*",
+
+        // ── misc utilities ──
+        "echo *", "printf *", "sleep *", "test *", "true", "false",
+        "basename*", "dirname*", "realpath*", "readlink*"
     ]
 }

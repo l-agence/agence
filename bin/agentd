@@ -30,6 +30,9 @@ SESSION="${AGENTD_SESSION:-agence}"
 DEFAULT_AGENTS="copilot ralph sonya aider"
 DRIVER="${AGENTD_DRIVER:-stub}"
 
+# Source shell UI for tmux status bar + title management
+[[ -f "$AGENCE_ROOT/lib/shell-ui.sh" ]] && source "$AGENCE_ROOT/lib/shell-ui.sh"
+
 # ── Directories ─────────────────────────────────────────────────────────────
 
 AGENTD_DIR="$AGENCE_ROOT/nexus/agentd"
@@ -117,6 +120,36 @@ _agent_cmd() {
 _agent_window() {
   local agent="$1"
   _agent_cmd "$agent"
+}
+
+# ── Window Title + Color ───────────────────────────────────────────────────
+
+# Map agent name to tmux fg color
+_agent_tmux_fg() {
+  case "${1:-@}" in
+    human)          echo "white,bold" ;;
+    copilot|pilot)  echo "cyan" ;;
+    ralph)          echo "green" ;;
+    sonya|sonny)    echo "magenta" ;;
+    aider)          echo "yellow" ;;
+    claude|claudia) echo "white" ;;
+    haiku)          echo "blue" ;;
+    *)              echo "white" ;;
+  esac
+}
+
+# Set window name + per-window color style
+# Usage: _set_window_color <session> <window-index> <agent> [state]
+_set_window_color() {
+  local session="$1" win_idx="$2" agent="$3" state="${4:-+}"
+  local display_agent="$agent"
+  [[ "$agent" == "human" ]] && display_agent="${USER:-human}"
+  display_agent="${display_agent:0:5}"
+  local fg; fg=$(_agent_tmux_fg "$agent")
+
+  tmux rename-window -t "${session}:${win_idx}" "${state}:@${display_agent}" 2>/dev/null || true
+  tmux set-option -t "${session}:${win_idx}" -w window-status-style "fg=${fg}" 2>/dev/null || true
+  tmux set-option -t "${session}:${win_idx}" -w window-status-current-style "fg=${fg},bold,underscore" 2>/dev/null || true
 }
 
 # ── Tangent Registry ───────────────────────────────────────────────────────
@@ -229,9 +262,10 @@ _socket_start() {
   # Remove stale socket
   rm -f "$sock"
 
-  # Start socat listener: receives commands, routes to tmux send-keys
+  # Start socat listener: receives commands, routes to handler
+  # Note: stdout/stderr redirected to prevent blocking $() subshell capture
   socat UNIX-LISTEN:"$sock",fork \
-    EXEC:"${AGENCE_ROOT}/bin/agentd _socket_handler $tangent_id" &
+    EXEC:"${AGENCE_ROOT}/bin/agentd _socket_handler $tangent_id" >/dev/null 2>&1 &
   local socat_pid=$!
 
   # Verify socat started
@@ -273,14 +307,22 @@ cmd__socket_handler() {
     exit 0
   fi
 
-  # Route: tmux send-keys to the tangent's pane
-  local window="@${tangent_id}"
-  if tmux has-session -t "$SESSION" 2>/dev/null; then
-    tmux send-keys -t "${SESSION}:${window}" "$cmd" Enter
-    echo "OK: sent to ${SESSION}:${window}"
+  # Check if this tangent has a running Docker container
+  local container_name="agence-${tangent_id}"
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qxF "$container_name"; then
+    # Docker driver: exec into the container
+    docker exec -i "$container_name" bash -c "$cmd" 2>&1
+    echo "OK: exec in $container_name"
   else
-    echo "✗ Session $SESSION not running" >&2
-    exit 1
+    # Stub driver: route via tmux send-keys to the tangent's pane
+    local window="@${tangent_id}"
+    if tmux has-session -t "$SESSION" 2>/dev/null; then
+      tmux send-keys -t "${SESSION}:${window}" "$cmd" Enter
+      echo "OK: sent to ${SESSION}:${window}"
+    else
+      echo "✗ Session $SESSION not running" >&2
+      exit 1
+    fi
   fi
 }
 
@@ -320,19 +362,33 @@ cmd_start() {
   # Initialize tangent registry
   _tangent_registry_init
 
-  # Create session detached with first agent as first window
-  local first="${agents[0]}"
-  tmux new-session -d -s "$SESSION" -n "@${first}" \
-    "$(_agent_window "$first")"
+  # Window 0: @control — human ibash pane (always first)
+  tmux new-session -d -s "$SESSION" -n "@control" \
+    "env AI_AGENT=human AI_ROLE=interactive GIT_ROOT=${AGENCE_ROOT} bash --rcfile ${AGENCE_ROOT}/bin/aibash"
 
-  # Add remaining agents as windows
-  for agent in "${agents[@]:1}"; do
+  # Add agent windows after @control
+  for agent in "${agents[@]}"; do
     tmux new-window -t "$SESSION" -n "@${agent}" \
       "$(_agent_window "$agent")"
   done
 
-  # Select first window
-  tmux select-window -t "$SESSION:@${first}"
+  # Apply tmux status bar styling + disable automatic-rename
+  # (must run before rename-window calls so automatic-rename doesn't clobber them)
+  if declare -F agence_tmux_status_bar &>/dev/null; then
+    agence_tmux_status_bar "$SESSION"
+  fi
+
+  # Set color-coded window titles: [STATE] agent
+  # @control gets [~] human, agents get [~] <name> (~ = pending/awaiting)
+  _set_window_color "$SESSION" 0 "human"
+  local idx=1
+  for agent in "${agents[@]}"; do
+    _set_window_color "$SESSION" "$idx" "$agent"
+    ((idx++))
+  done
+
+  # Select window 0 (by index, not name — avoids race)
+  tmux select-window -t "$SESSION:0"
 
   echo "[agentd] Started (PID $$)."
   echo "  Attach:     agentd attach"
@@ -517,6 +573,15 @@ cmd_tangent_create() {
     # Container driver: stream logs into tmux pane
     tmux new-window -t "$SESSION" -n "$window" \
       "${AGENCE_ROOT}/bin/agentd _driver_logs_pane ${tangent_id}"
+  fi
+
+  # Set color-coded title for the tangent window: [~] agent:tangent_id
+  local tangent_win_idx
+  tangent_win_idx=$(tmux list-windows -t "$SESSION" -F "#{window_index} #{window_name}" 2>/dev/null \
+    | grep "$window" | head -1 | awk '{print $1}')
+  if [[ -n "$tangent_win_idx" ]]; then
+    tmux rename-window -t "${SESSION}:${tangent_win_idx}" "[~] ${agent}:${tangent_id}" 2>/dev/null || true
+    _set_window_color "$SESSION" "$tangent_win_idx" "$agent" "~"
   fi
 
   # 4. Socat socket listener

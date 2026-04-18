@@ -68,13 +68,27 @@ function isoNow(): string {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
+/** Map agent name → 3-letter LLM model tag */
+function modelTag(agent: string): string {
+  switch (agent) {
+    case "copilot": case "pilot": return "gpt";
+    case "ralph":                  return "son";
+    case "sonya":  case "sonny":   return "son";
+    case "aider":                  return "son";
+    case "haiku":                  return "hku";
+    case "claude": case "claudia": return "cld";
+    case "human":                  return "hum";
+    default:                       return agent.slice(0, 3);
+  }
+}
+
 function generateSessionId(agent: string): string {
   const time = new Date();
-  const hhmmss = String(time.getHours()).padStart(2, "0")
-    + String(time.getMinutes()).padStart(2, "0")
-    + String(time.getSeconds()).padStart(2, "0");
-  const hex = randomBytes(4).toString("hex").slice(0, 8);
-  return `${agent}-${hhmmss}-${hex}`;
+  const hhmm = String(time.getHours()).padStart(2, "0")
+    + String(time.getMinutes()).padStart(2, "0");
+  const a5 = agent.slice(0, 5);
+  const m3 = modelTag(agent);
+  return `${a5}-${m3}-${hhmm}`;
 }
 
 /** Emit eval-safe shell variable. Values are single-quoted to prevent injection. */

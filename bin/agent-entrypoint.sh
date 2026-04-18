@@ -8,7 +8,7 @@
 #   upper  = /tmp/.git-upper   (ephemeral writable layer)
 #   merged = /repo/.git        (what git sees — reads from lower, writes to upper)
 #
-# Uses fuse-overlayfs (no --cap-add SYS_ADMIN needed).
+# Uses fuse-overlayfs (requires --cap-add SYS_ADMIN, dropped after mount).
 # agentd cherry-picks resultant commits from the worktree after tangent wins.
 
 set -euo pipefail
@@ -36,6 +36,16 @@ fi
 # Fix worktree .git pointer if tangent_id is set
 if [[ -n "${AGENCE_TANGENT_ID:-}" && -f "/workspace/.git" ]]; then
   echo "gitdir: /repo/.git/worktrees/${AGENCE_TANGENT_ID}" > /workspace/.git
+fi
+
+# Allow git operations on mounted workspace (ownership differs from container user)
+git config --global --add safe.directory /workspace 2>/dev/null || true
+
+# Drop SYS_ADMIN now that fuse mount is done — layered security
+# capsh drops the capability for PID 1 and its children.
+# Note: docker exec still inherits container-level caps (guard.ts is the real TCB).
+if command -v capsh &>/dev/null; then
+  exec capsh --drop=cap_sys_admin -- -c 'exec "$@"' -- "$@"
 fi
 
 exec "$@"

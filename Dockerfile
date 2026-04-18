@@ -32,6 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gawk \
     git \
     jq \
+    libcap2-bin \
     socat \
     unzip \
   && rm -rf /var/lib/apt/lists/*
@@ -63,6 +64,7 @@ WORKDIR /agence
 # Copy only what the container needs — no hermetic, no synthetic, no nexus
 COPY bin/agent-entrypoint.sh  bin/agent-entrypoint.sh
 COPY bin/.agencerc   bin/.agencerc
+COPY bin/.agentrc    bin/.agentrc
 COPY bin/agence      bin/agence
 COPY bin/aibash      bin/aibash
 COPY bin/aicmd       bin/aicmd
@@ -97,6 +99,11 @@ COPY codex/PRINCIPLES.md        codex/PRINCIPLES.md
 
 # Ensure bin/ is executable
 RUN chmod +x bin/*
+
+# Symlink bun + yq into AI_BIN so they're available on the restricted PATH
+RUN ln -sf /usr/local/bin/bun  bin/bun \
+ && ln -sf /usr/local/bin/bunx bin/bunx \
+ && ln -sf /usr/local/bin/yq   bin/yq
 
 # ── Environment ──────────────────────────────────────────────────────────
 

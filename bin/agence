@@ -3484,7 +3484,7 @@ install_macos_packages() {
     echo "  ✗ Homebrew not found. Install from: https://brew.sh" >&2
     return 1
   fi
-  local -a brew_pkgs=("gh" "jq" "tmux")
+  local -a brew_pkgs=("gh" "jq" "tmux" "socat")
   echo "  Core (required):"
   for pkg in "${brew_pkgs[@]}"; do
     echo -n "  [$pkg] "
@@ -3537,7 +3537,7 @@ install_linux_packages() {
   fi
   echo ""
   # System packages
-  local -a apt_pkgs=("git" "jq" "gawk" "tmux" "util-linux" "gh" "npm" "curl" "unzip" "wslu")
+  local -a apt_pkgs=("git" "jq" "gawk" "tmux" "socat" "util-linux" "gh" "npm" "curl" "unzip" "wslu")
   local pkg_ok=0 pkg_fail=0
   echo "  System (apt):"
   for pkg in "${apt_pkgs[@]}"; do

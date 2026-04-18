@@ -10,12 +10,13 @@
 #   - aibash marks pane "-" on exit so swarm reap can reclaim
 #   - Prefer reusing idle panes over creating new ones
 #
-# State legend (from codex/TAXONOMY.md):
-#   ~  pending       +  queued        (BLUE)
-#   %  in-progress   &  executing     $  coordinating   (AMBER)
-#   _  paused        #  held          (PURPLE)
-#   -  completed                      (GREEN)
-#   !  failed        ?  awaiting      (RED)
+# State legend (canonical — from synthetic/l-agence.org/docs/SYMBOLS.md):
+#   +  pending/todo    &  agent-assigned     (BLUE)   — queued, not yet running
+#   %  in-progress                           (AMBER)  — actively working
+#   _  paused/deferred #  held-by-human      (PURPLE) — blocked
+#   -  completed                             (GREEN)  — terminal
+#   !  failed          ?  awaiting-input     (RED)    — needs attention
+#   ~  swarm-queued    $  swarm-coordinating (CYAN)   — reserved v0.3.2+
 
 # ── ANSI Color Codes ─────────────────────────────────────────────────────────
 
@@ -59,37 +60,40 @@ _TMUX_RESET='#[default]'
 # Returns ANSI color escape for a given state symbol.
 # Usage: _state_color "%" → prints \033[33m (amber)
 _state_color() {
-  case "${1:-~}" in
-    '~'|'+')  printf '%s' "$_C_BLUE"   ;;  # pending/queued
-    '%'|'&'|'$') printf '%s' "$_C_AMBER" ;;  # in-progress/executing/coordinating
-    '_'|'#')  printf '%s' "$_C_PURPLE" ;;  # paused/held
-    '-')      printf '%s' "$_C_GREEN"  ;;  # completed
-    '!'|'?')  printf '%s' "$_C_RED"    ;;  # failed/awaiting human
-    *)        printf '%s' "$_C_WHITE"  ;;  # unknown
+  case "${1:-+}" in
+    '+'|'&')      printf '%s' "$_C_BLUE"   ;;  # pending / agent-assigned
+    '%')          printf '%s' "$_C_AMBER"  ;;  # in-progress
+    '_'|'#')     printf '%s' "$_C_PURPLE" ;;  # paused / held-by-human
+    '-')          printf '%s' "$_C_GREEN"  ;;  # completed
+    '!'|'?')     printf '%s' "$_C_RED"    ;;  # failed / awaiting-input
+    '~'|'$')     printf '%s' "$_C_CYAN"   ;;  # swarm (reserved)
+    *)            printf '%s' "$_C_WHITE"  ;;  # unknown
   esac
 }
 
 # PS1-safe variant (with \[\] wrappers)
 _state_color_ps1() {
-  case "${1:-~}" in
-    '~'|'+')  printf '%s' "$_P_BLUE"   ;;
-    '%'|'&'|'$') printf '%s' "$_P_AMBER" ;;
-    '_'|'#')  printf '%s' "$_P_PURPLE" ;;
-    '-')      printf '%s' "$_P_GREEN"  ;;
-    '!'|'?')  printf '%s' "$_P_RED"    ;;
-    *)        printf '%s' "$_P_WHITE"  ;;
+  case "${1:-+}" in
+    '+'|'&')      printf '%s' "$_P_BLUE"   ;;
+    '%')          printf '%s' "$_P_AMBER"  ;;
+    '_'|'#')     printf '%s' "$_P_PURPLE" ;;
+    '-')          printf '%s' "$_P_GREEN"  ;;
+    '!'|'?')     printf '%s' "$_P_RED"    ;;
+    '~'|'$')     printf '%s' "$_P_CYAN"   ;;
+    *)            printf '%s' "$_P_WHITE"  ;;
   esac
 }
 
 # tmux style string variant
 _state_color_tmux() {
-  case "${1:-~}" in
-    '~'|'+')  printf '%s' "$_TMUX_BLUE"   ;;
-    '%'|'&'|'$') printf '%s' "$_TMUX_AMBER" ;;
-    '_'|'#')  printf '%s' "$_TMUX_PURPLE" ;;
-    '-')      printf '%s' "$_TMUX_GREEN"  ;;
-    '!'|'?')  printf '%s' "$_TMUX_RED"    ;;
-    *)        printf '%s' "$_TMUX_WHITE"  ;;
+  case "${1:-+}" in
+    '+'|'&')      printf '%s' "$_TMUX_BLUE"   ;;
+    '%')          printf '%s' "$_TMUX_AMBER"  ;;
+    '_'|'#')     printf '%s' "$_TMUX_PURPLE" ;;
+    '-')          printf '%s' "$_TMUX_GREEN"  ;;
+    '!'|'?')     printf '%s' "$_TMUX_RED"    ;;
+    '~'|'$')     printf '%s' "$_TMUX_CYAN"   ;;
+    *)            printf '%s' "$_TMUX_WHITE"  ;;
   esac
 }
 
@@ -136,73 +140,90 @@ _agent_color_tmux() {
 }
 
 # ── PS1 Builder ──────────────────────────────────────────────────────────────
-# Builds the prompt: session@agent:<STATE>$
+# Format: [state]:[tangent>]@agent$
 #
-# Usage: agence_ps1 <session-id> <agent> <state>
-#   e.g. agence_ps1 "robo4f3ce0ce" "copilot" "%"
-#   → \[\033[2m\]robo4f3c\[\033[0m\]@\[\033[36m\]copilot\[\033[0m\]:\[\033[33m\]%\[\033[0m\]$
+# Usage: agence_ps1 <agent> <state> [tangent]
+#   agence_ps1 "copilot" "~"           → ~:@copil$
+#   agence_ps1 "sonya" "$"             → $:@sonya$
+#   agence_ps1 "ralph" "!" "t1"        → !:t1>@ralph$
+#   agence_ps1 "human" "+"             → +:@steff$   (uses $USER)
 
 agence_ps1() {
-  local session="${1:-????}"
-  local agent="${2:-@}"
-  local state="${3:-~}"
+  local agent="${1:-@}"
+  local state="${2:-+}"
+  local tangent="${3:-}"
 
-  # Truncate session to 8 chars for brevity
-  local sid="${session:0:8}"
+  # human → $USER
+  local display_agent="$agent"
+  [[ "$agent" == "human" ]] && display_agent="${USER:-human}"
+
+  # Truncate agent display to 5 chars
+  display_agent="${display_agent:0:5}"
 
   local ac; ac="$(_agent_color_ps1 "$agent")"
   local sc; sc="$(_state_color_ps1 "$state")"
 
-  printf '%s%s%s@%s%s%s:%s%s%s\$ ' \
-    "$_P_DIM" "$sid" "$_P_RESET" \
-    "$ac" "$agent" "$_P_RESET" \
-    "$sc" "$state" "$_P_RESET"
+  # Build tangent segment: "t1>" or ""
+  local tseg=""
+  if [[ -n "$tangent" ]]; then
+    tseg="${_P_DIM}${tangent}>${_P_RESET}"
+  fi
+
+  printf '%s%s%s:%s%s@%s%s%s\$ ' \
+    "$sc" "$state" "$_P_RESET" \
+    "$tseg" \
+    "$ac" "$display_agent" "$_P_RESET"
 }
 
 # ── Terminal Title (OSC escape) ──────────────────────────────────────────────
 # Sets the terminal window/tab title via OSC escape sequence.
 # Works in xterm, iTerm2, Windows Terminal, VS Code integrated terminal.
 #
-# Usage: agence_set_title <session-id> <agent> <state>
+# Usage: agence_set_title <agent> <state>
 
 agence_set_title() {
-  local session="${1:-????}"
-  local agent="${2:-@}"
-  local state="${3:-~}"
+  local agent="${1:-@}"
+  local state="${2:-+}"
 
-  local sid="${session:0:8}"
+  local display_agent="$agent"
+  [[ "$agent" == "human" ]] && display_agent="${USER:-human}"
+  display_agent="${display_agent:0:5}"
+
   local icon=""
   case "$state" in
-    '~'|'+')  icon="📋" ;;  # pending
-    '%'|'&'|'$') icon="⚙️" ;;   # running
-    '_'|'#')  icon="⏸" ;;   # paused
+    '+'|'&')  icon="📋" ;;  # pending/assigned
+    '%')      icon="⚙️" ;;   # in-progress
+    '_'|'#')  icon="⏸" ;;   # paused/held
     '-')      icon="✅" ;;  # done
-    '!'|'?')  icon="🔴" ;;  # needs human
+    '!'|'?')  icon="🔴" ;;  # needs attention
+    '~'|'$')  icon="🔗" ;;  # swarm
     *)        icon="🤖" ;;
   esac
 
   # OSC 0 = set window title
-  printf '\033]0;%s [%s] %s@%s\007' "$icon" "$state" "$sid" "$agent" 2>/dev/null || true
+  printf '\033]0;%s %s:@%s\007' "$icon" "$state" "$display_agent" 2>/dev/null || true
 }
 
 # ── tmux Window/Pane Title ───────────────────────────────────────────────────
 # Sets tmux pane title (visible in status bar if automatic-rename is off).
 #
-# Usage: agence_tmux_title <pane-target> <session-id> <agent> <state>
+# Usage: agence_tmux_title <pane-target> <agent> <state>
 
 agence_tmux_title() {
   local pane_target="$1"
-  local session="${2:-????}"
-  local agent="${3:-@}"
-  local state="${4:-~}"
+  local agent="${2:-@}"
+  local state="${3:-+}"
 
-  local sid="${session:0:8}"
-  # Rename the pane's parent window to show agent + state
+  local display_agent="$agent"
+  [[ "$agent" == "human" ]] && display_agent="${USER:-human}"
+  display_agent="${display_agent:0:5}"
+
+  # Rename the pane's parent window to show state:@agent
   local window="${pane_target%%.*}"
-  tmux rename-window -t "$window" "[${state}] ${agent}" 2>/dev/null || true
+  tmux rename-window -t "$window" "${state}:@${display_agent}" 2>/dev/null || true
 
   # Also set pane title (visible with pane-border-format)
-  tmux select-pane -t "$pane_target" -T "${sid}@${agent}:${state}" 2>/dev/null || true
+  tmux select-pane -t "$pane_target" -T "${state}:@${display_agent}" 2>/dev/null || true
 }
 
 # ── State Transition: Update PS1 + Title in one call ─────────────────────────
@@ -212,23 +233,23 @@ agence_tmux_title() {
 # Reads: AI_SESSION, AI_AGENT, TMUX_PANE (if inside tmux)
 
 agence_state_update() {
-  local state="${1:-~}"
-  local session="${AI_SESSION:-????}"
+  local state="${1:-+}"
   local agent="${AI_AGENT:-@}"
 
   # Export for child processes / PROMPT_COMMAND
   export AGENCE_TASK_STATE="$state"
 
   # Update PS1
-  PS1="$(agence_ps1 "$session" "$agent" "$state")"
+  local tangent="${AGENCE_TANGENT_ID:-}"
+  PS1="$(agence_ps1 "$agent" "$state" "$tangent")"
   export PS1
 
   # Update terminal title
-  agence_set_title "$session" "$agent" "$state"
+  agence_set_title "$agent" "$state"
 
   # Update tmux if inside tmux
   if [[ -n "${TMUX_PANE:-}" ]]; then
-    agence_tmux_title "$TMUX_PANE" "$session" "$agent" "$state"
+    agence_tmux_title "$TMUX_PANE" "$agent" "$state"
   fi
 }
 
@@ -255,11 +276,15 @@ agence_tmux_status_bar() {
     "#[fg=white,dim]%H:%M #[default]"
 
   # Window format: show window name (which we set to "[state] agent")
-  # The color is baked into the window name via rename-window
+  # Colors come from per-window window-status-style set by _set_window_color
   tmux set-option -t "$session" window-status-format \
-    " #[fg=white,dim]#I:#W#[default] "
+    " #I:#W "
   tmux set-option -t "$session" window-status-current-format \
-    " #[fg=cyan,bold]#I:#W#[default] "
+    " #I:#W "
+
+  # Default inactive style (overridden per-window by _set_window_color)
+  tmux set-option -t "$session" window-status-style "fg=white,dim"
+  tmux set-option -t "$session" window-status-current-style "fg=cyan,bold,underscore"
 
   # Pane borders: show pane title
   tmux set-option -t "$session" pane-border-format \

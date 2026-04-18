@@ -48,6 +48,7 @@ _driver_spawn() {
     --name "$container_name" \
     --hostname "$tangent_id" \
     --device /dev/fuse \
+    --cap-add SYS_ADMIN \
     --security-opt apparmor:unconfined \
     -v "${AGENCE_ROOT}/.git:/repo/.git-lower:ro" \
     -v "${wt_gitdir}:/repo/.git-lower/worktrees/${tangent_id}" \

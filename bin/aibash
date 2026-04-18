@@ -37,12 +37,17 @@ fi
 
 # ── SECURITY ENVELOPE (must stay in bash — process-level isolation) ───────────
 
-# Restrict PATH to minimal safe binaries
-if [[ -n "${AI_BIN:-}" ]]; then
-	export PATH="/usr/bin:/bin:$AI_BIN"
-else
-	export PATH="/usr/bin:/bin"
+# Restrict PATH to minimal safe binaries + bun runtime
+_restricted_path="/usr/bin:/bin"
+[[ -n "${AI_BIN:-}" ]] && _restricted_path="${_restricted_path}:${AI_BIN}"
+# Ensure bun is reachable (may live outside /usr/bin, e.g. ~/.bun/bin)
+_bun_path="$(command -v bun 2>/dev/null)"
+if [[ -n "${_bun_path:-}" ]]; then
+	_bun_dir="$(dirname "$_bun_path")"
+	[[ ":${_restricted_path}:" != *":${_bun_dir}:"* ]] && _restricted_path="${_restricted_path}:${_bun_dir}"
 fi
+export PATH="$_restricted_path"
+unset _restricted_path _bun_path _bun_dir
 
 # Unset risky env vars
 unset HISTFILE HISTSIZE HISTCONTROL HISTIGNORE PROMPT_COMMAND BASH_ENV ENV CDPATH
@@ -78,9 +83,19 @@ _bun_config="$("$AGENCE_ROOT/bin/airun" aibash init "$@" 2>/dev/null)" || {
 	# Bun not available — fall back to minimal bash defaults
 	AI_AGENT="${AI_AGENT:-copilot}"
 	AI_ROLE="${AI_ROLE:-agentic}"
-	_hhmmss=$(date +%H%M%S)
-	_hex=$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')
-	AI_SESSION="${AI_SESSION:-${AI_AGENT}-${_hhmmss}-${_hex}}"
+	_hhmm=$(date +%H%M)
+	# Map agent → 3-letter LLM model tag
+	case "${AI_AGENT}" in
+		copilot|pilot)  _mtag="gpt" ;;
+		ralph)          _mtag="son" ;;
+		sonya|sonny)    _mtag="son" ;;
+		aider)          _mtag="son" ;;
+		haiku)          _mtag="hku" ;;
+		claude|claudia) _mtag="cld" ;;
+		human)          _mtag="hum" ;;
+		*)              _mtag="${AI_AGENT:0:3}" ;;
+	esac
+	AI_SESSION="${AI_SESSION:-${AI_AGENT:0:5}-${_mtag}-${_hhmm}}"
 	SHELL_TYPE="${SHELL_TYPE:-bash}"
 	_day_dir="$(agence_session_day_dir)"
 	SESSION_LOG="${_day_dir}/${AI_SESSION}.typescript"
@@ -88,7 +103,7 @@ _bun_config="$("$AGENCE_ROOT/bin/airun" aibash init "$@" 2>/dev/null)" || {
 	_AIBASH_PIPE_PANE=0
 	_AIBASH_COMMAND=""
 	export AI_AGENT AI_ROLE AI_SESSION SHELL_TYPE SESSION_LOG SESSION_META
-	unset _hhmmss _hex _day_dir
+	unset _hhmm _mtag _day_dir
 	echo "[aibash] Bun unavailable, using bash fallback" >&2
 }
 
@@ -154,27 +169,26 @@ fi
 
 cd "$GIT_ROOT" || { echo "[AIBASH] ✗ Failed to cd to $GIT_ROOT" >&2; exit 1; }
 
-# Set initial state: pending (~), title + PS1
-export AGENCE_TASK_STATE="~"
+# Set initial state: pending (+) during setup, will transition to ? (awaiting) before shell
+export AGENCE_TASK_STATE="+"
 if declare -F agence_state_update &>/dev/null; then
-	agence_state_update "~"
+	agence_state_update "+"
 else
 	printf '\033]0;🤖 %s | aibash\007' "${AI_AGENT}" 2>/dev/null || true
 fi
 echo "[aibash] agent=${AI_AGENT} session=${AI_SESSION:0:8} root=${GIT_ROOT}"
 
-# Build bash args
-_bash_args=(--noprofile --norc)
+# Build bash args — use .agentrc for PS1 + minimal interactive setup
+_bash_args=(--noprofile --rcfile "${AGENCE_ROOT}/bin/.agentrc")
 if [[ -n "${_AIBASH_COMMAND:-}" ]]; then
 	_bash_args+=("-c" "$_AIBASH_COMMAND")
 fi
 
-# Export PS1 so child bash inherits the agence prompt
-if declare -F agence_ps1 &>/dev/null; then
-	export PS1="$(agence_ps1 "${AI_SESSION:-????}" "${AI_AGENT:-@}" "${AGENCE_TASK_STATE:-~}")"
-fi
-
 notify_awaiting
+
+# Relax strict mode before launching interactive session.
+# The security envelope is set up; the inner bash must survive errors.
+set +e +u +o pipefail
 
 # Choose exec mode: pipe-pane > script(1) > direct
 if [[ "${_AIBASH_PIPE_PANE:-0}" == "1" ]]; then

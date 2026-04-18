@@ -1,0 +1,26 @@
+#!/bin/bash
+# .agentrc — Minimal rcfile for aibash inner shell
+#
+# Loaded via: bash --rcfile bin/.agentrc
+# Inherits: restricted PATH, env vars, sandbox from parent aibash
+# Purpose: PS1 prompt, cd alias, minimal interactive comfort
+#
+# ECONOMY: This file must stay small. No package loading, no completion trees.
+
+# ── PS1: Use agence prompt if available, else minimal agent prompt ────────
+if [[ -n "${AGENCE_ROOT:-}" ]] && [[ -f "$AGENCE_ROOT/lib/shell-ui.sh" ]]; then
+  source "$AGENCE_ROOT/lib/shell-ui.sh"
+  PS1="$(agence_ps1 "${AI_AGENT:-@}" "${AGENCE_TASK_STATE:-+}" "${AGENCE_TANGENT_ID:-}")"
+else
+  # Fallback: state:@agent$
+  PS1='\[\033[33m\]${AGENCE_TASK_STATE:-+}\[\033[0m\]:@\[\033[36m\]${AI_AGENT:-agent}\[\033[0m\]\$ '
+fi
+
+# ── Sandbox cd (if defined by parent aibash) ──────────────────────────────
+if declare -F sandbox_cd &>/dev/null; then
+  alias cd='sandbox_cd'
+fi
+
+# ── Minimal interactive comfort ───────────────────────────────────────────
+set -o emacs          # readline keybindings
+shopt -s checkwinsize # track terminal resize
