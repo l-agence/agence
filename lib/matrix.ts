@@ -42,6 +42,7 @@ const AGENCE_ROOT = process.env.AGENCE_ROOT
   || join(import.meta.dir, "..");
 
 const DATA_DIR = join(AGENCE_ROOT, "organic");
+const DASHBOARDS_DIR = join(DATA_DIR, "dashboards");
 const TASKS_FILE = join(DATA_DIR, "tasks.json");
 const DEPS_FILE = join(DATA_DIR, "deps.json");
 const WORKFLOWS_FILE = join(DATA_DIR, "workflows.json");
@@ -312,6 +313,256 @@ function cmdWorkflow(id: string): void {
   console.log(`\nCompletion: ${done}/${wf.tasks.length} (${pct}%)`);
 }
 
+// ─── Dashboard Generation ────────────────────────────────────────────────────
+// Regenerates TASKS.md, WORKFLOWS.md, PROJECTS.md from organic/ JSON sources.
+// Triggered by: airun matrix dashboard | agence ^regen | post-commit hook
+
+function dateStamp(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function genTasksDashboard(
+  tasks: Task[], edges: DepEdge[], blocking: Map<string, string[]>
+): string {
+  const scored = tasks.map(t => ({
+    ...t, score: computeScore(t), blockedBy: blocking.get(t.id) || [],
+  })).sort((a, b) => b.score - a.score);
+
+  const total = tasks.length;
+  const completed = tasks.filter(t => t.state === "-").length;
+  const running = tasks.filter(t => t.state === "&" || t.state === "$").length;
+  const pending = tasks.filter(t => RUNNABLE_STATES.has(t.state)).length;
+  const blocked = tasks.filter(t => (blocking.get(t.id) || []).length > 0).length;
+  const failed = tasks.filter(t => t.state === "!").length;
+
+  // State distribution
+  const stateCounts = new Map<string, number>();
+  for (const t of tasks) stateCounts.set(t.state, (stateCounts.get(t.state) || 0) + 1);
+
+  const stateLabels: Record<string, string> = {
+    "+": "Pending", "~": "Human-assigned", "$": "Human-working",
+    "%": "Agent-assigned", "&": "Agent-executing", "-": "Completed",
+    "_": "Paused", "#": "Held", "!": "Failure", "?": "Awaiting-input",
+  };
+
+  let md = `# Tasks Dashboard\n\n`;
+  md += `> **Source**: \`organic/tasks.json\` | **Formula**: score = 10P + 25S + 100H\n`;
+  md += `> **Generated**: ${dateStamp()} | **Project**: PROJ-LAGENCE\n\n---\n\n`;
+
+  // Active Tasks table
+  md += `## Active Tasks\n\n`;
+  md += `| ID | Title | State | Pri | Stars | Heat | Score | Agent | Blocked By |\n`;
+  md += `|----|-------|-------|-----|-------|------|-------|-------|------------|\n`;
+  for (const s of scored) {
+    const done = s.state === "-";
+    const id = done ? `~~${s.id}~~` : s.id;
+    const title = done ? `~~${s.title}~~` : s.title;
+    const blk = s.blockedBy.length > 0
+      ? s.blockedBy.map(b => {
+          const bt = tasks.find(t => t.id === b);
+          return bt && bt.state === "-" ? `~~${b}~~` : b;
+        }).join(", ")
+      : "\u2014";
+    md += `| ${id} | ${title} | \`${s.state}\` | ${s.priority} | ${s.stars} | ${s.heat} | **${s.score}** | ${s.agent || "\u2014"} | ${blk} |\n`;
+  }
+
+  // Summary
+  md += `\n## Summary\n\n`;
+  md += `| Metric | Value |\n|--------|-------|\n`;
+  md += `| Total tasks | ${total} |\n`;
+  md += `| Runnable | ${pending} |\n`;
+  md += `| Blocked | ${blocked} |\n`;
+  md += `| Completed | ${completed} |\n`;
+  md += `| Failed | ${failed} |\n`;
+
+  // State Distribution
+  md += `\n## State Distribution\n\n`;
+  md += `| State | Symbol | Count |\n|-------|--------|-------|\n`;
+  for (const [sym, count] of stateCounts) {
+    md += `| ${stateLabels[sym] || sym} | \`${sym}\` | ${count} |\n`;
+  }
+
+  // Scoring Leaderboard (top 10)
+  md += `\n---\n\n## Scoring Leaderboard\n\n`;
+  md += `*Top 10 tasks by score (highest first):*\n\n`;
+  md += `| Rank | ID | Score | State |\n|------|----|-------|-------|\n`;
+  const top10 = scored.slice(0, 10);
+  for (let i = 0; i < top10.length; i++) {
+    const s = top10[i];
+    const done = s.state === "-";
+    const id = done ? `~~${s.id}~~` : s.id;
+    const stateStr = done ? `\`-\` \u2705` : `\`${s.state}\``;
+    md += `| ${i + 1} | ${id} | ${s.score} | ${stateStr} |\n`;
+  }
+
+  // Dependency Graph (ASCII)
+  md += `\n---\n\n## Dependency Graph\n\n`;
+  const taskMap = new Map<string, Task>();
+  for (const t of tasks) taskMap.set(t.id, t);
+
+  // Group edges into chains
+  const rendered = new Set<string>();
+  for (const e of edges) {
+    const key = `${e.from}->${e.to}`;
+    if (rendered.has(key)) continue;
+    rendered.add(key);
+    const fromT = taskMap.get(e.from);
+    const toT = taskMap.get(e.to);
+    const fromDone = fromT?.state === "-" ? " \u2705" : ` ${fromT?.state || "?"}`;
+    const toDone = toT?.state === "-" ? " \u2705" : ` ${toT?.state || "?"}`;
+    const arrow = e.type === "^" ? "\u2500\u2500^\u2500\u2500>" : "\u2500\u2500 ; \u2500\u2500>";
+    md += `${e.from}${fromDone} ${arrow} ${e.to}${toDone}\n\n`;
+  }
+  md += `^ = hard block | ; = soft advisory\n\n`;
+
+  md += `---\n\n*Regenerate: \`airun matrix dashboard\` | Spec: MATRICES.md | Symbols: SYMBOLS.md*\n`;
+  return md;
+}
+
+function genWorkflowsDashboard(
+  tasks: Task[], edges: DepEdge[], workflows: Workflow[], blocking: Map<string, string[]>
+): string {
+  const taskMap = new Map<string, Task>();
+  for (const t of tasks) taskMap.set(t.id, t);
+
+  let md = `# Workflows Dashboard\n\n`;
+  md += `> **Source**: \`organic/workflows.json\` + \`organic/tasks.json\`\n`;
+  md += `> **Generated**: ${dateStamp()} | **Project**: PROJ-LAGENCE\n\n---\n\n`;
+
+  // Summary table
+  md += `## Active Workflows\n\n`;
+  md += `| ID | Title | Tasks | Completed | Remaining | Completion % | Status |\n`;
+  md += `|----|-------|-------|-----------|-----------|-------------|--------|\n`;
+  for (const wf of workflows) {
+    const wfTasks = wf.tasks.map(id => taskMap.get(id)).filter(Boolean) as Task[];
+    const wfTotal = wfTasks.length;
+    const wfDone = wfTasks.filter(t => t.state === "-").length;
+    const pct = wfTotal > 0 ? Math.round((wfDone / wfTotal) * 100) : 0;
+    const status = pct === 100 ? "\u2705 Done" : pct > 0 ? "\uD83D\uDFE1 In progress" : "\u26AA Not started";
+    md += `| ${wf.id} | ${wf.title} | ${wfTotal} | ${wfDone} | ${wfTotal - wfDone} | ${pct}% | ${status} |\n`;
+  }
+
+  // Per-workflow detail
+  md += `\n---\n\n## Workflow Detail\n`;
+  for (const wf of workflows) {
+    const wfTasks = wf.tasks.map(id => taskMap.get(id)).filter(Boolean) as Task[];
+    md += `\n### ${wf.id} \u2014 ${wf.title} (${wfTasks.length} tasks)\n\n`;
+    md += `| ID | Title | State | Score | Blocked |\n`;
+    md += `|----|-------|-------|-------|---------|\n`;
+    for (const t of wfTasks) {
+      const score = computeScore(t);
+      const blockers = blocking.get(t.id) || [];
+      const blk = blockers.length > 0
+        ? blockers.map(b => {
+            const bt = taskMap.get(b);
+            return bt && bt.state === "-" ? `~~${b}~~` : b;
+          }).join(", ")
+        : "\u2014";
+      md += `| ${t.id} | ${t.title} | \`${t.state}\` | ${score} | ${blk} |\n`;
+    }
+  }
+
+  md += `\n---\n\n## Completion Formula\n\n`;
+  md += `$$\\text{completion}(W) = \\frac{|\\{t \\in W : \\text{state}(t) = \\texttt{\"-\"}\\}|}{|W|} \\times 100\\%$$\n\n`;
+  md += `A workflow is **complete** when all its tasks reach state \`-\`.\n\n`;
+  md += `---\n\n*Regenerate: \`airun matrix dashboard\` | Spec: [MATRICES.md](../MATRICES.md)*\n`;
+  return md;
+}
+
+function genProjectsDashboard(
+  tasks: Task[], workflows: Workflow[], projects: Project[],
+  blocking: Map<string, string[]>
+): string {
+  const taskMap = new Map<string, Task>();
+  for (const t of tasks) taskMap.set(t.id, t);
+  const wfMap = new Map<string, Workflow>();
+  for (const wf of workflows) wfMap.set(wf.id, wf);
+
+  let md = `# Projects Dashboard\n\n`;
+  md += `> **Source**: \`organic/projects.json\` + \`organic/workflows.json\`\n`;
+  md += `> **Generated**: ${dateStamp()} | **Repo**: agence-master\n\n---\n\n`;
+
+  md += `## Active Projects\n\n`;
+  md += `| ID | Title | Workflows | Avg Completion % | Status |\n`;
+  md += `|----|-------|-----------|-----------------|--------|\n`;
+
+  for (const proj of projects) {
+    const projWfs = proj.workflows.map(id => wfMap.get(id)).filter(Boolean) as Workflow[];
+    let totalPct = 0;
+    for (const wf of projWfs) {
+      const wfTasks = wf.tasks.map(id => taskMap.get(id)).filter(Boolean) as Task[];
+      const wfDone = wfTasks.filter(t => t.state === "-").length;
+      totalPct += wfTasks.length > 0 ? (wfDone / wfTasks.length) * 100 : 0;
+    }
+    const avgPct = projWfs.length > 0 ? Math.round(totalPct / projWfs.length) : 0;
+    const status = avgPct === 100 ? "\u2705 Done" : avgPct > 0 ? "\uD83D\uDFE1 In progress" : "\u26AA Not started";
+    md += `| ${proj.id} | ${proj.title} | ${projWfs.length} | ${avgPct}% | ${status} |\n`;
+  }
+
+  // Project → Workflow Breakdown
+  for (const proj of projects) {
+    const projWfs = proj.workflows.map(id => wfMap.get(id)).filter(Boolean) as Workflow[];
+    md += `\n## Project \u2192 Workflow Breakdown\n\n`;
+    md += `### ${proj.id} \u2014 ${proj.title}\n\n`;
+    md += `| Workflow | Title | Tasks | Done | Completion |\n`;
+    md += `|----------|-------|-------|------|------------|\n`;
+    let grandTotal = 0, grandDone = 0;
+    for (const wf of projWfs) {
+      const wfTasks = wf.tasks.map(id => taskMap.get(id)).filter(Boolean) as Task[];
+      const wfDone = wfTasks.filter(t => t.state === "-").length;
+      const pct = wfTasks.length > 0 ? Math.round((wfDone / wfTasks.length) * 100) : 0;
+      md += `| ${wf.id} | ${wf.title} | ${wfTasks.length} | ${wfDone} | ${pct}% |\n`;
+      grandTotal += wfTasks.length;
+      grandDone += wfDone;
+    }
+    const grandPct = grandTotal > 0 ? Math.round((grandDone / grandTotal) * 100) : 0;
+    md += `| **Total** | | **${grandTotal}** | **${grandDone}** | **${grandPct}%** |\n`;
+
+    // Score Heat Map
+    md += `\n### Score Heat Map\n\n`;
+    md += `| Workflow | Top Score | Total Score | Blocked |\n`;
+    md += `|----------|-----------|-------------|---------|\n`;
+    for (const wf of projWfs) {
+      const wfTasks = wf.tasks.map(id => taskMap.get(id)).filter(Boolean) as Task[];
+      const scores = wfTasks.map(t => computeScore(t));
+      const topScore = scores.length > 0 ? Math.max(...scores) : 0;
+      const totalScore = scores.reduce((a, b) => a + b, 0);
+      const blockedCount = wfTasks.filter(t => (blocking.get(t.id) || []).length > 0).length;
+      md += `| ${wf.id} | ${topScore} | ${totalScore} | ${blockedCount} |\n`;
+    }
+  }
+
+  md += `\n---\n\n## Completion Formula\n\n`;
+  md += `$$\\text{completion}(P) = \\frac{\\sum_{W \\in P} \\text{completion}(W)}{|P|}$$\n\n`;
+  md += `Project completion is the mean of its workflow completions.\n\n`;
+  md += `---\n\n*Regenerate: \`airun matrix dashboard\` | Spec: [MATRICES.md](../MATRICES.md)*\n`;
+  return md;
+}
+
+function cmdDashboard(): void {
+  const { tasks } = loadTasks();
+  const { edges } = loadDeps();
+  const { workflows } = loadWorkflows();
+  const { projects } = loadProjects();
+  const blocking = computeBlocking(tasks, edges);
+
+  mkdirSync(DASHBOARDS_DIR, { recursive: true });
+
+  const tasksMd = genTasksDashboard(tasks, edges, blocking);
+  writeFileSync(join(DASHBOARDS_DIR, "TASKS.md"), tasksMd, "utf-8");
+
+  const workflowsMd = genWorkflowsDashboard(tasks, edges, workflows, blocking);
+  writeFileSync(join(DASHBOARDS_DIR, "WORKFLOWS.md"), workflowsMd, "utf-8");
+
+  const projectsMd = genProjectsDashboard(tasks, workflows, projects, blocking);
+  writeFileSync(join(DASHBOARDS_DIR, "PROJECTS.md"), projectsMd, "utf-8");
+
+  console.log(`Dashboard regenerated → ${DASHBOARDS_DIR}/`);
+  console.log(`  TASKS.md      ${tasks.length} tasks`);
+  console.log(`  WORKFLOWS.md  ${workflows.length} workflows`);
+  console.log(`  PROJECTS.md   ${projects.length} projects`);
+}
+
 // ─── Mutation Commands ───────────────────────────────────────────────────────
 
 function cmdAdd(id: string | undefined, title: string): void {
@@ -510,6 +761,8 @@ Commands:
   complete <id>       Mark task completed (state → -)
   dep <from> <to> [^|;]  Add dependency (default: ^ hard)
 
+  dashboard           Regenerate organic/dashboards/ from JSON sources
+
   init                Create empty data files
   help                This message
 
@@ -575,6 +828,10 @@ switch (cmd) {
   case "dep":
     if (!args[0] || !args[1]) { process.stderr.write("usage: matrix dep <from> <to> [^|;]\n"); process.exit(2); }
     cmdDep(args[0], args[1], args[2] || "^");
+    break;
+
+  case "dashboard":
+    cmdDashboard();
     break;
 
   case "init":

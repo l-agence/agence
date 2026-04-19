@@ -359,6 +359,7 @@ LEDGER & AUDIT (^):
 INDEX (^):
   ^index                         Scan for missing INDEX.json files
   ^reindex                       Regenerate INDEX.json via bin/indexer
+  ^regen                         Regenerate organic/dashboards/ from JSON
   ^recall <pattern>              Search hermetic memory
 
 SWARM (agentd + !swarm):
@@ -1418,6 +1419,18 @@ mode_init() {
       reindex_knowledge_bases $init_args
       return $?
       ;;
+    "regen")
+      # Regenerate organic/dashboards/ from JSON sources
+      # Usage: agence ^regen
+      local _matrix_ts="${AGENCE_ROOT}/lib/matrix.ts"
+      if command -v bun &>/dev/null && [[ -f "$_matrix_ts" ]]; then
+        bun run "$_matrix_ts" dashboard
+      else
+        echo "Error: ^regen requires bun + lib/matrix.ts" >&2
+        return 1
+      fi
+      return $?
+      ;;
     "recall")
       # Search hermetic memory (personal notes, brainstorms, design docs)
       # Usage: agence ^recall <pattern> [grep-options...]
@@ -1490,7 +1503,7 @@ mode_init() {
       echo "Error: Unknown init command: $init_cmd" >&2
       echo "Available: help, init, reload, install, save, learn, commit, push, session," >&2
       echo "           lesson, log, plan, todo, note, fault, issue, task, job, workflow, project," >&2
-      echo "           swarm, audit, recall, handoff, pickup, pause, resume, index, reindex, aido" >&2
+      echo "           swarm, audit, recall, handoff, pickup, pause, resume, index, reindex, regen, aido" >&2
       return 1
       ;;
   esac

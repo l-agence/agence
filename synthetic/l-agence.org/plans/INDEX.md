@@ -1,8 +1,8 @@
 # Agence Development Roadmap (2026 Q1–Q2)
 
-**Updated**: 2026-04-16
-**Status**: v0.4.4 shipped (guard.ts, signal.ts, Docker overlay, aicmd)
-**Current**: main @ ac1e18c (v0.4.4)
+**Updated**: 2026-04-19
+**Status**: v0.4.5 shipped (PS1 finalize, task ID hex8, ^regen dashboards)
+**Current**: main @ b0bc6da (v0.4.5)
 
 ---
 
@@ -44,7 +44,7 @@ v0.9.0                 ← Allegiance ledger (public append-only reputation)
 | **2.1** | v0.3.0 | tmux 1+1, env.sh, session.ts, .ailedger, pipe-pane | 🟢 DONE |
 | **2.2** | v0.3.1 | Bun extraction (router.ts, audit.ts), CI, airun | 🟢 DONE |
 | **2.3** | v0.3.2 | Version strings, model routing, glossary | 🟢 DONE |
-| **3** | v0.4.0–v0.4.4 | guard.ts, signal.ts, Dockerfile, fuse-overlayfs, aicmd, skills | ⏳ ~95% |
+| **3** | v0.4.0–v0.4.5 | guard.ts, signal.ts, Docker, PS1, task IDs, ^regen | 🟢 DONE |
 | **3.1** | v0.4.1 | F.AST chunking, 6-layer memory skeleton (COGNOS) | 📍 NEXT |
 | **4** | v0.5.0 | matrix.ts, Docker tangent tournaments, agentd | 📍 PLANNED |
 | **5** | v0.6.0 | MLS enforcement + MLS-POLICY.yml + capability tokens | 📍 FUTURE |
@@ -90,7 +90,7 @@ $task           swarm coordinating
 
 | Version | Feature | Status | Notes |
 |---------|---------|--------|-------|
-| v0.4.0–v0.4.4 | guard.ts, signal.ts, Docker overlay, aicmd, skill | ⏳ ~95% | guard✅ signal✅ docker✅ overlay✅ aicmd✅ agentd-spawn✅ — remaining: agentd live test |
+| v0.4.0–v0.4.5 | guard.ts, signal.ts, Docker, PS1, task IDs, ^regen | 🟢 DONE | guard✅ signal✅ docker✅ overlay✅ aicmd✅ agentd-spawn✅ PS1✅ hex8-IDs✅ ^regen✅ |
 | v0.4.1 | F.AST chunking, 6-layer memory skeleton | 📍 NEXT | COGNOS: objectcode/organic/synthetic/globalcache/hermetic + mnemonic (runtime) |
 | v0.5.0 | matrix.ts, Docker tangent tournaments, agentd | 📍 PLANNED | |
 | v0.6.0 | MLS enforcement + MLS-POLICY.yml + capabilities | 🅿️ PARKED | Not critical until multi-tenant |
@@ -122,11 +122,11 @@ $task           swarm coordinating
 - ✅ v0.3.0: tmux 1+1, .ailedger, pipe-pane capture
 - ✅ v0.3.1: Bun TS extraction, airun, router.ts
 - ✅ v0.3.2: Model routing, version strings, glossary
-- ⏳ v0.4.0: TCB gates enforced, Docker containers running
+- ✅ v0.4.0: TCB gates enforced, Docker containers running, PS1 finalized, ^regen dashboards
 - 📍 v0.4.1: F.AST indexes codebase, memory skeleton creates/reads all 6 layers
 
 ---
 
-**Last Updated**: 2026-04-16  
+**Last Updated**: 2026-04-19  
 **Owner**: l-agence team  
-**Next Review**: After v0.4.0 release
+**Next Review**: After v0.4.1 planning
