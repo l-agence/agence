@@ -33,6 +33,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
+import { createHash, randomBytes } from "crypto";
 
 // ─── Environment ─────────────────────────────────────────────────────────────
 
@@ -128,6 +129,12 @@ function loadProjects(): ProjectsData {
 
 function isoNow(): string {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+/** Generate hex8 task ID: md5(repo + timestamp + entropy).slice(0,8) */
+function generateTaskId(repo: string): string {
+  const payload = `${repo}:${Date.now()}:${randomBytes(4).toString("hex")}`;
+  return createHash("md5").update(payload).digest("hex").slice(0, 8);
 }
 
 // ─── Scoring ─────────────────────────────────────────────────────────────────
@@ -307,12 +314,8 @@ function cmdWorkflow(id: string): void {
 
 // ─── Mutation Commands ───────────────────────────────────────────────────────
 
-function cmdAdd(id: string, title: string): void {
+function cmdAdd(id: string | undefined, title: string): void {
   const data = loadTasks();
-  if (data.tasks.some(t => t.id === id)) {
-    process.stderr.write(`error: task '${id}' already exists\n`);
-    process.exit(1);
-  }
 
   const repo = (() => {
     try {
@@ -323,12 +326,20 @@ function cmdAdd(id: string, title: string): void {
     }
   })();
 
+  // Auto-generate hex8 ID if not supplied
+  const taskId = id || generateTaskId(repo);
+
+  if (data.tasks.some(t => t.id === taskId)) {
+    process.stderr.write(`error: task '${taskId}' already exists\n`);
+    process.exit(1);
+  }
+
   const now = isoNow();
   data.tasks.push({
-    id,
+    id: taskId,
     repo,
     title,
-    state: "~",
+    state: "+",
     priority: 1,
     stars: 0,
     heat: 0,
@@ -338,7 +349,7 @@ function cmdAdd(id: string, title: string): void {
   });
 
   saveJSON(TASKS_FILE, data);
-  console.log(`+ ${id}: ${title}`);
+  console.log(`+ ${taskId}: ${title}`);
 }
 
 function cmdSet(id: string, field: string, value: string): void {
@@ -537,8 +548,13 @@ switch (cmd) {
     break;
 
   case "add":
-    if (!args[0] || !args[1]) { process.stderr.write("usage: matrix add <id> <title>\n"); process.exit(2); }
-    cmdAdd(args[0], args.slice(1).join(" "));
+    if (!args[0]) { process.stderr.write("usage: matrix add [id] <title>\n"); process.exit(2); }
+    // If only one arg, it's the title (auto-gen ID). If 2+, first is ID.
+    if (args.length === 1) {
+      cmdAdd(undefined, args[0]);
+    } else {
+      cmdAdd(args[0], args.slice(1).join(" "));
+    }
     break;
 
   case "set":

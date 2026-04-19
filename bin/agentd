@@ -152,6 +152,17 @@ _set_window_color() {
   tmux set-option -t "${session}:${win_idx}" -w window-status-current-style "fg=${fg},bold,underscore" 2>/dev/null || true
 }
 
+# ── Task ID Generation ─────────────────────────────────────────────────────
+
+# Generate hex8 task ID: md5(repo + timestamp + entropy).slice(0,8)
+_generate_task_id() {
+  local repo
+  repo=$(cd "$AGENCE_ROOT" && git remote get-url origin 2>/dev/null \
+    | sed 's|.*[/:]||;s|\.git$||') || repo="local"
+  printf '%s:%s:%s' "$repo" "$(date +%s%N)" "$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')" \
+    | md5sum | cut -c1-8
+}
+
 # ── Tangent Registry ───────────────────────────────────────────────────────
 
 _tangent_registry_init() {
@@ -171,20 +182,23 @@ sys.exit(0 if '$id' in d.get('tangents',{}) else 1)
 }
 
 _tangent_register() {
-  local id="$1" agent="$2" worktree="$3" socket="$4" pid="$5"
+  local id="$1" agent="$2" worktree="$3" socket="$4" pid="$5" task_id="${6:-}"
   _tangent_registry_init
   python3 -c "
 import json
+from datetime import datetime, timezone
 f = '$AGENTD_TANGENTS_FILE'
 d = json.load(open(f))
-d.setdefault('tangents',{})['$id'] = {
+entry = {
     'agent': '$agent',
     'worktree': '$worktree',
     'socket': '$socket',
     'pid': int('$pid'),
     'driver': '$DRIVER',
-    'created': __import__('datetime').datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+    'task_id': '$task_id' or None,
+    'created': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 }
+d.setdefault('tangents',{})['$id'] = entry
 json.dump(d, open(f,'w'), indent=2)
 "
 }
@@ -526,12 +540,31 @@ cmd_add() {
 # ── Tangent Lifecycle ──────────────────────────────────────────────────────
 
 cmd_tangent_create() {
-  local tangent_id="${1:-}"
-  local agent="${2:-copilot}"
+  local tangent_id="" agent="copilot" task_id=""
+
+  # Parse args: tangent create [--task <hex>] <id> [agent]
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --task) task_id="$2"; shift 2 ;;
+      *)
+        if [[ -z "$tangent_id" ]]; then
+          tangent_id="$1"
+        else
+          agent="$1"
+        fi
+        shift ;;
+    esac
+  done
 
   if [[ -z "$tangent_id" ]]; then
-    echo "Usage: agentd tangent create <id> [agent]" >&2
+    echo "Usage: agentd tangent create [--task <hex>] <id> [agent]" >&2
     exit 1
+  fi
+
+  # Auto-generate task ID if not supplied
+  if [[ -z "$task_id" ]]; then
+    task_id=$(_generate_task_id)
+    echo "[agentd] Auto-assigned task: $task_id"
   fi
 
   _require_tmux
@@ -549,7 +582,7 @@ cmd_tangent_create() {
     exit 1
   fi
 
-  echo "[agentd] Creating tangent: $tangent_id (agent=$agent, driver=$DRIVER)"
+  echo "[agentd] Creating tangent: $tangent_id (agent=$agent, task=$task_id, driver=$DRIVER)"
 
   # 1. Git worktree (on HOST — never inside container)
   if ! _worktree_create "$tangent_id"; then
@@ -568,20 +601,19 @@ cmd_tangent_create() {
   if [[ "$DRIVER" == "stub" ]]; then
     # Stub: run aibash in the worktree directly
     tmux new-window -t "$SESSION" -n "$window" \
-      "env AI_AGENT=${agent} AI_ROLE=agentic GIT_ROOT=${worktree_path} bash --rcfile ${AGENCE_ROOT}/bin/aibash"
+      "env AI_AGENT=${agent} AI_ROLE=agentic GIT_ROOT=${worktree_path} AGENCE_TANGENT_ID=${tangent_id} AGENCE_TASK_ID=${task_id} bash --rcfile ${AGENCE_ROOT}/bin/aibash"
   else
     # Container driver: stream logs into tmux pane
     tmux new-window -t "$SESSION" -n "$window" \
       "${AGENCE_ROOT}/bin/agentd _driver_logs_pane ${tangent_id}"
   fi
 
-  # Set color-coded title for the tangent window: [~] agent:tangent_id
+  # Set color-coded title for the tangent window
   local tangent_win_idx
   tangent_win_idx=$(tmux list-windows -t "$SESSION" -F "#{window_index} #{window_name}" 2>/dev/null \
     | grep "$window" | head -1 | awk '{print $1}')
   if [[ -n "$tangent_win_idx" ]]; then
-    tmux rename-window -t "${SESSION}:${tangent_win_idx}" "[~] ${agent}:${tangent_id}" 2>/dev/null || true
-    _set_window_color "$SESSION" "$tangent_win_idx" "$agent" "~"
+    _set_window_color "$SESSION" "$tangent_win_idx" "$agent" "+"
   fi
 
   # 4. Socat socket listener
@@ -598,11 +630,12 @@ cmd_tangent_create() {
   # 5. Register in tangent registry
   local sock
   sock=$(_socket_path "$tangent_id")
-  _tangent_register "$tangent_id" "$agent" "$worktree_path" "$sock" "$socat_pid"
+  _tangent_register "$tangent_id" "$agent" "$worktree_path" "$sock" "$socat_pid" "$task_id"
 
-  echo "[agentd] Tangent '$tangent_id' ready."
+  echo "[agentd] Tangent '$tangent_id' ready (task=$task_id)."
   echo "  Window:   ${SESSION}:${window}"
   echo "  Socket:   $sock"
+  echo "  Task:     $task_id"
   echo "  Worktree: $worktree_path"
   echo "  Inject:   agentd inject $tangent_id <command>"
 }

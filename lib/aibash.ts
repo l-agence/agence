@@ -69,26 +69,12 @@ function isoNow(): string {
 }
 
 /** Map agent name → 3-letter LLM model tag */
-function modelTag(agent: string): string {
-  switch (agent) {
-    case "copilot": case "pilot": return "gpt";
-    case "ralph":                  return "son";
-    case "sonya":  case "sonny":   return "son";
-    case "aider":                  return "son";
-    case "haiku":                  return "hku";
-    case "claude": case "claudia": return "cld";
-    case "human":                  return "hum";
-    default:                       return agent.slice(0, 3);
-  }
-}
-
 function generateSessionId(agent: string): string {
   const time = new Date();
   const hhmm = String(time.getHours()).padStart(2, "0")
     + String(time.getMinutes()).padStart(2, "0");
-  const a5 = agent.slice(0, 5);
-  const m3 = modelTag(agent);
-  return `${a5}-${m3}-${hhmm}`;
+  const hex = randomBytes(2).toString("hex");
+  return `${agent.slice(0, 5)}-${hhmm}-${hex}`;
 }
 
 /** Emit eval-safe shell variable. Values are single-quoted to prevent injection. */

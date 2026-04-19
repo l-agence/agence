@@ -84,18 +84,8 @@ _bun_config="$("$AGENCE_ROOT/bin/airun" aibash init "$@" 2>/dev/null)" || {
 	AI_AGENT="${AI_AGENT:-copilot}"
 	AI_ROLE="${AI_ROLE:-agentic}"
 	_hhmm=$(date +%H%M)
-	# Map agent → 3-letter LLM model tag
-	case "${AI_AGENT}" in
-		copilot|pilot)  _mtag="gpt" ;;
-		ralph)          _mtag="son" ;;
-		sonya|sonny)    _mtag="son" ;;
-		aider)          _mtag="son" ;;
-		haiku)          _mtag="hku" ;;
-		claude|claudia) _mtag="cld" ;;
-		human)          _mtag="hum" ;;
-		*)              _mtag="${AI_AGENT:0:3}" ;;
-	esac
-	AI_SESSION="${AI_SESSION:-${AI_AGENT:0:5}-${_mtag}-${_hhmm}}"
+	_hex=$(head -c 2 /dev/urandom | od -An -tx1 | tr -d ' \n')
+	AI_SESSION="${AI_SESSION:-${AI_AGENT:0:5}-${_hhmm}-${_hex}}"
 	SHELL_TYPE="${SHELL_TYPE:-bash}"
 	_day_dir="$(agence_session_day_dir)"
 	SESSION_LOG="${_day_dir}/${AI_SESSION}.typescript"
@@ -103,7 +93,7 @@ _bun_config="$("$AGENCE_ROOT/bin/airun" aibash init "$@" 2>/dev/null)" || {
 	_AIBASH_PIPE_PANE=0
 	_AIBASH_COMMAND=""
 	export AI_AGENT AI_ROLE AI_SESSION SHELL_TYPE SESSION_LOG SESSION_META
-	unset _hhmm _mtag _day_dir
+	unset _hhmm _hex _day_dir
 	echo "[aibash] Bun unavailable, using bash fallback" >&2
 }
 
