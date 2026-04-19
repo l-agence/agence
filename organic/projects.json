@@ -3,10 +3,10 @@
     {
       "id": "PROJ-LAGENCE",
       "title": "l'Agence Framework",
-      "workflows": ["WF-INFRA", "WF-DOCS", "WF-TEST", "WF-CLI", "WF-SWARM", "WF-BUGS"],
-      "completed_tasks": 13,
-      "total_tasks": 15,
-      "completion_pct": 89,
+      "workflows": ["WF-INFRA", "WF-DOCS", "WF-TEST", "WF-CLI", "WF-SWARM", "WF-BUGS", "WF-AGENTS", "WF-SKILLS"],
+      "completed_tasks": 16,
+      "total_tasks": 24,
+      "completion_pct": 67,
       "status": "in-progress"
     }
   ]

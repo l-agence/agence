@@ -47,6 +47,22 @@
       "completed": 1,
       "total": 1,
       "completion_pct": 100
+    },
+    {
+      "id": "WF-AGENTS",
+      "title": "Agent Personas & Dispatch",
+      "tasks": ["AGENT-001", "SKILL-001"],
+      "completed": 0,
+      "total": 2,
+      "completion_pct": 0
+    },
+    {
+      "id": "WF-SKILLS",
+      "title": "Skill Commands",
+      "tasks": ["SKILL-002", "SKILL-003", "SKILL-004", "SKILL-005", "SKILL-006", "SKILL-007"],
+      "completed": 0,
+      "total": 6,
+      "completion_pct": 0
     }
   ]
 }

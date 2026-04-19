@@ -15,6 +15,8 @@
 | WF-CLI | CLI & Tools | 2 | 2 | 0 | 100% | ✅ Done |
 | WF-SWARM | Swarm Orchestration | 2 | 2 | 0 | 100% | ✅ Done |
 | WF-BUGS | Bug Fixes | 1 | 1 | 0 | 100% | ✅ Done |
+| WF-AGENTS | Agent Personas & Dispatch | 2 | 0 | 2 | 0% | ⚪ Not started |
+| WF-SKILLS | Skill Commands | 6 | 0 | 6 | 0% | ⚪ Not started |
 
 ---
 
@@ -64,6 +66,24 @@
 | ID | Title | State | Score | Blocked |
 |----|-------|-------|-------|---------|
 | BUG-001 | mnemonic prune + sessions prune (stale file cleanup) | `-` | 40 | — |
+
+### WF-AGENTS — Agent Personas & Dispatch (2 tasks)
+
+| ID | Title | State | Score | Blocked |
+|----|-------|-------|-------|---------|
+| AGENT-001 | @linus, @feynman, @aleph persona definitions | `+` | 115 | — |
+| SKILL-001 | Skill infrastructure: agent dispatch + artifact routing to synthetic/objectcode | `+` | 170 | AGENT-001 |
+
+### WF-SKILLS — Skill Commands (6 tasks)
+
+| ID | Title | State | Score | Blocked |
+|----|-------|-------|-------|---------|
+| SKILL-002 | Code skills: ^fix, ^build, ^feature, ^refactor, ^solve | `+` | 105 | SKILL-001 |
+| SKILL-003 | Review skills: ^review, ^precommit, ^simplify | `+` | 105 | SKILL-001 |
+| SKILL-004 | Analysis skills: ^analyse, ^design, ^pattern, ^scope, ^spec, ^split | `+` | 105 | SKILL-001 |
+| SKILL-005 | Peer skills: ^peer-design, ^peer-review, ^peer-solve, ^peer-analyse | `+` | 95 | SKILL-001 |
+| SKILL-006 | Red team skills: ^hack, ^break (autonomous attack surface probing) | `+` | 85 | SKILL-001 |
+| SKILL-007 | Knowledge skills: ^document, ^test, ^recon, ^grasp, ^glimpse | `+` | 75 | SKILL-001 |
 
 ---
 

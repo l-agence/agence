@@ -46,6 +46,15 @@ agence_format_footer() {
   esac
 }
 
+# agence_format_legend
+# Prints canonical state-symbol legend to stderr. Silent in json/yaml mode.
+agence_format_legend() {
+  case "${_AGENCE_FMT:-text}" in
+    json|yaml) return ;;
+  esac
+  printf '\033[2msymbols: -=done +=pending &=assigned %%=running _=paused #=held !=error ?=needs-human ~=swarm-queued $=swarm-sched *=priority\033[0m\n' >&2
+}
+
 # -- Key-value & steps ---------------------------------------------------------
 
 # agence_format_kv "key" "value"

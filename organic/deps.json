@@ -4,6 +4,13 @@
     { "from": "INFRA-002", "to": "SWARM-002", "type": "^" },
     { "from": "SWARM-001", "to": "SWARM-002", "type": ";" },
     { "from": "DOC-001", "to": "DOC-002", "type": ";" },
-    { "from": "CLI-003", "to": "TEST-001", "type": ";" }
+    { "from": "CLI-003", "to": "TEST-001", "type": ";" },
+    { "from": "AGENT-001", "to": "SKILL-001", "type": "^" },
+    { "from": "SKILL-001", "to": "SKILL-002", "type": "^" },
+    { "from": "SKILL-001", "to": "SKILL-003", "type": "^" },
+    { "from": "SKILL-001", "to": "SKILL-004", "type": "^" },
+    { "from": "SKILL-001", "to": "SKILL-005", "type": "^" },
+    { "from": "SKILL-001", "to": "SKILL-006", "type": "^" },
+    { "from": "SKILL-001", "to": "SKILL-007", "type": "^" }
   ]
 }
