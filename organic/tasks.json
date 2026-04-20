@@ -229,25 +229,25 @@
       "id": "SKILL-002",
       "repo": "agence",
       "title": "Code skills: ^fix, ^build, ^feature, ^refactor, ^solve",
-      "state": "+",
+      "state": "-",
       "priority": 3,
       "stars": 1,
       "heat": 0.5,
-      "agent": null,
+      "agent": "@copilot",
       "created": "2026-04-19T00:00:00Z",
-      "updated": "2026-04-19T00:00:00Z"
+      "updated": "2026-04-19T18:30:00Z"
     },
     {
       "id": "SKILL-003",
       "repo": "agence",
       "title": "Review skills: ^review, ^precommit, ^simplify",
-      "state": "+",
+      "state": "-",
       "priority": 3,
       "stars": 1,
       "heat": 0.5,
-      "agent": null,
+      "agent": "@copilot",
       "created": "2026-04-19T00:00:00Z",
-      "updated": "2026-04-19T00:00:00Z"
+      "updated": "2026-04-19T18:30:00Z"
     },
     {
       "id": "SKILL-004",

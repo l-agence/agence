@@ -9,7 +9,7 @@
 
 | ID | Title | Workflows | Avg Completion % | Status |
 |----|-------|-----------|-----------------|--------|
-| PROJ-LAGENCE | l'Agence Framework | 8 | 75% | 🟡 In progress |
+| PROJ-LAGENCE | l'Agence Framework | 8 | 88% | 🟡 In progress |
 
 ## Project → Workflow Breakdown
 
@@ -23,9 +23,9 @@
 | WF-CLI | CLI & Tools | 2 | 2 | 100% |
 | WF-SWARM | Swarm Orchestration | 2 | 2 | 100% |
 | WF-BUGS | Bug Fixes | 1 | 1 | 100% |
-| WF-AGENTS | Agent Personas & Dispatch | 2 | 0 | 0% |
+| WF-AGENTS | Agent Personas & Dispatch | 2 | 2 | 100% |
 | WF-SKILLS | Skill Commands | 6 | 0 | 0% |
-| **Total** | | **23** | **15** | **65%** |
+| **Total** | | **23** | **17** | **74%** |
 
 ### Score Heat Map
 
@@ -37,8 +37,8 @@
 | WF-CLI | 20 | 40 | 0 |
 | WF-SWARM | 105 | 210 | 0 |
 | WF-BUGS | 40 | 40 | 0 |
-| WF-AGENTS | 170 | 285 | 1 |
-| WF-SKILLS | 105 | 570 | 6 |
+| WF-AGENTS | 170 | 285 | 0 |
+| WF-SKILLS | 105 | 570 | 0 |
 
 ---
 
