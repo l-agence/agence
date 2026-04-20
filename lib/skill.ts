@@ -488,6 +488,12 @@ async function main(): Promise<number> {
           peers = true;
           agent = undefined;
         }
+        // @pair → peers mode with pair flavor (2-tangent)
+        if (agent?.replace(/^@/, "") === "pair") {
+          peers = true;
+          flavor = "pair";
+          agent = undefined;
+        }
         break;
       case "--peers":
         peers = true;

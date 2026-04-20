@@ -287,7 +287,8 @@ USAGE:
 AGENT ROUTING:
   agence @ralph "query"          Route to specific agent
   agence !aider.opus             Launch tool with model qualifier
-  agence @peers "query"          Fan-out to peer ensemble
+  agence @peers "query"          Fan-out to 3-tangent peer ensemble
+  agence @pair "query"           Fan-out to 2-tangent pair (copilot + aider)
   Grammar: [prefix] target [.qualifier]* [payload]
 
 SYSTEM TOOLS (!):
@@ -1624,6 +1625,9 @@ mode_init() {
           if [[ "${AGENCE_AGENT_PARAM}" == "peers" ]]; then
             # WIRE-001: @peers → --peers mode (fan-out to 3 LLMs)
             _skill_peers_flag="--peers"
+          elif [[ "${AGENCE_AGENT_PARAM}" == "pair" ]]; then
+            # @pair → --peers mode with pair flavor (2-tangent consensus)
+            _skill_peers_flag="--peers --flavor pair"
           else
             _skill_agent_flag="--agent @${AGENCE_AGENT_PARAM}"
           fi

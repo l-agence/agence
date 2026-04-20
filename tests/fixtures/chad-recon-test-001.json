@@ -1,0 +1,28 @@
+{
+  "test": "chad-recon-001",
+  "description": "@chad ^recon — first autonomous recon test case",
+  "created": "2026-04-20",
+  "agent": "@chad",
+  "skill": "^recon",
+  "targets": [
+    {
+      "url": "https://github.com/garrytan/gstack",
+      "label": "Gary Tan (YC) gstack — Claude Code derived CLI framework",
+      "source": "hermetic/acme.tld/anthropic.md",
+      "expected": "Analyze: feature set, architecture, differentiation vs Agence, star count, activity"
+    },
+    {
+      "url": "https://github.com/topics/ai",
+      "label": "GitHub AI Topics — trending AI repos and ecosystem scan",
+      "source": "hermetic/acme.tld/anthropic.md",
+      "expected": "Identify: new CLI agent frameworks, governance tools, competitive threats, opportunity gaps"
+    }
+  ],
+  "expected_output": {
+    "artifact": "analysis",
+    "scope": "globalcache",
+    "format": "Competitive intel brief with threat ratings and Agence positioning notes"
+  },
+  "invoke": "agence @chad ^recon 'Scan gstack and GitHub AI topics for competitive threats to Agence'",
+  "notes": "First real test of autonomous ^recon wiring. Created 2026-04-20 as test fixture for when WIRE routing is live."
+}

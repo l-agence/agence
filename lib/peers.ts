@@ -1,23 +1,25 @@
 #!/usr/bin/env bun
-// lib/peers.ts — Multi-Agent Consensus Engine (3-LLM ensemble)
+// lib/peers.ts — Multi-Agent Consensus Engine (2-or-3 LLM ensemble)
 //
-// Calls 3 LLM APIs in parallel, collects structured responses,
-// computes expertise-weighted consensus, surfaces disagreements.
+// @peers: Calls 3 LLM APIs in parallel (3-tangent consensus)
+// @pair:  Calls 2 LLM APIs in parallel (2-tangent lightweight consensus)
 //
 // Flavors:
 //   code   — Best coding models (sonnet, gpt-4o, gemini-2-pro)
 //   light  — Fast/cheap models (haiku, gpt-4o-mini, gemini-flash)
 //   heavy  — Heavyweight reasoning (opus, gpt-4-turbo, o1-pro)
+//   pair   — 2-tangent: copilot (anthropic) + aider (openai)
 //
 // Usage:
 //   airun peers solve "problem description"
 //   airun peers review "code or design to review"
 //   airun peers analyze "subject to analyze"
 //   airun peers plan "initiative to plan"
+//   airun peers --pair solve "lightweight 2-way consensus"
 //   airun peers help
 //
 // Each peer returns JSON: { finding, confidence, reasoning }
-// Consensus = expertise-weighted aggregation across all 3 peers.
+// Consensus = expertise-weighted aggregation across all peers.
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -30,7 +32,7 @@ const AGENCE_ROOT = process.env.AGENCE_ROOT
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Flavor = "code" | "light" | "heavy";
+type Flavor = "code" | "light" | "heavy" | "pair";
 type Skill = "solve" | "review" | "analyze" | "plan";
 
 interface PeerConfig {
@@ -128,6 +130,23 @@ const FLAVORS: Record<Flavor, PeerConfig[]> = {
       provider: "gemini",
       model: process.env.PEERS_HEAVY_GEMINI || "gemini-2.0-pro",
       weights: { reasoning: 0.88, planning: 0.87, rca: 0.85, strategy: 0.90 },
+    },
+  ],
+
+  // @pair: 2-tangent lightweight consensus (copilot + aider)
+  // Intentionally 2 quality models competing/collaborating before synthesizing
+  pair: [
+    {
+      name: "copilot",
+      provider: "anthropic",
+      model: process.env.PAIR_ANTHROPIC || "claude-sonnet-4-5-20250514",
+      weights: { architecture: 0.93, implementation: 0.90, debugging: 0.88, review: 0.92, reasoning: 0.90, planning: 0.88 },
+    },
+    {
+      name: "aider",
+      provider: "openai",
+      model: process.env.PAIR_OPENAI || "gpt-4o",
+      weights: { architecture: 0.90, implementation: 0.93, debugging: 0.90, review: 0.88, reasoning: 0.88, planning: 0.85 },
     },
   ],
 };
@@ -248,8 +267,8 @@ async function callPeer(
 
 // ─── Peer Prompt Construction ────────────────────────────────────────────────
 
-function buildSystemPrompt(skill: Skill): string {
-  const base = `You are a peer in a 3-agent consensus system. You will analyze the given problem independently.
+function buildSystemPrompt(skill: Skill, peerCount = 3): string {
+  const base = `You are a peer in a ${peerCount}-agent consensus system. You will analyze the given problem independently.
 
 IMPORTANT: Respond ONLY with valid JSON (no markdown fences, no extra text). Use this exact schema:
 {
@@ -433,10 +452,11 @@ async function runPeers(
     return 1;
   }
 
-  const system = buildSystemPrompt(skill);
+  const system = buildSystemPrompt(skill, configs.length);
   const userMsg = `Task: ${skill}\n\nQuery:\n${query}`;
 
-  console.error(`[peers] Dispatching to 3 ${flavor} peers: ${configs.map(c => c.name).join(", ")}...`);
+  const mode = configs.length === 2 ? "pair" : `${flavor}`;
+  console.error(`[peers] Dispatching to ${configs.length} ${mode} peers: ${configs.map(c => c.name).join(", ")}...`);
 
   // Call all 3 peers in parallel
   const promises = configs.map(async (peer): Promise<PeerResponse> => {
@@ -492,10 +512,11 @@ async function runPeers(
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
 function cmdHelp(): number {
-  console.log(`peers — Multi-Agent Consensus Engine (3-LLM ensemble)
+  console.log(`peers — Multi-Agent Consensus Engine
 
 Usage:
   airun peers <skill> [--flavor code|light|heavy] [--json] <query...>
+  airun peers <skill> --pair [--json] <query...>
 
 Skills:
   solve     Tackle stuck/insolvable problems via multi-perspective consensus
@@ -503,12 +524,17 @@ Skills:
   analyze   Multi-perspective analysis of systems, data, trends
   plan      Strategic planning with spec + roadmap output
 
-Flavors:
+Modes:
+  @peers    3-tangent consensus (default) — 3 independent LLMs
+  @pair     2-tangent consensus — copilot (anthropic) + aider (openai)
+
+Flavors (3-tangent only):
   code      Best coding models (sonnet + gpt-4o + gemini-pro)    [default]
   light     Fast/cheap models (haiku + gpt-4o-mini + gemini-flash)
   heavy     Heavyweight reasoning (opus + gpt-4-turbo + o1-pro)
 
 Options:
+  --pair         2-tangent mode: copilot + aider (faster, cheaper)
   --flavor <f>   Select model flavor (default: code)
   --json         Output raw JSON instead of formatted table
   --help         Show this help
@@ -517,14 +543,16 @@ Environment (override individual peer models):
   PEERS_CODE_ANTHROPIC, PEERS_CODE_OPENAI, PEERS_CODE_GEMINI
   PEERS_LIGHT_ANTHROPIC, PEERS_LIGHT_OPENAI, PEERS_LIGHT_GEMINI
   PEERS_HEAVY_ANTHROPIC, PEERS_HEAVY_OPENAI, PEERS_HEAVY_GEMINI
+  PAIR_ANTHROPIC, PAIR_OPENAI
 
-Requires: ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY
+Requires: ANTHROPIC_API_KEY, OPENAI_API_KEY (and GEMINI_API_KEY for 3-tangent)
   (Peers with missing keys are skipped; at least 1 must work)
 
 Examples:
   airun peers solve "Our CI takes 45 minutes, how to cut to 10?"
   airun peers review --flavor heavy < src/auth.ts
   airun peers analyze --json "Why are deploys failing on Mondays?"
+  airun peers --pair solve "Quick 2-way consensus on this approach"
   airun peers plan "Migrate from REST to gRPC across 4 services"
 `);
   return 0;
@@ -537,7 +565,14 @@ async function main(): Promise<number> {
     return cmdHelp();
   }
 
-  const skill = args[0] as Skill;
+  // Handle --pair before or after skill name
+  let pairMode = false;
+  const filteredArgs = args.filter(a => {
+    if (a === "--pair") { pairMode = true; return false; }
+    return true;
+  });
+
+  const skill = filteredArgs[0] as Skill;
   if (!["solve", "review", "analyze", "plan"].includes(skill)) {
     console.error(`[peers] Unknown skill: ${skill}`);
     console.error("  Valid skills: solve, review, analyze, plan");
@@ -545,21 +580,21 @@ async function main(): Promise<number> {
   }
 
   // Parse flags
-  let flavor: Flavor = "code";
+  let flavor: Flavor = pairMode ? "pair" : "code";
   let format: "text" | "json" = "text";
   const queryParts: string[] = [];
 
-  for (let i = 1; i < args.length; i++) {
-    switch (args[i]) {
+  for (let i = 1; i < filteredArgs.length; i++) {
+    switch (filteredArgs[i]) {
       case "--flavor":
-        flavor = (args[++i] || "code") as Flavor;
+        flavor = (filteredArgs[++i] || "code") as Flavor;
         break;
       case "--json":
       case "-j":
         format = "json";
         break;
       default:
-        queryParts.push(args[i]);
+        queryParts.push(filteredArgs[i]);
     }
   }
 
