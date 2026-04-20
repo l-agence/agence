@@ -16,7 +16,7 @@
 | WF-SWARM | Swarm Orchestration | 2 | 2 | 0 | 100% | ✅ Done |
 | WF-BUGS | Bug Fixes | 1 | 1 | 0 | 100% | ✅ Done |
 | WF-AGENTS | Agent Personas & Dispatch | 2 | 2 | 0 | 100% | ✅ Done |
-| WF-SKILLS | Skill Commands | 6 | 2 | 4 | 33% | 🟡 In progress |
+| WF-SKILLS | Skill Commands | 6 | 6 | 0 | 100% | ✅ Done |
 
 ---
 
@@ -80,10 +80,10 @@
 |----|-------|-------|-------|---------|
 | SKILL-002 | Code skills: ^fix, ^build, ^feature, ^refactor, ^solve | `-` | 105 | — |
 | SKILL-003 | Review skills: ^review, ^precommit, ^simplify | `-` | 105 | — |
-| SKILL-004 | Analysis skills: ^analyse, ^design, ^pattern, ^scope, ^spec, ^split | `+` | 105 | — |
-| SKILL-005 | Peer skills: ^peer-design, ^peer-review, ^peer-solve, ^peer-analyse | `+` | 95 | — |
-| SKILL-006 | Red team skills: ^hack, ^break (autonomous attack surface probing) | `+` | 85 | — |
-| SKILL-007 | Knowledge skills: ^document, ^test, ^recon, ^grasp, ^glimpse | `+` | 75 | — |
+| SKILL-004 | Analysis skills: ^analyse, ^design, ^pattern, ^scope, ^spec, ^split | `-` | 105 | — |
+| SKILL-005 | Peer skills: ^peer-design, ^peer-review, ^peer-solve, ^peer-analyse | `-` | 95 | — |
+| SKILL-006 | Red team skills: ^hack, ^break (autonomous attack surface probing) | `-` | 85 | — |
+| SKILL-007 | Knowledge skills: ^document, ^test, ^recon, ^grasp, ^glimpse | `-` | 75 | — |
 
 ---
 

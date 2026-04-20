@@ -17,13 +17,13 @@
 | ~~SWARM-002~~ | ~~agentd interface contract: abstract container-spawn (Docker now, Nomad later)~~ | `-` | 3 | 1 | 0.5 | **105** | copilot | — |
 | ~~SKILL-002~~ | ~~Code skills: ^fix, ^build, ^feature, ^refactor, ^solve~~ | `-` | 3 | 1 | 0.5 | **105** | @copilot | — |
 | ~~SKILL-003~~ | ~~Review skills: ^review, ^precommit, ^simplify~~ | `-` | 3 | 1 | 0.5 | **105** | @copilot | — |
-| SKILL-004 | Analysis skills: ^analyse, ^design, ^pattern, ^scope, ^spec, ^split | `+` | 3 | 1 | 0.5 | **105** | — | — |
+| ~~SKILL-004~~ | ~~Analysis skills: ^analyse, ^design, ^pattern, ^scope, ^spec, ^split~~ | `-` | 3 | 1 | 0.5 | **105** | @copilot | — |
 | ~~INFRA-004~~ | ~~.ailedger enhancements: AIPOLICY.yaml commit, prune policy~~ | `-` | 3 | 1 | 0.4 | **95** | copilot | — |
 | ~~SHELL-001~~ | ~~Shell UI: state-colored PS1, tmux titles, shell economy + reap~~ | `-` | 2 | 1 | 0.5 | **95** | copilot | — |
-| SKILL-005 | Peer skills: ^peer-design, ^peer-review, ^peer-solve, ^peer-analyse | `+` | 3 | 1 | 0.4 | **95** | — | — |
-| SKILL-006 | Red team skills: ^hack, ^break (autonomous attack surface probing) | `+` | 2 | 1 | 0.4 | **85** | — | — |
+| ~~SKILL-005~~ | ~~Peer skills: ^peer-design, ^peer-review, ^peer-solve, ^peer-analyse~~ | `-` | 3 | 1 | 0.4 | **95** | @copilot | — |
+| ~~SKILL-006~~ | ~~Red team skills: ^hack, ^break (autonomous attack surface probing)~~ | `-` | 2 | 1 | 0.4 | **85** | @copilot | — |
 | ~~INFRA-003~~ | ~~Publish AIPOLICY.yaml schema as governance standard~~ | `-` | 2 | 1 | 0.3 | **75** | copilot | — |
-| SKILL-007 | Knowledge skills: ^document, ^test, ^recon, ^grasp, ^glimpse | `+` | 2 | 1 | 0.3 | **75** | — | — |
+| ~~SKILL-007~~ | ~~Knowledge skills: ^document, ^test, ^recon, ^grasp, ^glimpse~~ | `-` | 2 | 1 | 0.3 | **75** | @copilot | — |
 | ~~TEST-001~~ | ~~Shellspec tests for ^ledger, ^audit, ^session prune, ^index~~ | `-` | 2 | 0 | 0.3 | **50** | copilot | — |
 | ~~INFRA-005~~ | ~~Agent persona loading from codex/agents/registry.json~~ | `-` | 2 | 0 | 0.3 | **50** | — | — |
 | ~~CLI-003~~ | ~~Smoke tests: path validation rejects escapes without junctions~~ | `-` | 2 | 0 | 0.3 | **50** | — | — |
@@ -39,17 +39,16 @@
 | Metric | Value |
 |--------|-------|
 | Total tasks | 24 |
-| Runnable | 4 |
+| Runnable | 0 |
 | Blocked | 0 |
-| Completed | 20 |
+| Completed | 24 |
 | Failed | 0 |
 
 ## State Distribution
 
 | State | Symbol | Count |
 |-------|--------|-------|
-| Completed | `-` | 20 |
-| Pending | `+` | 4 |
+| Completed | `-` | 24 |
 
 ---
 
@@ -67,7 +66,7 @@
 | 6 | ~~SWARM-002~~ | 105 | `-` ✅ |
 | 7 | ~~SKILL-002~~ | 105 | `-` ✅ |
 | 8 | ~~SKILL-003~~ | 105 | `-` ✅ |
-| 9 | SKILL-004 | 105 | `+` |
+| 9 | ~~SKILL-004~~ | 105 | `-` ✅ |
 | 10 | ~~INFRA-004~~ | 95 | `-` ✅ |
 
 ---
@@ -90,13 +89,13 @@ SKILL-001 ✅ ──^──> SKILL-002 ✅
 
 SKILL-001 ✅ ──^──> SKILL-003 ✅
 
-SKILL-001 ✅ ──^──> SKILL-004 +
+SKILL-001 ✅ ──^──> SKILL-004 ✅
 
-SKILL-001 ✅ ──^──> SKILL-005 +
+SKILL-001 ✅ ──^──> SKILL-005 ✅
 
-SKILL-001 ✅ ──^──> SKILL-006 +
+SKILL-001 ✅ ──^──> SKILL-006 ✅
 
-SKILL-001 ✅ ──^──> SKILL-007 +
+SKILL-001 ✅ ──^──> SKILL-007 ✅
 
 ^ = hard block | ; = soft advisory
 
