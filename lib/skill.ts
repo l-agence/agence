@@ -131,6 +131,12 @@ const SKILLS: Record<string, SkillDef> = {
                systemPrompt: "You are a code comprehension expert. Rapidly understand the given code and explain: purpose, key abstractions, data flow, and important design decisions. Be concise." },
   glimpse:   { name: "glimpse",   artifact: "analysis", description: "High-level overview",
                systemPrompt: "You are an overview specialist. Provide a bird's-eye view: what this is, why it exists, how it fits into the larger system, and key things to know." },
+
+  // Ops skills (SKILL-008)
+  deploy:    { name: "deploy",    artifact: "result",   description: "Deployment and release operations",
+               systemPrompt: "You are a deployment engineer. Plan and execute deployments safely: pre-flight checks, rollback strategy, health verification, and post-deploy validation." },
+  brainstorm: { name: "brainstorm", artifact: "analysis", description: "Ideation and divergent thinking",
+               systemPrompt: "You are a creative strategist. Generate diverse ideas, explore unconventional approaches, challenge assumptions, and map possibility space. Organize ideas by feasibility and impact." },
 };
 
 // ─── Agent Resolution ────────────────────────────────────────────────────────
@@ -391,6 +397,7 @@ function cmdList(): number {
     "Peer":      ["peer-design", "peer-review", "peer-solve", "peer-analyse"],
     "Red Team":  ["hack", "break"],
     "Knowledge": ["document", "test", "recon", "grasp", "glimpse"],
+    "Ops":       ["deploy", "brainstorm"],
   };
 
   for (const [group, names] of Object.entries(groups)) {
@@ -457,6 +464,13 @@ async function main(): Promise<number> {
 
   const skillName = args[0];
 
+  // WIRE-003: normalize spelling aliases
+  const ALIASES: Record<string, string> = {
+    "analyze": "analyse",
+    "peer-analyze": "peer-analyse",
+  };
+  const canonicalSkill = ALIASES[skillName] || skillName;
+
   // Parse options
   let agent: string | undefined;
   let peers = false;
@@ -469,6 +483,11 @@ async function main(): Promise<number> {
     switch (args[i]) {
       case "--agent":
         agent = args[++i];
+        // WIRE-001: @peers always means peers mode, never single-agent
+        if (agent?.replace(/^@/, "") === "peers") {
+          peers = true;
+          agent = undefined;
+        }
         break;
       case "--peers":
         peers = true;
@@ -495,11 +514,11 @@ async function main(): Promise<number> {
   }
 
   if (!query.trim()) {
-    console.error(`[skill] No query provided for '${skillName}'`);
+    console.error(`[skill] No query provided for '${canonicalSkill}'`);
     return 1;
   }
 
-  return runSkill(skillName, query, { agent, peers, flavor, json, save });
+  return runSkill(canonicalSkill, query, { agent, peers, flavor, json, save });
 }
 
 process.exit(await main());
