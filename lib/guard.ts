@@ -447,11 +447,15 @@ function checkCommand(command: string): GuardDecision {
     }
   }
 
-  // ── Default: T1 (unknown command — flag but allow for now) ──
-  // In strict mode (v0.4.x), unknown commands would be T2 (escalate).
+  // ── Default: T2 (unknown command — escalate, require human approval) ──
+  // SEC-003: fail-closed. Unknown commands must not auto-allow.
+  // Override with AGENCE_GUARD_PERMISSIVE=1 for legacy T1 behavior.
+  const permissive = process.env.AGENCE_GUARD_PERMISSIVE === "1";
   return {
-    approved: true, tier: "T1", command: trimmed,
-    reason: "Unknown command — allowed with flag (default T1)",
+    approved: permissive, tier: permissive ? "T1" : "T2", command: trimmed,
+    reason: permissive
+      ? "Unknown command — allowed with flag (permissive mode)"
+      : "Unknown command — escalated (fail-closed default)",
     rule: "default", agent, timestamp: ts,
   };
 }
@@ -482,14 +486,27 @@ function logDecision(decision: GuardDecision): void {
 }
 
 // ─── Shell Export Emitter ────────────────────────────────────────────────────
+// SECURITY: Values are sanitized with printf '%q' style escaping to prevent
+// shell injection when the calling shell eval's this output.
+// See SEC-001: reason strings could contain $() or backticks from policy
+// patterns or attacker-controlled input.
+
+function shellEscape(s: string): string {
+  // Replace every character that could be interpreted by shell:
+  // backticks, $, ", \, newlines, and control characters.
+  // Result is safe to embed inside single quotes (with ' handled via '\'' idiom).
+  if (s.length === 0) return "''";
+  // Use single-quote wrapping: replace ' with '\'' and wrap in ''
+  return "'" + s.replace(/'/g, "'\\''") + "'";
+}
 
 function emitShellExports(decision: GuardDecision): void {
   const lines: string[] = [
     `export _GUARD_APPROVED=${decision.approved ? 1 : 0}`,
     `export _GUARD_TIER=${decision.tier}`,
-    `export _GUARD_REASON="${decision.reason.replace(/"/g, '\\"')}"`,
-    `export _GUARD_RULE="${decision.rule}"`,
-    `export _GUARD_TIMESTAMP="${decision.timestamp}"`,
+    `export _GUARD_REASON=${shellEscape(decision.reason)}`,
+    `export _GUARD_RULE=${shellEscape(decision.rule)}`,
+    `export _GUARD_TIMESTAMP=${shellEscape(decision.timestamp)}`,
   ];
   console.log(lines.join("\n"));
 }
