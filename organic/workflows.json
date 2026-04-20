@@ -89,11 +89,12 @@
         "SKILL-004",
         "SKILL-005",
         "SKILL-006",
-        "SKILL-007"
+        "SKILL-007",
+        "SKILL-008"
       ],
       "completed": 6,
-      "total": 6,
-      "completion_pct": 100
+      "total": 7,
+      "completion_pct": 86
     },
 
     {

@@ -297,6 +297,19 @@
       "created": "2026-04-19T00:00:00Z",
       "updated": "2026-04-19T19:00:00Z"
     },
+    {
+      "id": "SKILL-008",
+      "repo": "agence",
+      "title": "Move skills to synthetic root + add ^deploy, ^brainstorm",
+      "state": "+",
+      "priority": 3,
+      "stars": 1,
+      "heat": 0.5,
+      "agent": null,
+      "created": "2026-04-20T00:00:00Z",
+      "updated": "2026-04-20T00:00:00Z",
+      "notes": "(1) Skills belong at synthetic/ root, not under an org — they are generic, reusable, contain no PII or IP. (2) Add new skills: ^deploy (deployment/release ops), ^brainstorm (ideation/divergent thinking)"
+    },
 
     {
       "id": "SEC-001",
