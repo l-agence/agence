@@ -10,10 +10,14 @@
 | ID | Title | State | Pri | Stars | Heat | Score | Agent | Blocked By |
 |----|-------|-------|-----|-------|------|-------|-------|------------|
 | ~~SEC-001~~ | ~~F-1 CRITICAL: Fix shell injection in guard.ts emitShellExports eval~~ | `-` | 5 | 3 | 1 | **225** | — | — |
+| SEC-008 | ^break own tools: non-destructive stress test (aido/aicmd/aibash/aishell/agentd) | `_` | 4 | 2 | 0.9 | **180** | — | — |
+| SEC-009 | ^hack red-team probe: privilege escalation + self-modification attacks | `_` | 4 | 2 | 0.9 | **180** | — | — |
 | ~~INFRA-002~~ | ~~agentd skeleton: pid file, socket per tangent, Docker spawn~~ | `-` | 4 | 2 | 0.8 | **170** | copilot | — |
 | ~~SKILL-001~~ | ~~Skill infrastructure: agent dispatch + artifact routing to synthetic/objectcode~~ | `-` | 4 | 2 | 0.8 | **170** | @copilot | — |
+| SEC-007 | PERPETUAL: Security Integration Loop — ^integrate cycle | `_` | 4 | 2 | 0.8 | **170** | — | — |
 | ~~TEST-002~~ | ~~Guard security boundary tests (~50 tests for guard.ts, F-5)~~ | `-` | 4 | 2 | 0.7 | **160** | — | — |
 | ~~SEC-002~~ | ~~F-2 HIGH: Move Gemini API key from URL query param to x-goog-api-key header~~ | `-` | 4 | 2 | 0.5 | **140** | — | — |
+| SEC-010 | ^integrate findings: fix + verify + regression test loop | `_` | 3 | 1 | 0.7 | **125** | — | — |
 | ~~SEC-003~~ | ~~F-3 HIGH: Guard default unknown commands T1→T2 (fail-closed)~~ | `-` | 4 | 2 | 0.3 | **120** | — | — |
 | ~~AGENT-001~~ | ~~@linus, @feynman, @aleph persona definitions~~ | `-` | 3 | 1 | 0.6 | **115** | @copilot | — |
 | ~~WIRE-001~~ | ~~Wire @peers detection in skill.ts (~15 lines, @ routing)~~ | `-` | 3 | 1 | 0.6 | **115** | — | — |
@@ -36,7 +40,7 @@
 | SEC-006 | F-7 MEDIUM: Persona injection surface hardening (when @ routing wired) | `_` | 3 | 1 | 0.3 | **85** | — | WIRE-004 |
 | ~~INFRA-003~~ | ~~Publish AIPOLICY.yaml schema as governance standard~~ | `-` | 2 | 1 | 0.3 | **75** | copilot | — |
 | ~~SKILL-007~~ | ~~Knowledge skills: ^document, ^test, ^recon, ^grasp, ^glimpse~~ | `-` | 2 | 1 | 0.3 | **75** | @copilot | — |
-| WIRE-004 | Wire persona injection: codex/agents/<name>/agent.md → system prompt | `_` | 2 | 0 | 0.4 | **60** | — | — |
+| WIRE-004 | Wire persona injection: codex/agents/<name>/agent.md → system prompt | `+` | 2 | 0 | 0.4 | **60** | — | — |
 | ~~TEST-001~~ | ~~Shellspec tests for ^ledger, ^audit, ^session prune, ^index~~ | `-` | 2 | 0 | 0.3 | **50** | copilot | — |
 | ~~INFRA-005~~ | ~~Agent persona loading from codex/agents/registry.json~~ | `-` | 2 | 0 | 0.3 | **50** | — | — |
 | ~~CLI-003~~ | ~~Smoke tests: path validation rejects escapes without junctions~~ | `-` | 2 | 0 | 0.3 | **50** | — | — |
@@ -53,8 +57,8 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tasks | 39 |
-| Runnable | 0 |
+| Total tasks | 43 |
+| Runnable | 1 |
 | Blocked | 1 |
 | Completed | 35 |
 | Failed | 0 |
@@ -64,7 +68,8 @@
 | State | Symbol | Count |
 |-------|--------|-------|
 | Completed | `-` | 35 |
-| Paused | `_` | 4 |
+| Paused | `_` | 7 |
+| Pending | `+` | 1 |
 
 ---
 
@@ -75,15 +80,15 @@
 | Rank | ID | Score | State |
 |------|----|-------|-------|
 | 1 | ~~SEC-001~~ | 225 | `-` ✅ |
-| 2 | ~~INFRA-002~~ | 170 | `-` ✅ |
-| 3 | ~~SKILL-001~~ | 170 | `-` ✅ |
-| 4 | ~~TEST-002~~ | 160 | `-` ✅ |
-| 5 | ~~SEC-002~~ | 140 | `-` ✅ |
-| 6 | ~~SEC-003~~ | 120 | `-` ✅ |
-| 7 | ~~AGENT-001~~ | 115 | `-` ✅ |
-| 8 | ~~WIRE-001~~ | 115 | `-` ✅ |
-| 9 | ~~WIRE-002~~ | 115 | `-` ✅ |
-| 10 | ~~INFRA-001~~ | 105 | `-` ✅ |
+| 2 | SEC-008 | 180 | `_` |
+| 3 | SEC-009 | 180 | `_` |
+| 4 | ~~INFRA-002~~ | 170 | `-` ✅ |
+| 5 | ~~SKILL-001~~ | 170 | `-` ✅ |
+| 6 | SEC-007 | 170 | `_` |
+| 7 | ~~TEST-002~~ | 160 | `-` ✅ |
+| 8 | ~~SEC-002~~ | 140 | `-` ✅ |
+| 9 | SEC-010 | 125 | `_` |
+| 10 | ~~SEC-003~~ | 120 | `-` ✅ |
 
 ---
 
@@ -125,7 +130,7 @@ WIRE-001 ✅ ──^──> WIRE-002 ✅
 
 WIRE-002 ✅ ── ; ──> WIRE-003 ✅
 
-WIRE-004 _ ──^──> SEC-006 _
+WIRE-004 + ──^──> SEC-006 _
 
 TEST-002 ✅ ──^──> REL-002 ✅
 

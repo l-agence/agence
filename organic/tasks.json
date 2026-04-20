@@ -507,7 +507,7 @@
       "id": "WIRE-004",
       "repo": "agence",
       "title": "Wire persona injection: codex/agents/<name>/agent.md → system prompt",
-      "state": "+",
+      "state": "-",
       "priority": 2,
       "stars": 0,
       "heat": 0.4,

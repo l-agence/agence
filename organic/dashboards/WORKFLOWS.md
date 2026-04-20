@@ -21,6 +21,7 @@
 | WF-WIRING | v0.5 Feature Wiring (@peers.coders) | 4 | 3 | 1 | 75% | 🟡 In progress |
 | WF-V5TEST | v0.5 Security & Integration Tests | 2 | 2 | 0 | 100% | ✅ Done |
 | WF-RELEASE | v0.5.0 Release Packaging | 2 | 2 | 0 | 100% | ✅ Done |
+| WF-SECLOOP | Security Integration Loop (perpetual) | 4 | 0 | 4 | 0% | ⚪ Not started |
 
 ---
 
@@ -108,7 +109,7 @@
 | WIRE-001 | Wire @peers detection in skill.ts (~15 lines, @ routing) | `-` | 115 | — |
 | WIRE-002 | Wire peers.ts → CLI: @peers ^analyze/^solve/^review integration | `-` | 115 | — |
 | WIRE-003 | Add 'analyze' alias for 'analyse' spelling in skill dispatch | `-` | 40 | — |
-| WIRE-004 | Wire persona injection: codex/agents/<name>/agent.md → system prompt | `_` | 60 | — |
+| WIRE-004 | Wire persona injection: codex/agents/<name>/agent.md → system prompt | `+` | 60 | — |
 
 ### WF-V5TEST — v0.5 Security & Integration Tests (2 tasks)
 
@@ -123,6 +124,15 @@
 |----|-------|-------|-------|---------|
 | REL-001 | package.json version 0.5.0 + ROADMAP.md update | `-` | 40 | — |
 | REL-002 | Integration testing + tag v0.5.0-stable | `-` | 105 | — |
+
+### WF-SECLOOP — Security Integration Loop (perpetual) (4 tasks)
+
+| ID | Title | State | Score | Blocked |
+|----|-------|-------|-------|---------|
+| SEC-007 | PERPETUAL: Security Integration Loop — ^integrate cycle | `_` | 170 | — |
+| SEC-008 | ^break own tools: non-destructive stress test (aido/aicmd/aibash/aishell/agentd) | `_` | 180 | — |
+| SEC-009 | ^hack red-team probe: privilege escalation + self-modification attacks | `_` | 180 | — |
+| SEC-010 | ^integrate findings: fix + verify + regression test loop | `_` | 125 | — |
 
 ---
 

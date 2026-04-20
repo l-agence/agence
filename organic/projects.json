@@ -18,13 +18,13 @@
         "WF-RELEASE",
         "WF-SECLOOP"
       ],
-      "completed_tasks": 35,
+      "completed_tasks": 36,
       "total_tasks": 43,
-      "completion_pct": 81,
+      "completion_pct": 84,
       "status": "in-progress",
-      "completed_workflows": 11,
+      "completed_workflows": 12,
       "total_workflows": 13,
-      "phase": "v0.5.0-stable shipped. WF-SECLOOP (perpetual) launched cycle 1."
+      "phase": "v0.5.0-stable shipped. WIRE-004 done. WF-SECLOOP (v0.7) defined."
     }
   ]
 }
