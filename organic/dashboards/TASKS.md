@@ -15,8 +15,8 @@
 | ~~INFRA-001~~ | ~~Pipe-pane: replace script(1) with tmux-native PTY streaming~~ | `-` | 3 | 1 | 0.5 | **105** | copilot | — |
 | ~~SWARM-001~~ | ~~Gate = write access (not --safe flag) — update aido tier routing~~ | `-` | 3 | 1 | 0.5 | **105** | copilot | — |
 | ~~SWARM-002~~ | ~~agentd interface contract: abstract container-spawn (Docker now, Nomad later)~~ | `-` | 3 | 1 | 0.5 | **105** | copilot | — |
-| SKILL-002 | Code skills: ^fix, ^build, ^feature, ^refactor, ^solve | `+` | 3 | 1 | 0.5 | **105** | — | — |
-| SKILL-003 | Review skills: ^review, ^precommit, ^simplify | `+` | 3 | 1 | 0.5 | **105** | — | — |
+| ~~SKILL-002~~ | ~~Code skills: ^fix, ^build, ^feature, ^refactor, ^solve~~ | `-` | 3 | 1 | 0.5 | **105** | @copilot | — |
+| ~~SKILL-003~~ | ~~Review skills: ^review, ^precommit, ^simplify~~ | `-` | 3 | 1 | 0.5 | **105** | @copilot | — |
 | SKILL-004 | Analysis skills: ^analyse, ^design, ^pattern, ^scope, ^spec, ^split | `+` | 3 | 1 | 0.5 | **105** | — | — |
 | ~~INFRA-004~~ | ~~.ailedger enhancements: AIPOLICY.yaml commit, prune policy~~ | `-` | 3 | 1 | 0.4 | **95** | copilot | — |
 | ~~SHELL-001~~ | ~~Shell UI: state-colored PS1, tmux titles, shell economy + reap~~ | `-` | 2 | 1 | 0.5 | **95** | copilot | — |
@@ -39,17 +39,17 @@
 | Metric | Value |
 |--------|-------|
 | Total tasks | 24 |
-| Runnable | 6 |
+| Runnable | 4 |
 | Blocked | 0 |
-| Completed | 18 |
+| Completed | 20 |
 | Failed | 0 |
 
 ## State Distribution
 
 | State | Symbol | Count |
 |-------|--------|-------|
-| Completed | `-` | 18 |
-| Pending | `+` | 6 |
+| Completed | `-` | 20 |
+| Pending | `+` | 4 |
 
 ---
 
@@ -65,8 +65,8 @@
 | 4 | ~~INFRA-001~~ | 105 | `-` ✅ |
 | 5 | ~~SWARM-001~~ | 105 | `-` ✅ |
 | 6 | ~~SWARM-002~~ | 105 | `-` ✅ |
-| 7 | SKILL-002 | 105 | `+` |
-| 8 | SKILL-003 | 105 | `+` |
+| 7 | ~~SKILL-002~~ | 105 | `-` ✅ |
+| 8 | ~~SKILL-003~~ | 105 | `-` ✅ |
 | 9 | SKILL-004 | 105 | `+` |
 | 10 | ~~INFRA-004~~ | 95 | `-` ✅ |
 
@@ -86,9 +86,9 @@ CLI-003 ✅ ── ; ──> TEST-001 ✅
 
 AGENT-001 ✅ ──^──> SKILL-001 ✅
 
-SKILL-001 ✅ ──^──> SKILL-002 +
+SKILL-001 ✅ ──^──> SKILL-002 ✅
 
-SKILL-001 ✅ ──^──> SKILL-003 +
+SKILL-001 ✅ ──^──> SKILL-003 ✅
 
 SKILL-001 ✅ ──^──> SKILL-004 +
 

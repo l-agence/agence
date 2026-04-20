@@ -253,49 +253,49 @@
       "id": "SKILL-004",
       "repo": "agence",
       "title": "Analysis skills: ^analyse, ^design, ^pattern, ^scope, ^spec, ^split",
-      "state": "+",
+      "state": "-",
       "priority": 3,
       "stars": 1,
       "heat": 0.5,
-      "agent": null,
+      "agent": "@copilot",
       "created": "2026-04-19T00:00:00Z",
-      "updated": "2026-04-19T00:00:00Z"
+      "updated": "2026-04-19T19:00:00Z"
     },
     {
       "id": "SKILL-005",
       "repo": "agence",
       "title": "Peer skills: ^peer-design, ^peer-review, ^peer-solve, ^peer-analyse",
-      "state": "+",
+      "state": "-",
       "priority": 3,
       "stars": 1,
       "heat": 0.4,
-      "agent": null,
+      "agent": "@copilot",
       "created": "2026-04-19T00:00:00Z",
-      "updated": "2026-04-19T00:00:00Z"
+      "updated": "2026-04-19T19:00:00Z"
     },
     {
       "id": "SKILL-006",
       "repo": "agence",
       "title": "Red team skills: ^hack, ^break (autonomous attack surface probing)",
-      "state": "+",
+      "state": "-",
       "priority": 2,
       "stars": 1,
       "heat": 0.4,
-      "agent": null,
+      "agent": "@copilot",
       "created": "2026-04-19T00:00:00Z",
-      "updated": "2026-04-19T00:00:00Z"
+      "updated": "2026-04-19T19:00:00Z"
     },
     {
       "id": "SKILL-007",
       "repo": "agence",
       "title": "Knowledge skills: ^document, ^test, ^recon, ^grasp, ^glimpse",
-      "state": "+",
+      "state": "-",
       "priority": 2,
       "stars": 1,
       "heat": 0.3,
-      "agent": null,
+      "agent": "@copilot",
       "created": "2026-04-19T00:00:00Z",
-      "updated": "2026-04-19T00:00:00Z"
+      "updated": "2026-04-19T19:00:00Z"
     }
   ]
 }

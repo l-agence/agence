@@ -65,7 +65,7 @@ APT_CORE=(
   "jfrog-cli"
   "tflint"
   "awscli"
-  "azure-cli"
+  "azure-cli.agence/lib"
 )
 
 # ============================================================================
