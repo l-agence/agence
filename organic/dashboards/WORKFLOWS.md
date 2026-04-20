@@ -17,7 +17,7 @@
 | WF-BUGS | Bug Fixes | 1 | 1 | 0 | 100% | ✅ Done |
 | WF-AGENTS | Agent Personas & Dispatch | 2 | 2 | 0 | 100% | ✅ Done |
 | WF-SKILLS | Skill Commands | 7 | 6 | 1 | 86% | 🟡 In progress |
-| WF-SECURITY | v0.5 Security Fixes (@aleph findings) | 6 | 0 | 6 | 0% | ⚪ Not started |
+| WF-SECURITY | v0.5 Security Fixes (@aleph findings) | 6 | 3 | 3 | 50% | 🟡 In progress |
 | WF-WIRING | v0.5 Feature Wiring (@peers.coders) | 4 | 0 | 4 | 0% | ⚪ Not started |
 | WF-V5TEST | v0.5 Security & Integration Tests | 2 | 0 | 2 | 0% | ⚪ Not started |
 | WF-RELEASE | v0.5.0 Release Packaging | 2 | 0 | 2 | 0% | ⚪ Not started |
@@ -94,9 +94,9 @@
 
 | ID | Title | State | Score | Blocked |
 |----|-------|-------|-------|---------|
-| SEC-001 | F-1 CRITICAL: Fix shell injection in guard.ts emitShellExports eval | `+` | 225 | — |
-| SEC-002 | F-2 HIGH: Move Gemini API key from URL query param to x-goog-api-key header | `+` | 140 | — |
-| SEC-003 | F-3 HIGH: Guard default unknown commands T1→T2 (fail-closed) | `+` | 120 | — |
+| SEC-001 | F-1 CRITICAL: Fix shell injection in guard.ts emitShellExports eval | `-` | 225 | — |
+| SEC-002 | F-2 HIGH: Move Gemini API key from URL query param to x-goog-api-key header | `-` | 140 | — |
+| SEC-003 | F-3 HIGH: Guard default unknown commands T1→T2 (fail-closed) | `-` | 120 | — |
 | SEC-004 | F-4 MEDIUM: Signal forgery — add auth on IPC files in nexus/signals/ | `_` | 85 | — |
 | SEC-005 | F-6 MEDIUM: tmux send-keys injection in signal.ts | `_` | 85 | — |
 | SEC-006 | F-7 MEDIUM: Persona injection surface hardening (when @ routing wired) | `_` | 85 | WIRE-004 |
@@ -114,7 +114,7 @@
 
 | ID | Title | State | Score | Blocked |
 |----|-------|-------|-------|---------|
-| TEST-002 | Guard security boundary tests (~50 tests for guard.ts, F-5) | `+` | 160 | SEC-001 |
+| TEST-002 | Guard security boundary tests (~50 tests for guard.ts, F-5) | `+` | 160 | — |
 | TEST-003 | peers.ts + dispatch.ts unit test bootstrap | `+` | 105 | — |
 
 ### WF-RELEASE — v0.5.0 Release Packaging (2 tasks)
@@ -122,7 +122,7 @@
 | ID | Title | State | Score | Blocked |
 |----|-------|-------|-------|---------|
 | REL-001 | package.json version 0.5.0 + ROADMAP.md update | `+` | 40 | — |
-| REL-002 | Integration testing + tag v0.5.0-stable | `+` | 105 | SEC-001, SEC-002, SEC-003, TEST-002 |
+| REL-002 | Integration testing + tag v0.5.0-stable | `+` | 105 | TEST-002 |
 
 ---
 

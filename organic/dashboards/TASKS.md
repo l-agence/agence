@@ -9,12 +9,12 @@
 
 | ID | Title | State | Pri | Stars | Heat | Score | Agent | Blocked By |
 |----|-------|-------|-----|-------|------|-------|-------|------------|
-| SEC-001 | F-1 CRITICAL: Fix shell injection in guard.ts emitShellExports eval | `+` | 5 | 3 | 1 | **225** | — | — |
+| ~~SEC-001~~ | ~~F-1 CRITICAL: Fix shell injection in guard.ts emitShellExports eval~~ | `-` | 5 | 3 | 1 | **225** | — | — |
 | ~~INFRA-002~~ | ~~agentd skeleton: pid file, socket per tangent, Docker spawn~~ | `-` | 4 | 2 | 0.8 | **170** | copilot | — |
 | ~~SKILL-001~~ | ~~Skill infrastructure: agent dispatch + artifact routing to synthetic/objectcode~~ | `-` | 4 | 2 | 0.8 | **170** | @copilot | — |
-| TEST-002 | Guard security boundary tests (~50 tests for guard.ts, F-5) | `+` | 4 | 2 | 0.7 | **160** | — | SEC-001 |
-| SEC-002 | F-2 HIGH: Move Gemini API key from URL query param to x-goog-api-key header | `+` | 4 | 2 | 0.5 | **140** | — | — |
-| SEC-003 | F-3 HIGH: Guard default unknown commands T1→T2 (fail-closed) | `+` | 4 | 2 | 0.3 | **120** | — | — |
+| TEST-002 | Guard security boundary tests (~50 tests for guard.ts, F-5) | `+` | 4 | 2 | 0.7 | **160** | — | — |
+| ~~SEC-002~~ | ~~F-2 HIGH: Move Gemini API key from URL query param to x-goog-api-key header~~ | `-` | 4 | 2 | 0.5 | **140** | — | — |
+| ~~SEC-003~~ | ~~F-3 HIGH: Guard default unknown commands T1→T2 (fail-closed)~~ | `-` | 4 | 2 | 0.3 | **120** | — | — |
 | ~~AGENT-001~~ | ~~@linus, @feynman, @aleph persona definitions~~ | `-` | 3 | 1 | 0.6 | **115** | @copilot | — |
 | WIRE-001 | Wire @peers detection in skill.ts (~15 lines, @ routing) | `+` | 3 | 1 | 0.6 | **115** | — | — |
 | WIRE-002 | Wire peers.ts → CLI: @peers ^analyze/^solve/^review integration | `+` | 3 | 1 | 0.6 | **115** | — | WIRE-001 |
@@ -26,7 +26,7 @@
 | ~~SKILL-004~~ | ~~Analysis skills: ^analyse, ^design, ^pattern, ^scope, ^spec, ^split~~ | `-` | 3 | 1 | 0.5 | **105** | @copilot | — |
 | SKILL-008 | Move skills to synthetic root + add ^deploy, ^brainstorm | `+` | 3 | 1 | 0.5 | **105** | — | — |
 | TEST-003 | peers.ts + dispatch.ts unit test bootstrap | `+` | 3 | 1 | 0.5 | **105** | — | — |
-| REL-002 | Integration testing + tag v0.5.0-stable | `+` | 3 | 1 | 0.5 | **105** | — | SEC-001, SEC-002, SEC-003, TEST-002 |
+| REL-002 | Integration testing + tag v0.5.0-stable | `+` | 3 | 1 | 0.5 | **105** | — | TEST-002 |
 | ~~INFRA-004~~ | ~~.ailedger enhancements: AIPOLICY.yaml commit, prune policy~~ | `-` | 3 | 1 | 0.4 | **95** | copilot | — |
 | ~~SHELL-001~~ | ~~Shell UI: state-colored PS1, tmux titles, shell economy + reap~~ | `-` | 2 | 1 | 0.5 | **95** | copilot | — |
 | ~~SKILL-005~~ | ~~Peer skills: ^peer-design, ^peer-review, ^peer-solve, ^peer-analyse~~ | `-` | 3 | 1 | 0.4 | **95** | @copilot | — |
@@ -54,17 +54,17 @@
 | Metric | Value |
 |--------|-------|
 | Total tasks | 39 |
-| Runnable | 11 |
-| Blocked | 4 |
-| Completed | 24 |
+| Runnable | 8 |
+| Blocked | 3 |
+| Completed | 27 |
 | Failed | 0 |
 
 ## State Distribution
 
 | State | Symbol | Count |
 |-------|--------|-------|
-| Completed | `-` | 24 |
-| Pending | `+` | 11 |
+| Completed | `-` | 27 |
+| Pending | `+` | 8 |
 | Paused | `_` | 4 |
 
 ---
@@ -75,12 +75,12 @@
 
 | Rank | ID | Score | State |
 |------|----|-------|-------|
-| 1 | SEC-001 | 225 | `+` |
+| 1 | ~~SEC-001~~ | 225 | `-` ✅ |
 | 2 | ~~INFRA-002~~ | 170 | `-` ✅ |
 | 3 | ~~SKILL-001~~ | 170 | `-` ✅ |
 | 4 | TEST-002 | 160 | `+` |
-| 5 | SEC-002 | 140 | `+` |
-| 6 | SEC-003 | 120 | `+` |
+| 5 | ~~SEC-002~~ | 140 | `-` ✅ |
+| 6 | ~~SEC-003~~ | 120 | `-` ✅ |
 | 7 | ~~AGENT-001~~ | 115 | `-` ✅ |
 | 8 | WIRE-001 | 115 | `+` |
 | 9 | WIRE-002 | 115 | `+` |
@@ -114,13 +114,13 @@ SKILL-001 ✅ ──^──> SKILL-006 ✅
 
 SKILL-001 ✅ ──^──> SKILL-007 ✅
 
-SEC-001 + ──^──> REL-002 +
+SEC-001 ✅ ──^──> REL-002 +
 
-SEC-002 + ──^──> REL-002 +
+SEC-002 ✅ ──^──> REL-002 +
 
-SEC-003 + ──^──> REL-002 +
+SEC-003 ✅ ──^──> REL-002 +
 
-SEC-001 + ──^──> TEST-002 +
+SEC-001 ✅ ──^──> TEST-002 +
 
 WIRE-001 + ──^──> WIRE-002 +
 
