@@ -189,13 +189,20 @@ function resolveAgent(skillName: string, explicitAgent?: string): AgentMeta | nu
 }
 
 // ─── SKILL.md Loader ─────────────────────────────────────────────────────────
-// Searches for SKILL.md in synthetic/*/skills/<skill-name>/
+// SKILL-008: Skills live at synthetic/skills/ (root, not org-scoped).
+// Skills are generic, reusable, contain no PII or IP.
+// Fallback to legacy org-scoped path for backward compat.
 
 function loadSkillMd(skillName: string): string | undefined {
-  const skillDir = join(AGENCE_ROOT, "synthetic", ORG, "skills", skillName);
-  const skillFile = join(skillDir, "SKILL.md");
-  if (existsSync(skillFile)) {
-    return readFileSync(skillFile, "utf-8");
+  // Primary: synthetic/skills/<skill-name>/SKILL.md (generic, shared)
+  const rootSkillFile = join(AGENCE_ROOT, "synthetic", "skills", skillName, "SKILL.md");
+  if (existsSync(rootSkillFile)) {
+    return readFileSync(rootSkillFile, "utf-8");
+  }
+  // Fallback: synthetic/<org>/skills/<skill-name>/SKILL.md (legacy)
+  const orgSkillFile = join(AGENCE_ROOT, "synthetic", ORG, "skills", skillName, "SKILL.md");
+  if (existsSync(orgSkillFile)) {
+    return readFileSync(orgSkillFile, "utf-8");
   }
   return undefined;
 }
