@@ -94,6 +94,60 @@
       "completed": 6,
       "total": 6,
       "completion_pct": 100
+    },
+
+    {
+      "id": "WF-SECURITY",
+      "title": "v0.5 Security Fixes (@aleph findings)",
+      "tasks": [
+        "SEC-001",
+        "SEC-002",
+        "SEC-003",
+        "SEC-004",
+        "SEC-005",
+        "SEC-006"
+      ],
+      "completed": 0,
+      "total": 6,
+      "completion_pct": 0,
+      "notes": "SEC-001/002/003 block release; SEC-004/005/006 deferred (_)"
+    },
+    {
+      "id": "WF-WIRING",
+      "title": "v0.5 Feature Wiring (@peers.coders)",
+      "tasks": [
+        "WIRE-001",
+        "WIRE-002",
+        "WIRE-003",
+        "WIRE-004"
+      ],
+      "completed": 0,
+      "total": 4,
+      "completion_pct": 0,
+      "notes": "WIRE-004 is stretch goal for MVR"
+    },
+    {
+      "id": "WF-V5TEST",
+      "title": "v0.5 Security & Integration Tests",
+      "tasks": [
+        "TEST-002",
+        "TEST-003"
+      ],
+      "completed": 0,
+      "total": 2,
+      "completion_pct": 0
+    },
+    {
+      "id": "WF-RELEASE",
+      "title": "v0.5.0 Release Packaging",
+      "tasks": [
+        "REL-001",
+        "REL-002"
+      ],
+      "completed": 0,
+      "total": 2,
+      "completion_pct": 0,
+      "notes": "REL-002 is final gate — all SEC+WIRE+TEST must be complete"
     }
   ]
 }

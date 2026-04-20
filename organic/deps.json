@@ -11,6 +11,17 @@
     { "from": "SKILL-001", "to": "SKILL-004", "type": "^" },
     { "from": "SKILL-001", "to": "SKILL-005", "type": "^" },
     { "from": "SKILL-001", "to": "SKILL-006", "type": "^" },
-    { "from": "SKILL-001", "to": "SKILL-007", "type": "^" }
+    { "from": "SKILL-001", "to": "SKILL-007", "type": "^" },
+
+    { "from": "SEC-001", "to": "REL-002", "type": "^", "note": "F-1 blocks release" },
+    { "from": "SEC-002", "to": "REL-002", "type": "^", "note": "F-2 blocks release" },
+    { "from": "SEC-003", "to": "REL-002", "type": "^", "note": "F-3 blocks release" },
+    { "from": "SEC-001", "to": "TEST-002", "type": "^", "note": "fix before testing" },
+    { "from": "WIRE-001", "to": "WIRE-002", "type": "^", "note": "@peers detection before CLI wiring" },
+    { "from": "WIRE-002", "to": "WIRE-003", "type": ";", "note": "alias after main wiring" },
+    { "from": "WIRE-004", "to": "SEC-006", "type": "^", "note": "persona injection before hardening" },
+    { "from": "TEST-002", "to": "REL-002", "type": "^", "note": "guard tests before release" },
+    { "from": "TEST-003", "to": "REL-002", "type": ";", "note": "nice to have before release" },
+    { "from": "REL-001", "to": "REL-002", "type": ";" }
   ]
 }

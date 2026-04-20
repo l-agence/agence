@@ -11,14 +11,19 @@
         "WF-SWARM",
         "WF-BUGS",
         "WF-AGENTS",
-        "WF-SKILLS"
+        "WF-SKILLS",
+        "WF-SECURITY",
+        "WF-WIRING",
+        "WF-V5TEST",
+        "WF-RELEASE"
       ],
-      "completed_tasks": 23,
-      "total_tasks": 23,
-      "completion_pct": 100,
-      "status": "complete",
+      "completed_tasks": 24,
+      "total_tasks": 40,
+      "completion_pct": 60,
+      "status": "in-progress",
       "completed_workflows": 8,
-      "total_workflows": 8
+      "total_workflows": 12,
+      "phase": "v0.5.0 sprint — @peers-sourced tasks 2026-04-20"
     }
   ]
 }
