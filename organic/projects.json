@@ -17,13 +17,13 @@
         "WF-V5TEST",
         "WF-RELEASE"
       ],
-      "completed_tasks": 27,
-      "total_tasks": 41,
-      "completion_pct": 66,
+      "completed_tasks": 33,
+      "total_tasks": 39,
+      "completion_pct": 85,
       "status": "in-progress",
-      "completed_workflows": 8,
+      "completed_workflows": 10,
       "total_workflows": 12,
-      "phase": "v0.5.0 sprint — @peers-sourced tasks 2026-04-20"
+      "phase": "v0.5.0-stable shipped — TEST-002/003 + deferred SEC remaining"
     }
   ]
 }
