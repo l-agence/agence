@@ -10,6 +10,7 @@ nexus/agentd/*.pid
 nexus/agentd/*.json
 nexus/agentd/sockets/*.sock
 nexus/agentd/worktrees/
+nexus/.signal-secret
 nexus/sessions/*.meta.json
 nexus/sessions/*.awaiting
 nexus/sessions/*.typescript

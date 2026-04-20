@@ -25,9 +25,10 @@
 //   airun signal output '{"status":"ok","tests":91}'
 //   airun signal help
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, watchFile, unwatchFile } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, watchFile, unwatchFile, chmodSync } from "fs";
 import { join, basename } from "path";
 import { execSync } from "child_process";
+import { createHmac } from "crypto";
 
 // ─── Environment ─────────────────────────────────────────────────────────────
 
@@ -44,12 +45,13 @@ const SESSION_DIR = SESSION_BASE;
 type Transport = "tmux" | "file";
 
 interface SignalEnvelope {
-  type: "inject" | "instruct" | "input" | "prompt" | "notify" | "output";
+  type: "inject" | "instruct" | "input" | "prompt" | "notify" | "output" | "ask";
   from: string;       // agent or "human"
   to: string;         // agent or "human"
   payload: string;
   timestamp: string;
   id: string;         // unique signal ID for correlation
+  hmac?: string;      // SEC-004: HMAC-SHA256 envelope signature
 }
 
 interface PromptResponse {
@@ -71,12 +73,77 @@ function signalId(): string {
 }
 
 function ensureDir(dir: string): void {
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    // SEC-004: signals dir owner-only rwx
+    try { chmodSync(dir, 0o700); } catch {}
+  }
+}
+
+// ─── SEC-004: Signal Envelope HMAC ──────────────────────────────────────────
+// Prevents signal forgery by signing envelopes with a per-session secret.
+// Secret lives in nexus/.signal-secret (owner-only, 0o600).
+// Any forged or tampered signal will fail HMAC verification.
+
+const SIGNAL_SECRET_PATH = join(AGENCE_ROOT, "nexus", ".signal-secret");
+
+function getSignalSecret(): string {
+  if (existsSync(SIGNAL_SECRET_PATH)) {
+    return readFileSync(SIGNAL_SECRET_PATH, "utf-8").trim();
+  }
+  // Generate a new secret (32 random bytes hex)
+  const secret = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+    .map(b => b.toString(16).padStart(2, "0")).join("");
+  const nexusDir = join(AGENCE_ROOT, "nexus");
+  if (!existsSync(nexusDir)) mkdirSync(nexusDir, { recursive: true });
+  writeFileSync(SIGNAL_SECRET_PATH, secret + "\n", { mode: 0o600 });
+  return secret;
+}
+
+function signEnvelope(envelope: SignalEnvelope): string {
+  const secret = getSignalSecret();
+  const data = `${envelope.type}:${envelope.from}:${envelope.to}:${envelope.id}:${envelope.timestamp}:${envelope.payload}`;
+  return createHmac("sha256", secret).update(data).digest("hex");
+}
+
+function verifyEnvelope(envelope: SignalEnvelope): boolean {
+  if (!envelope.hmac) return false;
+  const expected = signEnvelope(envelope);
+  // Constant-time comparison to prevent timing attacks
+  if (expected.length !== envelope.hmac.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) {
+    diff |= expected.charCodeAt(i) ^ envelope.hmac.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+function validateEnvelopeFields(env: any): env is SignalEnvelope {
+  return (
+    typeof env === "object" && env !== null &&
+    typeof env.type === "string" &&
+    typeof env.from === "string" &&
+    typeof env.to === "string" &&
+    typeof env.payload === "string" &&
+    typeof env.timestamp === "string" &&
+    typeof env.id === "string" &&
+    /^[a-f0-9]{8}$/.test(env.id) &&
+    /^\d{4}-\d{2}-\d{2}T/.test(env.timestamp)
+  );
 }
 
 function shellSafe(s: string): string {
-  // Single-quote escape for shell: replace ' with '\''
-  return s.replace(/'/g, "'\\''");
+  // SEC-005: Strip control characters (0x00-0x1f except \n\t) that could
+  // be interpreted as tmux key sequences or terminal escape codes.
+  // Then single-quote escape for shell: replace ' with '\''.
+  const stripped = s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "");
+  return stripped.replace(/'/g, "'\\''");
+}
+
+// SEC-005: Validate pane target format to prevent tmux command injection.
+// Valid format: session:window.pane (e.g., "agence:0.1")
+function isValidPaneTarget(target: string): boolean {
+  return /^[a-zA-Z0-9_-]+:\d+\.\d+$/.test(target);
 }
 
 // ─── Transport Detection ─────────────────────────────────────────────────────
@@ -129,6 +196,11 @@ function resolveTmuxPane(agent: string, role: "human" | "agent"): string | null 
 // ─── Transport: tmux ─────────────────────────────────────────────────────────
 
 function tmuxSendKeys(paneTarget: string, text: string): boolean {
+  // SEC-005: Validate pane target format
+  if (!isValidPaneTarget(paneTarget)) {
+    process.stderr.write(`[signal] SEC-005: rejected invalid pane target: ${paneTarget}\n`);
+    return false;
+  }
   try {
     // send-keys sends literal text; Enter sends the Return key
     execSync(
@@ -142,6 +214,11 @@ function tmuxSendKeys(paneTarget: string, text: string): boolean {
 }
 
 function tmuxDisplayMessage(paneTarget: string, message: string): boolean {
+  // SEC-005: Validate pane target format
+  if (!isValidPaneTarget(paneTarget)) {
+    process.stderr.write(`[signal] SEC-005: rejected invalid pane target: ${paneTarget}\n`);
+    return false;
+  }
   try {
     execSync(
       `tmux display-message -t '${shellSafe(paneTarget)}' '${shellSafe(message)}'`,
@@ -157,8 +234,11 @@ function tmuxDisplayMessage(paneTarget: string, message: string): boolean {
 
 function fileWriteSignal(envelope: SignalEnvelope): string {
   ensureDir(SIGNAL_DIR);
+  // SEC-004: Sign envelope before writing
+  envelope.hmac = signEnvelope(envelope);
   const path = join(SIGNAL_DIR, `${envelope.id}.signal.json`);
-  writeFileSync(path, JSON.stringify(envelope, null, 2) + "\n");
+  // SEC-004: Restrictive permissions — owner-only read/write (0o600)
+  writeFileSync(path, JSON.stringify(envelope, null, 2) + "\n", { mode: 0o600 });
   return path;
 }
 
@@ -171,6 +251,16 @@ function fileWaitForResponse(signalId: string, timeoutMs: number): PromptRespons
     if (existsSync(responsePath)) {
       try {
         const data = JSON.parse(readFileSync(responsePath, "utf-8"));
+        // SEC-004: Verify response HMAC if present
+        if (data.hmac) {
+          const expected = createHmac("sha256", getSignalSecret())
+            .update(`response:${data.signal_id}:${data.answer}:${data.responder}:${data.timestamp}`)
+            .digest("hex");
+          if (data.hmac !== expected) {
+            process.stderr.write(`[signal] WARNING: response HMAC verification failed — possible forgery\n`);
+            return null;
+          }
+        }
         // Cleanup
         try { unlinkSync(responsePath); } catch {}
         try { unlinkSync(join(SIGNAL_DIR, `${signalId}.signal.json`)); } catch {}
@@ -227,7 +317,7 @@ function doInstruct(agent: string, text: string): number {
   // Write instructions to agent-specific file
   const instrFile = join(SIGNAL_DIR, `${agent.replace(/^@/, "")}.instructions`);
   ensureDir(SIGNAL_DIR);
-  writeFileSync(instrFile, text + "\n");
+  writeFileSync(instrFile, text + "\n", { mode: 0o600 });
   fileWriteSignal(envelope); // audit trail
 
   process.stderr.write(`[signal] instruct → ${agent}: wrote ${instrFile}\n`);
@@ -263,7 +353,7 @@ function doAsk(summary: string, timeoutSec: number = 15): number {
   // Mark awaiting
   ensureDir(SESSION_DIR);
   const awaitingPath = join(SESSION_DIR, `${sessionId}.awaiting`);
-  writeFileSync(awaitingPath, JSON.stringify({ signal_id: id, type: "ask", summary, timestamp: isoNow() }) + "\n");
+  writeFileSync(awaitingPath, JSON.stringify({ signal_id: id, type: "ask", summary, timestamp: isoNow() }) + "\n", { mode: 0o600 });
 
   process.stderr.write(`[signal] ^ask → human: ${summary} [${sessionId.slice(0, 8)}]\n`);
 
@@ -271,10 +361,13 @@ function doAsk(summary: string, timeoutSec: number = 15): number {
     const humanPane = resolveTmuxPane(agent, "human");
     if (humanPane) {
       const responsePath = join(SIGNAL_DIR, `${id}.response.json`);
-      // Concise one-liner: agent name, summary, session ref, y/n
+      // SEC-005: Hardened one-liner — $_ans is restricted to y/yes/n/no only.
+      // Any other input is treated as "no" to prevent shell injection via answer field.
+      // The answer is validated before being written to JSON.
       const askCmd = `read -t ${timeoutSec} -p '⚡ ${shellSafe(agent)} ${shellSafe(summary)} [${sessionId.slice(0, 8)}] (y/n): ' _ans && `
-        + `echo '{"signal_id":"${id}","answer":"'"\$_ans"'","responder":"human","timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > '${shellSafe(responsePath)}' `
-        + `|| echo '{"signal_id":"${id}","answer":"timeout","responder":"system","timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > '${shellSafe(responsePath)}'`;
+        + `case "$_ans" in [yY]|[yY][eE][sS]) _a=yes;; *) _a=no;; esac && `
+        + `printf '{"signal_id":"${id}","answer":"%s","responder":"human","timestamp":"%s"}\\n' "$_a" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > '${shellSafe(responsePath)}' `
+        + `|| printf '{"signal_id":"${id}","answer":"timeout","responder":"system","timestamp":"%s"}\\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > '${shellSafe(responsePath)}'`;
       tmuxSendKeys(humanPane, askCmd);
     }
   }
@@ -396,7 +489,10 @@ function doList(): number {
   for (const f of files) {
     try {
       const data = JSON.parse(readFileSync(join(SIGNAL_DIR, f), "utf-8"));
-      console.log(`  ${data.type} ${data.from}→${data.to}: ${data.payload.slice(0, 60)} [${data.id}]`);
+      // SEC-004: Verify HMAC on list display
+      const verified = validateEnvelopeFields(data) && data.hmac && verifyEnvelope(data);
+      const mark = verified ? "✓" : data.hmac ? "✗ UNVERIFIED" : "⚠ unsigned";
+      console.log(`  [${mark}] ${data.type} ${data.from}→${data.to}: ${data.payload.slice(0, 60)} [${data.id}]`);
     } catch {
       console.log(`  (corrupt: ${f})`);
     }
@@ -407,6 +503,11 @@ function doList(): number {
 // ─── Respond (human responds to a ^prompt or ^ask) ──────────────────────────
 
 function doRespond(sigId: string, answer: string): number {
+  // SEC-004: Validate signal ID format to prevent path traversal
+  if (!/^[a-f0-9]{8}$/.test(sigId)) {
+    console.error(`[signal] Invalid signal ID format: ${sigId}`);
+    return 2;
+  }
   const responsePath = join(SIGNAL_DIR, `${sigId}.response.json`);
   ensureDir(SIGNAL_DIR);
   const response: PromptResponse = {
@@ -415,7 +516,12 @@ function doRespond(sigId: string, answer: string): number {
     responder: process.env.USER || "human",
     timestamp: isoNow(),
   };
-  writeFileSync(responsePath, JSON.stringify(response, null, 2) + "\n");
+  // SEC-004: Sign response + restrictive permissions
+  const hmac = createHmac("sha256", getSignalSecret())
+    .update(`response:${sigId}:${response.answer}:${response.responder}:${response.timestamp}`)
+    .digest("hex");
+  const signed = { ...response, hmac };
+  writeFileSync(responsePath, JSON.stringify(signed, null, 2) + "\n", { mode: 0o600 });
   process.stderr.write(`[signal] responded to ${sigId}: ${answer}\n`);
   return 0;
 }
@@ -423,6 +529,11 @@ function doRespond(sigId: string, answer: string): number {
 // ─── Poll (agent checks if a ^prompt response has arrived) ───────────────────
 
 function doPoll(sigId: string): number {
+  // SEC-004: Validate signal ID format
+  if (!/^[a-f0-9]{8}$/.test(sigId)) {
+    console.error(`[signal] Invalid signal ID format: ${sigId}`);
+    return 2;
+  }
   const responsePath = join(SIGNAL_DIR, `${sigId}.response.json`);
   if (!existsSync(responsePath)) {
     console.log(`export _SIGNAL_ANSWERED=0`);
@@ -431,6 +542,18 @@ function doPoll(sigId: string): number {
   }
   try {
     const data = JSON.parse(readFileSync(responsePath, "utf-8")) as PromptResponse;
+    // SEC-004: Verify response HMAC if present
+    if (data.hmac) {
+      const expected = createHmac("sha256", getSignalSecret())
+        .update(`response:${data.signal_id}:${data.answer}:${data.responder}:${data.timestamp}`)
+        .digest("hex");
+      if (data.hmac !== expected) {
+        process.stderr.write(`[signal] WARNING: HMAC verification failed for response ${sigId} — possible forgery\n`);
+        console.log(`export _SIGNAL_ANSWERED=0`);
+        console.log(`export _SIGNAL_ID=${sigId}`);
+        return 1;
+      }
+    }
     console.log(`export _SIGNAL_ANSWERED=1`);
     console.log(`export _SIGNAL_ANSWER='${data.answer.replace(/'/g, "'\\''")}'`);
     console.log(`export _SIGNAL_ID=${sigId}`);

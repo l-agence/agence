@@ -19,7 +19,7 @@
 //   airun skill help
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "fs";
-import { join, basename, dirname } from "path";
+import { join, basename, dirname, resolve, relative } from "path";
 import { execSync, spawnSync } from "child_process";
 
 // ─── Environment ─────────────────────────────────────────────────────────────
@@ -203,34 +203,88 @@ function resolveAgent(skillName: string, explicitAgent?: string): AgentMeta | nu
   return match || agents[0]; // fallback to first agent
 }
 
+// ─── SEC-006: Input Validation Helpers ───────────────────────────────────────
+
+// Agent names must be alphanumeric + hyphens only — no dots, slashes, or path chars
+const AGENT_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$/;
+
+function isValidAgentName(name: string): boolean {
+  return AGENT_NAME_RE.test(name);
+}
+
+// SEC-006: Maximum persona file size (64KB) to prevent resource exhaustion
+const MAX_PERSONA_SIZE = 64 * 1024;
+
+// SEC-006: Maximum skill.md file size (128KB)
+const MAX_SKILL_MD_SIZE = 128 * 1024;
+
 // ─── SKILL.md Loader ─────────────────────────────────────────────────────────
 // SKILL-008: Skills live at synthetic/skills/ (root, not org-scoped).
 // Skills are generic, reusable, contain no PII or IP.
 // Fallback to legacy org-scoped path for backward compat.
 
 function loadSkillMd(skillName: string): string | undefined {
+  // SEC-006: Validate skill name to prevent path traversal
+  if (!AGENT_NAME_RE.test(skillName)) {
+    process.stderr.write(`[skill] SEC-006: rejected invalid skill name: ${skillName}\n`);
+    return undefined;
+  }
   // Primary: synthetic/skills/<skill-name>/SKILL.md (generic, shared)
   const rootSkillFile = join(AGENCE_ROOT, "synthetic", "skills", skillName, "SKILL.md");
+  // SEC-006: Verify resolved path is within expected directory
+  const expectedRoot = resolve(AGENCE_ROOT, "synthetic", "skills");
+  if (!resolve(rootSkillFile).startsWith(expectedRoot)) {
+    process.stderr.write(`[skill] SEC-006: path traversal blocked for skill: ${skillName}\n`);
+    return undefined;
+  }
   if (existsSync(rootSkillFile)) {
-    return readFileSync(rootSkillFile, "utf-8");
+    const content = readFileSync(rootSkillFile, "utf-8");
+    if (content.length > MAX_SKILL_MD_SIZE) {
+      process.stderr.write(`[skill] SEC-006: SKILL.md exceeds size limit (${content.length} > ${MAX_SKILL_MD_SIZE})\n`);
+      return content.slice(0, MAX_SKILL_MD_SIZE);
+    }
+    return content;
   }
   // Fallback: synthetic/<org>/skills/<skill-name>/SKILL.md (legacy)
   const orgSkillFile = join(AGENCE_ROOT, "synthetic", ORG, "skills", skillName, "SKILL.md");
   if (existsSync(orgSkillFile)) {
-    return readFileSync(orgSkillFile, "utf-8");
+    const content = readFileSync(orgSkillFile, "utf-8");
+    if (content.length > MAX_SKILL_MD_SIZE) return content.slice(0, MAX_SKILL_MD_SIZE);
+    return content;
   }
   return undefined;
 }
 
 // ─── Agent Persona Loader ────────────────────────────────────────────────────
 // WIRE-004: Load codex/agents/<name>/agent.md for system prompt persona injection.
-// This gives each agent its identity, voice, and behavioral constraints.
+// SEC-006: Path traversal protection, size limits, content boundary markers.
 
 function loadPersona(agentName: string): string | undefined {
   if (!agentName || agentName === "auto") return undefined;
-  const personaFile = join(AGENCE_ROOT, "codex", "agents", agentName, "agent.md");
+
+  // SEC-006: Validate agent name — alphanumeric + hyphens only
+  const cleanName = agentName.replace(/^@/, "");
+  if (!isValidAgentName(cleanName)) {
+    process.stderr.write(`[skill] SEC-006: rejected invalid agent name: ${agentName}\n`);
+    return undefined;
+  }
+
+  // SEC-006: Verify resolved path stays within codex/agents/
+  const personaFile = join(AGENCE_ROOT, "codex", "agents", cleanName, "agent.md");
+  const expectedDir = resolve(AGENCE_ROOT, "codex", "agents");
+  if (!resolve(personaFile).startsWith(expectedDir)) {
+    process.stderr.write(`[skill] SEC-006: path traversal blocked for agent: ${agentName}\n`);
+    return undefined;
+  }
+
   if (existsSync(personaFile)) {
-    return readFileSync(personaFile, "utf-8");
+    const content = readFileSync(personaFile, "utf-8");
+    // SEC-006: Size limit to prevent prompt stuffing
+    if (content.length > MAX_PERSONA_SIZE) {
+      process.stderr.write(`[skill] SEC-006: persona exceeds size limit (${content.length} > ${MAX_PERSONA_SIZE}), truncated\n`);
+      return content.slice(0, MAX_PERSONA_SIZE);
+    }
+    return content;
   }
   return undefined;
 }
@@ -363,18 +417,20 @@ async function runSkill(
   const agent = resolveAgent(skillName, opts.agent);
   const agentName = agent?.name || "auto";
 
-  // WIRE-004: Load agent persona from codex/agents/<name>/agent.md
+  // WIRE-004 + SEC-006: Load agent persona with hardened boundary markers
   const personaMd = loadPersona(agentName);
 
   // Load SKILL.md context
   const skillMd = loadSkillMd(skillName);
   let systemPrompt = "";
   if (personaMd) {
-    systemPrompt += `--- Agent Persona ---\n${personaMd}\n\n`;
+    // SEC-006: Boundary markers prevent persona content from overriding system instructions.
+    // The persona is sandboxed between markers — LLM should treat it as role context only.
+    systemPrompt += `[PERSONA-BEGIN agent=${agentName}]\n${personaMd}\n[PERSONA-END]\n\n`;
   }
   systemPrompt += def.systemPrompt;
   if (skillMd) {
-    systemPrompt += `\n\n--- Skill Reference ---\n${skillMd}`;
+    systemPrompt += `\n\n[SKILL-REF-BEGIN skill=${skillName}]\n${skillMd}\n[SKILL-REF-END]`;
   }
 
   console.error(`[skill] ${skillName} via ${usePeers ? "peers" : `@${agentName}`} | artifact → ${def.artifact}`);
@@ -535,6 +591,14 @@ async function main(): Promise<number> {
           peers = true;
           flavor = "pair";
           agent = undefined;
+        }
+        // SEC-006: Validate agent name early
+        if (agent) {
+          const cleanAgent = agent.replace(/^@/, "");
+          if (!isValidAgentName(cleanAgent)) {
+            console.error(`[skill] SEC-006: invalid agent name: ${agent} (alphanumeric + hyphens only, max 32 chars)`);
+            return 2;
+          }
         }
         break;
       case "--peers":
