@@ -1,142 +1,102 @@
 # Tasks Dashboard
 
 > **Source**: `organic/tasks.json` | **Formula**: score = 10P + 25S + 100H
-> **Generated**: 2026-04-20 | **Project**: PROJ-LAGENCE
+> **Generated**: 2026-04-20T21:00:00Z | **Project**: PROJ-LAGENCE
 
 ---
 
-## Active Tasks
+## Open Tasks (paused / deferred)
 
-| ID | Title | State | Pri | Stars | Heat | Score | Agent | Blocked By |
-|----|-------|-------|-----|-------|------|-------|-------|------------|
-| ~~SEC-001~~ | ~~F-1 CRITICAL: Fix shell injection in guard.ts emitShellExports eval~~ | `-` | 5 | 3 | 1 | **225** | — | — |
-| SEC-008 | ^break own tools: non-destructive stress test (aido/aicmd/aibash/aishell/agentd) | `_` | 4 | 2 | 0.9 | **180** | — | — |
-| SEC-009 | ^hack red-team probe: privilege escalation + self-modification attacks | `_` | 4 | 2 | 0.9 | **180** | — | — |
-| ~~INFRA-002~~ | ~~agentd skeleton: pid file, socket per tangent, Docker spawn~~ | `-` | 4 | 2 | 0.8 | **170** | copilot | — |
-| ~~SKILL-001~~ | ~~Skill infrastructure: agent dispatch + artifact routing to synthetic/objectcode~~ | `-` | 4 | 2 | 0.8 | **170** | @copilot | — |
-| SEC-007 | PERPETUAL: Security Integration Loop — ^integrate cycle | `_` | 4 | 2 | 0.8 | **170** | — | — |
-| ~~TEST-002~~ | ~~Guard security boundary tests (~50 tests for guard.ts, F-5)~~ | `-` | 4 | 2 | 0.7 | **160** | — | — |
-| ~~SEC-002~~ | ~~F-2 HIGH: Move Gemini API key from URL query param to x-goog-api-key header~~ | `-` | 4 | 2 | 0.5 | **140** | — | — |
-| SEC-010 | ^integrate findings: fix + verify + regression test loop | `_` | 3 | 1 | 0.7 | **125** | — | — |
-| ~~SEC-003~~ | ~~F-3 HIGH: Guard default unknown commands T1→T2 (fail-closed)~~ | `-` | 4 | 2 | 0.3 | **120** | — | — |
-| ~~AGENT-001~~ | ~~@linus, @feynman, @aleph persona definitions~~ | `-` | 3 | 1 | 0.6 | **115** | @copilot | — |
-| ~~WIRE-001~~ | ~~Wire @peers detection in skill.ts (~15 lines, @ routing)~~ | `-` | 3 | 1 | 0.6 | **115** | — | — |
-| ~~WIRE-002~~ | ~~Wire peers.ts → CLI: @peers ^analyze/^solve/^review integration~~ | `-` | 3 | 1 | 0.6 | **115** | — | — |
-| ~~INFRA-001~~ | ~~Pipe-pane: replace script(1) with tmux-native PTY streaming~~ | `-` | 3 | 1 | 0.5 | **105** | copilot | — |
-| ~~SWARM-001~~ | ~~Gate = write access (not --safe flag) — update aido tier routing~~ | `-` | 3 | 1 | 0.5 | **105** | copilot | — |
-| ~~SWARM-002~~ | ~~agentd interface contract: abstract container-spawn (Docker now, Nomad later)~~ | `-` | 3 | 1 | 0.5 | **105** | copilot | — |
-| ~~SKILL-002~~ | ~~Code skills: ^fix, ^build, ^feature, ^refactor, ^solve~~ | `-` | 3 | 1 | 0.5 | **105** | @copilot | — |
-| ~~SKILL-003~~ | ~~Review skills: ^review, ^precommit, ^simplify~~ | `-` | 3 | 1 | 0.5 | **105** | @copilot | — |
-| ~~SKILL-004~~ | ~~Analysis skills: ^analyse, ^design, ^pattern, ^scope, ^spec, ^split~~ | `-` | 3 | 1 | 0.5 | **105** | @copilot | — |
-| ~~SKILL-008~~ | ~~Move skills to synthetic root + add ^deploy, ^brainstorm~~ | `-` | 3 | 1 | 0.5 | **105** | — | — |
-| ~~TEST-003~~ | ~~peers.ts + dispatch.ts unit test bootstrap~~ | `-` | 3 | 1 | 0.5 | **105** | — | — |
-| ~~REL-002~~ | ~~Integration testing + tag v0.5.0-stable~~ | `-` | 3 | 1 | 0.5 | **105** | — | — |
-| ~~INFRA-004~~ | ~~.ailedger enhancements: AIPOLICY.yaml commit, prune policy~~ | `-` | 3 | 1 | 0.4 | **95** | copilot | — |
-| ~~SHELL-001~~ | ~~Shell UI: state-colored PS1, tmux titles, shell economy + reap~~ | `-` | 2 | 1 | 0.5 | **95** | copilot | — |
-| ~~SKILL-005~~ | ~~Peer skills: ^peer-design, ^peer-review, ^peer-solve, ^peer-analyse~~ | `-` | 3 | 1 | 0.4 | **95** | @copilot | — |
-| ~~SKILL-006~~ | ~~Red team skills: ^hack, ^break (autonomous attack surface probing)~~ | `-` | 2 | 1 | 0.4 | **85** | @copilot | — |
-| SEC-004 | F-4 MEDIUM: Signal forgery — add auth on IPC files in nexus/signals/ | `_` | 3 | 1 | 0.3 | **85** | — | — |
-| SEC-005 | F-6 MEDIUM: tmux send-keys injection in signal.ts | `_` | 3 | 1 | 0.3 | **85** | — | — |
-| SEC-006 | F-7 MEDIUM: Persona injection surface hardening (when @ routing wired) | `_` | 3 | 1 | 0.3 | **85** | — | WIRE-004 |
-| ~~INFRA-003~~ | ~~Publish AIPOLICY.yaml schema as governance standard~~ | `-` | 2 | 1 | 0.3 | **75** | copilot | — |
-| ~~SKILL-007~~ | ~~Knowledge skills: ^document, ^test, ^recon, ^grasp, ^glimpse~~ | `-` | 2 | 1 | 0.3 | **75** | @copilot | — |
-| WIRE-004 | Wire persona injection: codex/agents/<name>/agent.md → system prompt | `+` | 2 | 0 | 0.4 | **60** | — | — |
-| ~~TEST-001~~ | ~~Shellspec tests for ^ledger, ^audit, ^session prune, ^index~~ | `-` | 2 | 0 | 0.3 | **50** | copilot | — |
-| ~~INFRA-005~~ | ~~Agent persona loading from codex/agents/registry.json~~ | `-` | 2 | 0 | 0.3 | **50** | — | — |
-| ~~CLI-003~~ | ~~Smoke tests: path validation rejects escapes without junctions~~ | `-` | 2 | 0 | 0.3 | **50** | — | — |
-| ~~DOC-001~~ | ~~Update docs for v0.3.2 (plans INDEX, README, COMMANDS.md)~~ | `-` | 2 | 0 | 0.2 | **40** | copilot | — |
-| ~~DOC-002~~ | ~~Update show_help() with new commands (^ledger, ^audit, airun)~~ | `-` | 2 | 0 | 0.2 | **40** | copilot | — |
-| ~~BUG-001~~ | ~~mnemonic prune + sessions prune (stale file cleanup)~~ | `-` | 2 | 0 | 0.2 | **40** | copilot | — |
-| ~~WIRE-003~~ | ~~Add 'analyze' alias for 'analyse' spelling in skill dispatch~~ | `-` | 2 | 0 | 0.2 | **40** | — | — |
-| ~~REL-001~~ | ~~package.json version 0.5.0 + ROADMAP.md update~~ | `-` | 2 | 0 | 0.2 | **40** | — | — |
-| ~~DOC-003~~ | ~~Clear stale synthetic todos (shellspec, v0.2.5 done)~~ | `-` | 1 | 0 | 0.1 | **20** | copilot | — |
-| ~~CLI-001~~ | ~~agence help deep improvements (multi-tool docs entry point)~~ | `-` | 1 | 0 | 0.1 | **20** | copilot | — |
-| ~~CLI-002~~ | ~~.gitignore final review (local symlinks, build artifacts)~~ | `-` | 1 | 0 | 0.1 | **20** | copilot | — |
+| ID | Title | State | Pri | Score | Milestone | Parent |
+|----|-------|-------|-----|-------|-----------|--------|
+| SEC-007 | PERPETUAL: Security Integration Loop — ^integrate cycle | `_` | 4 | 170 | v0.7 | — |
+| SEC-008 | ^break own tools: non-destructive stress test | `_` | 4 | 180 | v0.7 | SEC-007 |
+| SEC-009 | ^hack red-team probe: privilege escalation + self-modification | `_` | 4 | 180 | v0.7 | SEC-007 |
+| SEC-010 | ^integrate findings: fix + verify + regression test loop | `_` | 3 | 125 | v0.7 | SEC-007 |
+| SEC-004 | F-4 MEDIUM: Signal forgery — IPC auth in nexus/signals/ | `_` | 3 | 85 | v0.6 | — |
+| SEC-005 | F-6 MEDIUM: tmux send-keys injection in signal.ts | `_` | 3 | 85 | v0.6 | — |
+| SEC-006 | F-7 MEDIUM: Persona injection surface hardening | `_` | 3 | 85 | v0.6 | — |
+
+---
+
+## Completed Tasks (36)
+
+| ID | Title | State | Score | Commit |
+|----|-------|-------|-------|--------|
+| SEC-001 | F-1 CRITICAL: Fix shell injection in guard.ts emitShellExports eval | `-` | 225 | bf5d8ab |
+| SEC-002 | F-2 HIGH: Move Gemini API key to x-goog-api-key header | `-` | 140 | bf5d8ab |
+| SEC-003 | F-3 HIGH: Guard default unknown T1→T2 (fail-closed) | `-` | 120 | bf5d8ab |
+| INFRA-002 | agentd skeleton: pid file, socket per tangent, Docker spawn | `-` | 170 | 93f96d9 |
+| SKILL-001 | Skill infrastructure: agent dispatch + artifact routing | `-` | 170 | — |
+| TEST-002 | Guard security boundary tests (122 tests) | `-` | 160 | 9ba25ea |
+| AGENT-001 | @linus, @feynman, @aleph persona definitions | `-` | 115 | — |
+| WIRE-001 | Wire @peers detection in skill.ts | `-` | 115 | — |
+| WIRE-002 | Wire peers.ts → CLI: @peers integration | `-` | 115 | — |
+| INFRA-001 | Pipe-pane: tmux-native PTY streaming | `-` | 105 | ab08428 |
+| SWARM-001 | Gate = write access — update aido tier routing | `-` | 105 | fba1e9d |
+| SWARM-002 | agentd interface contract: abstract container-spawn | `-` | 105 | 67ad891 |
+| SKILL-002 | Code skills: ^fix, ^build, ^feature, ^refactor, ^solve | `-` | 105 | — |
+| SKILL-003 | Review skills: ^review, ^precommit, ^simplify | `-` | 105 | — |
+| SKILL-004 | Analysis skills: ^analyse, ^design, ^pattern, ^scope, ^spec, ^split | `-` | 105 | — |
+| SKILL-008 | Move skills to synthetic root + ^deploy, ^brainstorm | `-` | 105 | 408719f |
+| TEST-003 | peers.ts + dispatch.ts unit tests (51 tests) | `-` | 105 | 9ba25ea |
+| REL-002 | Integration testing + tag v0.5.0-stable | `-` | 105 | f05c7be |
+| INFRA-004 | .ailedger enhancements: AIPOLICY.yaml commit, prune | `-` | 95 | 7ea36bd |
+| SHELL-001 | Shell UI: state-colored PS1, tmux titles, shell economy | `-` | 95 | 90e4fe7 |
+| SKILL-005 | Peer skills: ^peer-design, ^peer-review, ^peer-solve, ^peer-analyse | `-` | 95 | — |
+| SKILL-006 | Red team skills: ^hack, ^break | `-` | 85 | — |
+| INFRA-003 | Publish AIPOLICY.yaml schema as governance standard | `-` | 75 | e9dc9d0 |
+| SKILL-007 | Knowledge skills: ^document, ^test, ^recon, ^grasp, ^glimpse | `-` | 75 | — |
+| WIRE-004 | Wire persona injection: agent.md → system prompt | `-` | 60 | 55bfbbb |
+| TEST-001 | Shellspec tests for ^ledger, ^audit, ^session prune, ^index | `-` | 50 | — |
+| INFRA-005 | Agent persona loading from codex/agents/registry.json | `-` | 50 | 9eb373c |
+| CLI-003 | Smoke tests: path validation rejects escapes | `-` | 50 | f8250ff |
+| DOC-001 | Update docs for v0.3.2 (plans INDEX, README, COMMANDS.md) | `-` | 40 | — |
+| DOC-002 | Update show_help() with new commands | `-` | 40 | — |
+| BUG-001 | mnemonic prune + sessions prune (stale file cleanup) | `-` | 40 | — |
+| WIRE-003 | Add 'analyze' alias for 'analyse' | `-` | 40 | — |
+| REL-001 | package.json version 0.5.0 + ROADMAP.md update | `-` | 40 | — |
+| DOC-003 | Clear stale synthetic todos | `-` | 20 | — |
+| CLI-001 | agence help deep improvements | `-` | 20 | — |
+| CLI-002 | .gitignore final review | `-` | 20 | — |
+
+---
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tasks | 43 |
-| Runnable | 1 |
-| Blocked | 1 |
-| Completed | 35 |
-| Failed | 0 |
+| Completed (`-`) | 36 |
+| Paused (`_`) | 7 |
+| Active (`+`/`&`/`%`) | 0 |
+| Completion | **84%** |
 
-## State Distribution
+## By Milestone
 
-| State | Symbol | Count |
-|-------|--------|-------|
-| Completed | `-` | 35 |
-| Paused | `_` | 7 |
-| Pending | `+` | 1 |
-
----
-
-## Scoring Leaderboard
-
-*Top 10 tasks by score (highest first):*
-
-| Rank | ID | Score | State |
-|------|----|-------|-------|
-| 1 | ~~SEC-001~~ | 225 | `-` ✅ |
-| 2 | SEC-008 | 180 | `_` |
-| 3 | SEC-009 | 180 | `_` |
-| 4 | ~~INFRA-002~~ | 170 | `-` ✅ |
-| 5 | ~~SKILL-001~~ | 170 | `-` ✅ |
-| 6 | SEC-007 | 170 | `_` |
-| 7 | ~~TEST-002~~ | 160 | `-` ✅ |
-| 8 | ~~SEC-002~~ | 140 | `-` ✅ |
-| 9 | SEC-010 | 125 | `_` |
-| 10 | ~~SEC-003~~ | 120 | `-` ✅ |
+| Milestone | Open | Done | Total |
+|-----------|------|------|-------|
+| v0.5.0 | 0 | 36 | 36 |
+| v0.6 | 3 | 0 | 3 |
+| v0.7 | 4 | 0 | 4 |
 
 ---
 
 ## Dependency Graph
 
+```
 INFRA-001 ✅ ──^──> INFRA-002 ✅
-
 INFRA-002 ✅ ──^──> SWARM-002 ✅
-
 SWARM-001 ✅ ── ; ──> SWARM-002 ✅
-
 DOC-001 ✅ ── ; ──> DOC-002 ✅
-
 CLI-003 ✅ ── ; ──> TEST-001 ✅
-
 AGENT-001 ✅ ──^──> SKILL-001 ✅
-
-SKILL-001 ✅ ──^──> SKILL-002 ✅
-
-SKILL-001 ✅ ──^──> SKILL-003 ✅
-
-SKILL-001 ✅ ──^──> SKILL-004 ✅
-
-SKILL-001 ✅ ──^──> SKILL-005 ✅
-
-SKILL-001 ✅ ──^──> SKILL-006 ✅
-
-SKILL-001 ✅ ──^──> SKILL-007 ✅
-
-SEC-001 ✅ ──^──> REL-002 ✅
-
-SEC-002 ✅ ──^──> REL-002 ✅
-
-SEC-003 ✅ ──^──> REL-002 ✅
-
-SEC-001 ✅ ──^──> TEST-002 ✅
-
-WIRE-001 ✅ ──^──> WIRE-002 ✅
-
-WIRE-002 ✅ ── ; ──> WIRE-003 ✅
-
-WIRE-004 + ──^──> SEC-006 _
-
-TEST-002 ✅ ──^──> REL-002 ✅
-
-TEST-003 ✅ ── ; ──> REL-002 ✅
-
-REL-001 ✅ ── ; ──> REL-002 ✅
+SKILL-001 ✅ ──^──> SKILL-002..007 ✅
+SEC-001/002/003 ✅ ──^──> REL-002 ✅
+WIRE-001 ✅ ──^──> WIRE-002 ✅ ── ; ──> WIRE-003 ✅
+WIRE-004 ✅ ──^──> SEC-006 _
+SEC-007 _ ──^──> SEC-008/009/010 _  (v0.7 cycle)
+```
 
 ^ = hard block | ; = soft advisory
 
