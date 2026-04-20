@@ -17,11 +17,12 @@
 | WF-BUGS | Bug Fixes | 1 | 1 | 0 | 100% | ✅ Done |
 | WF-AGENTS | Agent Personas & Dispatch | 2 | 2 | 0 | 100% | ✅ Done |
 | WF-SKILLS | Skill Commands | 7 | 7 | 0 | 100% | ✅ Done |
-| WF-SECURITY | v0.5 Security Fixes (@aleph findings) | 6 | 3 | 3 | 50% | 🟡 In progress |
+| WF-SECURITY | v0.5 Security Fixes (@aleph findings) | 6 | 6 | 0 | 100% | ✅ Done |
 | WF-WIRING | v0.5 Feature Wiring (@peers.coders) | 4 | 4 | 0 | 100% | ✅ Done |
 | WF-V5TEST | v0.5 Security & Integration Tests | 2 | 2 | 0 | 100% | ✅ Done |
 | WF-RELEASE | v0.5.0 Release Packaging | 2 | 2 | 0 | 100% | ✅ Done |
 | WF-SECLOOP | Security Integration Loop (perpetual) | 4 | 0 | 4 | 0% | ⚪ Not started |
+| WF-MEMORY | Cognitive Memory Model | 4 | 2 | 2 | 50% | 🟡 In progress |
 
 ---
 
@@ -98,9 +99,9 @@
 | SEC-001 | F-1 CRITICAL: Fix shell injection in guard.ts emitShellExports eval | `-` | 225 | — |
 | SEC-002 | F-2 HIGH: Move Gemini API key from URL query param to x-goog-api-key header | `-` | 140 | — |
 | SEC-003 | F-3 HIGH: Guard default unknown commands T1→T2 (fail-closed) | `-` | 120 | — |
-| SEC-004 | F-4 MEDIUM: Signal forgery — add auth on IPC files in nexus/signals/ | `_` | 85 | — |
-| SEC-005 | F-6 MEDIUM: tmux send-keys injection in signal.ts | `_` | 85 | — |
-| SEC-006 | F-7 MEDIUM: Persona injection surface hardening (when @ routing wired) | `_` | 85 | — |
+| SEC-004 | F-4 MEDIUM: Signal forgery — add auth on IPC files in nexus/signals/ | `-` | 85 | — |
+| SEC-005 | F-6 MEDIUM: tmux send-keys injection in signal.ts | `-` | 85 | — |
+| SEC-006 | F-7 MEDIUM: Persona injection surface hardening (when @ routing wired) | `-` | 85 | — |
 
 ### WF-WIRING — v0.5 Feature Wiring (@peers.coders) (4 tasks)
 
@@ -133,6 +134,15 @@
 | SEC-008 | ^break own tools: non-destructive stress test (aido/aicmd/aibash/aishell/agentd) | `_` | 180 | — |
 | SEC-009 | ^hack red-team probe: privilege escalation + self-modification attacks | `_` | 180 | — |
 | SEC-010 | ^integrate findings: fix + verify + regression test loop | `_` | 125 | — |
+
+### WF-MEMORY — Cognitive Memory Model (4 tasks)
+
+| ID | Title | State | Score | Blocked |
+|----|-------|-------|-------|---------|
+| MEM-001 | Memory model core: lib/memory.ts + 6-tier COGNOS stores | `-` | 225 | — |
+| MEM-002 | Memory CLI: ^retain/^recall/^cache wired into bin/agence | `-` | 170 | — |
+| MEM-003 | Memory skill integration: ^grasp/^glimpse/^recon → memory-aware | `+` | 150 | — |
+| MEM-004 | Promotion pipelines: episodic→eidetic, episodic→kinesthetic, kinesthetic→semantic | `+` | 95 | — |
 
 ---
 

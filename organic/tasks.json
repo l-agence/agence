@@ -573,6 +573,62 @@
       "updated": "2026-04-20T00:00:00Z",
       "source": "@peers consensus 2026-04-19",
       "notes": "Final gate: all SEC + WIRE + TEST tasks must be - before tagging"
+    },
+    {
+      "id": "MEM-001",
+      "repo": "agence",
+      "title": "Memory model core: lib/memory.ts + 6-tier COGNOS stores",
+      "state": "-",
+      "priority": 5,
+      "stars": 3,
+      "heat": 1.0,
+      "agent": null,
+      "created": "2026-04-20T12:00:00Z",
+      "updated": "2026-04-20T12:00:00Z",
+      "source": "brainstorms/agence_cognitive_stack_v1 + agence_memory_tiers",
+      "notes": "lib/memory.ts: retain/recall/cache/forget/promote. MemoryRow JSONL schema. 6 stores: eidetic/semantic/episodic/kinesthetic/masonic + mnemonic cache. 39 tests."
+    },
+    {
+      "id": "MEM-002",
+      "repo": "agence",
+      "title": "Memory CLI: ^retain/^recall/^cache wired into bin/agence",
+      "state": "-",
+      "priority": 4,
+      "stars": 2,
+      "heat": 0.8,
+      "agent": null,
+      "created": "2026-04-20T12:00:00Z",
+      "updated": "2026-04-20T12:00:00Z",
+      "source": "MEM-001",
+      "notes": "^retain, ^recall (tags→memory engine, plain→figrep fallback), ^cache, ^forget, ^promote, ^memory. Tab completion. Help text updated."
+    },
+    {
+      "id": "MEM-003",
+      "repo": "agence",
+      "title": "Memory skill integration: ^grasp/^glimpse/^recon → memory-aware",
+      "state": "+",
+      "priority": 4,
+      "stars": 2,
+      "heat": 0.6,
+      "agent": null,
+      "created": "2026-04-20T12:00:00Z",
+      "updated": "2026-04-20T12:00:00Z",
+      "source": "brainstorms/agence_memory_linked_skills",
+      "notes": "Wire ^grasp to read from memory stores, ^glimpse to read mnemonic cache, ^recon to patrol + index globalcache. Deferred."
+    },
+    {
+      "id": "MEM-004",
+      "repo": "agence",
+      "title": "Promotion pipelines: episodic→eidetic, episodic→kinesthetic, kinesthetic→semantic",
+      "state": "+",
+      "priority": 3,
+      "stars": 1,
+      "heat": 0.4,
+      "agent": null,
+      "created": "2026-04-20T12:00:00Z",
+      "updated": "2026-04-20T12:00:00Z",
+      "source": "brainstorms/agence_memory_tiers",
+      "notes": "Auto-distill resultants into kinesthetic. Promote episodic insights to eidetic. Deferred."
     }
   ]
 }

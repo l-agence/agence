@@ -166,6 +166,20 @@
       "cycle": 1,
       "principle": "Security is a Process, not a Product",
       "notes": "SEC-007 is the parent/orchestrator. SEC-008 (^break), SEC-009 (^hack), SEC-010 (^integrate). When all 3 children complete, cycle increments and they relaunch. SEC-007 never reaches state '-'. All probes NON-DESTRUCTIVE."
+    },
+    {
+      "id": "WF-MEMORY",
+      "title": "Cognitive Memory Model",
+      "tasks": [
+        "MEM-001",
+        "MEM-002",
+        "MEM-003",
+        "MEM-004"
+      ],
+      "completed": 2,
+      "total": 4,
+      "completion_pct": 50,
+      "notes": "MEM-001/002 done (lib/memory.ts + CLI wiring). MEM-003 (skill integration) + MEM-004 (promotion pipelines) pending."
     }
   ]
 }

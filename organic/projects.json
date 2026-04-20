@@ -16,15 +16,16 @@
         "WF-WIRING",
         "WF-V5TEST",
         "WF-RELEASE",
-        "WF-SECLOOP"
+        "WF-SECLOOP",
+        "WF-MEMORY"
       ],
-      "completed_tasks": 39,
-      "total_tasks": 43,
-      "completion_pct": 91,
+      "completed_tasks": 41,
+      "total_tasks": 47,
+      "completion_pct": 87,
       "status": "in-progress",
       "completed_workflows": 13,
-      "total_workflows": 13,
-      "phase": "v0.6.0 SEC hardening shipped. WF-SECLOOP (v0.7) deferred. Memory model next."
+      "total_workflows": 14,
+      "phase": "v0.6.0 memory model core shipped. MEM-003/004 + WF-SECLOOP deferred."
     }
   ]
 }

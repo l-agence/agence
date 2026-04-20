@@ -280,7 +280,7 @@ USAGE:
   agence /<cmd>                  External command (AIPOLICY tier gated)
   agence !<tool>                 Launch system tool / agent shell
   agence ^<cmd>                  Init, workflow, knowledge commands
-  agence ~recall <pattern>       Search masonic (gated memory)
+  agence ~recall <pattern>       Grep masonic (gated private memory)
 
 ────────────────────────────────────────────────────────────────────────
 
@@ -362,7 +362,16 @@ INDEX (^):
   ^index                         Scan for missing INDEX.json files
   ^reindex                       Regenerate INDEX.json via bin/indexer
   ^regen                         Regenerate organic/dashboards/ from JSON
-  ^recall <pattern>              Search hermetic memory
+
+MEMORY (^):
+  ^retain <source> <tags> <text> Store a memory row (eidetic/semantic/episodic/kinesthetic/masonic)
+  ^recall <tags> [--source X]    Query memories by tags (comma-separated)
+  ^recall <pattern>              Legacy: grep hermetic/ (plain text fallback)
+  ^cache  <tags> [--max N]       Hydrate mnemonic working-set cache
+  ^forget <id> <source>          Remove a memory row
+  ^promote <id> <from> <to>      Move row between cognitive stores
+  ^memory stats                  Row counts per store
+  ^memory list <source>          List all rows in a store
 
 SWARM (agentd + !swarm):
   ^state                         Aggregate view: tasks + workflows + daemon
@@ -1540,15 +1549,103 @@ mode_init() {
       return $?
       ;;
     "recall")
-      # Search hermetic memory (personal notes, brainstorms, design docs)
-      # Usage: agence ^recall <pattern> [grep-options...]
+      # Query cognitive memory stores by tags (new memory engine)
+      # Falls back to figrep for plain text patterns (backward compat)
+      # Usage: agence ^recall <tags> [--source X] [--max N]
+      #        agence ^recall <pattern>  (legacy figrep fallback)
       if [[ -z "$init_args" ]]; then
-        echo "Usage: agence ^recall <pattern> [grep-options...]" >&2
-        echo "Searches: hermetic/ (personal memory)" >&2
+        echo "Usage: agence ^recall <tags> [--source X] [--max N]" >&2
+        echo "  Tags: comma-separated (e.g. jwt,auth)" >&2
+        echo "  Sources: eidetic, semantic, episodic, kinesthetic, masonic" >&2
+        echo "  Legacy: plain text falls back to hermetic/ grep" >&2
         return 1
       fi
-      # Use canonical path (not @ symlink — may point to /mnt/c/ in WSL)
-      "$AGENCE_BIN/figrep" "$AGENCE_ROOT/hermetic" $init_args
+      local _memory_ts="${AGENCE_ROOT}/lib/memory.ts"
+      # If first arg looks like comma-separated tags or has --source, use memory engine
+      if [[ "$init_args" == *","* || "$init_args" == *"--source"* || "$init_args" == *"--max"* ]] \
+         && command -v bun &>/dev/null && [[ -f "$_memory_ts" ]]; then
+        bun run "$_memory_ts" recall $init_args
+      else
+        # Legacy fallback: figrep against hermetic/
+        "$AGENCE_BIN/figrep" "$AGENCE_ROOT/hermetic" $init_args
+      fi
+      return $?
+      ;;
+    "retain")
+      # Store a memory row in a persistent cognitive store
+      # Usage: agence ^retain <source> <tags> <content>
+      local _memory_ts="${AGENCE_ROOT}/lib/memory.ts"
+      if [[ -z "$init_args" ]]; then
+        echo "Usage: agence ^retain <source> <tags> <content>" >&2
+        echo "  Sources: eidetic, semantic, episodic, kinesthetic, masonic" >&2
+        return 1
+      fi
+      if command -v bun &>/dev/null && [[ -f "$_memory_ts" ]]; then
+        bun run "$_memory_ts" retain $init_args
+      else
+        echo "Error: ^retain requires bun + lib/memory.ts" >&2
+        return 1
+      fi
+      return $?
+      ;;
+    "cache")
+      # Hydrate mnemonic working-set cache from all persistent stores
+      # Usage: agence ^cache <tags> [--max N] [--masonic]
+      local _memory_ts="${AGENCE_ROOT}/lib/memory.ts"
+      if [[ -z "$init_args" ]]; then
+        echo "Usage: agence ^cache <tags> [--max N] [--masonic]" >&2
+        return 1
+      fi
+      if command -v bun &>/dev/null && [[ -f "$_memory_ts" ]]; then
+        bun run "$_memory_ts" cache $init_args
+      else
+        echo "Error: ^cache requires bun + lib/memory.ts" >&2
+        return 1
+      fi
+      return $?
+      ;;
+    "forget")
+      # Remove a memory row from a store
+      # Usage: agence ^forget <id> <source>
+      local _memory_ts="${AGENCE_ROOT}/lib/memory.ts"
+      if [[ -z "$init_args" ]]; then
+        echo "Usage: agence ^forget <id> <source>" >&2
+        return 1
+      fi
+      if command -v bun &>/dev/null && [[ -f "$_memory_ts" ]]; then
+        bun run "$_memory_ts" forget $init_args
+      else
+        echo "Error: ^forget requires bun + lib/memory.ts" >&2
+        return 1
+      fi
+      return $?
+      ;;
+    "promote")
+      # Move a memory row between cognitive stores
+      # Usage: agence ^promote <id> <from> <to>
+      local _memory_ts="${AGENCE_ROOT}/lib/memory.ts"
+      if [[ -z "$init_args" ]]; then
+        echo "Usage: agence ^promote <id> <from> <to>" >&2
+        return 1
+      fi
+      if command -v bun &>/dev/null && [[ -f "$_memory_ts" ]]; then
+        bun run "$_memory_ts" promote $init_args
+      else
+        echo "Error: ^promote requires bun + lib/memory.ts" >&2
+        return 1
+      fi
+      return $?
+      ;;
+    "memory")
+      # Full memory subsystem CLI
+      # Usage: agence ^memory <command> [args...]
+      local _memory_ts="${AGENCE_ROOT}/lib/memory.ts"
+      if command -v bun &>/dev/null && [[ -f "$_memory_ts" ]]; then
+        bun run "$_memory_ts" $init_args
+      else
+        echo "Error: ^memory requires bun + lib/memory.ts" >&2
+        return 1
+      fi
       return $?
       ;;
     "session-restore")
@@ -1639,7 +1736,8 @@ mode_init() {
       echo "Error: Unknown init command: $init_cmd" >&2
       echo "Available: help, init, reload, install, save, learn, commit, push, session," >&2
       echo "           lesson, log, plan, todo, note, fault, issue, task, job, workflow, project," >&2
-      echo "           swarm, audit, recall, handoff, pickup, pause, resume, index, reindex, regen, state, aido," >&2
+      echo "           swarm, audit, recall, retain, cache, forget, promote, memory," >&2
+      echo "           handoff, pickup, pause, resume, index, reindex, regen, state, aido," >&2
       echo "           fix, build, feature, refactor, solve, review, precommit, simplify, deploy, brainstorm," >&2
       echo "           analyse, analyze, design, pattern, scope, spec, split, hack, break, document, test, recon, grasp, glimpse" >&2
       return 1
@@ -1835,7 +1933,7 @@ _agence_completion() {
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  local caret_commands="help symbols init reload install save learn commit push stash sync session lesson log plan todo fault issue task job audit ledger handoff pickup pause resume index reindex recall"
+  local caret_commands="help symbols init reload install save learn commit push stash sync session lesson log plan todo fault issue task job audit ledger handoff pickup pause resume index reindex recall retain cache forget promote memory"
   local knowledge_subcmds="list show add"
 
   case "${COMP_WORDS[1]}" in
@@ -1906,7 +2004,38 @@ _agence_completion() {
       fi
       ;;
     "^recall"|"~recall")
-      COMPREPLY=()
+      if [[ $COMP_CWORD -eq 2 && "$cur" == "--"* ]]; then
+        COMPREPLY=( $(compgen -W "--source --max --negative" -- "$cur") )
+      fi
+      ;;
+    "^retain")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "eidetic semantic episodic kinesthetic masonic" -- "$cur") )
+      elif [[ "$cur" == "--"* ]]; then
+        COMPREPLY=( $(compgen -W "--importance --negative" -- "$cur") )
+      fi
+      ;;
+    "^cache")
+      if [[ "$cur" == "--"* ]]; then
+        COMPREPLY=( $(compgen -W "--max --masonic" -- "$cur") )
+      fi
+      ;;
+    "^forget")
+      if [[ $COMP_CWORD -eq 3 ]]; then
+        COMPREPLY=( $(compgen -W "eidetic semantic episodic kinesthetic masonic" -- "$cur") )
+      fi
+      ;;
+    "^promote")
+      if [[ $COMP_CWORD -eq 3 || $COMP_CWORD -eq 4 ]]; then
+        COMPREPLY=( $(compgen -W "eidetic semantic episodic kinesthetic masonic" -- "$cur") )
+      fi
+      ;;
+    "^memory")
+      if [[ $COMP_CWORD -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "retain recall cache forget promote list stats help" -- "$cur") )
+      elif [[ $COMP_CWORD -eq 3 && "${COMP_WORDS[2]}" == "list" ]]; then
+        COMPREPLY=( $(compgen -W "eidetic semantic episodic kinesthetic masonic" -- "$cur") )
+      fi
       ;;
     "^session")
       if [[ $COMP_CWORD -eq 2 ]]; then

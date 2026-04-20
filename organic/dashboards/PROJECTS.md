@@ -9,7 +9,7 @@
 
 | ID | Title | Workflows | Avg Completion % | Status |
 |----|-------|-----------|-----------------|--------|
-| PROJ-LAGENCE | l'Agence Framework | 13 | 88% | 🟡 In progress |
+| PROJ-LAGENCE | l'Agence Framework | 14 | 89% | 🟡 In progress |
 
 ## Project → Workflow Breakdown
 
@@ -25,12 +25,13 @@
 | WF-BUGS | Bug Fixes | 1 | 1 | 100% |
 | WF-AGENTS | Agent Personas & Dispatch | 2 | 2 | 100% |
 | WF-SKILLS | Skill Commands | 7 | 7 | 100% |
-| WF-SECURITY | v0.5 Security Fixes (@aleph findings) | 6 | 3 | 50% |
+| WF-SECURITY | v0.5 Security Fixes (@aleph findings) | 6 | 6 | 100% |
 | WF-WIRING | v0.5 Feature Wiring (@peers.coders) | 4 | 4 | 100% |
 | WF-V5TEST | v0.5 Security & Integration Tests | 2 | 2 | 100% |
 | WF-RELEASE | v0.5.0 Release Packaging | 2 | 2 | 100% |
 | WF-SECLOOP | Security Integration Loop (perpetual) | 4 | 0 | 0% |
-| **Total** | | **42** | **35** | **83%** |
+| WF-MEMORY | Cognitive Memory Model | 4 | 2 | 50% |
+| **Total** | | **46** | **40** | **87%** |
 
 ### Score Heat Map
 
@@ -49,6 +50,7 @@
 | WF-V5TEST | 160 | 265 | 0 |
 | WF-RELEASE | 105 | 145 | 0 |
 | WF-SECLOOP | 180 | 655 | 0 |
+| WF-MEMORY | 225 | 640 | 0 |
 
 ---
 
