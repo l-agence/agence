@@ -133,10 +133,10 @@
         "TEST-002",
         "TEST-003"
       ],
-      "completed": 0,
+      "completed": 2,
       "total": 2,
-      "completion_pct": 0,
-      "notes": "TEST-002 saved for last per user request"
+      "completion_pct": 100,
+      "notes": "TEST-002: 122 guard tests, TEST-003: 47 peers/dispatch tests"
     },
     {
       "id": "WF-RELEASE",
