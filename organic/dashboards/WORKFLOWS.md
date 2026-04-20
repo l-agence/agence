@@ -16,7 +16,11 @@
 | WF-SWARM | Swarm Orchestration | 2 | 2 | 0 | 100% | ✅ Done |
 | WF-BUGS | Bug Fixes | 1 | 1 | 0 | 100% | ✅ Done |
 | WF-AGENTS | Agent Personas & Dispatch | 2 | 2 | 0 | 100% | ✅ Done |
-| WF-SKILLS | Skill Commands | 6 | 6 | 0 | 100% | ✅ Done |
+| WF-SKILLS | Skill Commands | 7 | 6 | 1 | 86% | 🟡 In progress |
+| WF-SECURITY | v0.5 Security Fixes (@aleph findings) | 6 | 0 | 6 | 0% | ⚪ Not started |
+| WF-WIRING | v0.5 Feature Wiring (@peers.coders) | 4 | 0 | 4 | 0% | ⚪ Not started |
+| WF-V5TEST | v0.5 Security & Integration Tests | 2 | 0 | 2 | 0% | ⚪ Not started |
+| WF-RELEASE | v0.5.0 Release Packaging | 2 | 0 | 2 | 0% | ⚪ Not started |
 
 ---
 
@@ -74,7 +78,7 @@
 | AGENT-001 | @linus, @feynman, @aleph persona definitions | `-` | 115 | — |
 | SKILL-001 | Skill infrastructure: agent dispatch + artifact routing to synthetic/objectcode | `-` | 170 | — |
 
-### WF-SKILLS — Skill Commands (6 tasks)
+### WF-SKILLS — Skill Commands (7 tasks)
 
 | ID | Title | State | Score | Blocked |
 |----|-------|-------|-------|---------|
@@ -84,6 +88,41 @@
 | SKILL-005 | Peer skills: ^peer-design, ^peer-review, ^peer-solve, ^peer-analyse | `-` | 95 | — |
 | SKILL-006 | Red team skills: ^hack, ^break (autonomous attack surface probing) | `-` | 85 | — |
 | SKILL-007 | Knowledge skills: ^document, ^test, ^recon, ^grasp, ^glimpse | `-` | 75 | — |
+| SKILL-008 | Move skills to synthetic root + add ^deploy, ^brainstorm | `+` | 105 | — |
+
+### WF-SECURITY — v0.5 Security Fixes (@aleph findings) (6 tasks)
+
+| ID | Title | State | Score | Blocked |
+|----|-------|-------|-------|---------|
+| SEC-001 | F-1 CRITICAL: Fix shell injection in guard.ts emitShellExports eval | `+` | 225 | — |
+| SEC-002 | F-2 HIGH: Move Gemini API key from URL query param to x-goog-api-key header | `+` | 140 | — |
+| SEC-003 | F-3 HIGH: Guard default unknown commands T1→T2 (fail-closed) | `+` | 120 | — |
+| SEC-004 | F-4 MEDIUM: Signal forgery — add auth on IPC files in nexus/signals/ | `_` | 85 | — |
+| SEC-005 | F-6 MEDIUM: tmux send-keys injection in signal.ts | `_` | 85 | — |
+| SEC-006 | F-7 MEDIUM: Persona injection surface hardening (when @ routing wired) | `_` | 85 | WIRE-004 |
+
+### WF-WIRING — v0.5 Feature Wiring (@peers.coders) (4 tasks)
+
+| ID | Title | State | Score | Blocked |
+|----|-------|-------|-------|---------|
+| WIRE-001 | Wire @peers detection in skill.ts (~15 lines, @ routing) | `+` | 115 | — |
+| WIRE-002 | Wire peers.ts → CLI: @peers ^analyze/^solve/^review integration | `+` | 115 | WIRE-001 |
+| WIRE-003 | Add 'analyze' alias for 'analyse' spelling in skill dispatch | `+` | 40 | — |
+| WIRE-004 | Wire persona injection: codex/agents/<name>/agent.md → system prompt | `_` | 60 | — |
+
+### WF-V5TEST — v0.5 Security & Integration Tests (2 tasks)
+
+| ID | Title | State | Score | Blocked |
+|----|-------|-------|-------|---------|
+| TEST-002 | Guard security boundary tests (~50 tests for guard.ts, F-5) | `+` | 160 | SEC-001 |
+| TEST-003 | peers.ts + dispatch.ts unit test bootstrap | `+` | 105 | — |
+
+### WF-RELEASE — v0.5.0 Release Packaging (2 tasks)
+
+| ID | Title | State | Score | Blocked |
+|----|-------|-------|-------|---------|
+| REL-001 | package.json version 0.5.0 + ROADMAP.md update | `+` | 40 | — |
+| REL-002 | Integration testing + tag v0.5.0-stable | `+` | 105 | SEC-001, SEC-002, SEC-003, TEST-002 |
 
 ---
 

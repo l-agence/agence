@@ -9,7 +9,7 @@
 
 | ID | Title | Workflows | Avg Completion % | Status |
 |----|-------|-----------|-----------------|--------|
-| PROJ-LAGENCE | l'Agence Framework | 8 | 100% | ✅ Done |
+| PROJ-LAGENCE | l'Agence Framework | 12 | 65% | 🟡 In progress |
 
 ## Project → Workflow Breakdown
 
@@ -24,8 +24,12 @@
 | WF-SWARM | Swarm Orchestration | 2 | 2 | 100% |
 | WF-BUGS | Bug Fixes | 1 | 1 | 100% |
 | WF-AGENTS | Agent Personas & Dispatch | 2 | 2 | 100% |
-| WF-SKILLS | Skill Commands | 6 | 6 | 100% |
-| **Total** | | **23** | **23** | **100%** |
+| WF-SKILLS | Skill Commands | 7 | 6 | 86% |
+| WF-SECURITY | v0.5 Security Fixes (@aleph findings) | 6 | 0 | 0% |
+| WF-WIRING | v0.5 Feature Wiring (@peers.coders) | 4 | 0 | 0% |
+| WF-V5TEST | v0.5 Security & Integration Tests | 2 | 0 | 0% |
+| WF-RELEASE | v0.5.0 Release Packaging | 2 | 0 | 0% |
+| **Total** | | **38** | **23** | **61%** |
 
 ### Score Heat Map
 
@@ -38,7 +42,11 @@
 | WF-SWARM | 105 | 210 | 0 |
 | WF-BUGS | 40 | 40 | 0 |
 | WF-AGENTS | 170 | 285 | 0 |
-| WF-SKILLS | 105 | 570 | 0 |
+| WF-SKILLS | 105 | 675 | 0 |
+| WF-SECURITY | 225 | 740 | 1 |
+| WF-WIRING | 115 | 330 | 1 |
+| WF-V5TEST | 160 | 265 | 1 |
+| WF-RELEASE | 105 | 145 | 1 |
 
 ---
 

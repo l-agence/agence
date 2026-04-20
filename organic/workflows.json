@@ -96,7 +96,6 @@
       "total": 7,
       "completion_pct": 86
     },
-
     {
       "id": "WF-SECURITY",
       "title": "v0.5 Security Fixes (@aleph findings)",
@@ -108,9 +107,9 @@
         "SEC-005",
         "SEC-006"
       ],
-      "completed": 0,
+      "completed": 3,
       "total": 6,
-      "completion_pct": 0,
+      "completion_pct": 50,
       "notes": "SEC-001/002/003 block release; SEC-004/005/006 deferred (_)"
     },
     {
