@@ -9,7 +9,7 @@
 
 | ID | Title | Workflows | Avg Completion % | Status |
 |----|-------|-----------|-----------------|--------|
-| PROJ-LAGENCE | l'Agence Framework | 14 | 89% | 🟡 In progress |
+| PROJ-LAGENCE | l'Agence Framework | 14 | 91% | 🟡 In progress |
 
 ## Project → Workflow Breakdown
 
@@ -30,8 +30,8 @@
 | WF-V5TEST | v0.5 Security & Integration Tests | 2 | 2 | 100% |
 | WF-RELEASE | v0.5.0 Release Packaging | 2 | 2 | 100% |
 | WF-SECLOOP | Security Integration Loop (perpetual) | 4 | 0 | 0% |
-| WF-MEMORY | Cognitive Memory Model | 4 | 2 | 50% |
-| **Total** | | **46** | **40** | **87%** |
+| WF-MEMORY | Cognitive Memory Model | 5 | 4 | 80% |
+| **Total** | | **47** | **42** | **89%** |
 
 ### Score Heat Map
 
@@ -50,7 +50,7 @@
 | WF-V5TEST | 160 | 265 | 0 |
 | WF-RELEASE | 105 | 145 | 0 |
 | WF-SECLOOP | 180 | 655 | 0 |
-| WF-MEMORY | 225 | 640 | 0 |
+| WF-MEMORY | 225 | 725 | 0 |
 
 ---
 

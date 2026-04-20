@@ -370,6 +370,7 @@ MEMORY (^):
   ^cache  <tags> [--max N]       Hydrate mnemonic working-set cache
   ^forget <id> <source>          Remove a memory row
   ^promote <id> <from> <to>      Move row between cognitive stores
+  ^distill <from> <to> [opts]    Batch promote by importance/age/tags
   ^memory stats                  Row counts per store
   ^memory list <source>          List all rows in a store
 
@@ -1648,6 +1649,23 @@ mode_init() {
       fi
       return $?
       ;;
+    "distill")
+      # Batch promote rows between cognitive stores
+      # Usage: agence ^distill <from> <to> [--min-importance N] [--tags T] [--dry-run]
+      local _memory_ts="${AGENCE_ROOT}/lib/memory.ts"
+      if [[ -z "$init_args" ]]; then
+        echo "Usage: agence ^distill <from> <to> [--min-importance N] [--min-age-days N] [--tags T] [--dry-run]" >&2
+        echo "  Paths: episodic→eidetic, episodic→kinesthetic, kinesthetic→semantic, masonic→eidetic" >&2
+        return 1
+      fi
+      if command -v bun &>/dev/null && [[ -f "$_memory_ts" ]]; then
+        bun run "$_memory_ts" distill $init_args
+      else
+        echo "Error: ^distill requires bun + lib/memory.ts" >&2
+        return 1
+      fi
+      return $?
+      ;;
     "session-restore")
       # Restore a session from a snapshot: ^session-restore <session_id> <snapshot_dir>
       local restore_session_id="${init_args%% *}"
@@ -1736,7 +1754,7 @@ mode_init() {
       echo "Error: Unknown init command: $init_cmd" >&2
       echo "Available: help, init, reload, install, save, learn, commit, push, session," >&2
       echo "           lesson, log, plan, todo, note, fault, issue, task, job, workflow, project," >&2
-      echo "           swarm, audit, recall, retain, cache, forget, promote, memory," >&2
+      echo "           swarm, audit, recall, retain, cache, forget, promote, distill, memory," >&2
       echo "           handoff, pickup, pause, resume, index, reindex, regen, state, aido," >&2
       echo "           fix, build, feature, refactor, solve, review, precommit, simplify, deploy, brainstorm," >&2
       echo "           analyse, analyze, design, pattern, scope, spec, split, hack, break, document, test, recon, grasp, glimpse" >&2
@@ -1933,7 +1951,7 @@ _agence_completion() {
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-  local caret_commands="help symbols init reload install save learn commit push stash sync session lesson log plan todo fault issue task job audit ledger handoff pickup pause resume index reindex recall retain cache forget promote memory"
+  local caret_commands="help symbols init reload install save learn commit push stash sync session lesson log plan todo fault issue task job audit ledger handoff pickup pause resume index reindex recall retain cache forget promote distill memory"
   local knowledge_subcmds="list show add"
 
   case "${COMP_WORDS[1]}" in
@@ -2032,9 +2050,16 @@ _agence_completion() {
       ;;
     "^memory")
       if [[ $COMP_CWORD -eq 2 ]]; then
-        COMPREPLY=( $(compgen -W "retain recall cache forget promote list stats help" -- "$cur") )
+        COMPREPLY=( $(compgen -W "retain recall cache forget promote distill list stats help" -- "$cur") )
       elif [[ $COMP_CWORD -eq 3 && "${COMP_WORDS[2]}" == "list" ]]; then
         COMPREPLY=( $(compgen -W "eidetic semantic episodic kinesthetic masonic" -- "$cur") )
+      fi
+      ;;
+    "^distill")
+      if [[ $COMP_CWORD -eq 2 || $COMP_CWORD -eq 3 ]]; then
+        COMPREPLY=( $(compgen -W "eidetic semantic episodic kinesthetic masonic" -- "$cur") )
+      elif [[ "$cur" == "--"* ]]; then
+        COMPREPLY=( $(compgen -W "--min-importance --min-age-days --tags --dry-run" -- "$cur") )
       fi
       ;;
     "^session")

@@ -313,22 +313,26 @@ If the repo does not have the file a tangent needs, that tangent should not be d
 - Use ^plan to map the dependency and route to the correct owner
 - Use swarm to route to the shard/tangent that has access
 
-## Mnemonic — 2-tier (confirmed April 3)
+## Cognitive Memory — 6-tier COGNOS (v0.6.0)
 
 ```
-$AI_ROOT/mnemonic/               <- ephemeral global cache, NOT committed
-                                    rebuilt: agence mnemonic rebuild
-                                    pruned/consolidated: agence mnemonic consolidate
-                                    hot chunks from federated indexes promoted here
+PERSISTENT (indexed, durable — .jsonl per store)
+  synthetic/eidetic/         → distilled knowledge, plans, decisions
+  globalcache/semantic/      → shared KB, designs, cross-repo
+  organic/episodic/          → tasks, workflows, execution traces
+  objectcode/kinesthetic/    → code patterns, solutions, skills
+  hermetic/masonic/          → private, local, gated (never auto-loaded)
 
-synthetic/<org>/mnemonic/        <- federated per-org, persistent
-                                    MAY be committed to private git
-                                    frequency-weighted promotion to global cache
-
-hermetic/grimoire/               <- gated, persistent, never auto-loaded
-                                    explicit recall only, never pruned
-                                    never part of default sequent resolution
+RUNTIME
+  nexus/mnemonic/            → fast working-set cache (hydrated projection)
+                               rebuilt: agence ^cache <tags>
+                               only mnemonic participates in automatic sequent resolution
 ```
+
+Operations: `^retain`, `^recall`, `^cache`, `^forget`, `^promote`, `^distill`
+Promotion paths: episodic→eidetic, episodic→kinesthetic, kinesthetic→semantic, masonic→eidetic
+Schema: MemoryRow JSONL — id, tags, content, source, importance, polarity, ts
+Anti-patterns: stored with polarity=negative, excluded from mnemonic hydration
 
 ## Pattern Normalisation (error memory matrix)
 

@@ -425,23 +425,161 @@ export function stats(): Record<string, number> {
   return result;
 }
 
+// ─── MEM-004: Promotion Pipelines ────────────────────────────────────────────
+// Structured promotion flows between cognitive stores:
+//   episodic  → eidetic      (distill knowledge from work)
+//   episodic  → kinesthetic  (distill capability from work)
+//   kinesthetic → semantic   (promote broadly useful patterns)
+//   masonic   → eidetic      (declassify private insights)
+//
+// distill() promotes multiple rows at once based on criteria:
+//   - importance threshold
+//   - age threshold (min days old — let insights settle)
+//   - tag matching
+//   - deduplication against target store
+
+export interface DistillOpts {
+  from: MemorySource;
+  to: MemorySource;
+  minImportance?: number;     // default 0.6
+  minAgeDays?: number;        // default 1 (let insights settle)
+  tags?: string[];            // only rows matching these tags
+  dryRun?: boolean;           // preview without moving
+}
+
+/** Valid promotion paths — prevent nonsensical flows */
+const VALID_PROMOTIONS: ReadonlySet<string> = new Set([
+  "episodic→eidetic",
+  "episodic→kinesthetic",
+  "kinesthetic→semantic",
+  "masonic→eidetic",
+  // Allow any→eidetic for manual distillation
+  "semantic→eidetic",
+  "kinesthetic→eidetic",
+]);
+
+function isValidPromotion(from: MemorySource, to: MemorySource): boolean {
+  return VALID_PROMOTIONS.has(`${from}→${to}`);
+}
+
+/**
+ * Simple content similarity: Jaccard coefficient on word sets.
+ * Returns 0.0–1.0 (1.0 = identical word sets).
+ */
+function contentSimilarity(a: string, b: string): number {
+  const wordsA = new Set(a.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+  const wordsB = new Set(b.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+  if (wordsA.size === 0 || wordsB.size === 0) return 0;
+  let intersection = 0;
+  for (const w of wordsA) if (wordsB.has(w)) intersection++;
+  return intersection / (wordsA.size + wordsB.size - intersection);
+}
+
+/**
+ * Check if a row is a near-duplicate of any existing row in the target store.
+ * Uses tag overlap + content similarity (Jaccard > 0.8 = duplicate).
+ */
+function isDuplicate(row: MemoryRow, targetRows: MemoryRow[]): boolean {
+  for (const existing of targetRows) {
+    // Same tags AND similar content = duplicate
+    const tagOverlap = row.tags.filter(t =>
+      existing.tags.map(et => et.toLowerCase()).includes(t.toLowerCase())
+    ).length;
+    if (tagOverlap >= Math.min(row.tags.length, existing.tags.length)) {
+      if (contentSimilarity(row.content, existing.content) > 0.8) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * ^distill — Batch promote rows from one store to another based on criteria.
+ * Returns list of promoted rows (or preview if dryRun).
+ */
+export function distill(opts: DistillOpts): { promoted: MemoryRow[]; skipped: number; duplicates: number } {
+  if (!isValidSource(opts.from)) throw new Error(`Invalid source: "${opts.from}"`);
+  if (!isValidSource(opts.to)) throw new Error(`Invalid target: "${opts.to}"`);
+  if (opts.from === opts.to) throw new Error("Cannot distill to same store");
+  if (!isValidPromotion(opts.from, opts.to)) {
+    throw new Error(`Invalid promotion path: ${opts.from} → ${opts.to}. Valid: ${[...VALID_PROMOTIONS].join(", ")}`);
+  }
+
+  const minImportance = opts.minImportance ?? 0.6;
+  const minAgeDays = opts.minAgeDays ?? 1;
+  const now = Date.now();
+  const minAgeMs = minAgeDays * 86_400_000;
+
+  let sourceRows = readStore(opts.from);
+  const targetRows = readStore(opts.to);
+
+  // Filter by criteria
+  let candidates = sourceRows.filter(row => {
+    // Importance threshold
+    if ((row.importance ?? 0.5) < minImportance) return false;
+    // Age threshold (let insights settle)
+    if ((now - row.ts) < minAgeMs) return false;
+    // Positive polarity only (don't promote anti-patterns)
+    if (row.polarity === "negative") return false;
+    // Tag filter if specified
+    if (opts.tags && opts.tags.length > 0) {
+      const rowTagsLower = new Set(row.tags.map(t => t.toLowerCase()));
+      const hasMatch = opts.tags.some(t => rowTagsLower.has(t.toLowerCase()));
+      if (!hasMatch) return false;
+    }
+    return true;
+  });
+
+  // Deduplicate against target
+  let duplicates = 0;
+  candidates = candidates.filter(row => {
+    if (isDuplicate(row, targetRows)) {
+      duplicates++;
+      return false;
+    }
+    return true;
+  });
+
+  if (opts.dryRun) {
+    return { promoted: candidates, skipped: sourceRows.length - candidates.length - duplicates, duplicates };
+  }
+
+  // Execute promotions
+  const promoted: MemoryRow[] = [];
+  for (const row of candidates) {
+    const result = promote(row.id, opts.from, opts.to);
+    if (result) promoted.push(result);
+  }
+
+  return { promoted, skipped: sourceRows.length - candidates.length - duplicates, duplicates };
+}
+
 // ─── CLI Entry Point ─────────────────────────────────────────────────────────
 
 function printHelp(): void {
   console.error(`Usage: airun memory <command> [args...]
 
 Commands:
-  retain <source> <tags> <content>    Store a memory row
+  retain <source> <tags> <content>      Store a memory row
   recall <tags> [--source X] [--max N]  Query memories by tags
   cache  <tags> [--max N] [--masonic]   Hydrate mnemonic cache
-  forget <id> <source>                Remove a row
-  promote <id> <from> <to>            Move row between tiers
-  list   <source>                     List all rows in a store
-  stats                               Row counts per store
-  help                                Show this help
+  forget <id> <source>                  Remove a row
+  promote <id> <from> <to>              Move row between tiers
+  distill <from> <to> [opts]            Batch promote by criteria
+  list   <source>                       List all rows in a store
+  stats                                 Row counts per store
+  help                                  Show this help
 
 Sources: eidetic, semantic, episodic, kinesthetic, masonic
 Tags:    Comma-separated, alphanumeric with . _ - (max 16)
+
+Promotion paths (distill):
+  episodic → eidetic       Distill knowledge from work
+  episodic → kinesthetic   Distill capability from work
+  kinesthetic → semantic   Promote broadly useful patterns
+  masonic → eidetic        Declassify private insights
+  *→ eidetic               Manual distillation to long-term
 
 Examples:
   airun memory retain eidetic "jwt,auth" "JWT tokens expire after 24h"
@@ -450,6 +588,8 @@ Examples:
   airun memory cache "deploy,k8s" --max 20
   airun memory forget ei-18f3a4b00 eidetic
   airun memory promote ep-18f3a4b00 episodic kinesthetic
+  airun memory distill episodic eidetic --min-importance 0.7
+  airun memory distill episodic kinesthetic --tags "pattern,fix" --dry-run
   airun memory list eidetic
   airun memory stats`);
 }
@@ -629,6 +769,51 @@ async function main() {
         break;
       }
 
+      case "distill": {
+        const from = args[1];
+        const to = args[2];
+        if (!from || !to) {
+          console.error("Usage: airun memory distill <from> <to> [--min-importance N] [--min-age-days N] [--tags T] [--dry-run]");
+          process.exit(1);
+        }
+        if (!isValidSource(from) || !isValidSource(to)) {
+          console.error(`Invalid source. Valid: ${[...VALID_SOURCES].join(", ")}`);
+          process.exit(1);
+        }
+        let minImportance: number | undefined;
+        let minAgeDays: number | undefined;
+        let dTags: string[] | undefined;
+        let dryRun = false;
+        for (let i = 3; i < args.length; i++) {
+          if (args[i] === "--min-importance" && args[i + 1]) { minImportance = parseFloat(args[++i]); }
+          else if (args[i] === "--min-age-days" && args[i + 1]) { minAgeDays = parseInt(args[++i], 10); }
+          else if (args[i] === "--tags" && args[i + 1]) { dTags = parseTags(args[++i]); }
+          else if (args[i] === "--dry-run") { dryRun = true; }
+        }
+        const result = distill({
+          from: from as MemorySource,
+          to: to as MemorySource,
+          minImportance,
+          minAgeDays,
+          tags: dTags,
+          dryRun,
+        });
+        if (dryRun) {
+          console.log(`[dry-run] Would promote ${result.promoted.length} rows (${from} → ${to})`);
+          console.log(`  Skipped: ${result.skipped} (below threshold), Duplicates: ${result.duplicates}`);
+          for (const r of result.promoted) {
+            console.log(`  ${formatRow(r)}`);
+          }
+        } else {
+          console.log(`Distilled: ${result.promoted.length} rows (${from} → ${to})`);
+          console.log(`  Skipped: ${result.skipped}, Duplicates: ${result.duplicates}`);
+          for (const r of result.promoted) {
+            console.log(`  → ${r.id} [${r.tags.join(",")}]`);
+          }
+        }
+        break;
+      }
+
       default:
         console.error(`Unknown command: ${cmd}`);
         printHelp();
@@ -640,4 +825,6 @@ async function main() {
   }
 }
 
-main();
+if (import.meta.main) {
+  main();
+}

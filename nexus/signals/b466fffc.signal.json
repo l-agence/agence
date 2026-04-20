@@ -1,0 +1,9 @@
+{
+  "type": "notify",
+  "from": "test",
+  "to": "human",
+  "payload": "perm-test",
+  "timestamp": "2026-04-20T20:00:26Z",
+  "id": "b466fffc",
+  "hmac": "be4c3842e189aaa80470e1093f47fa308a288ffc33ce4a42c338e1adf9eea4cd"
+}

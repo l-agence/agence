@@ -606,29 +606,57 @@
       "id": "MEM-003",
       "repo": "agence",
       "title": "Memory skill integration: ^grasp/^glimpse/^recon → memory-aware",
-      "state": "+",
+      "state": "-",
       "priority": 4,
       "stars": 2,
       "heat": 0.6,
       "agent": null,
       "created": "2026-04-20T12:00:00Z",
-      "updated": "2026-04-20T12:00:00Z",
+      "updated": "2026-04-20T14:00:00Z",
       "source": "brainstorms/agence_memory_linked_skills",
-      "notes": "Wire ^grasp to read from memory stores, ^glimpse to read mnemonic cache, ^recon to patrol + index globalcache. Deferred."
+      "notes": "^grasp recalls from all persistent stores, ^glimpse reads mnemonic cache, ^recon auto-retains findings to semantic. Memory context injected via [MEMORY-CONTEXT-BEGIN/END] markers in system prompt. 56 tests."
     },
     {
       "id": "MEM-004",
       "repo": "agence",
-      "title": "Promotion pipelines: episodic→eidetic, episodic→kinesthetic, kinesthetic→semantic",
-      "state": "+",
+      "title": "Promotion pipelines: ^distill with importance/age/tag filtering + dedup",
+      "state": "-",
       "priority": 3,
       "stars": 1,
       "heat": 0.4,
       "agent": null,
       "created": "2026-04-20T12:00:00Z",
-      "updated": "2026-04-20T12:00:00Z",
+      "updated": "2026-04-20T14:00:00Z",
       "source": "brainstorms/agence_memory_tiers",
-      "notes": "Auto-distill resultants into kinesthetic. Promote episodic insights to eidetic. Deferred."
+      "notes": "^distill: batch promote by importance threshold, min age, tag filter, Jaccard dedup. Paths: episodic→eidetic, episodic→kinesthetic, kinesthetic→semantic, masonic→eidetic. --dry-run preview. 56 tests."
+    },
+    {
+      "id": "MEM-005",
+      "repo": "agence",
+      "title": "^ken: Knowledge Extraction cycle (grasp + glimpse + recon + distill)",
+      "state": "+",
+      "priority": 3,
+      "stars": 1,
+      "heat": 0.3,
+      "agent": null,
+      "created": "2026-04-20T14:00:00Z",
+      "updated": "2026-04-20T14:00:00Z",
+      "source": "user request 2026-04-20",
+      "notes": "Orchestrator that chains: search→understand→retain→promote in one shot. v0.7 — primitives need to prove themselves first."
+    },
+    {
+      "id": "HARNESS-001",
+      "repo": "agence",
+      "title": "Execution loop harness: throttling, timeouts, loop guards",
+      "state": "+",
+      "priority": 4,
+      "stars": 2,
+      "heat": 0.5,
+      "agent": null,
+      "created": "2026-04-20T14:00:00Z",
+      "updated": "2026-04-20T14:00:00Z",
+      "source": "user observation 2026-04-20 (50-subprocess timeout incident)",
+      "notes": "Need execution loop harness: (1) subprocess throttle/concurrency limits, (2) configurable timeouts with overrides, (3) loop guards to prevent infinite agentic loops. v0.7."
     }
   ]
 }

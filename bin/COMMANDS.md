@@ -1226,16 +1226,93 @@ Scan all knowledge bases and report status (file counts, ✓/⚠ markers).
 agence ^index                                # Scan + report all knowledge bases
 ```
 
-### `agence ^recall <query>` / `agence ~recall <query>`
+### `agence ^recall <tags>` / `agence ~recall <pattern>`
 
-**Scope**: `^recall` = SYNTHETIC (team-shared), `~recall` = HERMETIC (personal)
+**Scope**: `^recall` = ALL memory stores (tag-based), `~recall` = HERMETIC only (grep)
 
-Search knowledge bases for matching content.
+Query cognitive memory stores by tags, or grep hermetic files for plain text.
+
+`^recall` with comma-separated tags uses the memory engine (lib/memory.ts).
+`^recall` with plain text falls back to `figrep` against hermetic/ (legacy compat).
+`~recall` always greps hermetic/masonic/ only (gated private memory).
 
 **Usage**:
 ```bash
-agence ^recall "session prune"               # Search team knowledge
-agence ~recall "my notes on routing"         # Search personal knowledge
+agence ^recall "jwt,auth"                    # Memory engine: search all stores by tags
+agence ^recall "jwt" --source kinesthetic    # Filter to one store
+agence ^recall "jwt,auth" --max 5            # Limit results
+agence ^recall "session prune"               # Legacy fallback: grep hermetic/
+agence ~recall "my notes on routing"         # Grep masonic/ (private only)
+```
+
+### `agence ^retain <source> <tags> <content>`
+
+**Scope**: COGNOS memory stores (per source)
+
+Store a memory row in a persistent cognitive store.
+
+**Usage**:
+```bash
+agence ^retain eidetic "jwt,auth" "JWT tokens expire after 24h"
+agence ^retain kinesthetic "pattern,retry" "Exponential backoff with jitter"
+agence ^retain masonic "private,note" "My personal insight"
+agence ^retain episodic "sprint,v0.6" "--importance 0.8 Key architecture decision"
+agence ^retain kinesthetic "antipattern" "--negative Never use force push on main"
+```
+
+**Sources**: eidetic, semantic, episodic, kinesthetic, masonic
+
+### `agence ^cache <tags> [--max N] [--masonic]`
+
+**Scope**: NEXUS (runtime)
+
+Hydrate mnemonic working-set cache from all persistent stores. Merges, scores by tag overlap × importance × recency, trims to budget.
+
+**Usage**:
+```bash
+agence ^cache "deploy,k8s"                   # Hydrate with deploy context
+agence ^cache "jwt,auth" --max 20            # Limit cache size
+agence ^cache "jwt" --masonic                 # Include private masonic store
+```
+
+### `agence ^forget <id> <source>`
+
+Remove a memory row from a store.
+
+```bash
+agence ^forget ei-18f3a4b00 eidetic
+```
+
+### `agence ^promote <id> <from> <to>`
+
+Move a single row between cognitive stores.
+
+```bash
+agence ^promote ep-18f3a4b00 episodic eidetic
+```
+
+### `agence ^distill <from> <to> [opts]`
+
+Batch promote rows by importance/age/tags with deduplication.
+
+**Usage**:
+```bash
+agence ^distill episodic eidetic --min-importance 0.7
+agence ^distill episodic kinesthetic --tags "pattern,fix" --dry-run
+agence ^distill kinesthetic semantic --min-age-days 7
+agence ^distill masonic eidetic                        # Declassify insights
+```
+
+**Promotion paths**: episodic→eidetic, episodic→kinesthetic, kinesthetic→semantic, masonic→eidetic
+
+### `agence ^memory <command> [args...]`
+
+Full memory subsystem CLI (combines all operations above).
+
+```bash
+agence ^memory stats                          # Row counts per store
+agence ^memory list eidetic                   # List all rows in a store
+agence ^memory help                           # Show all memory commands
 ```
 
 ### `agence ^session prune [--days N] [--dry-run]`
@@ -1283,6 +1360,10 @@ airun --help                         # Show usage
 | `guard` | Security guard runtime (v0.4.0) |
 | `signal` | Inter-agent signalling (v0.4.0) |
 | `matrix` | Priority matrix computation (v0.4.0) |
+| `memory` | Cognitive memory: retain, recall, cache, distill (v0.6.0) |
+| `skill` | Skill command orchestrator (v0.5.0) |
+| `peers` | Multi-agent consensus engine (v0.5.0) |
+| `dispatch` | Artifact routing (v0.4.0) |
 
 **Requires**: `bun` installed and `AGENCE_ROOT` set (auto-detected from script location)
 

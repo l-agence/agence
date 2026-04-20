@@ -1,0 +1,9 @@
+{
+  "type": "notify",
+  "from": "lister",
+  "to": "human",
+  "payload": "list-verify-test",
+  "timestamp": "2026-04-20T17:43:25Z",
+  "id": "39097a1b",
+  "hmac": "17e5f21d820e1a91147286162029cf5a209e195829389f9618d913911f3d6fd0"
+}

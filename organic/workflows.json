@@ -174,12 +174,13 @@
         "MEM-001",
         "MEM-002",
         "MEM-003",
-        "MEM-004"
+        "MEM-004",
+        "MEM-005"
       ],
-      "completed": 2,
-      "total": 4,
-      "completion_pct": 50,
-      "notes": "MEM-001/002 done (lib/memory.ts + CLI wiring). MEM-003 (skill integration) + MEM-004 (promotion pipelines) pending."
+      "completed": 4,
+      "total": 5,
+      "completion_pct": 80,
+      "notes": "MEM-001..004 complete (core engine + CLI + skill integration + distill pipelines, 56 tests). MEM-005 (^ken orchestrator) pending v0.7."
     }
   ]
 }

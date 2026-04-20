@@ -22,6 +22,10 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 
 import { join, basename, dirname, resolve, relative } from "path";
 import { execSync, spawnSync } from "child_process";
 
+// MEM-003: Memory-aware skill context injection
+import { recall, readMnemonic, retain, parseTags } from "./memory.ts";
+import type { MemoryRow, MemorySource } from "./memory.ts";
+
 // ─── Environment ─────────────────────────────────────────────────────────────
 
 const AGENCE_ROOT = process.env.AGENCE_ROOT
@@ -322,6 +326,97 @@ function saveArtifact(artifactType: string, content: string, skillName: string):
   return targetPath;
 }
 
+// ─── MEM-003: Memory-Aware Skill Context ────────────────────────────────────
+// Skills ^grasp, ^glimpse, ^recon inject relevant memory into their LLM context.
+//   ^grasp   — recall from all stores, inject as "prior knowledge"
+//   ^glimpse — read mnemonic cache, inject as "working context"
+//   ^recon   — after LLM output, auto-retain findings into semantic store
+
+const MEMORY_SKILLS: ReadonlySet<string> = new Set(["grasp", "glimpse", "recon"]);
+const MAX_MEMORY_CONTEXT = 8 * 1024; // 8KB budget for injected memory
+
+/**
+ * Build memory context block for injection into system prompt.
+ * Returns empty string if no relevant memory found.
+ */
+function buildMemoryContext(skillName: string, query: string): string {
+  if (!MEMORY_SKILLS.has(skillName)) return "";
+
+  try {
+    // Extract tags from query: split on whitespace + common delimiters, keep alphanumeric
+    const words = query.toLowerCase()
+      .replace(/[^a-z0-9\s,._-]/g, " ")
+      .split(/[\s,]+/)
+      .filter(w => w.length >= 2 && w.length <= 64);
+    // Dedupe and take top 8 as search tags
+    const tags = [...new Set(words)].slice(0, 8);
+    if (tags.length === 0) return "";
+
+    let rows: MemoryRow[] = [];
+
+    if (skillName === "glimpse") {
+      // ^glimpse reads from mnemonic (the pre-hydrated working-set cache)
+      rows = readMnemonic();
+      // Filter to tag-relevant subset
+      const tagSet = new Set(tags);
+      rows = rows.filter(r =>
+        r.tags.some(t => tagSet.has(t.toLowerCase()))
+      );
+    } else {
+      // ^grasp and ^recon query all persistent stores
+      rows = recall(tags, { max: 15 });
+    }
+
+    if (rows.length === 0) return "";
+
+    // Format memory rows into a concise context block
+    let block = "\n\n[MEMORY-CONTEXT-BEGIN]\n";
+    block += `Relevant memories (${rows.length} rows from ${[...new Set(rows.map(r => r.source))].join(", ")}):\n\n`;
+    let budget = MAX_MEMORY_CONTEXT;
+
+    for (const row of rows) {
+      const line = `[${row.source}] [${row.tags.join(",")}] ${row.content}\n`;
+      if (budget - line.length < 0) break;
+      block += line;
+      budget -= line.length;
+    }
+    block += "[MEMORY-CONTEXT-END]";
+    return block;
+  } catch {
+    // Memory read failure is non-fatal — skill runs without memory
+    return "";
+  }
+}
+
+/**
+ * After ^recon output, extract and retain key findings into semantic store.
+ * Parses structured sections from recon output.
+ */
+function retainReconFindings(output: string, query: string): void {
+  try {
+    // Extract tags from query
+    const words = query.toLowerCase()
+      .replace(/[^a-z0-9\s,._-]/g, " ")
+      .split(/[\s,]+/)
+      .filter(w => w.length >= 2 && w.length <= 64);
+    const tags = [...new Set(words)].slice(0, 6);
+    if (tags.length === 0) return;
+
+    // Add "recon" tag for provenance
+    const reconTags = [...new Set(["recon", ...tags])].slice(0, 8);
+
+    // Retain a summary of the recon output (first 2KB)
+    const summary = output.length > 2048
+      ? output.slice(0, 2048) + "\n[truncated]"
+      : output;
+
+    retain("semantic" as MemorySource, reconTags, summary, { importance: 0.6 });
+    process.stderr.write(`[skill] MEM-003: recon findings retained → semantic [${reconTags.join(",")}]\n`);
+  } catch {
+    // Non-fatal — recon still produces output even if retain fails
+  }
+}
+
 // ─── LLM Execution ──────────────────────────────────────────────────────────
 // For single-agent: use router.sh via bash subprocess.
 // For multi-agent (peer-*): delegate to peers.ts.
@@ -433,6 +528,13 @@ async function runSkill(
     systemPrompt += `\n\n[SKILL-REF-BEGIN skill=${skillName}]\n${skillMd}\n[SKILL-REF-END]`;
   }
 
+  // MEM-003: Inject relevant memory context for memory-aware skills
+  const memoryContext = buildMemoryContext(skillName, query);
+  if (memoryContext) {
+    systemPrompt += memoryContext;
+    console.error(`[skill] MEM-003: memory context injected for ^${skillName}`);
+  }
+
   console.error(`[skill] ${skillName} via ${usePeers ? "peers" : `@${agentName}`} | artifact → ${def.artifact}`);
 
   const start = Date.now();
@@ -477,6 +579,11 @@ async function runSkill(
     if (saved) {
       console.error(`[skill] Artifact saved: ${saved}`);
     }
+  }
+
+  // MEM-003: ^recon auto-retains findings into semantic store
+  if (skillName === "recon" && output) {
+    retainReconFindings(output, query);
   }
 
   console.error(`[skill] Done in ${latencyMs}ms`);

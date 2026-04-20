@@ -22,7 +22,7 @@
 | WF-V5TEST | v0.5 Security & Integration Tests | 2 | 2 | 0 | 100% | ✅ Done |
 | WF-RELEASE | v0.5.0 Release Packaging | 2 | 2 | 0 | 100% | ✅ Done |
 | WF-SECLOOP | Security Integration Loop (perpetual) | 4 | 0 | 4 | 0% | ⚪ Not started |
-| WF-MEMORY | Cognitive Memory Model | 4 | 2 | 2 | 50% | 🟡 In progress |
+| WF-MEMORY | Cognitive Memory Model | 5 | 4 | 1 | 80% | 🟡 In progress |
 
 ---
 
@@ -135,14 +135,15 @@
 | SEC-009 | ^hack red-team probe: privilege escalation + self-modification attacks | `_` | 180 | — |
 | SEC-010 | ^integrate findings: fix + verify + regression test loop | `_` | 125 | — |
 
-### WF-MEMORY — Cognitive Memory Model (4 tasks)
+### WF-MEMORY — Cognitive Memory Model (5 tasks)
 
 | ID | Title | State | Score | Blocked |
 |----|-------|-------|-------|---------|
 | MEM-001 | Memory model core: lib/memory.ts + 6-tier COGNOS stores | `-` | 225 | — |
 | MEM-002 | Memory CLI: ^retain/^recall/^cache wired into bin/agence | `-` | 170 | — |
-| MEM-003 | Memory skill integration: ^grasp/^glimpse/^recon → memory-aware | `+` | 150 | — |
-| MEM-004 | Promotion pipelines: episodic→eidetic, episodic→kinesthetic, kinesthetic→semantic | `+` | 95 | — |
+| MEM-003 | Memory skill integration: ^grasp/^glimpse/^recon → memory-aware | `-` | 150 | — |
+| MEM-004 | Promotion pipelines: ^distill with importance/age/tag filtering + dedup | `-` | 95 | — |
+| MEM-005 | ^ken: Knowledge Extraction cycle (grasp + glimpse + recon + distill) | `+` | 85 | — |
 
 ---
 

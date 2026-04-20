@@ -498,11 +498,11 @@ describe("skill.ts: WIRE-004 persona injection", () => {
 describe("skill.ts: output flags", () => {
   test("--no-save prevents artifact saving", () => {
     // This is tested implicitly — all our test calls use --no-save
-    // Just verify it doesn't crash
+    // Just verify it doesn't crash (bumped timeout: memory.ts import adds startup cost)
     const r = runSkill(["fix", "test", "--no-save"]);
     // May fail on router but should not fail on flag parsing
     expect(r.stderr).not.toContain("Unknown option");
-  });
+  }, 10_000);
 });
 
 // ─── 16. Skill Metadata Completeness ────────────────────────────────────────

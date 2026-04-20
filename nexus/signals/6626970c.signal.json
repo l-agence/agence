@@ -1,0 +1,9 @@
+{
+  "type": "notify",
+  "from": "unknown",
+  "to": "human",
+  "payload": "test$(whoami)",
+  "timestamp": "2026-04-20T17:38:55Z",
+  "id": "6626970c",
+  "hmac": "ef47b11324cb3f3babf98e8c46616324397b8e86c09dadf0f8dae347d0fdaf48"
+}
