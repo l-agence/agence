@@ -107,10 +107,10 @@
         "SEC-005",
         "SEC-006"
       ],
-      "completed": 3,
+      "completed": 6,
       "total": 6,
-      "completion_pct": 50,
-      "notes": "SEC-001/002/003 block release; SEC-004/005/006 deferred (_)"
+      "completion_pct": 100,
+      "notes": "SEC-001/002/003 v0.5.0. SEC-004/005/006 v0.6.0 (49c7894)."
     },
     {
       "id": "WF-WIRING",

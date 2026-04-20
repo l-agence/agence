@@ -18,13 +18,13 @@
         "WF-RELEASE",
         "WF-SECLOOP"
       ],
-      "completed_tasks": 36,
+      "completed_tasks": 39,
       "total_tasks": 43,
-      "completion_pct": 84,
+      "completion_pct": 91,
       "status": "in-progress",
-      "completed_workflows": 12,
+      "completed_workflows": 13,
       "total_workflows": 13,
-      "phase": "v0.5.0-stable shipped. WIRE-004 done. WF-SECLOOP (v0.7) defined."
+      "phase": "v0.6.0 SEC hardening shipped. WF-SECLOOP (v0.7) deferred. Memory model next."
     }
   ]
 }
