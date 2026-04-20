@@ -15,15 +15,16 @@
         "WF-SECURITY",
         "WF-WIRING",
         "WF-V5TEST",
-        "WF-RELEASE"
+        "WF-RELEASE",
+        "WF-SECLOOP"
       ],
       "completed_tasks": 35,
-      "total_tasks": 39,
-      "completion_pct": 90,
+      "total_tasks": 43,
+      "completion_pct": 81,
       "status": "in-progress",
       "completed_workflows": 11,
-      "total_workflows": 12,
-      "phase": "v0.5.0-stable — TEST-002/003 done. Only deferred SEC/WIRE remain."
+      "total_workflows": 13,
+      "phase": "v0.5.0-stable shipped. WF-SECLOOP (perpetual) launched cycle 1."
     }
   ]
 }

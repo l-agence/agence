@@ -307,6 +307,7 @@ describe("skill.ts: skill list", () => {
     // Ops
     expect(out).toContain("^deploy");
     expect(out).toContain("^brainstorm");
+    expect(out).toContain("^integrate");
   });
 });
 
@@ -494,11 +495,11 @@ describe("skill.ts: metadata completeness", () => {
     }
   });
 
-  test("skill count is 27", () => {
+  test("skill count is 28", () => {
     const r = runSkill(["list"]);
     // Count lines with ^ prefix (skill entries in SKILLS map)
     const skillLines = r.stdout.split("\n").filter(l => l.trim().startsWith("^"));
-    expect(skillLines.length).toBe(27);
+    expect(skillLines.length).toBe(28);
   });
 });
 

@@ -137,6 +137,21 @@ const SKILLS: Record<string, SkillDef> = {
                systemPrompt: "You are a deployment engineer. Plan and execute deployments safely: pre-flight checks, rollback strategy, health verification, and post-deploy validation." },
   brainstorm: { name: "brainstorm", artifact: "analysis", description: "Ideation and divergent thinking",
                systemPrompt: "You are a creative strategist. Generate diverse ideas, explore unconventional approaches, challenge assumptions, and map possibility space. Organize ideas by feasibility and impact." },
+  integrate: { name: "integrate", artifact: "report",   description: "CI/CD integration loop — find→break→fix→verify",
+               systemPrompt: `You are a DevOps integration engineer running a continuous improvement loop.
+Your cycle: DISCOVER → BREAK → FIX → VERIFY → REPORT.
+
+Phase 1 — DISCOVER: Identify integration points, boundaries, contracts, and assumptions.
+Phase 2 — BREAK: Run non-destructive probes. What fails? What's fragile? What's unguarded?
+Phase 3 — FIX: Propose minimal, targeted fixes for each finding. Rank by severity.
+Phase 4 — VERIFY: Define how to confirm each fix works (test commands, assertions, expected output).
+Phase 5 — REPORT: Structured output with findings, fixes, verification steps, and remaining gaps.
+
+CONSTRAINTS:
+- ALL probes MUST be non-destructive (read-only, dry-run, sandbox).
+- Never modify production state, delete files, or execute destructive commands.
+- If a probe requires write access, document it as a MANUAL_VERIFY item for human execution.
+- Output JSON array of findings: { id, severity, component, finding, fix, verify, status }.` },
 };
 
 // ─── Agent Resolution ────────────────────────────────────────────────────────
@@ -170,7 +185,7 @@ function loadAgents(): AgentMeta[] {
     { name: "linus",   role: "harsh reviewer",      tier: "T3", skills: ["review", "simplify", "refactor"] },
     { name: "feynman", role: "explainer",            tier: "T2", skills: ["document", "analyse", "grasp", "glimpse"] },
     { name: "aleph",   role: "red team",             tier: "T3", skills: ["hack", "break", "recon"] },
-    { name: "chad",    role: "DevOps/infra",         tier: "T1", skills: ["scope", "spec", "split", "pattern", "build"] },
+    { name: "chad",    role: "DevOps/infra",         tier: "T1", skills: ["scope", "spec", "split", "pattern", "build", "integrate"] },
   ];
 }
 
@@ -404,7 +419,7 @@ function cmdList(): number {
     "Peer":      ["peer-design", "peer-review", "peer-solve", "peer-analyse"],
     "Red Team":  ["hack", "break"],
     "Knowledge": ["document", "test", "recon", "grasp", "glimpse"],
-    "Ops":       ["deploy", "brainstorm"],
+    "Ops":       ["deploy", "brainstorm", "integrate"],
   };
 
   for (const [group, names] of Object.entries(groups)) {

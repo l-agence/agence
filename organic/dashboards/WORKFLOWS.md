@@ -19,7 +19,7 @@
 | WF-SKILLS | Skill Commands | 7 | 7 | 0 | 100% | ✅ Done |
 | WF-SECURITY | v0.5 Security Fixes (@aleph findings) | 6 | 3 | 3 | 50% | 🟡 In progress |
 | WF-WIRING | v0.5 Feature Wiring (@peers.coders) | 4 | 3 | 1 | 75% | 🟡 In progress |
-| WF-V5TEST | v0.5 Security & Integration Tests | 2 | 0 | 2 | 0% | ⚪ Not started |
+| WF-V5TEST | v0.5 Security & Integration Tests | 2 | 2 | 0 | 100% | ✅ Done |
 | WF-RELEASE | v0.5.0 Release Packaging | 2 | 2 | 0 | 100% | ✅ Done |
 
 ---
@@ -114,15 +114,15 @@
 
 | ID | Title | State | Score | Blocked |
 |----|-------|-------|-------|---------|
-| TEST-002 | Guard security boundary tests (~50 tests for guard.ts, F-5) | `+` | 160 | — |
-| TEST-003 | peers.ts + dispatch.ts unit test bootstrap | `+` | 105 | — |
+| TEST-002 | Guard security boundary tests (~50 tests for guard.ts, F-5) | `-` | 160 | — |
+| TEST-003 | peers.ts + dispatch.ts unit test bootstrap | `-` | 105 | — |
 
 ### WF-RELEASE — v0.5.0 Release Packaging (2 tasks)
 
 | ID | Title | State | Score | Blocked |
 |----|-------|-------|-------|---------|
 | REL-001 | package.json version 0.5.0 + ROADMAP.md update | `-` | 40 | — |
-| REL-002 | Integration testing + tag v0.5.0-stable | `-` | 105 | TEST-002 |
+| REL-002 | Integration testing + tag v0.5.0-stable | `-` | 105 | — |
 
 ---
 

@@ -149,6 +149,23 @@
       "total": 2,
       "completion_pct": 100,
       "notes": "v0.5.0-stable tagged at f05c7be, pushed 513294e"
+    },
+    {
+      "id": "WF-SECLOOP",
+      "title": "Security Integration Loop (perpetual)",
+      "tasks": [
+        "SEC-007",
+        "SEC-008",
+        "SEC-009",
+        "SEC-010"
+      ],
+      "completed": 0,
+      "total": 3,
+      "completion_pct": 0,
+      "perpetual": true,
+      "cycle": 1,
+      "principle": "Security is a Process, not a Product",
+      "notes": "SEC-007 is the parent/orchestrator. SEC-008 (^break), SEC-009 (^hack), SEC-010 (^integrate). When all 3 children complete, cycle increments and they relaunch. SEC-007 never reaches state '-'. All probes NON-DESTRUCTIVE."
     }
   ]
 }
