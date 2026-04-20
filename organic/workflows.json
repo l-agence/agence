@@ -76,9 +76,9 @@
         "AGENT-001",
         "SKILL-001"
       ],
-      "completed": 0,
+      "completed": 2,
       "total": 2,
-      "completion_pct": 0
+      "completion_pct": 100
     },
     {
       "id": "WF-SKILLS",

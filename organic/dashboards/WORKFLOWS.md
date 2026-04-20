@@ -1,7 +1,7 @@
 # Workflows Dashboard
 
 > **Source**: `organic/workflows.json` + `organic/tasks.json`
-> **Generated**: 2026-04-19 | **Project**: PROJ-LAGENCE
+> **Generated**: 2026-04-20 | **Project**: PROJ-LAGENCE
 
 ---
 

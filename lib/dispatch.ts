@@ -65,7 +65,17 @@ function loadAgents(): AgentMeta[] {
   if (existsSync(registryPath)) {
     try {
       const data = JSON.parse(readFileSync(registryPath, "utf-8"));
-      if (Array.isArray(data.agents)) return data.agents;
+      if (data.agents && typeof data.agents === "object") {
+        // registry.json uses {name: {type, provider, ...}} object format
+        return Object.entries(data.agents)
+          .filter(([_, v]: any) => v.type === "persona")
+          .map(([name, v]: any) => ({
+            name,
+            role: v.description || "",
+            tier: v.tier || "T2",
+            skills: v.skills || [],
+          }));
+      }
     } catch { /* fall through */ }
   }
 

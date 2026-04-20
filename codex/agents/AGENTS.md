@@ -1,6 +1,6 @@
 # Agence Agents: Quick Reference
 
-> **Agent Roster** (v0.2.5): aider, aish, aiko, chad, claudia, peers, ralph, sonya, copilot, pilot, kilo, cline, haiku, claude, azure, devops
+> **Agent Roster** (v0.3.0): aider, aiko, aleph, aish, azure, chad, claudia, copilot, devops, feynman, haiku, linus, peers, pilot, ralph, sonya
 > **Default interactive**: @copilot (Copilot Chat) | **Default shell agent**: @pilot (Copilot CLI) | **Windows shell**: @aish (Microsoft AI Shell)
 
 ---
@@ -193,6 +193,9 @@ winget install Microsoft.AIShell
 | Chad (GPT-4o) | ~10 | ~400 | 410 | ~$0.006 |
 | Aiko (Haiku) | ~10 | ~400 | 410 | ~$0.003 |
 | Ralph (Sonnet) | ~20 | ~450 | 470 | ~$0.008 |
+| Linus (Sonnet) | ~25 | ~500 | 525 | ~$0.008 |
+| Feynman (Sonnet) | ~25 | ~600 | 625 | ~$0.008 |
+| Aleph (Sonnet) | ~25 | ~500 | 525 | ~$0.008 |
 | Claudia (Opus 4.5) | ~30 | ~600 | 630 | ~$0.013 |
 
 **Cost per query** (approximate):
@@ -213,6 +216,9 @@ winget install Microsoft.AIShell
 | Ralph | 4 | Learning + reliability (balanced) |
 | Chad | 5 | Balanced humor + utility |
 | Aiko | 6 | Learning with personality |
+| Linus | 8 | Harsh code review |
+| Feynman | 5 | Teaching/explaining |
+| Aleph | 7 | Red team / security |
 
 **Override per query:**
 ```bash
@@ -251,6 +257,24 @@ agence @claudia --flavor=2 "Design patterns"
 - ✅ You need deep mentoring and explanation
 - ✅ Quality > speed
 - ✅ Long-term system reliability matters
+
+### Use Linus when:
+- ✅ Pre-merge code review (no mercy)
+- ✅ Simplifying over-engineered code
+- ✅ Precommit gates (reject bad code)
+- ✅ API surface review
+
+### Use Feynman when:
+- ✅ Writing documentation or ADRs
+- ✅ Understanding unfamiliar code (^grasp, ^glimpse)
+- ✅ Teaching concepts through analogy
+- ✅ Knowledge synthesis across modules
+
+### Use Aleph when:
+- ✅ Security review / threat modeling
+- ✅ Attack surface mapping (^recon)
+- ✅ Breaking assumptions (^break)
+- ✅ Pre-deployment security gates
 
 ### Use Aiko when:
 - ✅ Quick cloud/platform architecture questions

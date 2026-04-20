@@ -205,25 +205,25 @@
       "id": "AGENT-001",
       "repo": "agence",
       "title": "@linus, @feynman, @aleph persona definitions",
-      "state": "+",
+      "state": "-",
       "priority": 3,
       "stars": 1,
       "heat": 0.6,
-      "agent": null,
+      "agent": "@copilot",
       "created": "2026-04-19T00:00:00Z",
-      "updated": "2026-04-19T00:00:00Z"
+      "updated": "2026-04-19T18:00:00Z"
     },
     {
       "id": "SKILL-001",
       "repo": "agence",
       "title": "Skill infrastructure: agent dispatch + artifact routing to synthetic/objectcode",
-      "state": "+",
+      "state": "-",
       "priority": 4,
       "stars": 2,
       "heat": 0.8,
-      "agent": null,
+      "agent": "@copilot",
       "created": "2026-04-19T00:00:00Z",
-      "updated": "2026-04-19T00:00:00Z"
+      "updated": "2026-04-19T18:00:00Z"
     },
     {
       "id": "SKILL-002",

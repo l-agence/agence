@@ -1,7 +1,7 @@
 # Tasks Dashboard
 
 > **Source**: `organic/tasks.json` | **Formula**: score = 10P + 25S + 100H
-> **Generated**: 2026-04-19 | **Project**: PROJ-LAGENCE
+> **Generated**: 2026-04-20 | **Project**: PROJ-LAGENCE
 
 ---
 

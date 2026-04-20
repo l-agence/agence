@@ -13,11 +13,11 @@
         "WF-AGENTS",
         "WF-SKILLS"
       ],
-      "completed_tasks": 15,
+      "completed_tasks": 17,
       "total_tasks": 23,
-      "completion_pct": 65,
+      "completion_pct": 74,
       "status": "in-progress",
-      "completed_workflows": 6,
+      "completed_workflows": 7,
       "total_workflows": 8
     }
   ]

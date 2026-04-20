@@ -1607,10 +1607,24 @@ mode_init() {
       return $?
       ;;
     *)
+      # ── Skill command dispatch ───────────────────────────────────────────
+      # If init_cmd matches a known skill, route through lib/skill.ts
+      local _skill_ts="${AGENCE_ROOT}/lib/skill.ts"
+      local _skill_names="fix|build|feature|refactor|solve|review|precommit|simplify|analyse|design|pattern|scope|spec|split|peer-design|peer-review|peer-solve|peer-analyse|hack|break|document|test|recon|grasp|glimpse"
+      if [[ "$init_cmd" =~ ^(${_skill_names})$ ]] && command -v bun &>/dev/null && [[ -f "$_skill_ts" ]]; then
+        # Pass through @agent if set (skip bare "@" sentinel = no agent)
+        local _skill_agent_flag=""
+        [[ -n "${AGENCE_AGENT_PARAM:-}" && "${AGENCE_AGENT_PARAM}" != "@" ]] && _skill_agent_flag="--agent @${AGENCE_AGENT_PARAM}"
+        bun run "$_skill_ts" "$init_cmd" $_skill_agent_flag $init_args
+        return $?
+      fi
+
       echo "Error: Unknown init command: $init_cmd" >&2
       echo "Available: help, init, reload, install, save, learn, commit, push, session," >&2
       echo "           lesson, log, plan, todo, note, fault, issue, task, job, workflow, project," >&2
-      echo "           swarm, audit, recall, handoff, pickup, pause, resume, index, reindex, regen, state, aido" >&2
+      echo "           swarm, audit, recall, handoff, pickup, pause, resume, index, reindex, regen, state, aido," >&2
+      echo "           fix, build, feature, refactor, solve, review, precommit, simplify," >&2
+      echo "           analyse, design, pattern, scope, spec, split, hack, break, document, test, recon, grasp, glimpse" >&2
       return 1
       ;;
   esac

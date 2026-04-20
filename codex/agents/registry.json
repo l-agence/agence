@@ -61,6 +61,7 @@
       "provider": "anthropic",
       "default_model": "sonnet",
       "tier": "T1",
+      "skills": ["test", "review", "precommit", "break"],
       "description": "Learning + accountability harness"
     },
     "sonya": {
@@ -68,6 +69,7 @@
       "provider": "anthropic",
       "default_model": "sonnet",
       "tier": "T1",
+      "skills": ["design", "solve", "refactor", "analyse", "scope"],
       "description": "Full-stack engineer"
     },
     "claudia": {
@@ -75,6 +77,7 @@
       "provider": "anthropic",
       "default_model": "opus",
       "tier": "T4",
+      "skills": ["design", "review", "analyse", "solve", "spec"],
       "description": "Principal SRE/Architect"
     },
     "chad": {
@@ -82,6 +85,7 @@
       "provider": "openai",
       "default_model": "gpt4o",
       "tier": "T2",
+      "skills": ["scope", "spec", "split", "pattern", "build"],
       "description": "DevOps/CloudOps specialist"
     },
     "aiko": {
@@ -89,13 +93,39 @@
       "provider": "anthropic",
       "default_model": "haiku",
       "tier": "T1",
+      "skills": ["design", "build", "scope"],
       "description": "Cloud architect/platform engineer"
+    },
+    "linus": {
+      "type": "persona",
+      "provider": "anthropic",
+      "default_model": "sonnet",
+      "tier": "T3",
+      "skills": ["review", "simplify", "refactor", "precommit"],
+      "description": "Harsh code reviewer — Torvalds-inspired"
+    },
+    "feynman": {
+      "type": "persona",
+      "provider": "anthropic",
+      "default_model": "sonnet",
+      "tier": "T2",
+      "skills": ["document", "analyse", "grasp", "glimpse"],
+      "description": "Explainer — Feynman-inspired teaching"
+    },
+    "aleph": {
+      "type": "persona",
+      "provider": "anthropic",
+      "default_model": "sonnet",
+      "tier": "T3",
+      "skills": ["hack", "break", "recon"],
+      "description": "Red team / security analyst"
     },
     "copilot": {
       "type": "persona",
       "provider": "copilot",
       "default_model": null,
       "tier": "T2",
+      "skills": ["fix", "build", "feature", "refactor", "test"],
       "description": "GitHub Copilot chat agent"
     },
     "haiku": {
@@ -103,6 +133,7 @@
       "provider": "anthropic",
       "default_model": "haiku",
       "tier": "T0",
+      "skills": ["fix", "split", "build", "break", "glimpse"],
       "description": "Fast/cheap Claude Haiku"
     },
     "azure": {
