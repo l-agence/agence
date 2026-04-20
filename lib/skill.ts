@@ -222,6 +222,19 @@ function loadSkillMd(skillName: string): string | undefined {
   return undefined;
 }
 
+// ─── Agent Persona Loader ────────────────────────────────────────────────────
+// WIRE-004: Load codex/agents/<name>/agent.md for system prompt persona injection.
+// This gives each agent its identity, voice, and behavioral constraints.
+
+function loadPersona(agentName: string): string | undefined {
+  if (!agentName || agentName === "auto") return undefined;
+  const personaFile = join(AGENCE_ROOT, "codex", "agents", agentName, "agent.md");
+  if (existsSync(personaFile)) {
+    return readFileSync(personaFile, "utf-8");
+  }
+  return undefined;
+}
+
 // ─── Artifact Routing ────────────────────────────────────────────────────────
 // Re-use dispatch.ts route logic inline (avoid spawning subprocess)
 
@@ -350,9 +363,16 @@ async function runSkill(
   const agent = resolveAgent(skillName, opts.agent);
   const agentName = agent?.name || "auto";
 
+  // WIRE-004: Load agent persona from codex/agents/<name>/agent.md
+  const personaMd = loadPersona(agentName);
+
   // Load SKILL.md context
   const skillMd = loadSkillMd(skillName);
-  let systemPrompt = def.systemPrompt;
+  let systemPrompt = "";
+  if (personaMd) {
+    systemPrompt += `--- Agent Persona ---\n${personaMd}\n\n`;
+  }
+  systemPrompt += def.systemPrompt;
   if (skillMd) {
     systemPrompt += `\n\n--- Skill Reference ---\n${skillMd}`;
   }

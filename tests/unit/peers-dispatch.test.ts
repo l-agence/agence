@@ -456,11 +456,40 @@ describe("skill.ts: SKILL.md loading", () => {
     for (const name of expected) {
       const skillDir = join(skillsRoot, name);
       if (existsSync(skillDir)) {
-        // Directory exists; SKILL.md may or may not exist yet
-        // Just verify the directory is there
         expect(existsSync(skillDir)).toBe(true);
       }
     }
+  });
+});
+
+// ─── 14b. WIRE-004: Persona Injection ────────────────────────────────────────
+
+describe("skill.ts: WIRE-004 persona injection", () => {
+  test("agent.md files exist for known agents", () => {
+    const { existsSync } = require("fs");
+    const agents = ["linus", "sonya", "aleph", "chad", "ralph", "haiku", "copilot", "feynman"];
+    for (const name of agents) {
+      const personaFile = join(AGENCE_ROOT, "codex", "agents", name, "agent.md");
+      expect(existsSync(personaFile)).toBe(true);
+    }
+  });
+
+  test("@linus persona is injected into skill dispatch", () => {
+    const r = runSkill(["review", "--agent", "@linus", "test persona", "--no-save"]);
+    // Should route to @linus (persona loaded from codex/agents/linus/agent.md)
+    expect(r.stderr).toContain("@linus");
+    // Should NOT say persona not found
+    expect(r.stderr).not.toContain("persona not found");
+  });
+
+  test("@aleph persona is injected for hack skill", () => {
+    const r = runSkill(["hack", "--agent", "@aleph", "test target", "--no-save"]);
+    expect(r.stderr).toContain("@aleph");
+  });
+
+  test("@sonya persona is injected for design skill", () => {
+    const r = runSkill(["design", "--agent", "@sonya", "test system", "--no-save"]);
+    expect(r.stderr).toContain("@sonya");
   });
 });
 
