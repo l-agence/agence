@@ -578,6 +578,36 @@ main() {
       "$AGENCE_BIN/figrep" "$AGENCE_ROOT/hermetic" ${*:2}
       exit $?
       ;;
+    peers)
+      local _peers_ts="${AGENCE_ROOT}/lib/peers.ts"
+      if command -v bun &>/dev/null && [[ -f "$_peers_ts" ]]; then
+        bun run "$_peers_ts" ${*:2}
+      else
+        echo "Error: peers requires bun + lib/peers.ts" >&2
+        exit 1
+      fi
+      exit $?
+      ;;
+    watch)
+      local _watch_ts="${AGENCE_ROOT}/lib/watch.ts"
+      if command -v bun &>/dev/null && [[ -f "$_watch_ts" ]]; then
+        bun run "$_watch_ts" ${*:2}
+      else
+        echo "Error: watch requires bun + lib/watch.ts" >&2
+        exit 1
+      fi
+      exit $?
+      ;;
+    expect)
+      local _watch_ts="${AGENCE_ROOT}/lib/watch.ts"
+      if command -v bun &>/dev/null && [[ -f "$_watch_ts" ]]; then
+        bun run "$_watch_ts" expect ${*:2}
+      else
+        echo "Error: expect requires bun + lib/watch.ts" >&2
+        exit 1
+      fi
+      exit $?
+      ;;
     aido)
       if [[ -z "${*:2}" ]]; then
         echo "Usage: agence aido <tool> [args...]" >&2

@@ -1,8 +1,8 @@
 # Agence Development Roadmap (2026 Q1–Q2)
 
 **Updated**: 2026-04-19
-**Status**: v0.4.5 shipped (PS1 finalize, task ID hex8, ^regen dashboards)
-**Current**: main @ b0bc6da (v0.4.5)
+**Status**: v0.5.0-dev (rich display, dispatch, ^ CLI, legend footer)
+**Current**: main @ 5a60e4f (v0.5.0-dev)
 
 ---
 
@@ -21,7 +21,7 @@ v0.3.2 (RELEASED)     ← version strings, model routing, glossary
     ↓
 v0.4.0 (CURRENT)      ← guard.ts, signal.ts, TCB gates, Docker/Nomad
     ↓
-v0.4.1                 ← F.AST chunking, 6-layer memory skeleton
+v0.5.0 (IN PROGRESS)  ← dispatch, skills, peers, rich CLI, ^ symlink
     ↓
 v0.5.0                 ← matrix.ts, Docker tangent tournaments, agentd
     ↓
@@ -45,6 +45,7 @@ v0.9.0                 ← Allegiance ledger (public append-only reputation)
 | **2.2** | v0.3.1 | Bun extraction (router.ts, audit.ts), CI, airun | 🟢 DONE |
 | **2.3** | v0.3.2 | Version strings, model routing, glossary | 🟢 DONE |
 | **3** | v0.4.0–v0.4.5 | guard.ts, signal.ts, Docker, PS1, task IDs, ^regen | 🟢 DONE |
+| **3.5** | v0.5.0-dev | dispatch.ts, rich display, ^ CLI, skills infra, legend | 🟡 IN PROGRESS |
 | **3.1** | v0.4.1 | F.AST chunking, 6-layer memory skeleton (COGNOS) | 📍 NEXT |
 | **4** | v0.5.0 | matrix.ts, Docker tangent tournaments, agentd | 📍 PLANNED |
 | **5** | v0.6.0 | MLS enforcement + MLS-POLICY.yml + capability tokens | 📍 FUTURE |
