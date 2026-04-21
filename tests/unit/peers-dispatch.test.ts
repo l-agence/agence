@@ -524,11 +524,11 @@ describe("skill.ts: metadata completeness", () => {
     }
   });
 
-  test("skill count is 28", () => {
+  test("skill count is 29", () => {
     const r = runSkill(["list"]);
     // Count lines with ^ prefix (skill entries in SKILLS map)
     const skillLines = r.stdout.split("\n").filter(l => l.trim().startsWith("^"));
-    expect(skillLines.length).toBe(28);
+    expect(skillLines.length).toBe(29);
   });
 });
 

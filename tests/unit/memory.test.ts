@@ -711,3 +711,138 @@ describe("Memory: ^distill", () => {
     expect(r.stderr).toContain("episodic");
   });
 });
+
+// ─── MEM-005: ^ken orchestration primitives ──────────────────────────────────
+// Tests the memory operations that ^ken chains: grasp→glimpse→recon→distill.
+// LLM synthesis is tested via integration tests (requires API keys).
+
+describe("Memory: MEM-005 ^ken orchestration primitives", () => {
+  let tmp: string;
+
+  beforeEach(() => { tmp = makeTempRoot(); });
+  afterEach(() => { cleanTempRoot(tmp); });
+
+  it("full grasp+glimpse+distill pipeline on populated stores", () => {
+    // Seed episodic with old rows (backdate via direct JSONL write)
+    const oldTs = Date.now() - 3 * 86_400_000; // 3 days ago
+    const episodicPath = join(tmp, "organic", "episodic", "episodic.jsonl");
+    const row1 = JSON.stringify({ id: "ep1", tags: ["auth", "security"], content: "Auth module uses JWT with 24h expiry", source: "episodic", importance: 0.8, polarity: "positive", ts: oldTs });
+    const row2 = JSON.stringify({ id: "ep2", tags: ["auth", "login"], content: "Login flow validated via ^review", source: "episodic", importance: 0.7, polarity: "positive", ts: oldTs });
+    const row3 = JSON.stringify({ id: "ep3", tags: ["negative"], content: "Bad approach", source: "episodic", importance: 0.9, polarity: "negative", ts: oldTs });
+    writeFileSync(episodicPath, [row1, row2, row3].join("\n") + "\n");
+
+    // Seed kinesthetic with old patterns
+    const kinPath = join(tmp, "objectcode", "kinesthetic", "kinesthetic.jsonl");
+    const kinRow = JSON.stringify({ id: "kin1", tags: ["auth", "pattern"], content: "Guard decorator pattern for route auth", source: "kinesthetic", importance: 0.8, polarity: "positive", ts: oldTs });
+    writeFileSync(kinPath, kinRow + "\n");
+
+    // Step 1: GRASP — recall should find auth-tagged rows
+    const r1 = runMemory(tmp, ["recall", "auth"]);
+    expect(r1.exitCode).toBe(0);
+    expect(r1.stdout).toContain("auth");
+
+    // Step 2: GLIMPSE — cache then read mnemonic
+    const r2 = runMemory(tmp, ["cache", "auth"]);
+    expect(r2.exitCode).toBe(0);
+    // Mnemonic should have rows now
+    const mnemonicPath = join(tmp, "nexus", "mnemonic", "mnemonic.jsonl");
+    expect(existsSync(mnemonicPath)).toBe(true);
+    const mnemonicRows = readJsonl(mnemonicPath);
+    expect(mnemonicRows.length).toBeGreaterThan(0);
+
+    // Step 3: RECON auto-retain (simulate by retaining to semantic directly)
+    runMemory(tmp, ["retain", "semantic", "auth,recon", "Auth module is well-structured with proper JWT handling"]);
+    const semanticPath = join(tmp, "globalcache", "semantic", "semantic.jsonl");
+    expect(readJsonl(semanticPath).length).toBe(1);
+
+    // Step 4: DISTILL — episodic→eidetic should promote old, important, positive rows
+    const r4 = runMemory(tmp, ["distill", "episodic", "eidetic"]);
+    expect(r4.exitCode).toBe(0);
+    // row1 and row2 qualify (old, importance >= 0.6, positive)
+    // row3 is negative — should NOT be promoted
+    const eideticPath = join(tmp, "synthetic", "eidetic", "eidetic.jsonl");
+    const promoted = readJsonl(eideticPath);
+    expect(promoted.length).toBe(2);
+    expect(promoted.every((r: any) => r.polarity !== "negative")).toBe(true);
+
+    // Distill kinesthetic→semantic
+    const r5 = runMemory(tmp, ["distill", "kinesthetic", "semantic"]);
+    expect(r5.exitCode).toBe(0);
+    const semanticRows = readJsonl(semanticPath);
+    expect(semanticRows.length).toBe(2); // original retain + promoted kin1
+  });
+
+  it("ken pipeline works with empty stores", () => {
+    // Recall on empty stores should succeed gracefully
+    const r1 = runMemory(tmp, ["recall", "anything"]);
+    expect(r1.exitCode).toBe(0);
+
+    // Cache on empty should succeed
+    const r2 = runMemory(tmp, ["cache", "anything"]);
+    expect(r2.exitCode).toBe(0);
+
+    // Distill on empty should succeed with 0 promoted
+    const r3 = runMemory(tmp, ["distill", "episodic", "eidetic"]);
+    expect(r3.exitCode).toBe(0);
+    expect(r3.stdout).toContain("Distilled: 0");
+  });
+
+  it("ken pipeline skips negative polarity in distill", () => {
+    const oldTs = Date.now() - 5 * 86_400_000;
+    const episodicPath = join(tmp, "organic", "episodic", "episodic.jsonl");
+    const negRow = JSON.stringify({ id: "neg1", tags: ["test"], content: "Anti-pattern", source: "episodic", importance: 0.9, polarity: "negative", ts: oldTs });
+    const posRow = JSON.stringify({ id: "pos1", tags: ["test"], content: "Good pattern", source: "episodic", importance: 0.9, polarity: "positive", ts: oldTs });
+    writeFileSync(episodicPath, [negRow, posRow].join("\n") + "\n");
+
+    const r = runMemory(tmp, ["distill", "episodic", "eidetic"]);
+    expect(r.exitCode).toBe(0);
+    const eideticRows = readJsonl(join(tmp, "synthetic", "eidetic", "eidetic.jsonl"));
+    expect(eideticRows.length).toBe(1);
+    expect(eideticRows[0].content).toBe("Good pattern");
+  });
+
+  it("ken pipeline deduplicates across stores", () => {
+    const oldTs = Date.now() - 3 * 86_400_000;
+    const episodicPath = join(tmp, "organic", "episodic", "episodic.jsonl");
+    const eideticPath = join(tmp, "synthetic", "eidetic", "eidetic.jsonl");
+    // Same content in both stores
+    const content = "JWT tokens expire after 24 hours by default";
+    const srcRow = JSON.stringify({ id: "ep1", tags: ["auth"], content, source: "episodic", importance: 0.8, polarity: "positive", ts: oldTs });
+    const dstRow = JSON.stringify({ id: "ei1", tags: ["auth"], content, source: "eidetic", importance: 0.8, polarity: "positive", ts: oldTs });
+    writeFileSync(episodicPath, srcRow + "\n");
+    writeFileSync(eideticPath, dstRow + "\n");
+
+    const r = runMemory(tmp, ["distill", "episodic", "eidetic"]);
+    expect(r.exitCode).toBe(0);
+    // Should detect duplicate — eidetic should still have just 1 row
+    const eideticRows = readJsonl(eideticPath);
+    expect(eideticRows.length).toBe(1);
+  });
+
+  it("stats reflects all store counts after ken pipeline", () => {
+    // Seed data
+    const oldTs = Date.now() - 3 * 86_400_000;
+    seedRow(tmp, "episodic", ["test"], "episodic fact", { importance: 0.8 });
+    seedRow(tmp, "kinesthetic", ["test"], "kinesthetic skill", { importance: 0.8 });
+    runMemory(tmp, ["retain", "semantic", "test", "semantic knowledge"]);
+
+    const r = runMemory(tmp, ["stats"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("episodic");
+    expect(r.stdout).toContain("semantic");
+    expect(r.stdout).toContain("kinesthetic");
+  });
+
+  it("skill.ts exports ken in SKILLS dict", async () => {
+    // Verify ken is registered as a skill
+    const skillTs = readFileSync(join(AGENCE_ROOT, "lib", "skill.ts"), "utf-8");
+    expect(skillTs).toContain('"ken"');
+    expect(skillTs).toContain("Knowledge Extraction cycle");
+    expect(skillTs).toContain("runKen");
+  });
+
+  it("bin/agence recognizes ^ken in skill names", () => {
+    const agence = readFileSync(join(AGENCE_ROOT, "bin", "agence"), "utf-8");
+    expect(agence).toContain("|ken\"");
+  });
+});

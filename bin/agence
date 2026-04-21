@@ -1726,7 +1726,7 @@ mode_init() {
       # ── Skill command dispatch ───────────────────────────────────────────
       # If init_cmd matches a known skill, route through lib/skill.ts
       local _skill_ts="${AGENCE_ROOT}/lib/skill.ts"
-      local _skill_names="fix|build|feature|refactor|solve|review|precommit|simplify|analyse|analyze|design|pattern|scope|spec|split|deploy|brainstorm|peer-design|peer-review|peer-solve|peer-analyse|peer-analyze|hack|break|document|test|recon|grasp|glimpse"
+      local _skill_names="fix|build|feature|refactor|solve|review|precommit|simplify|analyse|analyze|design|pattern|scope|spec|split|deploy|brainstorm|peer-design|peer-review|peer-solve|peer-analyse|peer-analyze|hack|break|document|test|recon|grasp|glimpse|ken"
       if [[ "$init_cmd" =~ ^(${_skill_names})$ ]] && command -v bun &>/dev/null && [[ -f "$_skill_ts" ]]; then
         # Normalize spelling: analyze → analyse (canonical)
         local _skill_cmd="$init_cmd"
