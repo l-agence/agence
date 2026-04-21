@@ -409,8 +409,9 @@ mode_init() {
 # Resolution order: AGENCE_ORG env > @ symlink > @<org> named symlink > canonical dir
 resolve_org_path() {
   local scope_root="$1"
-  # AGENCE_ORG env (set by ^init / .agencerc) overrides the fallback argument
-  local fallback_org="${2:-${AGENCE_ORG:-l-agence.org}}"
+  # AGENCE_ORG env (set by ^init / .agencerc) has highest priority;
+  # $2 is only a caller-supplied hint used when neither env nor @ symlink resolves.
+  local fallback_org="${AGENCE_ORG:-${2:-l-agence.org}}"
 
   local symlink_path="$scope_root/@"
   local named_org_path="$scope_root/@$fallback_org"
