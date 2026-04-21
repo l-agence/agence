@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "agence": {
+      "type": "stdio",
+      "command": "bun",
+      "args": ["run", "lib/mcp.ts"],
+      "cwd": "${workspaceFolder}/.agence",
+      "env": {
+        "AGENCE_ROOT": "${workspaceFolder}/.agence"
+      }
+    }
+  }
+}
