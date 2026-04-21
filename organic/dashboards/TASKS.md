@@ -20,6 +20,7 @@
 | ~~MEM-002~~ | ~~Memory CLI: ^retain/^recall/^cache wired into bin/agence~~ | `-` | 4 | 2 | 0.8 | **170** | — | — |
 | ~~TEST-002~~ | ~~Guard security boundary tests (~50 tests for guard.ts, F-5)~~ | `-` | 4 | 2 | 0.7 | **160** | — | — |
 | ~~MEM-003~~ | ~~Memory skill integration: ^grasp/^glimpse/^recon → memory-aware~~ | `-` | 4 | 2 | 0.6 | **150** | — | — |
+| ~~MCP-001~~ | ~~MCP server — 10 tools + 3 resources over stdio~~ | `-` | 4 | 2 | 0.6 | **150** | — | — |
 | ~~SEC-002~~ | ~~F-2 HIGH: Move Gemini API key from URL query param to x-goog-api-key header~~ | `-` | 4 | 2 | 0.5 | **140** | — | — |
 | ~~HARNESS-001~~ | ~~Execution loop harness: bin/loop primitive + backpressure~~ | `-` | 4 | 2 | 0.5 | **140** | — | — |
 | SEC-010 | ^integrate findings: fix + verify + regression test loop | `_` | 3 | 1 | 0.7 | **125** | — | — |
@@ -40,11 +41,12 @@
 | ~~SHELL-001~~ | ~~Shell UI: state-colored PS1, tmux titles, shell economy + reap~~ | `-` | 2 | 1 | 0.5 | **95** | copilot | — |
 | ~~SKILL-005~~ | ~~Peer skills: ^peer-design, ^peer-review, ^peer-solve, ^peer-analyse~~ | `-` | 3 | 1 | 0.4 | **95** | @copilot | — |
 | ~~MEM-004~~ | ~~Promotion pipelines: ^distill with importance/age/tag filtering + dedup~~ | `-` | 3 | 1 | 0.4 | **95** | — | — |
+| ~~HARNESS-002~~ | ~~--backpressure-mode progressive for bin/loop (stall detection)~~ | `-` | 3 | 1 | 0.4 | **95** | — | — |
 | ~~SKILL-006~~ | ~~Red team skills: ^hack, ^break (autonomous attack surface probing)~~ | `-` | 2 | 1 | 0.4 | **85** | @copilot | — |
 | ~~SEC-004~~ | ~~F-4 MEDIUM: Signal forgery — add auth on IPC files in nexus/signals/~~ | `-` | 3 | 1 | 0.3 | **85** | — | — |
 | ~~SEC-005~~ | ~~F-6 MEDIUM: tmux send-keys injection in signal.ts~~ | `-` | 3 | 1 | 0.3 | **85** | — | — |
 | ~~SEC-006~~ | ~~F-7 MEDIUM: Persona injection surface hardening (when @ routing wired)~~ | `-` | 3 | 1 | 0.3 | **85** | — | — |
-| MEM-005 | ^ken: Knowledge Extraction cycle (grasp + glimpse + recon + distill) | `+` | 3 | 1 | 0.3 | **85** | — | — |
+| ~~MEM-005~~ | ~~^ken: Knowledge Extraction cycle (grasp + glimpse + recon + distill)~~ | `-` | 3 | 1 | 0.3 | **85** | — | — |
 | ~~INFRA-003~~ | ~~Publish AIPOLICY.yaml schema as governance standard~~ | `-` | 2 | 1 | 0.3 | **75** | copilot | — |
 | ~~SKILL-007~~ | ~~Knowledge skills: ^document, ^test, ^recon, ^grasp, ^glimpse~~ | `-` | 2 | 1 | 0.3 | **75** | @copilot | — |
 | ~~WIRE-004~~ | ~~Wire persona injection: codex/agents/<name>/agent.md → system prompt~~ | `-` | 2 | 0 | 0.4 | **60** | — | — |
@@ -64,19 +66,18 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tasks | 50 |
-| Runnable | 1 |
+| Total tasks | 52 |
+| Runnable | 0 |
 | Blocked | 0 |
-| Completed | 45 |
+| Completed | 48 |
 | Failed | 0 |
 
 ## State Distribution
 
 | State | Symbol | Count |
 |-------|--------|-------|
-| Completed | `-` | 45 |
+| Completed | `-` | 48 |
 | Paused | `_` | 4 |
-| Pending | `+` | 1 |
 
 ---
 

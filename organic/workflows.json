@@ -177,10 +177,10 @@
         "MEM-004",
         "MEM-005"
       ],
-      "completed": 4,
+      "completed": 5,
       "total": 5,
-      "completion_pct": 80,
-      "notes": "MEM-001..004 complete (core engine + CLI + skill integration + distill pipelines, 56 tests). MEM-005 (^ken orchestrator) pending v0.7."
+      "completion_pct": 100,
+      "notes": "MEM-001..005 complete. Core engine + CLI + skill integration + distill pipelines + ^ken orchestrator. 63 tests, 202 expect()."
     }
   ]
 }
