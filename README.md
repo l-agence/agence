@@ -37,21 +37,21 @@ Unlike single-agent tools (Claude Code, Copilot, aider), agence coordinates **mu
 ## What is l'Agence?
 
 Welcome to **Agence**, an agentic engineering collaboration environment.
-L'agence is a tool and model agnostic framework for humnan/agentic and multi-agentic development & collaboration. L'agence achieves this with a philosophy of simplicity. For example in agence there is no vectored database, no state machines. Where posisble, everything including swarm and task states, workflows, RAG and DWM, are managed based on git. L'agence scales and remembers  using **Git-based sharding**. 
+L'agence is a tool and model agnostic framework for human/agentic and multi-agentic development & collaboration. L'agence achieves this with a philosophy of simplicity. For example in agence there is no vectored database, no state machines. Where possible, everything including swarm and task states, workflows, RAG and DWM, are managed based on git. L'agence scales and remembers  using **Git-based sharding**. 
 
 L'agence is deployed both as a portable git submodule (.agence) living in any project's repo, and one or more 'team shards' existing as that .agence submodule origin. This way agence lives in an active context inside each project, but also shares upstream to a team based shard. However L'agence gates all knowledge, and so it allows you to selectively route and share. YOU DECIDE where and how to share. 
 
-Unlike other agentic models that aim for full AI autonomy, L'agence aims for human supervised workflows. It is human gated first by design. It incorporates strong, explicit and immutable safeguards via its CODEX: the laws, principles, rules, and most importantly an EBNF grammar-based universal tiered access AIpolicy.
+Unlike other agentic models that aim for full AI autonomy, L'agence aims for human supervised workflows. It is human gated first by design. It incorporates strong, explicit and immutable safeguards via its CODEX: the laws, principles, rules, and most importantly an EBNF grammar-based universal tiered access AIPOLICY.
 
 Governance is a central concept in L'agence. Agence is the first such system with a full agentic audit trail based on immutable append only merkle ailedger. The ailedger is implemented as a sister repository to each shard. AI commands are logged , auditable and replayable for RCA or accountability. 
 
 l 'agence implements a human control plane with multiple agent shells as needed. But full agent sessions must always be accesible via terminal panes or session replay or audits. 
 
-In agence, agent state is local, but knowledge and metadata is selectively sharded. Full local agent session states are preserved, allowing for local session save, resume and even handoff to other agents. L'agence does automatic full session capture of stdout, stdin, stderr, exit codes and everythimng via tmux pipe with a unix script based typescript fallback. 
+In agence, agent state is local, but knowledge and metadata is selectively sharded. Full local agent session states are preserved, allowing for local session save, resume and even handoff to other agents. L'agence does automatic full session capture of stdout, stdin, stderr, exit codes and everything via tmux pipe with fallback to unix script typescript logs. 
 This allows for full agentic access to the entire session, bypassing VScode 16kb buffer limits and reducing hallucinations and token wastage. 
 
 Full session data is never shared verbatim to the shard.  This is gated such that we do not leak unless a human asks. 
-As well, agence's knowledge bases are tiered and segregated between both hermetic (private local user knowledge in this repo) and sytnthetic ( team based Derived World Knowledge).
+As well, agence's knowledge bases are tiered and segregated between both hermetic (private local user knowledge in this repo) and synthetic ( team based Derived World Knowledge).
 
 L'agence uses an innovative and deterministic routing system that is flexible and secure. It allows uses to select where knowledge and lessons are shared. Efforts have been made to gate guard your data from unecessary disclosure. 
 
@@ -298,7 +298,7 @@ While I now know that the aido name is not unique, in agence it is something dif
 --- 
 ## The Agence Lexicon
 
-### COGGNOS foundation
+### COGNOS foundation
 Agence is built on a 6-pillar foundation the acronym for which is COGNOS: 
 
 CODEX: This forms the stronng and immutable governance layer of agence. It contains the Laws of Agentic : Laws, principles rules, as well as the AIPOLICY.
