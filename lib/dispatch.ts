@@ -16,6 +16,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join, basename } from "path";
+import { resolveOrg } from "./org.ts";
 
 // ─── Environment ─────────────────────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ function cmdRoute(artifactType: string): void {
   }
 
   // Resolve org path
-  const org = "l-agence.org";  // TODO: read from @ symlink
+  const org = resolveOrg(AGENCE_ROOT);
   let targetDir: string;
   if (route.scope === "synthetic") {
     targetDir = join(AGENCE_ROOT, route.scope, org, route.subdir);
@@ -138,7 +139,7 @@ function cmdSave(artifactType: string, filePath: string): void {
     process.exit(1);
   }
 
-  const org = "l-agence.org";
+  const org = resolveOrg(AGENCE_ROOT);
   let targetDir: string;
   if (route.scope === "synthetic") {
     targetDir = join(AGENCE_ROOT, route.scope, org, route.subdir);

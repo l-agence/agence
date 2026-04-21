@@ -16,38 +16,15 @@
 //
 // Exit codes: 0 = success, 1 = config error, 2 = policy violation
 
-import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { existsSync, writeFileSync } from "fs";
 import { join } from "path";
-import { randomBytes, createHash } from "crypto";
+import { randomBytes } from "crypto";
+
+// (2g) Import sessionDayDir from session.ts — single canonical implementation.
+// This eliminates the duplicate sessionDayDir + require("fs") anti-pattern.
+import { sessionDayDir } from "./session.ts";
 
 const AI_ROOT = process.env.AI_ROOT || process.env.AGENCE_ROOT || join(import.meta.dir, "..");
-const SESSION_BASE = join(AI_ROOT, "nexus", ".aisessions");
-
-/** Return day-sharded session dir (DD/) with monthly recycling */
-function sessionDayDir(): string {
-  const now = new Date();
-  const day = String(now.getDate()).padStart(2, "0");
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const dayDir = join(SESSION_BASE, day);
-  mkdirSync(dayDir, { recursive: true });
-
-  const marker = join(dayDir, ".month");
-  if (existsSync(marker)) {
-    const stored = require("fs").readFileSync(marker, "utf-8").trim();
-    if (stored !== currentMonth) {
-      // Recycle: delete old session files from previous month
-      for (const f of require("fs").readdirSync(dayDir)) {
-        if (f.endsWith(".typescript") || f.endsWith(".meta.json")) {
-          require("fs").unlinkSync(join(dayDir, f));
-        }
-      }
-      writeFileSync(marker, currentMonth + "\n");
-    }
-  } else {
-    writeFileSync(marker, currentMonth + "\n");
-  }
-  return dayDir;
-}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -68,13 +45,15 @@ function isoNow(): string {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
-/** Map agent name → 3-letter LLM model tag */
+/** Generate session ID matching bash schema: <agent>-YYYYMMDD_HHMMSS-<hex4>
+ * Matches session.sh:generate_shell_session_id for consistent log archaeology. */
 function generateSessionId(agent: string): string {
-  const time = new Date();
-  const hhmm = String(time.getHours()).padStart(2, "0")
-    + String(time.getMinutes()).padStart(2, "0");
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const datePart = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+  const timePart = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
   const hex = randomBytes(2).toString("hex");
-  return `${agent.slice(0, 5)}-${hhmm}-${hex}`;
+  return `${agent.slice(0, 5)}-${datePart}_${timePart}-${hex}`;
 }
 
 /** Emit eval-safe shell variable. Values are single-quoted to prevent injection. */

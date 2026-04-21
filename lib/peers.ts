@@ -23,6 +23,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
+import { resolveOrg } from "./org.ts";
 
 // ─── Environment ─────────────────────────────────────────────────────────────
 
@@ -500,7 +501,7 @@ async function runPeers(
   console.log(renderConsensus(result, format));
 
   // Save to synthetic/analyses/ if successful
-  const outDir = join(AGENCE_ROOT, "synthetic", "l-agence.org", "analyses");
+  const outDir = join(AGENCE_ROOT, "synthetic", resolveOrg(AGENCE_ROOT), "analyses");
   if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
   const outFile = join(outDir, `peers-${skill}-${Date.now()}.json`);
   writeFileSync(outFile, JSON.stringify(result, null, 2));

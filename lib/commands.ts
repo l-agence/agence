@@ -15,6 +15,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "fs";
 import { join, basename } from "path";
+import { resolveOrg } from "./org.ts";
 
 const AI_ROOT = process.env.AI_ROOT || process.env.AGENCE_ROOT || join(import.meta.dir, "..");
 const AGENCE_ROOT = process.env.AGENCE_ROOT || AI_ROOT;
@@ -435,7 +436,7 @@ if (!validTypes.includes(cmdType)) {
 }
 
 // Parse --org from args
-let org = "l-agence.org";
+let org = resolveOrg(AGENCE_ROOT);
 const orgIdx = rest.indexOf("--org");
 if (orgIdx >= 0 && rest[orgIdx + 1]) {
   org = rest[orgIdx + 1];

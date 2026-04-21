@@ -26,13 +26,15 @@ import { execSync, spawnSync } from "child_process";
 import { recall, readMnemonic, retain, parseTags, distill, stats } from "./memory.ts";
 import type { MemoryRow, MemorySource, DistillOpts } from "./memory.ts";
 
+import { resolveOrg } from "./org.ts";
+
 // ─── Environment ─────────────────────────────────────────────────────────────
 
 const AGENCE_ROOT = process.env.AGENCE_ROOT
   || process.env.AI_ROOT
   || join(import.meta.dir, "..");
 
-const ORG = "l-agence.org"; // TODO: resolve from @ symlink
+const ORG = resolveOrg(AGENCE_ROOT);
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

@@ -208,7 +208,7 @@ save_session() {
   local log_id="save-$(date +%Y%m%d_%H%M%S)-$(printf '%x' $((RANDOM * RANDOM)))"
   local saves_dir="${AGENCE_ROOT}/nexus/.aisaves"
   local sessions_dir="${AGENCE_ROOT}/nexus/sessions"
-  local lessons_dir="${AGENCE_ROOT}/synthetic/l-agence.org/lessons"
+  local lessons_dir="$(resolve_org_path "${AGENCE_ROOT}/synthetic")/lessons"
   mkdir -p "$saves_dir" "$sessions_dir" 2>/dev/null
 
   local branch; branch=$(git -C "$AGENCE_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
@@ -269,7 +269,7 @@ learn_agence_changes() {
   local sessions_dir="${AGENCE_ROOT}/nexus/.aisessions"
   local saves_dir="${AGENCE_ROOT}/nexus/.aisaves"
   local faults_dir="${AGENCE_ROOT}/nexus/faults"
-  local lessons_dir="${AGENCE_ROOT}/synthetic/l-agence.org/lessons"
+  local lessons_dir="$(resolve_org_path "${AGENCE_ROOT}/synthetic")/lessons"
   mkdir -p "$lessons_dir" 2>/dev/null
 
   local session_count=0; local save_count=0; local fault_count=0; local lesson_count=0

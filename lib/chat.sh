@@ -1,53 +1,21 @@
 #!/usr/bin/env bash
-# lib/chat.sh — Chat mode, AI-routed mode, provider resolution, peers consensus
+# lib/chat.sh — Chat mode, AI-routed mode, peers consensus
 # Sourced by bin/agence.
+# Provider resolution is canonical in lib/router.ts (lib/router.sh is the bash
+# wrapper).  This module delegates all provider detection to router_load_config().
 [[ -n "${_AGENCE_CHAT_LOADED:-}" ]] && return 0
 _AGENCE_CHAT_LOADED=1
 
+# ── resolve_provider ──────────────────────────────────────────────────────────
+# Thin shim: delegates to router.ts via router_load_config() (router.sh).
+# Kept for backward compatibility with bin/agence _resolve_provider early-exit.
 resolve_provider() {
-  # 1. Explicit agent routing
-  if [[ -n "${AGENCE_AGENT_PARAM:-}" ]]; then
-    echo "${AGENCE_AGENT_PARAM#@}"
-    return 0
-  fi
-
-  # 2. Explicit env override
-  if [[ -n "${AGENCE_DEFAULT_PROVIDER:-}" ]]; then
-    echo "$AGENCE_DEFAULT_PROVIDER"
-    return 0
-  fi
-
-  # 3. Auto-detect: standalone copilot CLI (snap) or gh copilot extension
-  if command -v copilot &>/dev/null; then
-    echo "pilot"
-    return 0
-  fi
-  if command -v gh &>/dev/null && gh copilot --version &>/dev/null 2>&1; then
-    echo "pilot"
-    return 0
-  fi
-
-  # 3b. Auto-detect: gh authenticated (use GitHub Copilot API via GITHUB_TOKEN)
-  if command -v gh &>/dev/null && gh auth token &>/dev/null 2>&1; then
-    echo "copilot"
-    return 0
-  fi
-
-  # 4. Auto-detect: Anthropic
-  if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
-    echo "claude"
-    return 0
-  fi
-
-  # 5. Auto-detect: OpenAI
-  if [[ -n "${OPENAI_API_KEY:-}" ]]; then
-    echo "openai"
-    return 0
-  fi
-
-  # 6. No provider available
-  echo "none"
-  return 1
+  # router_load_config sets AGENCE_LLM_PROVIDER (delegates to router.ts when bun
+  # is available, falls back to bash cascade in router.sh otherwise).
+  router_load_config 2>/dev/null || true
+  local _p="${AGENCE_LLM_PROVIDER:-none}"
+  echo "$_p"
+  [[ "$_p" != "none" ]]
 }
 
 # ============================================================================
