@@ -1,0 +1,9 @@
+{
+  "type": "notify",
+  "from": "inject-test",
+  "to": "human",
+  "payload": "${IFS}cat${IFS}/etc/passwd",
+  "timestamp": "2026-04-20T21:28:29Z",
+  "id": "c531466c",
+  "hmac": "39b39f90910f2c9fffaa6b3d3c757e7a57447d032c0ef4475899e2b3bbfe7367"
+}

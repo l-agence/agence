@@ -647,16 +647,30 @@
     {
       "id": "HARNESS-001",
       "repo": "agence",
-      "title": "Execution loop harness: throttling, timeouts, loop guards",
-      "state": "+",
+      "title": "Execution loop harness: bin/loop primitive + backpressure",
+      "state": "-",
       "priority": 4,
       "stars": 2,
       "heat": 0.5,
       "agent": null,
       "created": "2026-04-20T14:00:00Z",
-      "updated": "2026-04-20T14:00:00Z",
+      "updated": "2026-04-20T16:00:00Z",
       "source": "user observation 2026-04-20 (50-subprocess timeout incident)",
-      "notes": "Need execution loop harness: (1) subprocess throttle/concurrency limits, (2) configurable timeouts with overrides, (3) loop guards to prevent infinite agentic loops. v0.7."
+      "notes": "bin/loop: generic reusable iteration primitive. GHuntley Ralph Wiggum pattern with Principal Skinner backpressure. Max iterations, pipe-pane capture, ledger logging. Feeds prompt→agent→validate→repeat."
+    },
+    {
+      "id": "WIRE-005",
+      "repo": "agence",
+      "title": "Mixed agent routing: tool/loop/persona/ensemble dispatch fork",
+      "state": "-",
+      "priority": 5,
+      "stars": 3,
+      "heat": 0.9,
+      "agent": null,
+      "created": "2026-04-20T16:00:00Z",
+      "updated": "2026-04-20T16:00:00Z",
+      "source": "user design session 2026-04-20",
+      "notes": "skill.ts dispatch fork by registry type: persona→router.sh, tool→callTool (spawn CLI binary), loop→callLoop (bin/loop harness), ensemble→peers.ts tangent sequent. Dot-notation @agent.model (e.g. @ralph.gpt4o, @ralph.aider). 275 tests."
     }
   ]
 }

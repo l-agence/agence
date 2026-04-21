@@ -1,0 +1,312 @@
+#!/usr/bin/env bash
+# bin/loop — Generic iteration loop primitive
+#
+# Reusable outer loop for any CLI agent: claude, aider, codex, etc.
+# Based on GHuntley's Ralph Wiggum pattern with Principal Skinner backpressure.
+#
+# Design:
+#   - Feeds a prompt file to a CLI agent on each iteration
+#   - Captures output via tmux pipe-pane (if in tmux) or script(1) fallback
+#   - Optional backpressure: runs validation command between iterations
+#   - Writes iteration logs to nexus/.aisessions/
+#   - IMPLEMENTATION_PLAN.md on disk = shared state between iterations
+#
+# Usage:
+#   bin/loop --prompt PROMPT.md --binary claude [options]
+#   bin/loop --prompt PROMPT.md --binary aider --max 10
+#   bin/loop --help
+#
+# The loop is intentionally simple: feed prompt → run agent → validate → repeat.
+# The agent figures out what to do by reading its plan file each iteration.
+
+set -euo pipefail
+
+# ─── Defaults ─────────────────────────────────────────────────────────────────
+
+AGENCE_ROOT="${AGENCE_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+BINARY="claude"
+PROMPT_FILE=""
+MODEL=""
+MODEL_FLAG="--model"
+MAX_ITERATIONS=0       # 0 = unlimited
+BACKPRESSURE=""        # validation command (e.g. "bun test")
+AGENT="loop"
+SKILL=""
+HEADLESS_FLAG="-p"     # stdin-pipe flag for the binary
+PERMISSIONS_FLAG="--dangerously-skip-permissions"
+OUTPUT_FLAG=""
+DRY_RUN=false
+VERBOSE=false
+
+SESSION_DIR="${AGENCE_ROOT}/nexus/.aisessions"
+TMP_DIR="${AGENCE_ROOT}/nexus/tmp"
+
+# ─── Parse Args ───────────────────────────────────────────────────────────────
+
+usage() {
+  cat <<'EOF'
+loop — Generic iteration loop primitive
+
+Usage:
+  bin/loop --prompt <file> [options]
+
+Required:
+  --prompt <file>       Prompt file fed to agent each iteration
+
+Options:
+  --binary <cmd>        Agent CLI binary (default: claude)
+  --model <model>       Model name/alias
+  --model-flag <flag>   CLI flag for model (default: --model)
+  --headless <flag>     Stdin pipe flag (default: -p)
+  --permissions <flag>  Skip permissions flag (default: --dangerously-skip-permissions)
+  --output-format <fmt> Output format flag (e.g. --output-format=stream-json)
+  --max <n>             Max iterations (default: 0 = unlimited)
+  --backpressure <cmd>  Validation command run after each iteration
+  --agent <name>        Agent name for logging (default: loop)
+  --skill <name>        Skill name for logging
+  --dry-run             Show what would run without executing
+  --verbose             Verbose output
+  --help                Show this help
+
+Loop Mechanics:
+  1. Read prompt file
+  2. Pipe to agent binary (headless mode)
+  3. Agent reads IMPLEMENTATION_PLAN.md, picks task, implements, commits
+  4. If --backpressure: run validation; on failure, agent retries next iteration
+  5. Push changes (if git repo)
+  6. Increment iteration, loop back to 1
+
+  The IMPLEMENTATION_PLAN.md on disk is shared state between iterations.
+  Each iteration gets a fresh context window — no carry-over.
+
+Examples:
+  bin/loop --prompt PROMPT_build.md --binary claude --max 20
+  bin/loop --prompt PROMPT_plan.md --binary claude --model opus --max 5
+  bin/loop --prompt task.md --binary aider --headless "--message" --max 3
+  bin/loop --prompt task.md --backpressure "bun test" --max 10
+EOF
+  exit "${1:-0}"
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --prompt)       PROMPT_FILE="$2"; shift 2 ;;
+    --binary)       BINARY="$2"; shift 2 ;;
+    --model)        MODEL="$2"; shift 2 ;;
+    --model-flag)   MODEL_FLAG="$2"; shift 2 ;;
+    --headless)     HEADLESS_FLAG="$2"; shift 2 ;;
+    --permissions)  PERMISSIONS_FLAG="$2"; shift 2 ;;
+    --output-format) OUTPUT_FLAG="--output-format=$2"; shift 2 ;;
+    --max)          MAX_ITERATIONS="$2"; shift 2 ;;
+    --backpressure) BACKPRESSURE="$2"; shift 2 ;;
+    --agent)        AGENT="$2"; shift 2 ;;
+    --skill)        SKILL="$2"; shift 2 ;;
+    --dry-run)      DRY_RUN=true; shift ;;
+    --verbose)      VERBOSE=true; shift ;;
+    --help|-h)      usage 0 ;;
+    *)              echo "Unknown option: $1" >&2; usage 1 ;;
+  esac
+done
+
+if [[ -z "$PROMPT_FILE" ]]; then
+  echo "Error: --prompt is required" >&2
+  usage 1
+fi
+
+if [[ ! -f "$PROMPT_FILE" ]]; then
+  echo "Error: Prompt file not found: $PROMPT_FILE" >&2
+  exit 1
+fi
+
+# Verify binary exists
+if ! command -v "$BINARY" &>/dev/null; then
+  echo "Error: Binary not found: $BINARY" >&2
+  echo "  Install it or specify a different --binary" >&2
+  exit 1
+fi
+
+# ─── Session Setup ────────────────────────────────────────────────────────────
+
+mkdir -p "$SESSION_DIR" "$TMP_DIR"
+
+LOOP_ID="loop-${AGENT}-$(date +%s)-$$"
+LOOP_LOG="${SESSION_DIR}/${LOOP_ID}.log"
+ITERATION=0
+CURRENT_BRANCH=""
+
+if git rev-parse --is-inside-work-tree &>/dev/null; then
+  CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "detached")
+fi
+
+# ─── Output helpers ───────────────────────────────────────────────────────────
+
+_log() { echo "[loop] $*" | tee -a "$LOOP_LOG"; }
+_verbose() { $VERBOSE && _log "$@" || true; }
+
+_banner() {
+  local iter="$1" max_str=""
+  [[ $MAX_ITERATIONS -gt 0 ]] && max_str="/$MAX_ITERATIONS"
+  cat <<EOF
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Loop:    ${LOOP_ID}
+  Agent:   @${AGENT}${SKILL:+  Skill: ^${SKILL}}
+  Binary:  ${BINARY}${MODEL:+  Model: ${MODEL}}
+  Branch:  ${CURRENT_BRANCH:-n/a}
+  Iter:    ${iter}${max_str}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EOF
+}
+
+# ─── Build agent command ──────────────────────────────────────────────────────
+
+build_cmd() {
+  local cmd="cat '${PROMPT_FILE}' | ${BINARY}"
+
+  # Headless flag (e.g. -p for claude, --message for aider)
+  if [[ -n "$HEADLESS_FLAG" ]]; then
+    if [[ "$BINARY" == "aider" ]]; then
+      # aider uses --message "content" not stdin pipe
+      cmd="${BINARY} ${HEADLESS_FLAG} \"\$(cat '${PROMPT_FILE}')\" --yes"
+    else
+      cmd="cat '${PROMPT_FILE}' | ${BINARY} ${HEADLESS_FLAG}"
+    fi
+  fi
+
+  # Permissions bypass
+  [[ -n "$PERMISSIONS_FLAG" ]] && cmd+=" ${PERMISSIONS_FLAG}"
+
+  # Model
+  [[ -n "$MODEL" ]] && cmd+=" ${MODEL_FLAG} ${MODEL}"
+
+  # Output format
+  [[ -n "$OUTPUT_FLAG" ]] && cmd+=" ${OUTPUT_FLAG}"
+
+  # Verbose
+  $VERBOSE && cmd+=" --verbose"
+
+  echo "$cmd"
+}
+
+# ─── Tmux pipe-pane setup ────────────────────────────────────────────────────
+
+setup_pipe_pane() {
+  if [[ -n "${TMUX:-}" ]]; then
+    local pane_target
+    pane_target=$(tmux display-message -p '#{session_name}:#{window_index}.#{pane_index}' 2>/dev/null || true)
+    if [[ -n "$pane_target" ]]; then
+      local iter_log="${SESSION_DIR}/${LOOP_ID}-iter${ITERATION}.typescript"
+      tmux pipe-pane -o -t "$pane_target" "cat >> '${iter_log}'"
+      _verbose "pipe-pane → ${iter_log##*/}"
+    fi
+  fi
+}
+
+teardown_pipe_pane() {
+  if [[ -n "${TMUX:-}" ]]; then
+    local pane_target
+    pane_target=$(tmux display-message -p '#{session_name}:#{window_index}.#{pane_index}' 2>/dev/null || true)
+    [[ -n "$pane_target" ]] && tmux pipe-pane -t "$pane_target" 2>/dev/null || true
+  fi
+}
+
+# ─── Backpressure (Principal Skinner) ─────────────────────────────────────────
+
+run_backpressure() {
+  if [[ -z "$BACKPRESSURE" ]]; then
+    return 0
+  fi
+
+  _log "Backpressure: ${BACKPRESSURE}"
+  if eval "$BACKPRESSURE" >> "$LOOP_LOG" 2>&1; then
+    _log "Backpressure: PASS ✓"
+    return 0
+  else
+    _log "Backpressure: FAIL ✗ (agent will retry next iteration)"
+    return 1
+  fi
+}
+
+# ─── Ledger ──────────────────────────────────────────────────────────────────
+
+ledger_append() {
+  local action="$1" detail="$2"
+  if [[ -x "${AGENCE_ROOT}/bin/ailedger" ]]; then
+    "${AGENCE_ROOT}/bin/ailedger" append "loop" "$action" "${LOOP_ID}" "$detail" "0" 2>/dev/null || true
+  fi
+}
+
+# ─── Main Loop ────────────────────────────────────────────────────────────────
+
+main() {
+  local cmd
+  cmd=$(build_cmd)
+
+  if $DRY_RUN; then
+    echo "[loop] DRY RUN — would execute:"
+    echo "  Binary:       $BINARY"
+    echo "  Prompt:       $PROMPT_FILE"
+    echo "  Model:        ${MODEL:-auto}"
+    echo "  Max iters:    ${MAX_ITERATIONS:-unlimited}"
+    echo "  Backpressure: ${BACKPRESSURE:-none}"
+    echo "  Command:      $cmd"
+    exit 0
+  fi
+
+  _log "Starting loop: $LOOP_ID"
+  _log "Command: $cmd"
+  ledger_append "loop-start" "@${AGENT} ^${SKILL:-unknown} max=${MAX_ITERATIONS}"
+
+  while true; do
+    # Max iteration check
+    if [[ $MAX_ITERATIONS -gt 0 ]] && [[ $ITERATION -ge $MAX_ITERATIONS ]]; then
+      _log "Reached max iterations: $MAX_ITERATIONS"
+      break
+    fi
+
+    ITERATION=$((ITERATION + 1))
+    _banner "$ITERATION" | tee -a "$LOOP_LOG"
+
+    # Wire pipe-pane for this iteration
+    setup_pipe_pane
+
+    # Run the agent
+    _log "Iteration $ITERATION: running @${AGENT}..."
+    local iter_start
+    iter_start=$(date +%s)
+
+    if ! eval "$cmd" 2>&1 | tee -a "$LOOP_LOG"; then
+      _log "Agent exited with error — continuing to next iteration"
+    fi
+
+    local iter_end elapsed
+    iter_end=$(date +%s)
+    elapsed=$((iter_end - iter_start))
+    _log "Iteration $ITERATION: completed in ${elapsed}s"
+
+    # Teardown pipe-pane
+    teardown_pipe_pane
+
+    # Backpressure check
+    run_backpressure || true  # failures don't stop the loop — agent self-corrects
+
+    # Push changes if in a git repo
+    if [[ -n "$CURRENT_BRANCH" ]] && [[ "$CURRENT_BRANCH" != "detached" ]]; then
+      git push origin "$CURRENT_BRANCH" 2>/dev/null || {
+        _verbose "Push failed — may need upstream set"
+        git push -u origin "$CURRENT_BRANCH" 2>/dev/null || true
+      }
+    fi
+
+    ledger_append "loop-iter" "iter=${ITERATION} elapsed=${elapsed}s"
+    echo -e "\n======================== ITERATION $ITERATION COMPLETE ========================\n"
+  done
+
+  _log "Loop finished: $ITERATION iteration(s)"
+  ledger_append "loop-end" "iterations=${ITERATION}"
+
+  # Output final summary
+  echo "[loop] @${AGENT} completed $ITERATION iteration(s) — log: ${LOOP_LOG##*/}"
+}
+
+main

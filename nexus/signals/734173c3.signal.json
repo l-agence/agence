@@ -1,0 +1,9 @@
+{
+  "type": "notify",
+  "from": "inject-test",
+  "to": "human",
+  "payload": "test; rm -rf /",
+  "timestamp": "2026-04-21T00:38:13Z",
+  "id": "734173c3",
+  "hmac": "30acd3224ef727ff5a51d2b3b43c50cd2e653681060675223cb218614807c31a"
+}

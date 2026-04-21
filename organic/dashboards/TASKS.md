@@ -1,7 +1,7 @@
 # Tasks Dashboard
 
 > **Source**: `organic/tasks.json` | **Formula**: score = 10P + 25S + 100H
-> **Generated**: 2026-04-20 | **Project**: PROJ-LAGENCE
+> **Generated**: 2026-04-21 | **Project**: PROJ-LAGENCE
 
 ---
 
@@ -11,6 +11,7 @@
 |----|-------|-------|-----|-------|------|-------|-------|------------|
 | ~~SEC-001~~ | ~~F-1 CRITICAL: Fix shell injection in guard.ts emitShellExports eval~~ | `-` | 5 | 3 | 1 | **225** | — | — |
 | ~~MEM-001~~ | ~~Memory model core: lib/memory.ts + 6-tier COGNOS stores~~ | `-` | 5 | 3 | 1 | **225** | — | — |
+| ~~WIRE-005~~ | ~~Mixed agent routing: tool/loop/persona/ensemble dispatch fork~~ | `-` | 5 | 3 | 0.9 | **215** | — | — |
 | SEC-008 | ^break own tools: non-destructive stress test (aido/aicmd/aibash/aishell/agentd) | `_` | 4 | 2 | 0.9 | **180** | — | — |
 | SEC-009 | ^hack red-team probe: privilege escalation + self-modification attacks | `_` | 4 | 2 | 0.9 | **180** | — | — |
 | ~~INFRA-002~~ | ~~agentd skeleton: pid file, socket per tangent, Docker spawn~~ | `-` | 4 | 2 | 0.8 | **170** | copilot | — |
@@ -20,7 +21,7 @@
 | ~~TEST-002~~ | ~~Guard security boundary tests (~50 tests for guard.ts, F-5)~~ | `-` | 4 | 2 | 0.7 | **160** | — | — |
 | ~~MEM-003~~ | ~~Memory skill integration: ^grasp/^glimpse/^recon → memory-aware~~ | `-` | 4 | 2 | 0.6 | **150** | — | — |
 | ~~SEC-002~~ | ~~F-2 HIGH: Move Gemini API key from URL query param to x-goog-api-key header~~ | `-` | 4 | 2 | 0.5 | **140** | — | — |
-| HARNESS-001 | Execution loop harness: throttling, timeouts, loop guards | `+` | 4 | 2 | 0.5 | **140** | — | — |
+| ~~HARNESS-001~~ | ~~Execution loop harness: bin/loop primitive + backpressure~~ | `-` | 4 | 2 | 0.5 | **140** | — | — |
 | SEC-010 | ^integrate findings: fix + verify + regression test loop | `_` | 3 | 1 | 0.7 | **125** | — | — |
 | ~~SEC-003~~ | ~~F-3 HIGH: Guard default unknown commands T1→T2 (fail-closed)~~ | `-` | 4 | 2 | 0.3 | **120** | — | — |
 | ~~AGENT-001~~ | ~~@linus, @feynman, @aleph persona definitions~~ | `-` | 3 | 1 | 0.6 | **115** | @copilot | — |
@@ -63,19 +64,19 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tasks | 49 |
-| Runnable | 2 |
+| Total tasks | 50 |
+| Runnable | 1 |
 | Blocked | 0 |
-| Completed | 43 |
+| Completed | 45 |
 | Failed | 0 |
 
 ## State Distribution
 
 | State | Symbol | Count |
 |-------|--------|-------|
-| Completed | `-` | 43 |
+| Completed | `-` | 45 |
 | Paused | `_` | 4 |
-| Pending | `+` | 2 |
+| Pending | `+` | 1 |
 
 ---
 
@@ -87,14 +88,14 @@
 |------|----|-------|-------|
 | 1 | ~~SEC-001~~ | 225 | `-` ✅ |
 | 2 | ~~MEM-001~~ | 225 | `-` ✅ |
-| 3 | SEC-008 | 180 | `_` |
-| 4 | SEC-009 | 180 | `_` |
-| 5 | ~~INFRA-002~~ | 170 | `-` ✅ |
-| 6 | ~~SKILL-001~~ | 170 | `-` ✅ |
-| 7 | SEC-007 | 170 | `_` |
-| 8 | ~~MEM-002~~ | 170 | `-` ✅ |
-| 9 | ~~TEST-002~~ | 160 | `-` ✅ |
-| 10 | ~~MEM-003~~ | 150 | `-` ✅ |
+| 3 | ~~WIRE-005~~ | 215 | `-` ✅ |
+| 4 | SEC-008 | 180 | `_` |
+| 5 | SEC-009 | 180 | `_` |
+| 6 | ~~INFRA-002~~ | 170 | `-` ✅ |
+| 7 | ~~SKILL-001~~ | 170 | `-` ✅ |
+| 8 | SEC-007 | 170 | `_` |
+| 9 | ~~MEM-002~~ | 170 | `-` ✅ |
+| 10 | ~~TEST-002~~ | 160 | `-` ✅ |
 
 ---
 

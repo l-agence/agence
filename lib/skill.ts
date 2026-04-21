@@ -50,6 +50,12 @@ interface AgentMeta {
   role: string;
   tier: string;
   skills: string[];
+  type?: "persona" | "tool" | "ensemble" | "loop";
+  binary?: string | string[];
+  launchFlags?: string;
+  modelFlag?: string;
+  defaultModel?: string;
+  install?: string;
 }
 
 interface SkillResult {
@@ -167,14 +173,19 @@ function loadAgents(): AgentMeta[] {
     try {
       const data = JSON.parse(readFileSync(registryPath, "utf-8"));
       if (data.agents && typeof data.agents === "object") {
-        // registry.json uses {name: {type, provider, ...}} format
         return Object.entries(data.agents)
-          .filter(([_, v]: any) => v.type === "persona")
+          .filter(([_, v]: any) => v.type !== "ensemble") // exclude @peers — handled separately
           .map(([name, v]: any) => ({
             name,
             role: v.description || "",
             tier: v.tier || "T2",
             skills: v.skills || [],
+            type: v.type || "persona",
+            binary: v.binary,
+            launchFlags: v.launch_flags,
+            modelFlag: v.model_flag,
+            defaultModel: v.default_model,
+            install: v.install,
           }));
       }
     } catch { /* fall through */ }
@@ -182,14 +193,14 @@ function loadAgents(): AgentMeta[] {
 
   // Fallback: hardcoded mapping (mirrors dispatch.ts)
   return [
-    { name: "copilot", role: "general coder",     tier: "T2", skills: ["fix", "build", "feature", "refactor", "test"] },
-    { name: "haiku",   role: "fast coder",         tier: "T0", skills: ["fix", "split", "build", "break", "glimpse"] },
-    { name: "sonya",   role: "architect",           tier: "T1", skills: ["design", "solve", "refactor", "analyse", "scope"] },
-    { name: "ralph",   role: "test & QA",           tier: "T1", skills: ["test", "review", "precommit", "break"] },
-    { name: "linus",   role: "harsh reviewer",      tier: "T3", skills: ["review", "simplify", "refactor"] },
-    { name: "feynman", role: "explainer",            tier: "T2", skills: ["document", "analyse", "grasp", "glimpse"] },
-    { name: "aleph",   role: "red team",             tier: "T3", skills: ["hack", "break", "recon"] },
-    { name: "chad",    role: "DevOps/infra",         tier: "T1", skills: ["scope", "spec", "split", "pattern", "build", "integrate"] },
+    { name: "copilot", role: "general coder",     tier: "T2", skills: ["fix", "build", "feature", "refactor", "test"], type: "persona" },
+    { name: "haiku",   role: "fast coder",         tier: "T0", skills: ["fix", "split", "build", "break", "glimpse"], type: "persona" },
+    { name: "sonya",   role: "architect",           tier: "T1", skills: ["design", "solve", "refactor", "analyse", "scope"], type: "persona" },
+    { name: "ralph",   role: "test & QA",           tier: "T1", skills: ["test", "review", "precommit", "break"], type: "loop" },
+    { name: "linus",   role: "harsh reviewer",      tier: "T3", skills: ["review", "simplify", "refactor"], type: "persona" },
+    { name: "feynman", role: "explainer",            tier: "T2", skills: ["document", "analyse", "grasp", "glimpse"], type: "persona" },
+    { name: "aleph",   role: "red team",             tier: "T3", skills: ["hack", "break", "recon"], type: "persona" },
+    { name: "chad",    role: "DevOps/infra",         tier: "T1", skills: ["scope", "spec", "split", "pattern", "build", "integrate"], type: "persona" },
   ];
 }
 
@@ -198,8 +209,36 @@ function resolveAgent(skillName: string, explicitAgent?: string): AgentMeta | nu
 
   // Explicit agent requested
   if (explicitAgent) {
-    const name = explicitAgent.replace(/^@/, "");
-    return agents.find(a => a.name === name) || { name, role: "unknown", tier: "T2", skills: [] };
+    const raw = explicitAgent.replace(/^@/, "");
+
+    // Dot-notation: @agent.model or @agent.binary (e.g. @ralph.gpt4o, @ralph.aider)
+    // The part after the dot overrides the default model or selects a different inner binary.
+    const dotIdx = raw.indexOf(".");
+    let name = raw;
+    let modelOverride: string | undefined;
+    if (dotIdx > 0) {
+      name = raw.slice(0, dotIdx);
+      modelOverride = raw.slice(dotIdx + 1);
+    }
+
+    const base = agents.find(a => a.name === name) || { name, role: "unknown", tier: "T2", skills: [] } as AgentMeta;
+
+    if (modelOverride) {
+      // Check if the override is a known binary (aider, claude, etc.) or a model alias
+      const toolAgents = agents.filter(a => a.type === "tool");
+      const matchedTool = toolAgents.find(a => a.name === modelOverride);
+      if (matchedTool) {
+        // @ralph.aider → ralph harness wrapping aider binary
+        base.binary = matchedTool.binary;
+        base.launchFlags = matchedTool.launchFlags;
+        base.modelFlag = matchedTool.modelFlag;
+        base.defaultModel = matchedTool.defaultModel;
+      } else {
+        // @ralph.gpt4o → ralph harness with model override
+        base.defaultModel = modelOverride;
+      }
+    }
+    return base;
   }
 
   // Find best agent for this skill (first match by skills array)
@@ -468,6 +507,199 @@ function callRouter(system: string, userMsg: string, agent?: string): string {
   return result.stdout?.trim() || "";
 }
 
+// ─── Tool Agent Dispatch ────────────────────────────────────────────────────
+// For type="tool" agents: spawn their CLI binary in a tmux pane with pipe-pane
+// capture, inject the skill context, and collect output.
+
+function resolveToolBinary(agent: AgentMeta): string | null {
+  const bins = Array.isArray(agent.binary) ? agent.binary : agent.binary ? [agent.binary] : [];
+  for (const bin of bins) {
+    // Check if binary exists on PATH
+    const which = spawnSync("which", [bin.split(" ")[0]], { encoding: "utf-8" });
+    if (which.status === 0) return bin;
+  }
+  return null;
+}
+
+function callTool(agent: AgentMeta, systemPrompt: string, query: string): string {
+  const binary = resolveToolBinary(agent);
+  if (!binary) {
+    const installHint = agent.install ? `\n  Install: ${agent.install}` : "";
+    throw new Error(`Tool agent @${agent.name}: binary not found (${JSON.stringify(agent.binary)})${installHint}`);
+  }
+
+  // Build the command: binary [model-flag model] [launch-flags] <prompt>
+  const parts: string[] = [binary];
+
+  // Resolve model alias → full name from registry
+  if (agent.modelFlag && agent.defaultModel) {
+    const registryPath = join(AGENCE_ROOT, "codex", "agents", "registry.json");
+    let fullModel = agent.defaultModel;
+    try {
+      const data = JSON.parse(readFileSync(registryPath, "utf-8"));
+      fullModel = data.models?.[agent.defaultModel] || agent.defaultModel;
+    } catch { /* use as-is */ }
+    parts.push(agent.modelFlag, fullModel);
+  }
+
+  if (agent.launchFlags) {
+    parts.push(...agent.launchFlags.split(/\s+/).filter(Boolean));
+  }
+
+  // Tool-specific prompt injection: pipe system+user as stdin for headless tools
+  const prompt = `${systemPrompt}\n\n---\n\n${query}`;
+
+  // Check if we're in tmux — if so, use pipe-pane capture via tangent
+  const inTmux = !!process.env.TMUX;
+
+  if (inTmux) {
+    // Tmux path: create a tangent pane, pipe-pane capture, inject, collect
+    return callToolTmux(agent.name, parts, prompt);
+  } else {
+    // Headless path: spawn directly with stdin, collect stdout
+    return callToolDirect(parts, prompt);
+  }
+}
+
+function callToolDirect(cmdParts: string[], prompt: string): string {
+  // For tools that accept piped input (claude -p, aider --message)
+  // Most CLI tools accept a prompt via stdin with -p flag or similar
+  const cmd = cmdParts[0];
+
+  // Tool-specific stdin flags
+  let args = cmdParts.slice(1);
+  if (cmd === "claude") {
+    args.push("-p"); // headless mode
+  } else if (cmd === "aider") {
+    args.push("--message"); // non-interactive
+  }
+
+  const result = spawnSync(cmd, args, {
+    input: prompt,
+    env: process.env as Record<string, string>,
+    timeout: 300_000, // 5min for tool agents (they're slower)
+    maxBuffer: 2 * 1024 * 1024,
+    encoding: "utf-8",
+    cwd: AGENCE_ROOT,
+  });
+
+  if (result.status !== 0 && !result.stdout?.trim()) {
+    const err = result.stderr?.trim() || `${cmd} exited with code ${result.status}`;
+    throw new Error(err);
+  }
+
+  return result.stdout?.trim() || "";
+}
+
+function callToolTmux(agentName: string, cmdParts: string[], prompt: string): string {
+  // Create an ephemeral tangent for the tool agent, wire pipe-pane, inject prompt
+  const tangentId = `tool-${agentName}-${Date.now().toString(36)}`;
+  const sessionDir = join(AGENCE_ROOT, "nexus", ".aisessions");
+  const sid = `tool-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const logFile = join(sessionDir, `${sid}.typescript`);
+
+  mkdirSync(sessionDir, { recursive: true });
+
+  // Write prompt to a temp file for the tool to read
+  const promptFile = join(AGENCE_ROOT, "nexus", "tmp", `${tangentId}.prompt.md`);
+  mkdirSync(dirname(promptFile), { recursive: true });
+  writeFileSync(promptFile, prompt);
+
+  const session = process.env.AGENCE_TMUX_SESSION || "agence";
+
+  // Create tmux window for the tool
+  const cmdStr = cmdParts.join(" ");
+  const toolCmd = cmdParts[0] === "claude"
+    ? `cat '${promptFile}' | ${cmdStr} -p --dangerously-skip-permissions`
+    : cmdParts[0] === "aider"
+    ? `${cmdStr} --message "$(cat '${promptFile}')" --yes`
+    : `${cmdStr} < '${promptFile}'`;
+
+  const windowCmd = `${toolCmd}; echo '__AGENCE_TOOL_DONE__' >> '${logFile}'; sleep 2`;
+
+  // Launch in a new tmux window
+  spawnSync("tmux", [
+    "new-window", "-t", session, "-n", `@${tangentId}`,
+    "-d", // don't switch focus
+    "bash", "-c", windowCmd,
+  ], { encoding: "utf-8" });
+
+  // Wire pipe-pane for output capture
+  const paneTarget = `${session}:@${tangentId}`;
+  spawnSync("tmux", [
+    "pipe-pane", "-o", "-t", paneTarget,
+    `cat >> '${logFile}'`,
+  ], { encoding: "utf-8" });
+
+  // Poll for completion (max 5 min)
+  const deadline = Date.now() + 300_000;
+  while (Date.now() < deadline) {
+    if (existsSync(logFile)) {
+      const content = readFileSync(logFile, "utf-8");
+      if (content.includes("__AGENCE_TOOL_DONE__")) {
+        // Cleanup: kill the window, remove prompt file
+        spawnSync("tmux", ["kill-window", "-t", paneTarget], { encoding: "utf-8" });
+        try { require("fs").unlinkSync(promptFile); } catch {}
+        return content.replace("__AGENCE_TOOL_DONE__", "").trim();
+      }
+    }
+    // Sleep 2s between polls (sync via spawnSync to avoid blocking event loop)
+    spawnSync("sleep", ["2"]);
+  }
+
+  // Timeout — kill window and return partial
+  spawnSync("tmux", ["kill-window", "-t", paneTarget], { encoding: "utf-8" });
+  const partial = existsSync(logFile) ? readFileSync(logFile, "utf-8").trim() : "";
+  throw new Error(`Tool @${agentName} timed out after 5min${partial ? ". Partial output captured." : ""}`);
+}
+
+// ─── Loop Agent Dispatch ────────────────────────────────────────────────────
+// For type="loop" agents (ralph): launch bin/loop with the agent's config.
+// The loop primitive handles iteration, pipe-pane capture, and backpressure.
+
+function callLoop(agent: AgentMeta, systemPrompt: string, query: string, skillName: string): string {
+  const loopBin = join(AGENCE_ROOT, "bin", "loop");
+
+  // Write the prompt for the loop to consume
+  const promptFile = join(AGENCE_ROOT, "nexus", "tmp", `loop-${agent.name}-${Date.now().toString(36)}.prompt.md`);
+  mkdirSync(dirname(promptFile), { recursive: true });
+  writeFileSync(promptFile, `${systemPrompt}\n\n---\n\n${query}`);
+
+  // Resolve model
+  let model = agent.defaultModel || "sonnet";
+  const registryPath = join(AGENCE_ROOT, "codex", "agents", "registry.json");
+  try {
+    const data = JSON.parse(readFileSync(registryPath, "utf-8"));
+    model = data.models?.[model] || model;
+  } catch {}
+
+  // Resolve the tool binary for the inner loop (default: claude)
+  let innerBinary = "claude";
+  if (agent.binary) {
+    const resolved = resolveToolBinary(agent);
+    if (resolved) innerBinary = resolved;
+  }
+
+  const result = spawnSync("bash", [loopBin, "--prompt", promptFile, "--binary", innerBinary,
+    "--model", model, "--agent", agent.name, "--skill", skillName, "--max", "5"], {
+    env: process.env as Record<string, string>,
+    timeout: 600_000, // 10min for loops
+    maxBuffer: 4 * 1024 * 1024,
+    encoding: "utf-8",
+    cwd: AGENCE_ROOT,
+  });
+
+  // Cleanup prompt file
+  try { require("fs").unlinkSync(promptFile); } catch {}
+
+  if (result.status !== 0 && !result.stdout?.trim()) {
+    const err = result.stderr?.trim() || `loop @${agent.name} failed (exit ${result.status})`;
+    throw new Error(err);
+  }
+
+  return result.stdout?.trim() || "";
+}
+
 function callPeers(peerSkill: string, query: string, flavor = "code"): string {
   const peersTs = join(AGENCE_ROOT, "lib", "peers.ts");
   const result = spawnSync("bun", ["run", peersTs, peerSkill, "--flavor", flavor, query], {
@@ -535,7 +767,9 @@ async function runSkill(
     console.error(`[skill] MEM-003: memory context injected for ^${skillName}`);
   }
 
-  console.error(`[skill] ${skillName} via ${usePeers ? "peers" : `@${agentName}`} | artifact → ${def.artifact}`);
+  const agentType = agent?.type || "persona";
+  const routeLabel = usePeers ? "peers" : agentType === "tool" ? `tool:@${agentName}` : agentType === "loop" ? `loop:@${agentName}` : `@${agentName}`;
+  console.error(`[skill] ${skillName} via ${routeLabel} | artifact → ${def.artifact}`);
 
   const start = Date.now();
   let output: string;
@@ -543,6 +777,10 @@ async function runSkill(
   try {
     if (usePeers && peerSkill) {
       output = callPeers(peerSkill, `${systemPrompt}\n\n${query}`, opts.flavor || "code");
+    } else if (agentType === "tool" && agent) {
+      output = callTool(agent, systemPrompt, query);
+    } else if (agentType === "loop" && agent) {
+      output = callLoop(agent, systemPrompt, query, skillName);
     } else {
       output = callRouter(systemPrompt, query, agent?.name);
     }
@@ -632,23 +870,32 @@ Commands:
 
 Options:
   --agent @<name>      Route to specific agent (default: auto-pick best)
-  --peers              Use 3-agent consensus (available for solve/review/analyze/plan)
+  --agent @<a>.<model> Override model: @ralph.gpt4o, @sonya.opus
+  --agent @<a>.<tool>  Override binary: @ralph.aider (ralph loop via aider CLI)
+  --peers              Use 3-tangent consensus (available for solve/review/analyze/plan)
   --flavor <f>         Peer flavor: code|light|heavy (default: code)
   --json               Output structured JSON
   --no-save            Don't save artifact to disk
 
 Pipeline:
   1. Resolve agent (registry best-match or explicit @agent)
-  2. Load SKILL.md context if exists (synthetic/*/skills/<name>/)
-  3. Execute via router (single) or peers (consensus)
+  2. Dispatch by agent type:
+     persona → router.sh LLM call with persona injection
+     tool    → spawn external CLI binary (aider, claude, gh, az)
+     loop    → bin/loop iteration harness (ralph pattern)
+     ensemble→ peers.ts tangent sequent (@peers=3, @pair=2)
+  3. Load SKILL.md context if exists (synthetic/skills/<name>/)
   4. Save artifact to correct scope (synthetic/objectcode/organic)
 
 Examples:
   airun skill fix "TypeError in auth.ts line 42"
   airun skill review --agent @linus < src/server.ts
-  airun skill solve --peers "How to reduce CI from 45min to 10min"
+  airun skill fix --agent @aider "Fix the auth bug"      # tool: launches aider CLI
+  airun skill fix --agent @claude "Fix the auth bug"      # tool: launches claude CLI
+  airun skill test --agent @ralph "Add unit tests"        # loop: ralph iteration harness
+  airun skill solve --peers "How to reduce CI from 45min" # ensemble: 3-tangent consensus
+  airun skill solve --agent @pair "Optimize query"        # ensemble: 2-tangent consensus
   airun skill analyse --json "Why do Monday deploys fail?"
-  airun skill hack src/api/
   airun skill design "gRPC migration for 4 services"
 `);
   return 0;
@@ -700,10 +947,13 @@ async function main(): Promise<number> {
           agent = undefined;
         }
         // SEC-006: Validate agent name early
+        // Supports dot-notation: @agent.model (e.g. @ralph.gpt4o, @ralph.aider)
         if (agent) {
           const cleanAgent = agent.replace(/^@/, "");
-          if (!isValidAgentName(cleanAgent)) {
-            console.error(`[skill] SEC-006: invalid agent name: ${agent} (alphanumeric + hyphens only, max 32 chars)`);
+          const parts = cleanAgent.split(".");
+          const allValid = parts.every(p => isValidAgentName(p));
+          if (!allValid || parts.length > 2) {
+            console.error(`[skill] SEC-006: invalid agent name: ${agent} (alphanumeric + hyphens, optional .model suffix, max 32 chars per part)`);
             return 2;
           }
         }

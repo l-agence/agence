@@ -551,3 +551,120 @@ describe("peers.ts: flavor validation", () => {
     }
   });
 });
+
+// ─── 18. Mixed Agent Routing ─────────────────────────────────────────────────
+
+describe("skill.ts: mixed agent routing", () => {
+  test("help shows pipeline with agent types", () => {
+    const r = runSkill(["help"]);
+    expect(r.exitCode).toBe(0);
+    const out = r.stdout;
+    expect(out).toContain("persona");
+    expect(out).toContain("tool");
+    expect(out).toContain("loop");
+    expect(out).toContain("ensemble");
+  });
+
+  test("@aider routes as tool agent (stderr shows tool:@aider)", () => {
+    // aider binary probably not installed — should get a binary-not-found error, not a persona route
+    const r = runSkill(["fix", "--agent", "@aider", "test bug", "--no-save"]);
+    // Either shows tool routing or binary not found — both prove tool dispatch path
+    const combined = r.stdout + r.stderr;
+    const isToolRoute = combined.includes("tool:@aider") || combined.includes("binary not found");
+    expect(isToolRoute).toBe(true);
+  }, 30_000);
+
+  test("@ralph routes as loop agent (stderr shows loop:@ralph)", () => {
+    // bin/loop spawns full process chain (bun→skill→bash→loop→claude) — needs generous timeout
+    // Loop fails fast without API key but the chain itself takes time to unwind
+    const r = runSkill(["test", "--agent", "@ralph", "test something", "--no-save"]);
+    const combined = r.stdout + r.stderr;
+    const isLoopRoute = combined.includes("loop:@ralph") || combined.includes("Binary not found");
+    expect(isLoopRoute).toBe(true);
+  }, 60_000);
+
+  test("@sonya routes as persona (stderr shows @sonya, no tool/loop prefix)", () => {
+    const r = runSkill(["design", "--agent", "@sonya", "test design", "--no-save"]);
+    expect(r.stderr).toContain("@sonya");
+    expect(r.stderr).not.toContain("tool:@sonya");
+    expect(r.stderr).not.toContain("loop:@sonya");
+  });
+
+  test("@claude routes as tool agent", () => {
+    const r = runSkill(["fix", "--agent", "@claude", "test", "--no-save"]);
+    const combined = r.stdout + r.stderr;
+    expect(combined).toMatch(/tool:@claude|binary not found/i);
+  }, 30_000);
+
+  test("registry.json has correct types", () => {
+    const { readFileSync } = require("fs");
+    const registry = JSON.parse(readFileSync(join(AGENCE_ROOT, "codex/agents/registry.json"), "utf-8"));
+    expect(registry.agents.aider.type).toBe("tool");
+    expect(registry.agents.claude.type).toBe("tool");
+    expect(registry.agents.pilot.type).toBe("tool");
+    expect(registry.agents.aish.type).toBe("tool");
+    expect(registry.agents.azure.type).toBe("tool");
+    expect(registry.agents.devops.type).toBe("tool");
+    expect(registry.agents.ralph.type).toBe("loop");
+    expect(registry.agents.sonya.type).toBe("persona");
+    expect(registry.agents.linus.type).toBe("persona");
+    expect(registry.agents.copilot.type).toBe("persona");
+    expect(registry.agents.peers.type).toBe("ensemble");
+    expect(registry.agents.pair.type).toBe("ensemble");
+    expect(registry.agents.peers.tangents).toBe(3);
+    expect(registry.agents.pair.tangents).toBe(2);
+  });
+});
+
+// ─── 19. bin/loop primitive ──────────────────────────────────────────────────
+
+describe("bin/loop: generic loop primitive", () => {
+  test("--help shows usage", () => {
+    const r = Bun.spawnSync(["bash", join(AGENCE_ROOT, "bin/loop"), "--help"], {
+      env: { ...process.env, AGENCE_ROOT },
+    });
+    const out = new TextDecoder().decode(r.stdout);
+    expect(out).toContain("loop — Generic iteration loop primitive");
+    expect(out).toContain("--prompt");
+    expect(out).toContain("--binary");
+    expect(out).toContain("--backpressure");
+    expect(out).toContain("--max");
+  });
+
+  test("--dry-run shows command without executing", () => {
+    // Create a temp prompt file
+    const tmpPrompt = join(AGENCE_ROOT, "nexus/tmp/test-loop-prompt.md");
+    require("fs").mkdirSync(join(AGENCE_ROOT, "nexus/tmp"), { recursive: true });
+    require("fs").writeFileSync(tmpPrompt, "Test prompt for dry run");
+
+    const r = Bun.spawnSync(["bash", join(AGENCE_ROOT, "bin/loop"),
+      "--prompt", tmpPrompt, "--binary", "echo", "--max", "3", "--dry-run"], {
+      env: { ...process.env, AGENCE_ROOT },
+    });
+    const out = new TextDecoder().decode(r.stdout);
+    expect(out).toContain("DRY RUN");
+    expect(out).toContain("echo");
+    expect(out).toContain("3");
+
+    require("fs").unlinkSync(tmpPrompt);
+  });
+
+  test("missing --prompt fails with usage", () => {
+    const r = Bun.spawnSync(["bash", join(AGENCE_ROOT, "bin/loop")], {
+      env: { ...process.env, AGENCE_ROOT },
+    });
+    const combined = new TextDecoder().decode(r.stdout) + new TextDecoder().decode(r.stderr);
+    expect(combined).toContain("--prompt is required");
+    expect(r.exitCode).toBe(1);
+  });
+
+  test("missing prompt file fails gracefully", () => {
+    const r = Bun.spawnSync(["bash", join(AGENCE_ROOT, "bin/loop"),
+      "--prompt", "/nonexistent/file.md"], {
+      env: { ...process.env, AGENCE_ROOT },
+    });
+    const combined = new TextDecoder().decode(r.stdout) + new TextDecoder().decode(r.stderr);
+    expect(combined).toContain("Prompt file not found");
+    expect(r.exitCode).toBe(1);
+  });
+});

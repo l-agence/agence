@@ -19,13 +19,13 @@
         "WF-SECLOOP",
         "WF-MEMORY"
       ],
-      "completed_tasks": 43,
-      "total_tasks": 49,
-      "completion_pct": 88,
+      "completed_tasks": 45,
+      "total_tasks": 50,
+      "completion_pct": 90,
       "status": "in-progress",
       "completed_workflows": 13,
       "total_workflows": 14,
-      "phase": "v0.6.0 memory model MEM-001..004 complete. MEM-005 (^ken) + HARNESS-001 deferred to v0.7."
+      "phase": "v0.6.0 MEM-001..004 + WIRE-005 + HARNESS-001 complete. Mixed agent routing shipped."
     }
   ]
 }

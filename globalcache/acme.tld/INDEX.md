@@ -1,5 +1,11 @@
 # ACME.TLD - example org  Semantic KnowledgeBase
 
+## Ralpho Wiggum Autonomic Iteration loops 
+- based on GHuntley's ralph loop iteratro with Anthropic Principal Skinner harness
+- https://github.com/ghuntley/how-to-ralph-wiggum/tree/main/files
+- https://github.com/anthropics/claude-plugins-official/tree/main/plugins/ralph-loop
+
+
 ## MIT-Style Weighed Peer Consensus
 - https://arxiv.org/abs/2406.12708
 - https://arxiv.org/pdf/2406.12708

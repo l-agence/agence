@@ -1,0 +1,9 @@
+{
+  "type": "output",
+  "from": "output-test",
+  "to": "human",
+  "payload": "{\"key\":\"value with 'quotes' and $(cmd)\"}",
+  "timestamp": "2026-04-21T00:30:37Z",
+  "id": "709f52ca",
+  "hmac": "b8bf7054d9e0860bdb2b0dd4db2c63fbe4f5c582b62c1050227fb22034fa4ec9"
+}

@@ -57,12 +57,15 @@
       "description": "Microsoft AI Shell"
     },
     "ralph": {
-      "type": "persona",
+      "type": "loop",
+      "binary": "claude",
       "provider": "anthropic",
       "default_model": "sonnet",
       "tier": "T1",
-      "skills": ["test", "review", "precommit", "break"],
-      "description": "Learning + accountability harness"
+      "skills": ["test", "review", "precommit", "break", "build", "feature", "document"],
+      "backpressure": "bun test",
+      "max_iterations": 10,
+      "description": "Ralph Wiggum autonomous iteration loop with Principal Skinner backpressure harness"
     },
     "sonya": {
       "type": "persona",
@@ -137,18 +140,24 @@
       "description": "Fast/cheap Claude Haiku"
     },
     "azure": {
-      "type": "persona",
-      "provider": "azure",
+      "type": "tool",
+      "binary": "az",
+      "install": "curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash",
       "default_model": null,
+      "launch_flags": "",
+      "model_flag": null,
       "tier": "T3",
-      "description": "Azure Copilot specialist"
+      "description": "Azure DevOps CLI — pipelines, repos, boards"
     },
     "devops": {
-      "type": "persona",
-      "provider": null,
+      "type": "tool",
+      "binary": "gh",
+      "install": "gh extension install github/gh-actions",
       "default_model": null,
+      "launch_flags": "",
+      "model_flag": null,
       "tier": "T2",
-      "description": "Git DevOps assistant (auto-routed)"
+      "description": "GitHub DevOps — actions, releases, deployments"
     },
     "peers": {
       "type": "ensemble",
@@ -160,7 +169,21 @@
         "heavy": ["opus", "gpt4", "o1"]
       },
       "default_flavor": "code",
-      "description": "3-agent consensus ensemble"
+      "tangents": 3,
+      "description": "3-tangent sequent — MIT-style weighted consensus (arXiv:2406.12708)"
+    },
+    "pair": {
+      "type": "ensemble",
+      "providers": ["anthropic", "openai"],
+      "tier": "T3",
+      "flavors": {
+        "code":  ["sonnet", "gpt4o"],
+        "light": ["haiku", "mini"],
+        "heavy": ["opus", "gpt4"]
+      },
+      "default_flavor": "code",
+      "tangents": 2,
+      "description": "2-tangent sequent — lightweight consensus pair"
     }
   }
 }

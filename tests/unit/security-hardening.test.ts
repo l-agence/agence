@@ -275,8 +275,16 @@ describe("SEC-006: Persona injection hardening", () => {
     expect(r.stderr).toContain("invalid agent name");
   });
 
-  test("rejects agent names with dots", () => {
+  test("accepts agent.model dot-notation", () => {
+    // agent.model is valid dot-notation (e.g. @ralph.gpt4o)
     const r = runSkill(["fix", "--agent", "agent.evil", "test"]);
+    // Should NOT exit with validation error (2) — it passes SEC-006, then fails at router
+    expect(r.exitCode).not.toBe(2);
+    expect(r.stderr).not.toContain("SEC-006");
+  });
+
+  test("rejects agent names with multiple dots (path traversal)", () => {
+    const r = runSkill(["fix", "--agent", "agent.foo.bar", "test"]);
     expect(r.exitCode).toBe(2);
     expect(r.stderr).toContain("SEC-006");
   });
@@ -321,7 +329,7 @@ describe("SEC-006: Persona injection hardening", () => {
     // Should NOT exit with code 2 (validation error)
     expect(r.exitCode).not.toBe(2);
     expect(r.stderr).not.toContain("SEC-006");
-  });
+  }, 15_000);
 
   // ─── @peers and @pair bypass validation ────────────────────────────────────
 

@@ -1,0 +1,9 @@
+{
+  "type": "notify",
+  "from": "unicode",
+  "to": "human",
+  "payload": "测试 тест 🔥 ñ ü",
+  "timestamp": "2026-04-20T21:28:35Z",
+  "id": "5c4bbb70",
+  "hmac": "2d2e0495e8f4f6a1bf3d4e42bba97a790254fa1177ce068216fd9786ced0140f"
+}

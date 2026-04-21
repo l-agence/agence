@@ -1,7 +1,7 @@
 # Projects Dashboard
 
 > **Source**: `organic/projects.json` + `organic/workflows.json`
-> **Generated**: 2026-04-20 | **Repo**: agence-master
+> **Generated**: 2026-04-21 | **Repo**: agence-master
 
 ---
 
