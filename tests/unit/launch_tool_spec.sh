@@ -15,22 +15,22 @@ Describe 'agence !tool launcher (mode_system / launch_tool)'
   # ===========================================================================
 
   It 'launch_tool function is defined in bin/agence'
-    When run bash -c 'grep -c "^launch_tool()" bin/agence'
+    When run bash -c 'grep -c "^launch_tool()" lib/tools.sh'
     The output should match pattern '[1-9]*'
   End
 
   It 'aider case is present in launch_tool'
-    When run bash -c 'grep -c "aider)" bin/agence'
+    When run bash -c 'grep -c "\"aider\"" codex/agents/registry.json'
     The output should match pattern '[1-9]*'
   End
 
   It 'claude case is present in launch_tool'
-    When run bash -c 'grep -c "claude)" bin/agence'
+    When run bash -c 'grep -c "\"claude\"" codex/agents/registry.json'
     The output should match pattern '[1-9]*'
   End
 
   It 'pilot case is present in launch_tool'
-    When run bash -c 'grep -c "pilot)" bin/agence'
+    When run bash -c 'grep -c "\"pilot\"" codex/agents/registry.json'
     The output should match pattern '[1-9]*'
   End
 
@@ -100,7 +100,7 @@ Describe 'agence !tool launcher (mode_system / launch_tool)'
   # ===========================================================================
 
   It 'mode_system routes persona agents to shell_bash_session'
-    When run bash -c 'grep -c "shell_bash_session" bin/agence'
+    When run bash -c 'grep -rl "shell_bash_session" lib/tools.sh lib/session.sh | wc -l'
     The output should match pattern '[1-9]*'
   End
 

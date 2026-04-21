@@ -841,8 +841,8 @@ describe("Memory: MEM-005 ^ken orchestration primitives", () => {
     expect(skillTs).toContain("runKen");
   });
 
-  it("bin/agence recognizes ^ken in skill names", () => {
-    const agence = readFileSync(join(AGENCE_ROOT, "bin", "agence"), "utf-8");
-    expect(agence).toContain("|ken\"");
+  it("lib/init.sh recognizes ^ken in skill names", () => {
+    const initSh = readFileSync(join(AGENCE_ROOT, "lib", "init.sh"), "utf-8");
+    expect(initSh).toContain("|ken\"");
   });
 });

@@ -358,7 +358,7 @@ Describe 'Agence CLI'
   End
 
   It 'handles ^install init command (structure check)'
-    When run bash -c 'grep -c "install_agence_packages" bin/agence'
+    When run bash -c 'grep -c "install_agence_packages" lib/init.sh'
     The output should match pattern '[1-9]*'
   End
 
