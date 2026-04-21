@@ -29,6 +29,11 @@ The analysis is the byproduct of the index. Crawl once, read many times.
 | GitHub topic | `github:topics/ai-agents` | `globalcache/github.com/topics/ai-agents/` |
 | URL / web | `https://docs.example.com` | `globalcache/<domain>/` |
 
+> **Note on storage paths**: Local and GitHub repo/org targets write to `objectcode/`
+> (persistent, commitable knowledge base). GitHub topic and URL targets write to
+> `globalcache/` (external content cache, not source code — same convention as
+> the existing `globalcache/acme.tld/` knowledge bases).
+
 ---
 
 ## Modes

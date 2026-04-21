@@ -44,7 +44,16 @@ const AGENCE_ROOT = process.env.AGENCE_ROOT
   || process.env.AI_ROOT
   || join(import.meta.dir, "..");
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+/** GitHub domain used for globalcache path construction. */
+const GITHUB_DOMAIN = "github.com";
+
+/** Maximum source file size to index (bytes). Files larger than this are skipped
+ *  to avoid memory pressure on very large generated files (e.g. minified bundles). */
+const MAX_FILE_BYTES = 500_000;
+
+
 
 type TargetKind = "local" | "github-repo" | "github-org" | "github-topic" | "url";
 type ReconMode = "full" | "index" | "analyse" | "update";
@@ -83,7 +92,7 @@ function resolveTarget(raw: string): Target {
       kind: "github-topic",
       raw,
       label: `GitHub topic: ${tag}`,
-      outputDir: join(AGENCE_ROOT, "globalcache", "github.com", "topics", tag),
+      outputDir: join(AGENCE_ROOT, "globalcache", GITHUB_DOMAIN, "topics", tag),
     };
   }
 
@@ -102,13 +111,13 @@ function resolveTarget(raw: string): Target {
     return {
       kind: "github-org",
       raw,
-      label: `GitHub org: ${path}`,
+      label: `GitHub organization: ${path}`,
       outputDir: join(AGENCE_ROOT, "objectcode", path),
     };
   }
 
   // Full GitHub URL
-  if (raw.startsWith("https://github.com/") || raw.startsWith("http://github.com/")) {
+  if (raw.startsWith(`https://${GITHUB_DOMAIN}/`) || raw.startsWith(`http://${GITHUB_DOMAIN}/`)) {
     const url = new URL(raw);
     const parts = url.pathname.replace(/^\//, "").replace(/\.git$/, "").split("/").filter(Boolean);
     if (parts.length >= 2) {
@@ -185,10 +194,16 @@ function extractSymbols(content: string, lang: string): string[] {
 
   if (lang === "typescript" || lang === "javascript") {
     for (const line of lines) {
+      // Top-level declarations
       const m = line.match(
         /^(?:export\s+)?(?:async\s+)?(?:function|class|const|let|var|type|interface|enum)\s+([A-Za-z_$][A-Za-z0-9_$]*)/
       );
-      if (m) symbols.push(m[1]);
+      if (m) { symbols.push(m[1]); continue; }
+      // Class method definitions (  methodName( or  async methodName()
+      const mm = line.match(/^\s+(?:async\s+)?(?:static\s+)?(?:private\s+)?(?:public\s+)?(?:protected\s+)?([A-Za-z_$][A-Za-z0-9_$]*)\s*\(/);
+      if (mm && mm[1] !== "if" && mm[1] !== "for" && mm[1] !== "while" && mm[1] !== "switch") {
+        symbols.push(mm[1]);
+      }
     }
   } else if (lang === "python") {
     for (const line of lines) {
@@ -287,7 +302,7 @@ function collectFiles(dir: string, base: string = dir): string[] {
     } else if (st.isFile()) {
       const ext = extname(entry).toLowerCase();
       if (SKIP_EXTS.has(ext)) continue;
-      if (st.size > 500_000) continue; // skip very large files
+      if (st.size > MAX_FILE_BYTES) continue; // skip very large files
       results.push(relative(base, full));
     }
   }
@@ -451,7 +466,7 @@ function writeAnalysis(target: Target, index: IndexJson): void {
     .join("\n");
 
   // Config files heuristic
-  const configPatterns = /(config|settings|\.env|\.agence|docker|compose|package\.json|tsconfig|pyproject|Cargo\.toml)/i;
+  const configPatterns = /(config|settings|[._]env|[._]agence|docker|compose|package\.json|tsconfig|pyproject|Cargo\.toml)/i;
   const configFiles = index.files
     .filter(f => configPatterns.test(f.file))
     .slice(0, 10)
