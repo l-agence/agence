@@ -1,9 +1,11 @@
 # 🤖 l'Agence (^) —  Agentic Engineering Collaboration Environment
 
 **Author**: Stephane Korning · 2026 · [MIT + Commons Clause](LICENSE.md)  
-**Version**: v0.4.0-beta · *Pre-release — not yet production-ready*
+**Version**: v0.6.0-alpha · *First public release — the first governance framework for agentic CLI*
 
-> *The first git-native and governed, multi-agent swarm for software engineering.*
+> *The first git-native, governed, auditable multi-agent swarm for software engineering.*
+> 
+> Every agent action Merkle-chained. Every command policy-gated. Consensus from 3 independent LLMs, not one.
 
 ---
 
@@ -16,13 +18,18 @@ Unlike single-agent tools (Claude Code, Copilot, aider), agence coordinates **mu
 | Capability | How |
 |---|---|
 | Multi-agent swarm | tmux tiles — one agent per pane, human hypervisor |
+| Mixed agent routing | 4-type dispatch: persona, tool, loop, ensemble |
+| Dot-notation | `@ralph.gpt4o` — per-dispatch model/binary override |
 | Session persistence | `^save` / `^resume` — context survives restarts |
 | Safe handoffs | `^handoff @ralph` — full context transfer between agents |
-| Audit trail | `nexus/.ailedger` — append-only JSONL decision log |
+| Merkle audit trail | `nexus/.ailedger` — append-only HMAC-signed decision log |
 | Tiered governance | `AIPOLICY.yaml` → T0 (free) → T4 (gated) command tiers |
+| Peer consensus | `@peers ^review` — 3-LLM weighted consensus (arXiv:2406.12708) |
+| Cognitive memory | COGNOS 6-tier: eidetic/semantic/episodic/kinesthetic/masonic/mnemonic |
 | Tool-agnostic | Works with claude, copilot, aider, aish, or your own agent |
-| LLM-agnostic | Anthropic, OpenAI, GitHub Copilot, OpenRouter, Ollama, and more |
+| LLM-agnostic | Anthropic, OpenAI, Gemini, GitHub Copilot, OpenRouter, Ollama |
 | Git-native | No DB, no server — just git worktrees and flat files |
+| 275 tests | Security hardening, guard boundary, peer dispatch, memory ops |
 
 
 ---
@@ -220,15 +227,31 @@ The `^init` command checks and reports `@` symlink status. If missing, it tells 
 
 | Agent | Type | Best For | Model |
 |---|---|---|---|
-| `!ralph` | Persona | Learning, reliability, explanations | Claude Sonnet |
-| `!sonya` | Persona | Architecture, code review | Claude Sonnet |
-| `!claudia` | Persona | Deep reasoning, critical decisions | Claude Opus |
-| `!aiko` | Persona | Fast analysis, cheap queries | Claude Haiku |
-| `!chad` | Persona | DevOps, infra, CI/CD (Cockney) | GPT-4o |
-| `!claude` | Tool | Claude Code interactive CLI | Anthropic direct |
-| `!pilot` | Tool | GitHub Copilot CLI | GitHub Copilot |
-| `!aider` | Tool | Code patches, git diffs | OpenRouter/local |
-| `!aish` | Tool | Windows shell, Azure CLI | AI Shell (winget) |
+| Agent | Type | Best For | Model |
+|---|---|---|---|
+| `@ralph` | **Loop** | Autonomous iteration with backpressure | Claude Sonnet |
+| `@sonya` | Persona | Architecture, code review | Claude Sonnet |
+| `@claudia` | Persona | Deep reasoning, critical decisions | Claude Opus |
+| `@aiko` | Persona | Fast analysis, cheap queries | Claude Haiku |
+| `@chad` | Persona | DevOps, infra, CI/CD | GPT-4o |
+| `@linus` | Persona | Harsh code review (Torvalds-inspired) | Claude Sonnet |
+| `@feynman` | Persona | Explainer, teaching | Claude Sonnet |
+| `@aleph` | Persona | Red team, security analysis | Claude Sonnet |
+| `@claude` | **Tool** | Claude Code CLI (headless spawn) | Anthropic |
+| `@aider` | **Tool** | Code patches, git diffs | OpenRouter/local |
+| `@pilot` | **Tool** | GitHub Copilot CLI | GitHub Copilot |
+| `@aish` | **Tool** | Windows shell, Azure CLI | AI Shell |
+| `@peers` | **Ensemble** | 3-LLM weighted consensus | Claude+GPT+Gemini |
+| `@pair` | **Ensemble** | 2-LLM lightweight consensus | Claude+GPT |
+
+### Dot-notation (model/binary override)
+
+```bash
+@ralph.gpt4o          # Ralph loop using GPT-4o instead of default Sonnet
+@ralph.aider          # Ralph loop wrapping aider CLI instead of claude
+@sonya.opus           # Sonya persona with Opus model
+@haiku.flash          # Haiku persona with Gemini Flash
+```
 
 ---
 
@@ -323,13 +346,24 @@ MNEMONIC: This is a "fast access, ephemeral memory cache' It is intended to be a
 AIDO_NO_VERIFY=1 tests/lib/shellspec/shellspec --shell bash tests/unit/agence_spec.sh
 ```
 
-> ✅ **Current status (v0.4.0-beta)**: 91 examples, **0 failures**, 17 skips, 1 warning — all blocking failures resolved.
-> Skip categories (expected in CI):
-> - `gh` CLI integration tests — skipped when `gh auth status` returns unauthenticated.
->   To run these locally, authenticate first: `agence /ghlogin`
-> - TTY-interactive commands (`T2`/`fetch`/`pull`/`merge`) — skipped headless CI
+```bash
+# Run full test suite (bun:test)
+bun test tests/unit/
+```
+
+> ✅ **Current status (v0.6.0-alpha)**: **275 tests**, **0 failures**, 695 expect() calls.
 >
-> Warning: `gitstatus` emits a guard-unavailable notice to stderr (bun runtime absent in CI); test passes.
+> | Suite | Tests | Coverage |
+> |---|---|---|
+> | `guard.test.ts` | 126 | Command gate, tier escalation, AIPOLICY parsing |
+> | `peers-dispatch.test.ts` | 57 | Peer consensus, mixed routing, bin/loop |
+> | `memory.test.ts` | 56 | COGNOS 6-tier: retain/recall/cache/forget/promote/distill |
+> | `security-hardening.test.ts` | 36 | HMAC signing, signal forgery, injection hardening |
+>
+> Legacy shellspec tests also available:
+> ```bash
+> AIDO_NO_VERIFY=1 tests/lib/shellspec/shellspec --shell bash tests/unit/agence_spec.sh
+> ```
 
 ---
 
