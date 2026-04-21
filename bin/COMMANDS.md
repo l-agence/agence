@@ -269,6 +269,102 @@ agence ^reindex
 
 ---
 
+### `agence ^recon`
+
+**Purpose**: General-purpose crawler and indexer. The single primitive that turns any
+target into a structured, queryable knowledge index.
+
+**What it does**:
+- Crawls a local path, GitHub repo/org/topic, or URL
+- Writes one `.chunk.md` per source file to `objectcode/<target>/` (lightweight
+  AST-extracted symbols + preview)
+- Writes `objectcode/<target>/INDEX.md` (entry point overview) and `INDEX.json`
+  (machine-readable file manifest + git SHA)
+- Optionally writes `objectcode/<target>/ANALYSIS.md` — a human-readable
+  intelligence brief covering tech stack, entry points, and notable symbols
+
+**Replaces `^harvest`** — there is no separate harvest command. `^recon` is the
+crawler/indexer primitive.
+
+**Target types**:
+
+| Target | Example | Output path |
+|---|---|---|
+| Current repo | `.` | `objectcode/local/` |
+| Local path | `/path/to/dir` | `objectcode/<dirname>/` |
+| GitHub repo | `github:org/repo` | `objectcode/<org>/<repo>/` |
+| GitHub org | `github:org` | `objectcode/<org>/` |
+| GitHub topic | `github:topics/ai-agents` | `globalcache/github.com/topics/ai-agents/` |
+| URL / web | `https://docs.example.com` | `globalcache/<domain>/` |
+
+**Modes**:
+
+```bash
+agence ^recon <target>               # full: crawl + index + analysis brief (default)
+agence ^recon <target> --index       # index only, no analysis (fast)
+agence ^recon <target> --analyse     # analysis only (reads existing index)
+agence ^recon <target> --update      # incremental: re-index changed files only
+agence ^recon list                   # show all indexed targets + staleness
+agence ^recon status <target>        # index health, file counts, last updated
+```
+
+**Usage**:
+
+```bash
+# Index + analyse current repo
+agence ^recon .
+
+# Index only (no analysis — fast, cheap)
+agence ^recon . --index
+
+# Re-index only changed files since last ^recon (uses git diff)
+agence ^recon . --update
+
+# Index a GitHub repo (creates stub; full crawl requires agent with network access)
+agence ^recon github:garrytan/gstack
+
+# Index a GitHub topic area
+agence ^recon github:topics/ai-agents
+
+# Check index health
+agence ^recon status .
+
+# List all indexed targets + staleness
+agence ^recon list
+```
+
+**Output example** (`^recon status .`):
+
+```
+[recon status] Local: /path/to/repo
+  Path:       /path/to/.agence/objectcode/local
+  Files:      142
+  Indexed:    2026-04-21T14:30:00Z  (2h ago)
+  Git SHA:    a7f3b2e4
+  Analysis:   ✓ present
+```
+
+**Index structure** (`objectcode/<target>/`):
+
+```
+objectcode/local/
+  INDEX.md              ← entry point overview
+  INDEX.json            ← file manifest, git SHA, last indexed
+  lib__commands.ts.chunk.md   ← chunk per source file
+  lib__router.ts.chunk.md
+  ANALYSIS.md           ← intelligence brief (when --analyse run)
+```
+
+**Integration with `^glimpse` and `^grasp`**:
+
+- `^recon` **writes** the index
+- `^glimpse` and `^grasp` **read** from the index (avoiding redundant crawls)
+- `^ken` orchestrator runs `^recon --index` first, then consumers read cheaply
+
+**Implementation**: `lib/recon.ts` (Bun)
+
+---
+
 ### `agence ^learn`
 
 **Purpose**: Extract and synthesize knowledge from session history and recorded faults.

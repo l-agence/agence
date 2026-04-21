@@ -41,6 +41,7 @@ const ARTIFACT_ROUTES: Record<string, ArtifactRoute> = {
   document: { scope: "synthetic", subdir: "docs",      description: "Generated documentation" },
 
   // Structural artifacts → objectcode (AST-chunkable)
+  index:    { scope: "objectcode", subdir: "",          description: "^recon crawler index (per-target directory)" },
   pattern:  { scope: "objectcode", subdir: "patterns", description: "Reusable code pattern" },
   design:   { scope: "objectcode", subdir: "designs",  description: "Architecture/design blueprint" },
 
@@ -173,7 +174,7 @@ Commands:
 
 Artifact Types:
   skill, report, solution, analysis, document → synthetic/ (shared)
-  pattern, design                             → objectcode/ (structural)
+  index, pattern, design                      → objectcode/ (structural)
   result                                      → organic/ (work output)`);
 }
 
