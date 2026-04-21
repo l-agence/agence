@@ -27,8 +27,18 @@ provider: anthropic
 model: claude-sonnet-4-5
 
 # ── Shard (shared upstream ledger) ───────────────────────────────────────────
-# Git remote URL for the shared .ailedger submodule.
-# Override with AI_SHARD env var.
+# Git remote URL for the shared ailedger sister repo.
+#
+# Convention: the ailedger lives in a repo named "ailedger" in the same
+# org/user as your agence repo (the sister-repo pattern).
+#   origin:  https://github.com/l-agence/agence.git
+#   shard →  https://github.com/l-agence/ailedger.git
+#
+# Auto-derive: if 'shard' is not set and AI_SHARD env var is unset,
+# 'agence ^ledger init' will automatically derive the URL from origin
+# by replacing the repo name with "ailedger".
+#
+# Override: export AI_SHARD=https://github.com/YOUR-ORG/ailedger.git
 # shard: https://github.com/YOUR-ORG/ailedger.git
 
 

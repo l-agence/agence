@@ -93,10 +93,25 @@ function cmdInit(args: string[]): number {
     }
   }
 
+  // Auto-derive shard URL from origin when not explicitly configured.
+  // Convention: the ailedger lives in a sister repo named "ailedger" in the
+  // same org/user as the parent repo.
+  //   https://github.com/l-agence/agence.git  →  https://github.com/l-agence/ailedger.git
+  //   git@github.com:l-agence/agence.git      →  git@github.com:l-agence/ailedger.git
   if (!remote) {
-    stderr(`[ledger] Error: No shard remote URL.`);
-    stderr(`  Set AI_SHARD env var or pass --remote <url>`);
-    stderr(`  Or add 'shard: <url>' to ~/.agence/config.yaml`);
+    const originUrl = run("git remote get-url origin").trim();
+    if (originUrl) {
+      // Replace the last path/repo segment with "ailedger", preserving .git suffix
+      remote = originUrl.replace(/([/:])([^/:]+?)(\.git)?$/, (_m, sep, _repo, dotGit) => `${sep}ailedger${dotGit || ""}`);
+      stderr(`[ledger] Auto-derived shard remote from origin: ${remote}`);
+      stderr(`  Override: export AI_SHARD=<url>  or add 'shard: <url>' to ~/.agence/config.yaml`);
+    }
+  }
+
+  if (!remote) {
+    stderr(`[ledger] Error: No shard remote URL and could not derive one from git origin.`);
+    stderr(`  Set AI_SHARD env var, pass --remote <url>,`);
+    stderr(`  or add 'shard: <url>' to ~/.agence/config.yaml`);
     return 1;
   }
 
