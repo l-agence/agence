@@ -30,6 +30,10 @@ MODEL=""
 MODEL_FLAG="--model"
 MAX_ITERATIONS=0       # 0 = unlimited
 BACKPRESSURE=""        # validation command (e.g. "bun test")
+BACKPRESSURE_MODE="strict"  # strict | progressive
+BP_MAX_STALLS=3        # progressive: max consecutive stalls before abort
+BP_STALL_COUNT=0       # progressive: current consecutive stall counter
+BP_PREV_HASH=""        # progressive: hash of previous iteration output
 AGENT="loop"
 SKILL=""
 HEADLESS_FLAG="-p"     # stdin-pipe flag for the binary
@@ -62,11 +66,25 @@ Options:
   --output-format <fmt> Output format flag (e.g. --output-format=stream-json)
   --max <n>             Max iterations (default: 0 = unlimited)
   --backpressure <cmd>  Validation command run after each iteration
+  --backpressure-mode <mode>  Backpressure strategy: strict | progressive (default: strict)
+  --max-stalls <n>      Progressive mode: abort after n consecutive stalls (default: 3)
   --agent <name>        Agent name for logging (default: loop)
   --skill <name>        Skill name for logging
   --dry-run             Show what would run without executing
   --verbose             Verbose output
   --help                Show this help
+
+Backpressure Modes:
+  strict (default):
+    Pass/fail only. Failures are tolerated — agent self-corrects next iteration.
+
+  progressive:
+    Hybrid retry+stall detection. After each iteration:
+    - If backpressure passes → stall counter resets
+    - If backpressure fails but output changed → progress detected, counter resets
+    - If backpressure fails AND output is identical → stall, counter increments
+    - After --max-stalls consecutive stalls → loop aborts
+    Rewards slow deliberation. Penalizes loops-to-nowhere.
 
 Loop Mechanics:
   1. Read prompt file
@@ -84,6 +102,7 @@ Examples:
   bin/loop --prompt PROMPT_plan.md --binary claude --model opus --max 5
   bin/loop --prompt task.md --binary aider --headless "--message" --max 3
   bin/loop --prompt task.md --backpressure "bun test" --max 10
+  bin/loop --prompt task.md --backpressure "bun test" --backpressure-mode progressive --max 20
 EOF
   exit "${1:-0}"
 }
@@ -99,6 +118,8 @@ while [[ $# -gt 0 ]]; do
     --output-format) OUTPUT_FLAG="--output-format=$2"; shift 2 ;;
     --max)          MAX_ITERATIONS="$2"; shift 2 ;;
     --backpressure) BACKPRESSURE="$2"; shift 2 ;;
+    --backpressure-mode) BACKPRESSURE_MODE="$2"; shift 2 ;;
+    --max-stalls)   BP_MAX_STALLS="$2"; shift 2 ;;
     --agent)        AGENT="$2"; shift 2 ;;
     --skill)        SKILL="$2"; shift 2 ;;
     --dry-run)      DRY_RUN=true; shift ;;
@@ -212,18 +233,67 @@ teardown_pipe_pane() {
 
 # ─── Backpressure (Principal Skinner) ─────────────────────────────────────────
 
+# Hash the iteration output for progressive stall detection
+_output_hash() {
+  local log_file="${SESSION_DIR}/${LOOP_ID}-iter${ITERATION}.typescript"
+  if [[ -f "$log_file" ]]; then
+    sha256sum "$log_file" 2>/dev/null | cut -d' ' -f1
+  else
+    echo "empty"
+  fi
+}
+
 run_backpressure() {
   if [[ -z "$BACKPRESSURE" ]]; then
     return 0
   fi
 
-  _log "Backpressure: ${BACKPRESSURE}"
+  _log "Backpressure [${BACKPRESSURE_MODE}]: ${BACKPRESSURE}"
+
+  local bp_passed=false
   if eval "$BACKPRESSURE" >> "$LOOP_LOG" 2>&1; then
-    _log "Backpressure: PASS ✓"
-    return 0
-  else
-    _log "Backpressure: FAIL ✗ (agent will retry next iteration)"
+    bp_passed=true
+  fi
+
+  if [[ "$BACKPRESSURE_MODE" == "progressive" ]]; then
+    # Progressive mode: detect stalls (identical output = no progress)
+    local current_hash
+    current_hash=$(_output_hash)
+
+    if $bp_passed; then
+      _log "Backpressure: PASS ✓ (stall counter reset)"
+      BP_STALL_COUNT=0
+      BP_PREV_HASH="$current_hash"
+      return 0
+    fi
+
+    # Check if output changed (progress despite failure)
+    if [[ -n "$BP_PREV_HASH" ]] && [[ "$current_hash" == "$BP_PREV_HASH" ]]; then
+      BP_STALL_COUNT=$((BP_STALL_COUNT + 1))
+      _log "Backpressure: FAIL ✗ — stall detected (${BP_STALL_COUNT}/${BP_MAX_STALLS}, identical output)"
+    else
+      # Output changed — agent is making progress, tolerate the failure
+      BP_STALL_COUNT=0
+      _log "Backpressure: FAIL ✗ — but output changed (progress detected, stall counter reset)"
+    fi
+    BP_PREV_HASH="$current_hash"
+
+    # Abort if max consecutive stalls reached
+    if [[ $BP_STALL_COUNT -ge $BP_MAX_STALLS ]]; then
+      _log "Backpressure: ABORT — ${BP_MAX_STALLS} consecutive stalls (agent is looping without progress)"
+      ledger_append "loop-stall-abort" "stalls=${BP_STALL_COUNT} iter=${ITERATION}"
+      return 2  # 2 = abort signal (distinct from 1 = normal failure)
+    fi
     return 1
+  else
+    # Strict mode: original behavior
+    if $bp_passed; then
+      _log "Backpressure: PASS ✓"
+      return 0
+    else
+      _log "Backpressure: FAIL ✗ (agent will retry next iteration)"
+      return 1
+    fi
   fi
 }
 
@@ -249,13 +319,16 @@ main() {
     echo "  Model:        ${MODEL:-auto}"
     echo "  Max iters:    ${MAX_ITERATIONS:-unlimited}"
     echo "  Backpressure: ${BACKPRESSURE:-none}"
+    echo "  BP Mode:      ${BACKPRESSURE_MODE}"
+    [[ "$BACKPRESSURE_MODE" == "progressive" ]] && echo "  Max stalls:   ${BP_MAX_STALLS}"
     echo "  Command:      $cmd"
     exit 0
   fi
 
   _log "Starting loop: $LOOP_ID"
   _log "Command: $cmd"
-  ledger_append "loop-start" "@${AGENT} ^${SKILL:-unknown} max=${MAX_ITERATIONS}"
+  [[ "$BACKPRESSURE_MODE" == "progressive" ]] && _log "Progressive mode: max-stalls=${BP_MAX_STALLS}"
+  ledger_append "loop-start" "@${AGENT} ^${SKILL:-unknown} max=${MAX_ITERATIONS} bp-mode=${BACKPRESSURE_MODE}"
 
   while true; do
     # Max iteration check
@@ -288,7 +361,13 @@ main() {
     teardown_pipe_pane
 
     # Backpressure check
-    run_backpressure || true  # failures don't stop the loop — agent self-corrects
+    local bp_rc=0
+    run_backpressure || bp_rc=$?
+    if [[ $bp_rc -eq 2 ]]; then
+      _log "Loop aborted by progressive backpressure (stall limit reached)"
+      break
+    fi
+    # bp_rc=1 is a normal failure — agent self-corrects next iteration
 
     # Push changes if in a git repo
     if [[ -n "$CURRENT_BRANCH" ]] && [[ "$CURRENT_BRANCH" != "detached" ]]; then
