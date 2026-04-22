@@ -22,7 +22,7 @@ High-level overview. Bird's-eye view of what something is, why it exists, and ho
 ```
 ^glimpse .                                  # overview of current repo
 ^glimpse "What is the peers consensus engine?"
-^glimpse --agent @haiku < lib/dispatch.ts   # quick overview
+^glimpse --agent @haiku < lib/skill.ts      # quick overview
 ```
 
 ## Quality Criteria

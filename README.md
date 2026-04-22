@@ -18,8 +18,8 @@ Unlike single-agent tools (Claude Code, Copilot, aider), agence coordinates **mu
 | Capability | How |
 |---|---|
 | Multi-agent swarm | tmux tiles — one agent per pane, human hypervisor |
-| Mixed agent routing | 4-type dispatch: persona, tool, loop, ensemble |
-| Dot-notation | `@ralph.gpt4o` — per-dispatch model/binary override |
+| Mixed agent routing | 4 agent types: persona, tool, loop, ensemble |
+| Dot-notation | `@ralph.gpt4o` — per-agent model/binary override |
 | Session persistence | `^save` / `^resume` — context survives restarts |
 | Safe handoffs | `^handoff @ralph` — full context transfer between agents |
 | Merkle audit trail | `nexus/.ailedger` — append-only HMAC-signed decision log |
@@ -29,7 +29,7 @@ Unlike single-agent tools (Claude Code, Copilot, aider), agence coordinates **mu
 | Tool-agnostic | Works with claude, copilot, aider, aish, or your own agent |
 | LLM-agnostic | Anthropic, OpenAI, Gemini, GitHub Copilot, OpenRouter, Ollama |
 | Git-native | No DB, no server — just git worktrees and flat files |
-| 275 tests | Security hardening, guard boundary, peer dispatch, memory ops |
+| 275 tests | Security hardening, guard boundary, peer routing, memory ops |
 
 
 ---
@@ -372,5 +372,4 @@ bun test tests/unit/
 MIT + Commons Clause — free to use, modify, and self-host.  
 Commercial redistribution requires a separate agreement.  
 See [LICENSE.md](LICENSE.md).
-
 

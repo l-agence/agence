@@ -130,7 +130,7 @@ agence ^audit trail          # View full decision audit trail
 1. **Merkle-chained audit ledger** — cryptographic proof of every agent action
 2. **AIPOLICY.yaml governance** — tiered command permissions (T0-T4), 120+ rules
 3. **Git-native state** — no database, no server, `organic/` is the single source of truth
-4. **Mixed agent routing** — 4-type dispatch (persona/tool/loop/ensemble) with dot-notation
+4. **Mixed agent routing** — 4 agent types (persona/tool/loop/ensemble) with dot-notation
 5. **Peer consensus** — 3-LLM weighted voting based on MIT research (arXiv:2406.12708)
 6. **COGNOS memory** — 6-tier cognitive memory model (eidetic/semantic/episodic/kinesthetic/masonic/mnemonic)
 

@@ -1,233 +1,133 @@
 # Agent Routing Architecture (Canonical)
 
-This document describes the agent routing architecture and references the canonical universal `@` routing and state prefix model. All code and documentation must conform to the canonical definitions in synthetic/l-agence.org/docs/ROUTING.md.
+This document describes the current routing model and complements the canonical universal `@` routing and state prefix model in `synthetic/l-agence.org/docs/ROUTING.md`.
 
 ## Universal Routing Prefix: `@`
 
-- `@` is the universal routing prefix for agent, org, team, repo, security label, etc.
-- Usage patterns:
-  - `@agent` — explicit agent routing (e.g., @ralph, @copilot)
-  - `@org`, `@team`, `@shard`, `@sec` — explicit org/team/shard/security routing
-  - `@` alone — default/current agent or context (resolved via symlink or config)
-- Appears in metadata: `agent=@ralph`, `org=@acme.ltd`, `sec=@internal`
-- Supported in all command grammars and EBNF definitions.
-
-## Canonical State Prefix Table
-
-See synthetic/l-agence.org/docs/ROUTING.md for the canonical state prefix table and full glossary.
-
-
+- `@` is the universal routing prefix for agents and explicit context routing.
+- Common usage:
+  - `@agent` — explicit agent selection (for example `@sonya`, `@copilot`)
+  - `@agent.model` — explicit model/binary override (for example `@ralph.gpt4o`, `@ralph.aider`)
+  - `@` alone — current/default agent or context, when supported by the calling path
 
 ## Overview
 
-Agence uses a **three-tier agent/model routing system** for flexible LLM persona management with minimal token overhead.
+Agence now uses a **registry-backed routing model**:
 
-## Architecture
+- `codex/agents/registry.json` is the source of truth for models, providers, agent types, and skill affinity
+- `lib/router.sh` resolves provider/model execution for direct chat and persona/tool launches
+- `lib/skill.ts` orchestrates `^` skills, selects an agent from the registry, and routes ensemble work to `lib/peers.ts`
+- `lib/dispatch.ts` remains an artifact-routing helper; it is no longer the primary description of agent routing
 
-```
-User Input: agence @<name> <query>
-    ↓
-bin/agence (entry point)
-    ├── Detects @ prefix
-    └── Calls: mode_chat() with @<name>
-         ↓
-         lib/router.sh (router_resolve)
-         ├── Check: Is <name> an agent?
-         │   ├── Yes → router_parse_agent() → Load agent.md
-         │   │        Extract: model, system_prompt, behavior
-         │   │        Token cost: ~40-60 tokens
-         │   └── No → Continue to step 2
-         │
-         ├── Check: Is <name> a model alias?
-         │   ├── Yes → router_resolve_model() → Load model config
-         │   │        Token cost: 0 tokens (direct call)
-         │   └── No → Continue to step 3
-         │
-         └── Check: Default agent via @ symlink?
-             ├── Yes → Use symlinked agent
-             └── No → Fall back to auto-select
+## Runtime Flow
 
-         ↓
-         router_inject_context()
-         ├── Add git branch/remote
-         ├── Add repo org/project/env
-         └── Enhance system prompt with environment
+### Direct agent/chat flow
 
-         ↓
-         router_init_provider()
-         └── Load API credentials
-             (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
-
-         ↓
-         LLM Provider (anthropic/openai/ollama)
-         └── Execute: system_prompt + query → response
+```text
+agence @<agent>[.<override>] <query>
+  ↓
+bin/agence
+  ↓
+lib/router.sh
+  ├── resolve agent / model / provider
+  ├── inject repo + environment context
+  └── call selected backend
 ```
 
-## File Structure
+### Skill flow
 
+```text
+agence ^<skill> [--agent @<agent>[.<override>]]
+  ↓
+bin/agence / airun
+  ↓
+lib/skill.ts
+  ├── load skill definition
+  ├── load agents from codex/agents/registry.json
+  ├── resolve persona / tool / loop agent
+  ├── route ensemble skills to lib/peers.ts when needed
+  └── save artifact via artifact routing helpers
 ```
+
+## Routing Types
+
+The registry currently defines four routing types:
+
+- **persona** — direct LLM-backed personas routed through `lib/router.sh`
+- **tool** — external binaries such as `claude`, `aider`, `copilot`, `aish`
+- **loop** — iterative agents such as `@ralph`
+- **ensemble** — consensus agents such as `@peers` and `@pair`, executed through `lib/peers.ts`
+
+## Source of Truth Files
+
+```text
 .agence/
-├── .github/
-│   ├── agence.md                  ← Framework spec
-│   ├── copilot-instructions.md    ← LLM-agnostic guidelines
-│   ├── CLAUDE.md                  ← Claude-specific config
-│   └── AGENTS.md ← Quick reference (this section)
-│
 ├── bin/
-│   ├── agence                     ← Entry point (330 lines)
-│   └── commands.json              ← Allowed external commands
-│
-├── lib/
-│   ├── router.sh                  ← Agent/model resolution (341 lines)
-│   ├── logging.sh                 ← Logging utilities (TBD)
-│   └── utils.sh                   ← Common helpers (TBD)
-│
+│   ├── agence
+│   └── airun
 ├── codex/
 │   └── agents/
-│       ├── ROUTING.md             ← Routing specifications
-│       ├── AGENTS.md              ← Agent quick reference
-│       ├── @                      ← Symlink to default agent (optional)
-│       ├── aider/
-│       │   └── agent.md           ← (aider) Aider session (~40 tokens) - aider coding agent
-│       ├── chad/
-│       │   └── agent.md           ← (chatGPT) (~0 tokens) - low cost optimized but reliable CloudOps/DevOps.
-│       ├── claudia/
-│       │   └── agent.md           ← (opus) (~60 tokens) -Visionary, Principal SRE and architect. Full stack evolution.
-│       ├── aiko/
-│       │   └── agent.md           ← (haiku) Fast/lightweight architecture HLA, prototypes or CI/CD DevOps. Disruptive innovation.
-│       ├── olena/
-│       │   └── agent.md           ← (ollama) (~0 tokens) secure On-Premises Local ollama agents with guardrails.
-│       ├── pilot/
-│       │   └── agent.md           ← (copilot) GitHub Copilot agent sessions.
-│       ├── ralph/
-│       │   └── agent.md           ← (ralph) Ralph Wiggum recursion loops with principal Skinner harness
-│       └── sonya/
-│           └── agent.md           ← (sonnet) Sr SRE and Full Stack developer. tricky problems. Obsession with Code beauty.
-│
-└── modules/
-    ├── git/
-    │   └── git.sh                 ← Git operations module
-    ├── iac/
-    │   └── iac.sh                 ← Terraform/Bicep module
-    └── cloud/
-        └── aws.sh                 ← Cloud platform module
+│       ├── registry.json        ← canonical agent/model/type registry
+│       ├── AGENTS.md
+│       ├── ROUTING.md
+│       └── <agent>/agent.md     ← extended persona/tool docs
+└── lib/
+    ├── router.sh                ← provider + model routing
+    ├── skill.ts                 ← skill orchestration
+    ├── peers.ts                 ← ensemble execution
+    ├── memory.ts                ← memory stores used by knowledge skills
+    └── dispatch.ts              ← artifact routing helper
 ```
 
-## Agent Metadata Format
+## Registry Model
 
-Each `agent.md` contains:
+`codex/agents/registry.json` defines:
 
-```markdown
-# Agent: <Name>
+- model aliases (`opus`, `sonnet`, `gpt4o`, `flash`, …)
+- agent type (`persona`, `tool`, `loop`, `ensemble`)
+- provider or binary
+- default model
+- skill affinity
+- tier and descriptive metadata
 
-## Identity
-Who this agent is and their background
-
-## Behavior
-How the agent operates:
-- **Default Mode**: interactive, batch, background, tool-based
-- **Execution**: via CLI, direct LLM, middleware
-
-## Expertise
-Domain specialization
-
-## Model Routing
-```json
-{
-  "model": "claude-3-5-sonnet",
-  "provider": "anthropic",
-  "temperature": 0.6,
-  "max_tokens": 3000
-}
-```
-
-## System Prompt (minimal)
-```
-2-3 sentences defining persona and behavior.
-Optimized for lowest token overhead.
-```
-
-## Examples
-Usage examples and expected output.
-
----
-
-**Token Cost**: ~60 tokens (prompt) + output
-**Latency**: ~2-4s
-**Best For**: [use cases]
-```
-
-## Token Efficiency
-
-| Agent | Prompt Tokens | Advantage |
-|-------|---------------|-----------|
-| Aider | ~40 | Offline/tool-based | 
-| Chad | ~50 | Fast, direct |
-| Claudia | ~60 | Deep expertise |
-| Direct Model | 0 | No persona overhead |
-| Default @ | 0-60 | Configured for task |
-
-**Key**: System prompts are *minimal* (2-3 sentences) to keep token overhead low.
-
-Compare to typical LLM persona systems: 150-300+ tokens per query.
+This allows routing decisions to be made from structured metadata instead of hardcoded doc assumptions.
 
 ## Invocation Patterns
 
-### Pattern 1: Chat with Agent Persona
+### Persona
+
 ```bash
-agence @claudia "Design the API layer"
-# → Loads claudia agent
-# → Injects minimal system prompt (~60 tokens)
-# → Adds git/repo context
-# → Calls claude-3-5-sonnet
+agence @sonya "Design the API layer"
 ```
 
-### Pattern 2: Direct Model Call (No Persona)
+### Tool
+
 ```bash
-agence @gpt-4o "Quick answer?"
-# → Direct model mapping
-# → No persona system prompt
-# → Minimal overhead
+agence !claude
+agence !aider
 ```
 
-### Pattern 3: Default Agent
+### Skill with auto-resolution
+
 ```bash
-agence "What should I do?"
-# → Resolves @ symlink (or auto-select)
-# → Uses configured default agent
+agence ^review src/
+agence ^glimpse lib/skill.ts
 ```
 
-## Implementation Checklist
+### Skill with explicit override
 
-- [x] Entry point routing in `bin/agence`
-- [x] Router library in `lib/router.sh` with:
-  - [x] `router_resolve_name()` → agent or model
-  - [x] `router_parse_agent()` → extract config
-  - [x] `router_resolve_model()` → alias to model
-  - [x] `router_inject_context()` → git/repo context
-  - [x] `router_init_provider()` → load API creds
-  - [x] `router_chat()` → main entry function
-- [x] Agent definitions:
-  - [x] Aider (tool-based, offline)
-  - [x] Chad (DevOps, sarcastic)
-  - [x] Claudia (SRE architect, mentor)
-- [x] Routing docs in `codex/agents/ROUTING.md`
-- [x] Agent reference in `codex/agents/AGENTS.md`
-- [ ] Support files: `lib/logging.sh`, `lib/utils.sh` (TBD)
-- [ ] LLM client integration (TBD)
-- [ ] Tests (TBD)
+```bash
+agence ^solve --agent @ralph.gpt4o "CI is flaky"
+```
 
-## Next Steps
+### Ensemble
 
-1. **Implement LLM clients** (`lib/llm_provider.py` or similar)
-2. **Integrate with entry point** (wire `mode_chat()` to `router_chat()`)
-3. **Add remaining agents** (haiku, lima, pilot, ralph, sonny)
-4. **Build domain modules** (git, IaC, cloud)
-5. **Add knowledge management** (RAG integration)
-6. **Create tests** (unit + integration)
+```bash
+agence @peers ^review "Is this ready to merge?"
+```
 
----
+## Notes
 
-**Version**: 0.1.0 (alpha)
-**Last Updated**: 2026-03-04
-**Status**: Routing architecture defined, core agents created
+- Dot-notation applies to the selected agent, not to a separate dispatch layer.
+- `agent.md` files remain useful as descriptive persona references, but routing metadata now comes from `registry.json`.
+- When documenting routing behavior, prefer `router.sh`, `skill.ts`, `peers.ts`, and `registry.json` over older `dispatch.ts`-centric descriptions.
