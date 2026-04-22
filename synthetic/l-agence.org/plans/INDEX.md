@@ -45,7 +45,7 @@ v0.9.0                 ← Allegiance ledger (public append-only reputation)
 | **2.2** | v0.3.1 | Bun extraction (router.ts, audit.ts), CI, airun | 🟢 DONE |
 | **2.3** | v0.3.2 | Version strings, model routing, glossary | 🟢 DONE |
 | **3** | v0.4.0–v0.4.5 | guard.ts, signal.ts, Docker, PS1, task IDs, ^regen | 🟢 DONE |
-| **3.5** | v0.5.0-dev | dispatch.ts, rich display, ^ CLI, skills infra, legend | 🟡 IN PROGRESS |
+| **3.5** | v0.5.0-dev | routing layer, rich display, ^ CLI, skills infra, legend | 🟡 IN PROGRESS |
 | **3.1** | v0.4.1 | F.AST chunking, 6-layer memory skeleton (COGNOS) | 📍 NEXT |
 | **4** | v0.5.0 | matrix.ts, Docker tangent tournaments, agentd | 📍 PLANNED |
 | **5** | v0.6.0 | MLS enforcement + MLS-POLICY.yml + capability tokens | 📍 FUTURE |

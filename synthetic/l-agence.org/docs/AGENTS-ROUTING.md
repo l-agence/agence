@@ -17,7 +17,7 @@ Agence now uses a **registry-backed routing model**:
 - `codex/agents/registry.json` is the source of truth for models, providers, agent types, and skill affinity
 - `lib/router.sh` resolves provider/model execution for direct chat and persona/tool launches
 - `lib/skill.ts` orchestrates `^` skills, selects an agent from the registry, and routes ensemble work to `lib/peers.ts`
-- `lib/dispatch.ts` remains an artifact-routing helper; it is no longer the primary description of agent routing
+- artifact routing remains a separate helper concern; it is no longer the primary description of agent routing
 
 ## Runtime Flow
 
@@ -76,7 +76,7 @@ The registry currently defines four routing types:
     ├── skill.ts                 ← skill orchestration
     ├── peers.ts                 ← ensemble execution
     ├── memory.ts                ← memory stores used by knowledge skills
-    └── dispatch.ts              ← artifact routing helper
+    └── artifact routing helpers ← save/report output placement
 ```
 
 ## Registry Model
@@ -130,4 +130,4 @@ agence @peers ^review "Is this ready to merge?"
 
 - Dot-notation applies to the selected agent, not to a separate dispatch layer.
 - `agent.md` files remain useful as descriptive persona references, but routing metadata now comes from `registry.json`.
-- When documenting routing behavior, prefer `router.sh`, `skill.ts`, `peers.ts`, and `registry.json` over older `dispatch.ts`-centric descriptions.
+- When documenting routing behavior, prefer `router.sh`, `skill.ts`, `peers.ts`, and `registry.json` over older dispatch-centric descriptions.
