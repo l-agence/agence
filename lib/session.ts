@@ -13,6 +13,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync, copyFileSync, unlinkSync } from "fs";
 import { join, basename } from "path";
 import { execSync } from "child_process";
+import { resolveOrg } from "./org.ts";
 
 // Resolve paths from env (set by lib/env.sh) or fallback
 const AI_ROOT = process.env.AI_ROOT || process.env.AGENCE_ROOT || join(import.meta.dir, "..");
@@ -72,7 +73,7 @@ function isoNow(): string {
 }
 
 /** Return day-sharded session dir (DD/) with monthly recycling */
-function sessionDayDir(): string {
+export function sessionDayDir(): string {
   const now = new Date();
   const day = String(now.getDate()).padStart(2, "0");
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -319,7 +320,7 @@ function sessionPrune(args: string[]): number {
   console.error(`[SESSION] Prune: ${candidates.length} files from ${sessionIds.size} sessions (older than ${days} days)`);
 
   // Archive to hermetic if requested
-  const HERMETIC_DIR = join(AI_ROOT, "hermetic", "l-agence.org");
+  const HERMETIC_DIR = join(AI_ROOT, "hermetic", resolveOrg(AI_ROOT));
   const ARCHIVE_DIR = join(HERMETIC_DIR, "sessions");
   const hermeticHasGit = existsSync(join(HERMETIC_DIR, ".git"));
 

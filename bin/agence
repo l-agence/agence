@@ -61,10 +61,11 @@ source "${AGENCE_LIB}/ailedger.sh"     # append-only decision ledger
 
 # ── Higher-level command modules ─────────────────────────────────────────────
 source "${AGENCE_LIB}/help.sh"         # show_help, show_version, mode_symbols
-source "${AGENCE_LIB}/chat.sh"         # mode_chat, mode_ai_routed, resolve_provider
+source "${AGENCE_LIB}/chat.sh"         # mode_chat, mode_ai_routed, resolve_provider (delegates to router.ts)
 source "${AGENCE_LIB}/external.sh"     # mode_external (slash-commands, git shortcuts)
-source "${AGENCE_LIB}/init.sh"         # mode_init (^commands), env setup, install
-source "${AGENCE_LIB}/knowledge.sh"    # mode_knowledge, cmd_state, task/wf/project matrix
+source "${AGENCE_LIB}/init.sh"         # mode_init dispatcher + resolve_org_path
+source "${AGENCE_LIB}/setup.sh"        # init_agence_environment, reload, install (^init chain)
+source "${AGENCE_LIB}/knowledge.sh"    # mode_knowledge, cmd_state, scan/reindex, task/wf/project matrix
 source "${AGENCE_LIB}/tools.sh"        # launch_tool, mode_system (!aider, !bash …)
 source "${AGENCE_LIB}/session.sh"      # mode_session, save/commit/push, handoffs
 source "${AGENCE_LIB}/completion.sh"   # bash tab-completion

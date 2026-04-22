@@ -27,11 +27,32 @@ set -u
 
 AGENCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SESSION="${AGENTD_SESSION:-agence}"
-DEFAULT_AGENTS="copilot ralph sonya aider"
 DRIVER="${AGENTD_DRIVER:-stub}"
 
 # Source shell UI for tmux status bar + title management
 [[ -f "$AGENCE_ROOT/lib/shell-ui.sh" ]] && source "$AGENCE_ROOT/lib/shell-ui.sh"
+
+# ── Default agent list ───────────────────────────────────────────────────────
+# Sourced dynamically from dispatch.ts (via airun) so agentd stays in sync
+# with codex/agents/registry.json.  Falls back to a hardcoded list if bun or
+# dispatch.ts is unavailable (e.g. first boot before ^install).
+_resolve_default_agents() {
+  local _dispatch_ts="${AGENCE_ROOT}/lib/dispatch.ts"
+  local _airun="${AGENCE_ROOT}/bin/airun"
+  if command -v bun &>/dev/null && [[ -f "$_dispatch_ts" ]] && [[ -f "$_airun" ]]; then
+    local _list
+    _list=$("$_airun" dispatch agents 2>/dev/null \
+      | python3 -c "import json,sys; d=json.load(sys.stdin); print(' '.join(a['name'] for a in d))" 2>/dev/null)
+    if [[ -n "$_list" ]]; then
+      echo "$_list"
+      return 0
+    fi
+  fi
+  # Fallback — matches the agent set in codex/agents/registry.json
+  echo "copilot ralph sonya aider"
+}
+
+DEFAULT_AGENTS="${AGENTD_AGENTS:-$(_resolve_default_agents)}"
 
 # ── Directories ─────────────────────────────────────────────────────────────
 

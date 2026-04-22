@@ -860,3 +860,74 @@ knowledge_status() {
   esac
 }
 
+
+# ============================================================================
+# INDEX: Scan for knowledge base INDEX.md / INDEX.json pairs (^index)
+# ============================================================================
+scan_knowledge_bases() {
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  AGENCE INDEX SCAN (^index)"
+  echo "══════════════════════════════════════════════"; echo ""
+  local dirs=("synthetic" "nexus" "globalcache" "organic")
+  local scanned=0
+  local missing=0
+  for dir in "${dirs[@]}"; do
+    local d="${AGENCE_ROOT}/$dir"
+    [[ -d "$d" ]] || continue
+    echo "  Scanning: $dir/"
+    while IFS= read -r md; do
+      local base; base=$(dirname "$md")
+      local json="${base}/INDEX.json"
+      if [[ ! -f "$json" ]]; then
+        echo "    ⚠ Missing INDEX.json: ${base#$AGENCE_ROOT/}"
+        ((missing++))
+      else
+        echo "    ✓ ${base#$AGENCE_ROOT/}"
+      fi
+      ((scanned++))
+    done < <(find "$d" -name "INDEX.md" -type f 2>/dev/null | sort)
+  done
+  echo ""
+  echo "  Scanned: $scanned INDEX.md files ($missing missing INDEX.json)"
+  echo ""; echo "══════════════════════════════════════════════"
+  echo "  INDEX SCAN COMPLETE"; echo ""
+}
+
+# ============================================================================
+# REINDEX: Run bin/indexer on knowledge bases (^reindex)
+# ============================================================================
+reindex_knowledge_bases() {
+  local indexer="${AGENCE_ROOT}/bin/indexer"
+  if [[ ! -f "$indexer" ]]; then
+    echo "Error: bin/indexer not found" >&2; return 1
+  fi
+  if ! command -v python3 &>/dev/null; then
+    echo "Error: python3 required for bin/indexer" >&2; return 1
+  fi
+
+  local args=("$@")
+  if [[ ${#args[@]} -eq 0 ]]; then
+    echo ""; echo "══════════════════════════════════════════════"
+    echo "  AGENCE REINDEX (^reindex)"
+    echo "══════════════════════════════════════════════"; echo ""
+    local dirs=("synthetic" "globalcache" "organic")
+    local count=0
+    for dir in "${dirs[@]}"; do
+      local d="${AGENCE_ROOT}/$dir"
+      [[ -d "$d" ]] || continue
+      while IFS= read -r md; do
+        local base; base=$(dirname "$md")
+        local json="${base}/INDEX.json"
+        echo "  Indexing: ${base#$AGENCE_ROOT/}"
+        python3 "$indexer" --source kb --input "$md" --output "$json" 2>&1 | sed 's/^/    /'
+        ((count++))
+      done < <(find "$d" -name "INDEX.md" -type f 2>/dev/null | sort)
+    done
+    echo ""
+    echo "  Reindexed: $count knowledge bases"
+    echo ""; echo "══════════════════════════════════════════════"
+    echo "  REINDEX COMPLETE"; echo ""
+  else
+    python3 "$indexer" "${args[@]}"
+  fi
+}
