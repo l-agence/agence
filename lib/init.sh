@@ -355,11 +355,24 @@ mode_init() {
       esac
       return $?
       ;;
+    "recon")
+      # ── Direct primitive: ^recon → lib/recon.ts (crawler/indexer, no LLM) ──
+      # Unlike skills that route through skill.ts → LLM, ^recon is a
+      # deterministic filesystem operation: crawl + index + optional analysis.
+      local _recon_ts="${AGENCE_ROOT}/lib/recon.ts"
+      if command -v bun &>/dev/null && [[ -f "$_recon_ts" ]]; then
+        bun run "$_recon_ts" $init_args
+      else
+        echo "Error: bun not found or lib/recon.ts missing. Run agence ^install" >&2
+        return 1
+      fi
+      return $?
+      ;;
     *)
       # ── Skill command dispatch ───────────────────────────────────────────
       # If init_cmd matches a known skill, route through lib/skill.ts
       local _skill_ts="${AGENCE_ROOT}/lib/skill.ts"
-      local _skill_names="fix|build|feature|refactor|solve|review|precommit|simplify|analyse|analyze|design|pattern|scope|spec|split|deploy|brainstorm|peer-design|peer-review|peer-solve|peer-analyse|peer-analyze|hack|break|document|test|recon|grasp|glimpse|ken"
+      local _skill_names="fix|build|feature|refactor|solve|review|precommit|simplify|analyse|analyze|design|pattern|scope|spec|split|deploy|brainstorm|peer-design|peer-review|peer-solve|peer-analyse|peer-analyze|hack|break|document|test|grasp|glimpse|ken"
       if [[ "$init_cmd" =~ ^(${_skill_names})$ ]] && command -v bun &>/dev/null && [[ -f "$_skill_ts" ]]; then
         # Normalize spelling: analyze → analyse (canonical)
         local _skill_cmd="$init_cmd"

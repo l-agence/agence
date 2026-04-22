@@ -4,6 +4,11 @@
 // @peers: Calls 3 LLM APIs in parallel (3-tangent consensus)
 // @pair:  Calls 2 LLM APIs in parallel (2-tangent lightweight consensus)
 //
+// Consensus algorithms:
+//   --consensus winner  Highest weighted-score peer wins (default, fast)
+//   --consensus judge   4th LLM synthesises best answer from all peers
+//   --consensus merge   Delphi: peers revise + judge (best quality, 2× calls)
+//
 // Flavors:
 //   code   — Best coding models (sonnet, gpt-4o, gemini-2-pro)
 //   light  — Fast/cheap models (haiku, gpt-4o-mini, gemini-flash)
@@ -12,8 +17,8 @@
 //
 // Usage:
 //   airun peers solve "problem description"
-//   airun peers review "code or design to review"
-//   airun peers analyze "subject to analyze"
+//   airun peers review --consensus judge "code to review"
+//   airun peers analyze --consensus merge "subject to analyze"
 //   airun peers plan "initiative to plan"
 //   airun peers --pair solve "lightweight 2-way consensus"
 //   airun peers help
@@ -35,6 +40,7 @@ const AGENCE_ROOT = process.env.AGENCE_ROOT
 
 type Flavor = "code" | "light" | "heavy" | "pair";
 type Skill = "solve" | "review" | "analyze" | "plan";
+type ConsensusAlgo = "winner" | "judge" | "merge";
 
 interface PeerConfig {
   name: string;
@@ -58,6 +64,7 @@ interface ConsensusResult {
   skill: Skill;
   flavor: Flavor;
   query: string;
+  algo: ConsensusAlgo;
   peers: PeerResponse[];
   consensus: {
     finding: string;
@@ -374,6 +381,7 @@ function computeConsensus(
     skill,
     flavor,
     query,
+    algo: "winner",
     peers: scored,
     consensus: {
       finding: best.finding,
@@ -384,6 +392,146 @@ function computeConsensus(
     dissent,
     timestamp: new Date().toISOString(),
   };
+}
+
+// ─── Judge Consensus (LLM Synthesis) ─────────────────────────────────────────
+// A 4th LLM call synthesises the best answer from all peer responses.
+// This is the algorithm originally from chat.sh _peers_consensus().
+
+async function consensusJudge(
+  skill: Skill,
+  flavor: Flavor,
+  query: string,
+  peers: PeerResponse[],
+  configs: PeerConfig[]
+): Promise<ConsensusResult> {
+  // Build synthesis prompt with all peer responses
+  const peerSummaries = peers.map((p, i) =>
+    `── Peer ${i + 1}: ${p.peer} (${p.model}, confidence: ${p.confidence}%) ──\n${p.finding}\n\nReasoning: ${p.reasoning}`
+  ).join("\n\n");
+
+  const judgeSystem = `You are a judge synthesising the best answer from ${peers.length} independent expert responses.
+Evaluate each response for correctness, completeness, and insight.
+Produce a single definitive answer that takes the best from each.
+Respond ONLY with valid JSON:
+{
+  "finding": "Your synthesised answer (comprehensive, 3-8 sentences)",
+  "confidence": <number 0-100>,
+  "reasoning": "Why you chose to emphasise certain responses over others (2-4 sentences)",
+  "agreement": "unanimous" | "majority" | "split"
+}`;
+
+  const judgeMsg = `Original query: ${query}\n\n${peerSummaries}`;
+
+  // Use the first available provider for the judge call
+  const judgeConfig = configs[0];
+  let judgeRaw: string;
+  try {
+    console.error(`[peers] judge: synthesising via ${judgeConfig.name} (${judgeConfig.model})...`);
+    judgeRaw = await callPeer(judgeConfig, judgeSystem, judgeMsg);
+  } catch (err: any) {
+    console.error(`[peers] judge synthesis failed: ${err.message}`);
+    // Fallback to winner algorithm
+    return computeConsensus(skill, flavor, query, peers, configs);
+  }
+
+  // Parse judge response
+  let finding = "";
+  let confidence = 50;
+  let reasoning = "";
+  let agreement: "unanimous" | "majority" | "split" = "majority";
+  try {
+    let cleaned = judgeRaw.trim();
+    if (cleaned.startsWith("```")) {
+      cleaned = cleaned.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "");
+    }
+    const parsed = JSON.parse(cleaned);
+    finding = String(parsed.finding || "");
+    confidence = Math.max(0, Math.min(100, Number(parsed.confidence) || 50));
+    reasoning = String(parsed.reasoning || "");
+    if (["unanimous", "majority", "split"].includes(parsed.agreement)) {
+      agreement = parsed.agreement;
+    }
+  } catch {
+    finding = judgeRaw.slice(0, 1000);
+    reasoning = "(judge response was not structured JSON)";
+  }
+
+  const avgConfidence = peers.reduce((s, p) => s + p.confidence, 0) / peers.length;
+  const avgWeightedScore = peers.reduce((s, p) => s + p.confidence, 0) / peers.length;
+
+  return {
+    skill,
+    flavor,
+    query,
+    algo: "judge",
+    peers,
+    consensus: {
+      finding,
+      avgConfidence: Math.round(avgConfidence),
+      weightedScore: Math.round(avgWeightedScore * 10) / 10,
+      agreement,
+    },
+    dissent: [],
+    timestamp: new Date().toISOString(),
+  };
+}
+
+// ─── Merge Consensus (Delphi Convergence) ────────────────────────────────────
+// Two rounds: (1) independent responses (already collected), (2) each peer
+// sees all other responses and revises. Final = judge synthesis of round 2.
+
+async function consensusMerge(
+  skill: Skill,
+  flavor: Flavor,
+  query: string,
+  peers: PeerResponse[],
+  configs: PeerConfig[]
+): Promise<ConsensusResult> {
+  // Round 2: each peer revises with knowledge of all other findings
+  const round2Prompt = (self: PeerResponse, others: PeerResponse[]) => {
+    const otherSummaries = others.map((o, i) =>
+      `Peer ${o.peer} (${o.model}, ${o.confidence}%): ${o.finding}`
+    ).join("\n");
+
+    return `You previously answered this query:
+"${query}"
+
+Your answer was:
+${self.finding}
+(confidence: ${self.confidence}%, reasoning: ${self.reasoning})
+
+Here are the other peers' independent answers:
+${otherSummaries}
+
+Now revise your answer, incorporating any valid points from other peers.
+Keep your original position if you believe it's correct, or update it.
+Respond ONLY with valid JSON:
+{
+  "finding": "Your revised recommendation (1-3 sentences)",
+  "confidence": <number 0-100>,
+  "reasoning": "What changed or why you maintained your position (2-4 sentences)"
+}`;
+  };
+
+  console.error(`[peers] merge round 2: ${configs.length} peers revising...`);
+  const round2System = buildSystemPrompt(skill, configs.length);
+  const round2Promises = peers.map(async (self, i): Promise<PeerResponse> => {
+    const others = peers.filter((_, j) => j !== i);
+    const msg = round2Prompt(self, others);
+    const start = Date.now();
+    try {
+      const raw = await callPeer(configs[i], round2System, msg);
+      return parsePeerResponse(raw, self.peer, self.model, Date.now() - start);
+    } catch {
+      return self; // Keep round 1 answer on failure
+    }
+  });
+
+  const round2Responses = await Promise.all(round2Promises);
+
+  // Final synthesis via judge on the converged round-2 answers
+  return consensusJudge(skill, flavor, query, round2Responses, configs);
 }
 
 // ─── Output Rendering ────────────────────────────────────────────────────────
@@ -445,7 +593,8 @@ async function runPeers(
   skill: Skill,
   query: string,
   flavor: Flavor = "code",
-  format: "text" | "json" = "text"
+  format: "text" | "json" = "text",
+  algo: ConsensusAlgo = "winner"
 ): Promise<number> {
   const configs = FLAVORS[flavor];
   if (!configs) {
@@ -495,7 +644,19 @@ async function runPeers(
     return 1;
   }
 
-  const result = computeConsensus(skill, flavor, query, valid, configs);
+  let result: ConsensusResult;
+  switch (algo) {
+    case "judge":
+      result = await consensusJudge(skill, flavor, query, valid, configs);
+      break;
+    case "merge":
+      result = await consensusMerge(skill, flavor, query, valid, configs);
+      break;
+    case "winner":
+    default:
+      result = computeConsensus(skill, flavor, query, valid, configs);
+      break;
+  }
 
   // Output
   console.log(renderConsensus(result, format));
@@ -516,7 +677,7 @@ function cmdHelp(): number {
   console.log(`peers — Multi-Agent Consensus Engine
 
 Usage:
-  airun peers <skill> [--flavor code|light|heavy] [--json] <query...>
+  airun peers <skill> [--flavor code|light|heavy] [--consensus winner|judge|merge] [--json] <query...>
   airun peers <skill> --pair [--json] <query...>
 
 Skills:
@@ -534,11 +695,17 @@ Flavors (3-tangent only):
   light     Fast/cheap models (haiku + gpt-4o-mini + gemini-flash)
   heavy     Heavyweight reasoning (opus + gpt-4-turbo + o1-pro)
 
+Consensus algorithms:
+  winner    Highest weighted-score peer wins (fast, deterministic)  [default]
+  judge     4th LLM synthesises best answer from all peers (slower, better)
+  merge     Delphi: peers revise after seeing others, then judge (slowest, best)
+
 Options:
-  --pair         2-tangent mode: copilot + aider (faster, cheaper)
-  --flavor <f>   Select model flavor (default: code)
-  --json         Output raw JSON instead of formatted table
-  --help         Show this help
+  --pair            2-tangent mode: copilot + aider (faster, cheaper)
+  --flavor <f>      Select model flavor (default: code)
+  --consensus <a>   Consensus algorithm: winner|judge|merge (default: winner)
+  --json            Output raw JSON instead of formatted table
+  --help            Show this help
 
 Environment (override individual peer models):
   PEERS_CODE_ANTHROPIC, PEERS_CODE_OPENAI, PEERS_CODE_GEMINI
@@ -583,12 +750,21 @@ async function main(): Promise<number> {
   // Parse flags
   let flavor: Flavor = pairMode ? "pair" : "code";
   let format: "text" | "json" = "text";
+  let algo: ConsensusAlgo = "winner";
   const queryParts: string[] = [];
 
   for (let i = 1; i < filteredArgs.length; i++) {
     switch (filteredArgs[i]) {
       case "--flavor":
         flavor = (filteredArgs[++i] || "code") as Flavor;
+        break;
+      case "--consensus":
+        algo = (filteredArgs[++i] || "winner") as ConsensusAlgo;
+        if (!["winner", "judge", "merge"].includes(algo)) {
+          console.error(`[peers] Unknown consensus algorithm: ${algo}`);
+          console.error("  Valid: winner, judge, merge");
+          return 1;
+        }
         break;
       case "--json":
       case "-j":
@@ -610,7 +786,7 @@ async function main(): Promise<number> {
     return 1;
   }
 
-  return runPeers(skill, query, flavor, format);
+  return runPeers(skill, query, flavor, format, algo);
 }
 
 process.exit(await main());

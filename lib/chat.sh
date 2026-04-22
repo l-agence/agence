@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lib/chat.sh — Chat mode, AI-routed mode, peers consensus
+# lib/chat.sh — Chat mode, AI-routed mode (peers delegated to peers.ts)
 # Sourced by bin/agence.
 # Provider resolution is canonical in lib/router.ts (lib/router.sh is the bash
 # wrapper).  This module delegates all provider detection to router_load_config().
@@ -41,10 +41,19 @@ mode_chat() {
 
   [[ "$DEBUG" == "1" ]] && echo "[DEBUG] Provider: $provider" >&2
 
-  # ── @peers ensemble: fan-out to multiple providers ────────────────────────
+  # ── @peers ensemble: delegate to peers.ts (canonical consensus engine) ────
   if [[ "$provider" == "peers" ]]; then
-    _peers_consensus "$query"
-    return $?
+    local _peers_ts="${AGENCE_ROOT}/lib/peers.ts"
+    if command -v bun &>/dev/null && [[ -f "$_peers_ts" ]]; then
+      local _peers_flavor="${AGENCE_PEERS_FLAVOR:-code}"
+      local _peers_algo="${AGENCE_PEERS_ALGO:-winner}"
+      # Default skill is "solve" for chat-mode queries
+      bun run "$_peers_ts" solve --flavor "$_peers_flavor" --consensus "$_peers_algo" "$query"
+      return $?
+    else
+      echo "Error: bun not found or lib/peers.ts missing. Run agence ^install" >&2
+      return 1
+    fi
   fi
 
   # ── Persona agent routing: resolve to real provider ──────────────────────
@@ -85,146 +94,6 @@ mode_chat() {
   }
 
   echo "$response"
-  return 0
-}
-
-# ============================================================================
-# PEERS: Multi-provider consensus ensemble
-# ============================================================================
-# Fan-out query to N providers in parallel, collect responses, synthesize.
-# Flavor (code/light/heavy) selects which models to call.
-# Output: per-agent results + synthesized consensus.
-
-_peers_consensus() {
-  local query="$1"
-  local flavor="${AGENCE_PEERS_FLAVOR:-code}"
-
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "  @peers consensus (flavor: $flavor)"
-  echo "  Query: ${query:0:80}${query:80:+...}"
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-  # Trace mode shortcut
-  if [[ "${AGENCE_TRACE:-0}" == "1" ]]; then
-    echo "[peers_consensus] flavor=${flavor} query=${query}"
-    return 0
-  fi
-
-  # Resolve flavor → model list from registry
-  local models_csv=""
-  if [[ -f "$_AGENT_REGISTRY" ]]; then
-    models_csv=$(python3 -c "
-import json
-r=json.load(open('$_AGENT_REGISTRY'))
-f=r.get('agents',{}).get('peers',{}).get('flavors',{}).get('$flavor',[])
-m=r.get('models',{})
-print(','.join(m.get(a,a) for a in f))
-" 2>/dev/null)
-  fi
-
-  # Fallback defaults if registry unavailable
-  if [[ -z "$models_csv" ]]; then
-    case "$flavor" in
-      code)  models_csv="claude-opus-4-5,gpt-4-turbo,gemini-2-pro" ;;
-      light) models_csv="claude-haiku-3-5,gpt-4o-mini,gemini-2-flash" ;;
-      heavy) models_csv="claude-opus-4-5,gpt-4-turbo,o1-pro" ;;
-      *)     models_csv="claude-opus-4-5,gpt-4-turbo,gemini-2-pro" ;;
-    esac
-  fi
-
-  IFS=',' read -ra _peer_models <<< "$models_csv"
-  local _peer_count=${#_peer_models[@]}
-
-  # Map model → provider
-  _model_to_provider() {
-    case "$1" in
-      claude-*) echo "anthropic" ;;
-      gpt-*)    echo "openai" ;;
-      o1-*)     echo "openai" ;;
-      gemini-*) echo "gemini" ;;
-      *)        echo "openai" ;; # fallback
-    esac
-  }
-
-  echo ""
-  echo "Models: ${_peer_models[*]}"
-  echo ""
-
-  router_load_config
-
-  local system_prompt
-  system_prompt=$(router_build_system_prompt)
-
-  # Fan-out: call each provider in background, collect to temp files
-  local _tmpdir
-  _tmpdir=$(mktemp -d)
-  local _pids=()
-
-  for i in "${!_peer_models[@]}"; do
-    local _model="${_peer_models[$i]}"
-    local _provider
-    _provider=$(_model_to_provider "$_model")
-    (
-      export AGENCE_LLM_PROVIDER="$_provider"
-      export AGENCE_LLM_MODEL="$_model"
-      local _response
-      _response=$(router_chat "$query" 2>/dev/null) || _response="[ERROR: ${_provider}/${_model} failed]"
-      echo "$_response" > "$_tmpdir/peer_${i}.txt"
-    ) &
-    _pids+=($!)
-  done
-
-  # Wait for all peers
-  echo "Waiting for ${_peer_count} peers..."
-  for pid in "${_pids[@]}"; do
-    wait "$pid" 2>/dev/null
-  done
-
-  # Collect and display responses
-  echo ""
-  for i in "${!_peer_models[@]}"; do
-    local _model="${_peer_models[$i]}"
-    echo "┌─ Peer $((i+1)): $_model"
-    echo "│"
-    if [[ -f "$_tmpdir/peer_${i}.txt" ]]; then
-      sed 's/^/│  /' "$_tmpdir/peer_${i}.txt"
-    else
-      echo "│  [NO RESPONSE]"
-    fi
-    echo "│"
-    echo "└─────────────────────────────────────────────────────────────"
-    echo ""
-  done
-
-  # Synthesize consensus (use the first available provider)
-  if [[ $_peer_count -gt 1 ]]; then
-    echo "━━━ SYNTHESIS ━━━"
-    echo ""
-    local _synth_input="You are a consensus synthesizer. Below are ${_peer_count} independent responses to the same query. Identify common ground, highlight valuable disagreements, and produce a concise synthesized answer."
-    _synth_input="${_synth_input}\n\nOriginal query: ${query}\n"
-    for i in "${!_peer_models[@]}"; do
-      _synth_input="${_synth_input}\n--- Response from ${_peer_models[$i]} ---\n"
-      if [[ -f "$_tmpdir/peer_${i}.txt" ]]; then
-        _synth_input="${_synth_input}$(cat "$_tmpdir/peer_${i}.txt")\n"
-      fi
-    done
-
-    local _synth_provider="$(_model_to_provider "${_peer_models[0]}")"
-    export AGENCE_LLM_PROVIDER="$_synth_provider"
-    export AGENCE_LLM_MODEL="${_peer_models[0]}"
-    local _synthesis
-    _synthesis=$(router_chat "$(echo -e "$_synth_input")" 2>/dev/null) || _synthesis="[Synthesis unavailable]"
-    echo "$_synthesis"
-    echo ""
-  fi
-
-  # Cleanup
-  rm -rf "$_tmpdir"
-
-  # Log to ailedger
-  ailedger_append "route" "peers-consensus-${flavor}" "" "@peers ${_peer_count} models" "0"
-
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   return 0
 }
 
