@@ -130,4 +130,4 @@ agence @peers ^review "Is this ready to merge?"
 
 - Dot-notation applies to the selected agent, not to a separate dispatch layer.
 - `agent.md` files remain useful as descriptive persona references, but routing metadata now comes from `registry.json`.
-- When documenting routing behavior, prefer `router.sh`, `skill.ts`, `peers.ts`, and `registry.json` over older dispatch-centric descriptions.
+- When documenting routing behavior, treat `router.sh`, `skill.ts`, `peers.ts`, and `registry.json` as the primary routing sources of truth.
