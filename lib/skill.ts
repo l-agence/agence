@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // lib/skill.ts — Skill Command Orchestrator
 //
-// The glue between dispatch.ts (artifact routing), peers.ts (consensus),
+// The glue between artifact routing, peers.ts (consensus),
 // router.sh (LLM calls), and SKILL.md definitions.
 //
 // Pipeline:
@@ -169,7 +169,7 @@ CONSTRAINTS:
 };
 
 // ─── Agent Resolution ────────────────────────────────────────────────────────
-// Load agents from dispatch.ts infrastructure and pick best for skill.
+// Load agents from codex/agents/registry.json and pick best for skill.
 
 function loadAgents(): AgentMeta[] {
   const registryPath = join(AGENCE_ROOT, "codex", "agents", "registry.json");
@@ -195,7 +195,7 @@ function loadAgents(): AgentMeta[] {
     } catch { /* fall through */ }
   }
 
-  // Fallback: hardcoded mapping (mirrors dispatch.ts)
+  // Fallback: hardcoded mapping
   return [
     { name: "copilot", role: "general coder",     tier: "T2", skills: ["fix", "build", "feature", "refactor", "test"], type: "persona" },
     { name: "haiku",   role: "fast coder",         tier: "T0", skills: ["fix", "split", "build", "break", "glimpse"], type: "persona" },
@@ -337,7 +337,7 @@ function loadPersona(agentName: string): string | undefined {
 }
 
 // ─── Artifact Routing ────────────────────────────────────────────────────────
-// Re-use dispatch.ts route logic inline (avoid spawning subprocess)
+// Route map for saving skill output to the correct scope directory.
 
 const ARTIFACT_ROUTES: Record<string, { scope: string; subdir: string }> = {
   skill:    { scope: "synthetic", subdir: "skills" },
