@@ -1,0 +1,9 @@
+{
+  "type": "notify",
+  "from": "inject-test",
+  "to": "human",
+  "payload": "`id`",
+  "timestamp": "2026-04-22T00:21:42Z",
+  "id": "879b6040",
+  "hmac": "a009a37a5adc160725cb9ddc19c28c126569d31dd961189316d16028cd8e1a54"
+}

@@ -1,0 +1,9 @@
+{
+  "type": "notify",
+  "from": "inject-test",
+  "to": "human",
+  "payload": "$(whoami)",
+  "timestamp": "2026-04-22T17:29:14Z",
+  "id": "4a6eb8c3",
+  "hmac": "773de2460d2d3a6542c38fc8845986e6df25cd51df0f0cd56999d6cbda48bf1f"
+}

@@ -44,7 +44,7 @@ All state lives in git. Tasks, workflows, projects, memory — all flat files in
 - **Peer consensus**: 3-LLM weighted voting based on MIT research (arXiv:2406.12708)
 - **16 agents**: 11 personas + 4 tools + 1 loop + 2 ensembles
 - **28 skill commands**: `^fix`, `^build`, `^review`, `^hack`, `^recon`, `^design`, `^peers`, and more
-- **275 tests**: Security hardening, guard boundary, peer routing, memory operations
+- **291 tests**: Security hardening, guard boundary, peer routing, memory operations
 - **HMAC-signed IPC**: Human↔agent signals are cryptographically authenticated
 
 ## Quick start

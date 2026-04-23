@@ -29,7 +29,7 @@ Unlike single-agent tools (Claude Code, Copilot, aider), agence coordinates **mu
 | Tool-agnostic | Works with claude, copilot, aider, aish, or your own agent |
 | LLM-agnostic | Anthropic, OpenAI, Gemini, GitHub Copilot, OpenRouter, Ollama |
 | Git-native | No DB, no server — just git worktrees and flat files |
-| 275 tests | Security hardening, guard boundary, peer routing, memory ops |
+| 291 tests | Security hardening, guard boundary, peer routing, memory ops |
 
 
 ---
