@@ -71,8 +71,8 @@ Agence organizes commands into **five prefixes** that determine their behavior. 
 
 | **Prefix** | **Purpose**                                                                                          | **Example**                        |
 |------------|------------------------------------------------------------------------------------------------------|------------------------------------|
-| `^`        | **Universal AI commands**: Shared, synthetic context for agent collaboration.                        | `^plan`, `^deploy`, `^learn`      |
-| `~`        | **Hermetic commands**: Operating in local/private scope.                                              | `~reload`, `~commit`              |
+| `^`        | **Universal AI commands**: Shared, knowledge context for agent collaboration.                        | `^plan`, `^deploy`, `^learn`      |
+| `~`        | **Private commands**: Operating in local/private scope.                                              | `~reload`, `~commit`              |
 | `!`        | **Shell launcher commands**: Calls external tools like bash or Aider.                                 | `!bash`, `!aider`, `!git`         |
 | `/`        | **External commands**: Delegates commands to underlying systems like Git or Terraform.                | `/git status`, `/terraform-plan`  |
 | `@`        | **Routing qualifiers**: Directs commands to agents, projects, or organizational targets.              | `^plan @project`, `~commit @ralph`|
@@ -111,9 +111,9 @@ Example:
 ---
 
 #### **Hermetic Command (`~`)**
-In agence , we Use `~` to denote Ai powered commands that act in a private aka 'hermetic' context. Hermetic includes ~todos nad ~notes whic are always personal and never shared directly to the shared shard  without user request.  These execute commands in **offline/local-only** contexts. 
+In agence , we Use `~` to denote Ai powered commands that act in a private context. Private includes ~todos and ~notes which are always personal and never shared directly to the shared shard  without user request.  These execute commands in **offline/local-only** contexts. 
 
-Agence segregates derived world model into a synthetic (shared) and hermitic (private) knowledge base. This allows you to store tests, failures etc privately per repo in local filesystem without polluting or leaking to the team. 
+Agence segregates derived world model into shared team knowledge (`knowledge/`) and private knowledge (`knowledge/private/`). This allows you to store tests, failures etc privately per repo in local filesystem without polluting or leaking to the team.
 
 ```bash
 ~commit @myproject
@@ -170,14 +170,10 @@ The `@` symbol directs commands to specific agents or contexts:
 For example in getting started, you should create a folder called 
 
 ``` 
-   mkdir globalcache/<domain.tld>
-   ln -s lobalcache/<domain.tld globalcache/@
-   mkdir synthetic/<domain.tld>
-   ln -s synthetic/<domain.tld synthetic/@
-   mkdir hermetic/<domain.tld>
-   ln -s  hermetic/<domain.tld> hermetic/@
-   mkdir codebase/<domain.tld>
-   ln -s codebase/<domain.tld> codebase/@
+   mkdir -p knowledge/<domain.tld>
+   ln -s knowledge/<domain.tld> knowledge/@
+   mkdir -p knowledge/private/<domain.tld>
+   ln -s knowledge/private/<domain.tld> knowledge/private/@
 ```
 From that point on you can start to populate these with the required .md  and json files :
 
@@ -230,8 +226,8 @@ Agence includes a **ShellSpec testing framework** to validate your workflows. To
 ---
 
 ### **Additional Resources**
-- For routing rules, review: [`AGENTS-ROUTING.md`](https://github.com/l-agence/agence/blob/main/synthetic/l-agence.org/docs/AGENTS-ROUTING.md).
-- For architecture details, see: [`ARCHITECTURE.md`](https://github.com/l-agence/agence/blob/main/synthetic/l-agence.org/docs/ARCHITECTURE.md).
+- For routing rules, review: [`AGENTS-ROUTING.md`](https://github.com/l-agence/agence/blob/main/knowledge/l-agence.org/docs/AGENTS-ROUTING.md).
+- For architecture details, see: [`ARCHITECTURE.md`](https://github.com/l-agence/agence/blob/main/knowledge/l-agence.org/docs/ARCHITECTURE.md).
 - For a complete command list, refer to: [`AIPOLICY.md`](https://github.com/l-agence/agence/blob/main/codex/AIPOLICY.md).
 
 ---

@@ -1,36 +1,34 @@
 #!/usr/bin/env bun
-// lib/memory.ts — Agence Cognitive Memory System
+// lib/memory.ts — Agence Knowledge Memory System
 //
-// Unified memory CRUD across 6 COGNOS tiers:
+// 3-store memory model:
 //
-//   PERSISTENT (indexed, durable)
-//     synthetic/eidetic/      → distilled knowledge, plans, decisions
-//     globalcache/semantic/   → shared KB, designs, cross-repo
-//     organic/episodic/       → tasks, workflows, execution traces
-//     objectcode/kinesthetic/ → code patterns, solutions, skills
-//     hermetic/masonic/       → private, local, gated
+//   PERSISTENT
+//     knowledge/{org}/memory/shared.jsonl   → team knowledge (versioned, committed)
+//     knowledge/private/memory/private.jsonl → local-only (gitignored, 0o600)
 //
 //   RUNTIME
-//     nexus/mnemonic/         → fast working-set cache (hydrated projection)
+//     nexus/memory/working.jsonl            → fast working-set cache (hydrated projection)
 //
 // Schema: All stores use the same MemoryRow JSONL format.
 // Storage: One .jsonl file per store (append-optimized, grep-friendly).
+// Tags carry semantic distinctions: kind:code, kind:decision, source:recon, etc.
 //
 // Operations:
 //   ^retain  <source> <tags> <content>  — write row to persistent store
 //   ^recall  <tags> [--source X]        — query across stores, ranked
-//   ^cache   <tags> [--max N]           — hydrate mnemonic from all stores
+//   ^cache   <tags> [--max N]           — hydrate working memory from all stores
 //   ^forget  <id> <source>              — remove row from store
-//   ^promote <id> <from> <to>           — move row between tiers
+//   ^promote <id> <from> <to>           — move row between stores
 //
 // Usage:
-//   airun memory retain eidetic "jwt,auth" "JWT tokens expire after 24h..."
+//   airun memory retain shared "jwt,auth" "JWT tokens expire after 24h..."
 //   airun memory recall "jwt,auth"
-//   airun memory recall "jwt" --source kinesthetic
+//   airun memory recall "jwt" --source shared
 //   airun memory cache "deploy,k8s" --max 20
-//   airun memory forget k-1713600000 kinesthetic
-//   airun memory promote ep-123 episodic eidetic
-//   airun memory list eidetic
+//   airun memory forget sh-1713600000 shared
+//   airun memory promote pr-123 private shared
+//   airun memory list shared
 //   airun memory stats
 //   airun memory help
 
@@ -45,7 +43,7 @@ const AGENCE_ROOT = process.env.AGENCE_ROOT
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type MemorySource = "eidetic" | "semantic" | "episodic" | "kinesthetic" | "masonic";
+export type MemorySource = "shared" | "private";
 
 export interface MemoryRow {
   id: string;
@@ -67,26 +65,20 @@ interface StoreConfig {
 }
 
 const STORE_MAP: Record<MemorySource, StoreConfig> = {
-  eidetic:     { dir: "synthetic/eidetic",       file: "eidetic.jsonl",     versioned: true },
-  semantic:    { dir: "globalcache/semantic",     file: "semantic.jsonl",    versioned: true },
-  episodic:    { dir: "organic/episodic",         file: "episodic.jsonl",    versioned: true },
-  kinesthetic: { dir: "objectcode/kinesthetic",   file: "kinesthetic.jsonl", versioned: true },
-  masonic:     { dir: "hermetic/masonic",         file: "masonic.jsonl",     versioned: false },
+  shared:  { dir: "knowledge/@/memory",         file: "shared.jsonl",  versioned: true },
+  private: { dir: "knowledge/private/memory",    file: "private.jsonl", versioned: false },
 };
 
-const MNEMONIC_DIR = "nexus/mnemonic";
-const MNEMONIC_FILE = "mnemonic.jsonl";
+const WORKING_DIR = "nexus/memory";
+const WORKING_FILE = "working.jsonl";
 
 // ─── Validation ──────────────────────────────────────────────────────────────
 
 const VALID_SOURCES: ReadonlySet<string> = new Set(Object.keys(STORE_MAP));
 const TAG_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
 const ID_PREFIX: Record<MemorySource, string> = {
-  eidetic: "ei",
-  semantic: "se",
-  episodic: "ep",
-  kinesthetic: "ki",
-  masonic: "ma",
+  shared: "sh",
+  private: "pr",
 };
 const MAX_CONTENT_SIZE = 64 * 1024;  // 64KB per row
 const MAX_TAGS = 16;
@@ -123,8 +115,8 @@ function storePath(source: MemorySource): string {
   return join(AGENCE_ROOT, cfg.dir, cfg.file);
 }
 
-function mnemonicPath(): string {
-  return join(AGENCE_ROOT, MNEMONIC_DIR, MNEMONIC_FILE);
+function workingPath(): string {
+  return join(AGENCE_ROOT, WORKING_DIR, WORKING_FILE);
 }
 
 function ensureDir(filePath: string): void {
@@ -158,10 +150,10 @@ export function readStore(source: MemorySource): MemoryRow[] {
 }
 
 /**
- * Read mnemonic (runtime cache).
+ * Read working memory (runtime cache).
  */
-export function readMnemonic(): MemoryRow[] {
-  const path = mnemonicPath();
+export function readWorking(): MemoryRow[] {
+  const path = workingPath();
   if (!existsSync(path)) return [];
 
   const lines = readFileSync(path, "utf-8").split("\n").filter(l => l.trim());
@@ -180,15 +172,15 @@ export function readMnemonic(): MemoryRow[] {
 /**
  * Append a single row to a JSONL store.
  * Creates the directory and file if needed.
- * masonic files get 0o600 permissions.
+ * Private files get 0o600 permissions.
  */
 function appendRow(source: MemorySource, row: MemoryRow): void {
   const path = storePath(source);
   ensureDir(path);
   appendFileSync(path, JSON.stringify(row) + "\n", "utf-8");
 
-  // masonic is private — restrict file permissions
-  if (source === "masonic") {
+  // private store — restrict file permissions
+  if (source === "private") {
     chmodSync(path, 0o600);
   }
 }
@@ -201,16 +193,16 @@ function rewriteStore(source: MemorySource, rows: MemoryRow[]): void {
   ensureDir(path);
   const data = rows.map(r => JSON.stringify(r)).join("\n") + (rows.length ? "\n" : "");
   writeFileSync(path, data, "utf-8");
-  if (source === "masonic") {
+  if (source === "private") {
     chmodSync(path, 0o600);
   }
 }
 
 /**
- * Write mnemonic cache (full replace, not append).
+ * Write working memory cache (full replace, not append).
  */
-function writeMnemonic(rows: MemoryRow[]): void {
-  const path = mnemonicPath();
+function writeWorking(rows: MemoryRow[]): void {
+  const path = workingPath();
   ensureDir(path);
   const data = rows.map(r => JSON.stringify(r)).join("\n") + (rows.length ? "\n" : "");
   writeFileSync(path, data, "utf-8");
@@ -310,21 +302,21 @@ export function recall(
 }
 
 /**
- * ^cache — Hydrate mnemonic from all persistent stores.
- * Merges, scores, trims to budget, writes nexus/mnemonic.
+ * ^cache — Hydrate working memory from all persistent stores.
+ * Merges, scores, trims to budget, writes nexus/memory/working.jsonl.
  */
 export function cache(
   queryTags: string[],
-  opts?: { max?: number; masonic?: boolean }
+  opts?: { max?: number; includePrivate?: boolean }
 ): MemoryRow[] {
   validateTags(queryTags);
   const max = opts?.max ?? 30;
   const querySet = new Set(queryTags.map(t => t.toLowerCase()));
 
   // Collect from all persistent stores
-  const sources: MemorySource[] = opts?.masonic
+  const sources: MemorySource[] = opts?.includePrivate
     ? (Object.keys(STORE_MAP) as MemorySource[])
-    : (Object.keys(STORE_MAP) as MemorySource[]).filter(s => s !== "masonic");
+    : (Object.keys(STORE_MAP) as MemorySource[]).filter(s => s !== "private");
 
   let pool: MemoryRow[] = [];
   for (const src of sources) {
@@ -359,8 +351,8 @@ export function cache(
     .slice(0, max)
     .map(s => s.row);
 
-  // Write to mnemonic (full replace)
-  writeMnemonic(selected);
+  // Write to working memory (full replace)
+  writeWorking(selected);
   return selected;
 }
 
@@ -421,16 +413,13 @@ export function stats(): Record<string, number> {
   for (const src of Object.keys(STORE_MAP) as MemorySource[]) {
     result[src] = readStore(src).length;
   }
-  result.mnemonic = readMnemonic().length;
+  result.working = readWorking().length;
   return result;
 }
 
-// ─── MEM-004: Promotion Pipelines ────────────────────────────────────────────
-// Structured promotion flows between cognitive stores:
-//   episodic  → eidetic      (distill knowledge from work)
-//   episodic  → kinesthetic  (distill capability from work)
-//   kinesthetic → semantic   (promote broadly useful patterns)
-//   masonic   → eidetic      (declassify private insights)
+// ─── Promotion Pipelines ────────────────────────────────────────────────
+// Promote between persistent stores:
+//   private → shared   (declassify private insights for team)
 //
 // distill() promotes multiple rows at once based on criteria:
 //   - importance threshold
@@ -449,13 +438,7 @@ export interface DistillOpts {
 
 /** Valid promotion paths — prevent nonsensical flows */
 const VALID_PROMOTIONS: ReadonlySet<string> = new Set([
-  "episodic→eidetic",
-  "episodic→kinesthetic",
-  "kinesthetic→semantic",
-  "masonic→eidetic",
-  // Allow any→eidetic for manual distillation
-  "semantic→eidetic",
-  "kinesthetic→eidetic",
+  "private→shared",
 ]);
 
 function isValidPromotion(from: MemorySource, to: MemorySource): boolean {
@@ -563,34 +546,30 @@ function printHelp(): void {
 Commands:
   retain <source> <tags> <content>      Store a memory row
   recall <tags> [--source X] [--max N]  Query memories by tags
-  cache  <tags> [--max N] [--masonic]   Hydrate mnemonic cache
+  cache  <tags> [--max N] [--private]   Hydrate working memory cache
   forget <id> <source>                  Remove a row
-  promote <id> <from> <to>              Move row between tiers
+  promote <id> <from> <to>              Move row between stores
   distill <from> <to> [opts]            Batch promote by criteria
   list   <source>                       List all rows in a store
   stats                                 Row counts per store
   help                                  Show this help
 
-Sources: eidetic, semantic, episodic, kinesthetic, masonic
+Sources: shared, private
 Tags:    Comma-separated, alphanumeric with . _ - (max 16)
 
 Promotion paths (distill):
-  episodic → eidetic       Distill knowledge from work
-  episodic → kinesthetic   Distill capability from work
-  kinesthetic → semantic   Promote broadly useful patterns
-  masonic → eidetic        Declassify private insights
-  *→ eidetic               Manual distillation to long-term
+  private → shared        Declassify private insights for team
 
 Examples:
-  airun memory retain eidetic "jwt,auth" "JWT tokens expire after 24h"
+  airun memory retain shared "jwt,auth" "JWT tokens expire after 24h"
   airun memory recall "jwt,auth"
-  airun memory recall "jwt" --source kinesthetic --max 10
+  airun memory recall "jwt" --source shared --max 10
   airun memory cache "deploy,k8s" --max 20
-  airun memory forget ei-18f3a4b00 eidetic
-  airun memory promote ep-18f3a4b00 episodic kinesthetic
-  airun memory distill episodic eidetic --min-importance 0.7
-  airun memory distill episodic kinesthetic --tags "pattern,fix" --dry-run
-  airun memory list eidetic
+  airun memory forget sh-18f3a4b00 shared
+  airun memory promote pr-18f3a4b00 private shared
+  airun memory distill private shared --min-importance 0.7
+  airun memory distill private shared --tags "pattern,fix" --dry-run
+  airun memory list shared
   airun memory stats`);
 }
 
@@ -675,18 +654,18 @@ async function main() {
       case "cache": {
         const tagStr = args[1];
         if (!tagStr) {
-          console.error("Usage: airun memory cache <tags> [--max N] [--masonic]");
+          console.error("Usage: airun memory cache <tags> [--max N] [--private]");
           process.exit(1);
         }
         let max: number | undefined;
-        let masonic = false;
+        let includePrivate = false;
         for (let i = 2; i < args.length; i++) {
           if (args[i] === "--max" && args[i + 1]) { max = parseInt(args[++i], 10); }
-          else if (args[i] === "--masonic") { masonic = true; }
+          else if (args[i] === "--private") { includePrivate = true; }
         }
         const tags = parseTags(tagStr);
-        const rows = cache(tags, { max, masonic });
-        console.log(`Cached ${rows.length} rows → nexus/mnemonic/mnemonic.jsonl`);
+        const rows = cache(tags, { max, includePrivate });
+        console.log(`Cached ${rows.length} rows → nexus/memory/working.jsonl`);
         if (rows.length > 0) {
           const sources = [...new Set(rows.map(r => r.source))];
           console.log(`Sources: ${sources.join(", ")}`);

@@ -40,8 +40,8 @@ create_required_dirs() {
     "organic/tasks"
     "organic/workflows"
     "organic/jobs"
-    "globalcache"
-    "objectcode"
+    "knowledge"
+    "knowledge/private"
   )
   local created=0 warn=0
   for dir in "${required_dirs[@]}"; do
@@ -72,7 +72,7 @@ check_agencerc() {
 # .agencerc — Agence environment configuration
 # Source this from your .bashrc/.zshrc, or agence sources it automatically.
 
-# Your org/team name (used to scope shared knowledge under synthetic/ and hermetic/).
+# Your org/team name (used to scope shared knowledge under knowledge/).
 # Set during ^init or override here:
 # export AGENCE_ORG="your-org.example.com"
 
@@ -99,17 +99,17 @@ AGENCERC
 # Prompts for org name if not already set, then creates/validates @ symlinks.
 # Sets AGENCE_ORG and persists it to .agencerc.
 setup_org_symlinks() {
-  echo "  The '@' symlink inside synthetic/ and hermetic/ points to the"
-  echo "  active org directory (e.g. hermetic/@ → hermetic/acme.tld)."
+  echo "  The '@' symlink inside knowledge/ points to the"
+  echo "  active org directory (e.g. knowledge/@ → knowledge/l-agence.org)."
   echo "  This lets commands resolve paths without hardcoding org names."
   echo ""
 
   # Resolve current org: env var > existing @ symlink > prompt
   local current_org="${AGENCE_ORG:-}"
 
-  # If not in env, check existing synthetic/@ symlink
-  if [[ -z "$current_org" ]] && [[ -L "${AGENCE_ROOT}/synthetic/@" ]]; then
-    current_org="$(readlink "${AGENCE_ROOT}/synthetic/@" 2>/dev/null || true)"
+  # If not in env, check existing knowledge/@ symlink
+  if [[ -z "$current_org" ]] && [[ -L "${AGENCE_ROOT}/knowledge/@" ]]; then
+    current_org="$(readlink "${AGENCE_ROOT}/knowledge/@" 2>/dev/null || true)"
     current_org="${current_org##*/}"  # basename in case it's a full path
   fi
 
@@ -136,9 +136,9 @@ setup_org_symlinks() {
     echo "  ✓ AGENCE_ORG=${current_org} persisted to .agencerc"
   fi
 
-  # Create/validate @ symlinks in synthetic/ and hermetic/
+  # Create/validate @ symlink in knowledge/
   local warn=0
-  local -a scope_dirs=("synthetic" "hermetic")
+  local -a scope_dirs=("knowledge")
   for scope in "${scope_dirs[@]}"; do
     local scope_path="${AGENCE_ROOT}/$scope"
     local at_link="${scope_path}/@"

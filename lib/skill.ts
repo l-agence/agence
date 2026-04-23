@@ -23,7 +23,7 @@ import { join, basename, dirname, resolve, relative } from "path";
 import { execSync, spawnSync } from "child_process";
 
 // MEM-003: Memory-aware skill context injection
-import { recall, readMnemonic, retain, parseTags, distill, stats } from "./memory.ts";
+import { recall, readWorking, retain, parseTags, distill, stats } from "./memory.ts";
 import type { MemoryRow, MemorySource, DistillOpts } from "./memory.ts";
 
 import { resolveOrg } from "./org.ts";
@@ -372,8 +372,8 @@ function saveArtifact(artifactType: string, content: string, skillName: string):
 // ─── MEM-003: Memory-Aware Skill Context ────────────────────────────────────
 // Skills ^grasp, ^glimpse, ^recon inject relevant memory into their LLM context.
 //   ^grasp   — recall from all stores, inject as "prior knowledge"
-//   ^glimpse — read mnemonic cache, inject as "working context"
-//   ^recon   — after LLM output, auto-retain findings into semantic store
+//   ^glimpse — read working memory cache, inject as "working context"
+//   ^recon   — after LLM output, auto-retain findings into shared store
 
 const MEMORY_SKILLS: ReadonlySet<string> = new Set(["grasp", "glimpse", "recon", "ken"]);
 const MAX_MEMORY_CONTEXT = 8 * 1024; // 8KB budget for injected memory
@@ -398,8 +398,8 @@ function buildMemoryContext(skillName: string, query: string): string {
     let rows: MemoryRow[] = [];
 
     if (skillName === "glimpse") {
-      // ^glimpse reads from mnemonic (the pre-hydrated working-set cache)
-      rows = readMnemonic();
+      // ^glimpse reads from working memory (the pre-hydrated working-set cache)
+      rows = readWorking();
       // Filter to tag-relevant subset
       const tagSet = new Set(tags);
       rows = rows.filter(r =>
@@ -432,7 +432,7 @@ function buildMemoryContext(skillName: string, query: string): string {
 }
 
 /**
- * After ^recon output, extract and retain key findings into semantic store.
+ * After ^recon output, extract and retain key findings into shared store.
  * Parses structured sections from recon output.
  */
 function retainReconFindings(output: string, query: string): void {
@@ -453,8 +453,8 @@ function retainReconFindings(output: string, query: string): void {
       ? output.slice(0, 2048) + "\n[truncated]"
       : output;
 
-    retain("semantic" as MemorySource, reconTags, summary, { importance: 0.6 });
-    process.stderr.write(`[skill] MEM-003: recon findings retained → semantic [${reconTags.join(",")}]\n`);
+    retain("shared" as MemorySource, reconTags, summary, { importance: 0.6 });
+    process.stderr.write(`[skill] MEM-003: recon findings retained → shared [${reconTags.join(",")}]\n`);
   } catch {
     // Non-fatal — recon still produces output even if retain fails
   }
@@ -724,9 +724,9 @@ function callPeers(peerSkill: string, query: string, flavor = "code"): string {
 // ─── MEM-005: ^ken — Knowledge Extraction Cycle ─────────────────────────────
 // Orchestrates grasp → glimpse → recon → distill in a single compound pass.
 // 1. grasp:   recall from all persistent stores (prior knowledge)
-// 2. glimpse: read mnemonic cache (working context)
-// 3. recon:   LLM synthesis + auto-retain findings to semantic
-// 4. distill: batch promote mature rows (episodic→eidetic, kinesthetic→semantic)
+// 2. glimpse: read working memory cache (working context)
+// 3. recon:   LLM synthesis + auto-retain findings to shared
+// 4. distill: batch promote mature rows (private→shared)
 
 async function runKen(
   query: string,
@@ -756,16 +756,16 @@ async function runKen(
     console.error("[ken] grasp: no tags extracted — skipping recall");
   }
 
-  // ── Step 2: GLIMPSE — read mnemonic working-set cache ──
+  // ── Step 2: GLIMPSE — read working memory cache ──
   let glimpseRows: MemoryRow[] = [];
   try {
-    glimpseRows = readMnemonic();
+    glimpseRows = readWorking();
     if (tags.length > 0) {
       const tagSet = new Set(tags);
       glimpseRows = glimpseRows.filter(r => r.tags.some(t => tagSet.has(t.toLowerCase())));
     }
-    console.error(`[ken] glimpse: ${glimpseRows.length} rows from mnemonic`);
-  } catch { console.error("[ken] glimpse: mnemonic read failed (non-fatal)"); }
+    console.error(`[ken] glimpse: ${glimpseRows.length} rows from working memory`);
+  } catch { console.error("[ken] glimpse: working memory read failed (non-fatal)"); }
 
   // ── Step 3: RECON — LLM synthesis with combined memory context ──
   // Build combined memory context from grasp + glimpse
@@ -826,14 +826,13 @@ async function runKen(
     return 1;
   }
 
-  // Auto-retain recon findings to semantic
+  // Auto-retain recon findings to shared
   retainReconFindings(output, query);
-  console.error("[ken] recon: findings retained → semantic");
+  console.error("[ken] recon: findings retained → shared");
 
   // ── Step 4: DISTILL — batch promote mature rows ──
   const distillPaths: Array<[MemorySource, MemorySource]> = [
-    ["episodic" as MemorySource, "eidetic" as MemorySource],
-    ["kinesthetic" as MemorySource, "semantic" as MemorySource],
+    ["private" as MemorySource, "shared" as MemorySource],
   ];
   let totalPromoted = 0;
   let totalDuplicates = 0;

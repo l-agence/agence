@@ -46,7 +46,7 @@ mode_knowledge() {
   # DETERMINE SCOPE & PATHS (bash fallback)
   # ============================================================================
   
-  local scope_type  # HERMETIC, NEXUS, SYNTHETIC, ORGANIC
+  local scope_type  # PRIVATE, NEXUS, KNOWLEDGE, ORGANIC
   local base_path
   local default_org="l-agence.org"
   local org="$default_org"
@@ -54,16 +54,16 @@ mode_knowledge() {
   # Parse command-specific options
   case "$cmd_type" in
     "lesson"|"plan"|"issue")
-      # SYNTHETIC scope (team-shared)
-      scope_type="SYNTHETIC"
+      # KNOWLEDGE scope (team-shared)
+      scope_type="KNOWLEDGE"
       # Support --org flag: agence ^lesson list --org acme.tld
       if [[ "$args" == *"--org"* ]]; then
         org=$(echo "$args" | sed -n 's/.*--org[= ]\([^ ]*\).*/\1/p')
-        base_path="$AGENCE_ROOT/synthetic/@$org"
+        base_path="$AGENCE_ROOT/knowledge/@$org"
       else
         # Routing inheritance: prefer @ symlink (user-set org context)
         # Falls back to explicit l-agence.org if @ symlink missing
-        base_path=$(resolve_org_path "$AGENCE_ROOT/synthetic" "$default_org")
+        base_path=$(resolve_org_path "$AGENCE_ROOT/knowledge" "$default_org")
       fi
       ;;
     "log"|"fault")
@@ -72,10 +72,10 @@ mode_knowledge() {
       base_path="$AGENCE_ROOT/nexus"
       ;;
     "todo"|"note")
-      # HERMETIC scope (local, personal)
-      scope_type="HERMETIC"
-      # Use @ symlink if present in hermetic
-      base_path=$(resolve_org_path "$AGENCE_ROOT/hermetic" "$default_org")
+      # PRIVATE scope (local, personal)
+      scope_type="PRIVATE"
+      # Use knowledge/private/ for personal content
+      base_path="$AGENCE_ROOT/knowledge/private"
       ;;
     "task"|"job"|"workflow"|"project")
       # ORGANIC scope (team-assigned work)
@@ -868,7 +868,7 @@ scan_knowledge_bases() {
   echo ""; echo "══════════════════════════════════════════════"
   echo "  AGENCE INDEX SCAN (^index)"
   echo "══════════════════════════════════════════════"; echo ""
-  local dirs=("synthetic" "nexus" "globalcache" "organic")
+  local dirs=("knowledge" "nexus" "organic")
   local scanned=0
   local missing=0
   for dir in "${dirs[@]}"; do
@@ -910,7 +910,7 @@ reindex_knowledge_bases() {
     echo ""; echo "══════════════════════════════════════════════"
     echo "  AGENCE REINDEX (^reindex)"
     echo "══════════════════════════════════════════════"; echo ""
-    local dirs=("synthetic" "globalcache" "organic")
+    local dirs=("knowledge" "organic")
     local count=0
     for dir in "${dirs[@]}"; do
       local d="${AGENCE_ROOT}/$dir"

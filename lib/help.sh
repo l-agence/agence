@@ -15,7 +15,7 @@ USAGE:
   agence /<cmd>                  External command (AIPOLICY tier gated)
   agence !<tool>                 Launch system tool / agent shell
   agence ^<cmd>                  Init, workflow, knowledge commands
-  agence ~recall <pattern>       Grep masonic (gated private memory)
+  agence ~recall <pattern>       Grep private memory
 
 ────────────────────────────────────────────────────────────────────────
 
@@ -99,10 +99,10 @@ INDEX (^):
   ^regen                         Regenerate organic/dashboards/ from JSON
 
 MEMORY (^):
-  ^retain <source> <tags> <text> Store a memory row (eidetic/semantic/episodic/kinesthetic/masonic)
+  ^retain <source> <tags> <text> Store a memory row (shared/private)
   ^recall <tags> [--source X]    Query memories by tags (comma-separated)
-  ^recall <pattern>              Legacy: grep hermetic/ (plain text fallback)
-  ^cache  <tags> [--max N]       Hydrate mnemonic working-set cache
+  ^recall <pattern>              Legacy: grep knowledge/private/ (plain text fallback)
+  ^cache  <tags> [--max N]       Hydrate working memory cache
   ^forget <id> <source>          Remove a memory row
   ^promote <id> <from> <to>      Move row between cognitive stores
   ^distill <from> <to> [opts]    Batch promote by importance/age/tags
@@ -246,12 +246,12 @@ COMPLETION MATH  (signed addition)
   %done      = done / (done + remaining)
 
 SCOPES
-  hermetic/   personal, never committed    ^todo, ^note (~todo, ~note)
-  nexus/      local-only, sensitive        ^fault, ^log, ^session
-  synthetic/  team-shared, git-committed   ^plan, ^lesson, ^issue
-  organic/    team work, agent-routable    ^task, ^job
+  knowledge/private/  personal, never committed    ^todo, ^note (~todo, ~note)
+  nexus/              local-only, sensitive        ^fault, ^log, ^session
+  knowledge/@/        team-shared, git-committed   ^plan, ^lesson, ^issue
+  organic/            team work, agent-routable    ^task, ^job
 
-See also: codex/TAXONOMY.md · synthetic/@/docs/SYMBOLS.md · MATRICES.md
+See also: codex/TAXONOMY.md · knowledge/@/docs/SYMBOLS.md · MATRICES.md
 EOF
   return 0
 }
@@ -272,10 +272,10 @@ SHELL ENVIRONMENT
 
 KNOWLEDGE COMMANDS (^ prefix)
 
-  HERMETIC — Local only, never committed (personal)
-  ─────────────────────────────────────────────────
-  ^todo  [list|status|show|add]       Personal todos     → hermetic/@/todos/
-  ^note  [list|status|show|add]       Personal notes     → hermetic/@/notes/
+  PRIVATE — Local only, never committed (personal)
+  ──────────────────────────────────────────────────
+  ^todo  [list|status|show|add]       Personal todos     → knowledge/private/todos/
+  ^note  [list|status|show|add]       Personal notes     → knowledge/private/notes/
 
   NEXUS — Local only (sensitive: faults, logs, sessions)
   ───────────────────────────────────────────────────────
@@ -283,11 +283,11 @@ KNOWLEDGE COMMANDS (^ prefix)
   ^log   [list|show|add]              Ops logs           → nexus/logs/
   ^audit [trail|show|agent|session|diff|stats]  Ledger audit → .ailedger
 
-  SYNTHETIC — Team-shared via Git (committed)
-  ────────────────────────────────────────────
-  ^lesson [list|show|add] [--org ORG]  Lessons learned  → synthetic/@/lessons/
-  ^plan   [list|show|add] [--org ORG]  Strategic plans  → synthetic/@/plans/
-  ^issue  [list|show|add] [--org ORG]  Discoveries      → synthetic/@/issues/
+  KNOWLEDGE — Team-shared via Git (committed)
+  ─────────────────────────────────────────────
+  ^lesson [list|show|add] [--org ORG]  Lessons learned  → knowledge/@/lessons/
+  ^plan   [list|show|add] [--org ORG]  Strategic plans  → knowledge/@/plans/
+  ^issue  [list|show|add] [--org ORG]  Discoveries      → knowledge/@/issues/
 
   ORGANIC — Team work, agent-routable
   ─────────────────────────────────────
@@ -306,7 +306,7 @@ WORKFLOW COMMANDS
   ^sync                     Sync with remote
 
 ROUTING INHERITANCE
-  Commands inherit org context from @ symlink (e.g. synthetic/@→l-agence.org)
+  Commands inherit org context from @ symlink (e.g. knowledge/@→l-agence.org)
   Override with --org flag:  agence ^plan list --org acme.tld
 
 SYMBOLS (quick ref)
