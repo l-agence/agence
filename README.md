@@ -25,7 +25,7 @@ Unlike single-agent tools (Claude Code, Copilot, aider), agence coordinates **mu
 | Merkle audit trail | `nexus/.ailedger` — append-only HMAC-signed decision log |
 | Tiered governance | `AIPOLICY.yaml` → T0 (free) → T4 (gated) command tiers |
 | Peer consensus | `@peers ^review` — 3-LLM weighted consensus (arXiv:2406.12708) |
-| Cognitive memory | COGNOS 6-tier: eidetic/semantic/episodic/kinesthetic/masonic/mnemonic |
+| Cognitive memory | COGNOS 3-store: shared/private/working |
 | Tool-agnostic | Works with claude, copilot, aider, aish, or your own agent |
 | LLM-agnostic | Anthropic, OpenAI, Gemini, GitHub Copilot, OpenRouter, Ollama |
 | Git-native | No DB, no server — just git worktrees and flat files |
@@ -51,7 +51,7 @@ In agence, agent state is local, but knowledge and metadata is selectively shard
 This allows for full agentic access to the entire session, bypassing VScode 16kb buffer limits and reducing hallucinations and token wastage. 
 
 Full session data is never shared verbatim to the shard.  This is gated such that we do not leak unless a human asks. 
-As well, agence's knowledge bases are tiered and segregated between both hermetic (private local user knowledge in this repo) and synthetic ( team based Derived World Knowledge).
+As well, agence's knowledge bases are tiered and segregated between private (local user knowledge in knowledge/private/) and shared team knowledge (in knowledge/).
 
 L'agence uses an innovative and deterministic routing system that is flexible and secure. It allows uses to select where knowledge and lessons are shared. Efforts have been made to gate guard your data from unecessary disclosure. 
 
@@ -162,18 +162,17 @@ YOUR REPO/
     │   ├── .ailedger            # Append-only decision audit log (JSONL)
     │   ├── faults/              # Incident tracking
     │   └── sessions/            # Persisted agent context
-    ├── synthetic/               # Team-shared knowledge (committed)
+    ├── knowledge/               # Team-shared knowledge (committed)
     │   ├── @                    # → symlink to active org (e.g. l-agence.org)
-    │   └── l-agence.org/
-    │       ├── docs/            # Architecture, routing, swarm docs
-    │       ├── lessons/         # Captured insights
-    │       └── plans/           # Project roadmap
-    ├── hermetic/                # Private knowledge (gitignored, never shared)
-    │   ├── @                    # → symlink to active org
-    │   └── l-agence.org/
-    │       ├── todos/           # Personal task tracking
-    │       └── brainstorms/     # Design notes, analysis
-    ├── globalcache/             # Cross-org shared knowledge (committed)
+    │   ├── l-agence.org/
+    │   │   ├── docs/            # Architecture, routing, swarm docs
+    │   │   ├── lessons/         # Captured insights
+    │   │   └── plans/           # Project roadmap
+    │   └── private/             # Private knowledge (gitignored, never shared)
+    │       ├── @                # → symlink to active org
+    │       └── l-agence.org/
+    │           ├── todos/       # Personal task tracking
+    │           └── brainstorms/ # Design notes, analysis
     ├── organic/                 # Swarm coordination (tasks, jobs, workflows)
     │   ├── tasks/               # In-progress agent work items
     │   ├── jobs/                # Scheduled background work
@@ -191,18 +190,18 @@ YOUR REPO/
 
 ### The `@` Symlink (Org Routing)
 
-Inside `synthetic/` and `hermetic/`, the `@` symlink points to the **active organization directory**:
+Inside `knowledge/` and `knowledge/private/`, the `@` symlink points to the **active organization directory**:
 
 ```
-synthetic/@ → synthetic/l-agence.org/
-hermetic/@  → hermetic/l-agence.org/
+knowledge/@         → knowledge/l-agence.org/
+knowledge/private/@ → knowledge/private/l-agence.org/
 ```
 
-This lets all commands resolve paths like `synthetic/@/docs/ARCHITECTURE.md` without hardcoding the org name. When you add agence to a different org's repo, just point `@` at that org's directory:
+This lets all commands resolve paths like `knowledge/@/docs/ARCHITECTURE.md` without hardcoding the org name. When you add agence to a different org's repo, just point `@` at that org's directory:
 
 ```bash
 # In your-company's repo:
-ln -s synthetic/your-company.com synthetic/@
+ln -s knowledge/your-company.com knowledge/@
 ```
 
 The `^init` command checks and reports `@` symlink status. If missing, it tells you what to create.
@@ -214,8 +213,8 @@ The `^init` command checks and reports `@` symlink status. If missing, it tells 
 | Prefix | Mode | Example | Use When |
 |---|---|---|---|
 | _(none)_ | Chat | `agence "explain this error"` | Advice, explanation, Q&A |
-| `^` | Synthetic | `agence ^save`, `agence ^lesson` | Shared state, knowledge ops |
-| `~` | Hermetic | `agence ~note "idea"` | Private notes (never committed) |
+| `^` | Knowledge | `agence ^save`, `agence ^lesson` | Shared state, knowledge ops |
+| `~` | Private | `agence ~note "idea"` | Private notes (never committed) |
 | `+` | Autonomous | `agence +refactor-auth` | Agent plans & executes a task |
 | `/` | Validated | `agence /git-status` | Pre-approved safe commands |
 | `!` | System | `agence !ralph`, `agence !claude` | Launch agents or tools |
@@ -299,28 +298,27 @@ While I now know that the aido name is not unique, in agence it is something dif
 ## The Agence Lexicon
 
 ### COGNOS foundation
-Agence is built on a 6-pillar foundation the acronym for which is COGNOS: 
+Agence is built on a foundational architecture with 4 core pillars:
 
 CODEX: This forms the stronng and immutable governance layer of agence. It contains the Laws of Agentic : Laws, principles rules, as well as the AIPOLICY.
 
-OBJECTCODE: in Agence this a RAG meant exclusively for your organization's code bases. Eg it should contain .md and json files describing your git repos. These are handled differently than other RAG sources (eg they can use an AST Chunking memory index. ) 
-
-It may also contain  architecture docs, Solutions and patterns specific to your organzation. 
-
-GLOBALCACHE: is the main RAG 'database' . It consists of .md and json files that can fast indexed via a Dwey-Decimal like formtag. Global cache is distinct from DWM derived world model so we don't assume truth unless gated by a human. 
+KNOWLEDGE: (`knowledge/`) This is the unified knowledge layer. It contains team-shared derived world knowledge, org-specific code references (with AST chunking memory index), RAG sources (.md and .json files indexed via Dewey-Decimal-like formtags), architecture docs, lessons, and plans — all committed to git and selectively routed via `@` symlinks. External sources in knowledge are distinct from DWM so we don't assume truth unless gated by a human.
 
 NEXUS:  This is the local state machine. It is intentionally not shared to the shard.  Agenst states are preserved vi a mix of tmux pipe-pan and script typescript as fallback. This allows for full agentic session view, session audits and vene session replay. 
 
 ORGANIC:  This is the SWARM or Orchestration layer. This contains our unique matrix-based task and workflow and project system. It also includes the Shard based team shared dahsboards to view these. In time this will be more sophisticated. But the general idea is that each shard head becomes a git based dashboard into the state of all the tasks, workflows, projects. 
 
-SYNTHETHIC: This is the Derived World Model. Whereas tasks, projects and workflows are team shared (the states of them) actual knowledge is gated by our routing rules. So Synthetic knowledge is only shared where you decide. This tries to enforce a compromise between sharing and data leakage. 
+Knowledge is gated by routing rules — you decide where and how to share. This enforces a compromise between sharing and data leakage.
 
+### Memory stores
+
+3 memory stores: **shared** (`knowledge/@/memory/shared.jsonl`), **private** (`knowledge/private/memory/private.jsonl`), **working** (`nexus/memory/working.jsonl`).
 
 ### Other layers: 
 
-HERMETIC: BY design this is an intentionally private local only Derived World Model. It is quite useful to put strategic vision, personal todos and personal notes .
+PRIVATE: (`knowledge/private/`) This is the intentionally private, local-only knowledge layer. It is gitignored and never shared. Useful for strategic vision, personal todos, and personal notes.
 
-MNEMONIC: This is a "fast access, ephemeral memory cache' It is intended to be an index that can be regenreated on the fly from canonical and persistent knowledge. This bit is still in development and not fully tested but as our datasets grow this will become important. 
+WORKING: (`nexus/memory/working.jsonl`) This is a fast-access, ephemeral memory cache. It is intended to be an index that can be regenerated on the fly from canonical and persistent knowledge. This bit is still in development and not fully tested but as our datasets grow this will become important.
 
 
 
@@ -328,8 +326,8 @@ MNEMONIC: This is a "fast access, ephemeral memory cache' It is intended to be a
 
 | Doc | What it covers |
 |---|---|
-| [Architecture](synthetic/l-agence.org/docs/ARCHITECTURE.md) | How agence works end-to-end |
-| [Swarm](synthetic/l-agence.org/docs/SWARM.md) | agentd, tangents, tmux model |
+| [Architecture](knowledge/l-agence.org/docs/ARCHITECTURE.md) | How agence works end-to-end |
+| [Swarm](knowledge/l-agence.org/docs/SWARM.md) | agentd, tangents, tmux model |
 | [Routing](codex/agents/ROUTING.md) | LLM provider selection, tiers, blast_radius |
 | [Agents](codex/agents/AGENTS.md) | Full agent roster and system prompts |
 | [Commands](bin/COMMANDS.md) | Complete CLI reference |
@@ -357,7 +355,7 @@ bun test tests/unit/
 > |---|---|---|
 > | `guard.test.ts` | 126 | Command gate, tier escalation, AIPOLICY parsing |
 > | `peers-dispatch.test.ts` | 57 | Peer consensus, mixed routing, bin/loop |
-> | `memory.test.ts` | 56 | COGNOS 6-tier: retain/recall/cache/forget/promote/distill |
+> | `memory.test.ts` | 56 | COGNOS 3-store: retain/recall/cache/forget/promote/distill |
 > | `security-hardening.test.ts` | 36 | HMAC signing, signal forgery, injection hardening |
 >
 > Legacy shellspec tests also available:

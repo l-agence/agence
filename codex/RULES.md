@@ -143,7 +143,7 @@ What's your recommendation?"
 
 ---
 
-## Rule 5: Use OBJECTCODE for Code References
+## Rule 5: Use KNOWLEDGE for Code References
 
 **Do**: When asking about code, include git SHA and file path.
 
@@ -174,37 +174,37 @@ Generate a patch that adds structured logging."
 
 ---
 
-## Rule 6: Trust SYNTHESIS, Question GLOBALCACHE
+## Rule 6: Trust KNOWLEDGE, Verify External Sources
 
 **Do**: 
-- Trust SYNTHESIS (our derived analysis) until proven wrong
-- Question GLOBALCACHE (external sources) until verified
+- Trust KNOWLEDGE (our derived analysis) until proven wrong
+- Verify external sources in KNOWLEDGE until confirmed
 
 **Why**:
-- SYNTHESIS is our own thinking (we understand assumptions)
-- GLOBALCACHE comes from external sources (could be outdated/wrong)
+- KNOWLEDGE contains our own thinking (we understand assumptions)
+- External sources in KNOWLEDGE could be outdated/wrong
 
 **Examples**:
 
 ```bash
 # ✅ DO THIS: Trust our own analysis
-agence "@ralph In SYNTHESIS:l-agence.org/agence-patterns.md,
+agence "@ralph In knowledge/@/l-agence.org/agence-patterns.md,
 I wrote that Ralph needs Principal Skinner for reliability.
 Can you explain the pattern?"
 # → Ralph explains our own writing (he understands context)
 
 # ⚠️ CHECK THIS: Verify external sources
-agence "@claudia I found this in GLOBALCACHE about microservices patterns.
+agence "@claudia I found this in KNOWLEDGE about microservices patterns.
 But it's from 2019. Is it still current?
-Source: globalcache/medium.com/microservices-2019/index.md"
+Source: knowledge/medium.com/microservices-2019/index.md"
 # → Claudia can evaluate how much things changed
 ```
 
 ---
 
-## Rule 7: Record Key Insights in SYNTHESIS
+## Rule 7: Record Key Insights in KNOWLEDGE
 
-**Do**: After learning something valuable, save it to SYNTHESIS.
+**Do**: After learning something valuable, save it to KNOWLEDGE.
 
 **Why**: 
 - Builds our collective knowledge base
@@ -212,7 +212,7 @@ Source: globalcache/medium.com/microservices-2019/index.md"
 - Creates audit trail of discoveries
 - Feeds into future AI training (your own analysis feeds future models)
 
-**Format**: Create/update SYNTHESIS entries with:
+**Format**: Create/update KNOWLEDGE entries with:
 - What we learned
 - Why it matters
 - Source (if external)
@@ -227,7 +227,7 @@ full table scans because the index was on the wrong column.
 Let me save this pattern to SYNTHESIS."
 
 # Aiko then saves to:
-# synthetic/l-agence.org/database-patterns/index-optimization.md
+# knowledge/l-agence.org/database-patterns/index-optimization.md
 ```
 
 ---

@@ -28,19 +28,14 @@ Describe 'TEST-001: ledger / audit / session prune / index'
       The output should include 'INDEX SCAN'
     End
 
-    It 'scans synthetic directory'
+    It 'scans knowledge directory'
       When run bash bin/agence index
-      The output should include 'Scanning: synthetic/'
+      The output should include 'Scanning: knowledge/'
     End
 
     It 'scans nexus directory'
       When run bash bin/agence index
       The output should include 'Scanning: nexus/'
-    End
-
-    It 'scans globalcache directory'
-      When run bash bin/agence index
-      The output should include 'Scanning: globalcache/'
     End
 
     It 'scans organic directory'

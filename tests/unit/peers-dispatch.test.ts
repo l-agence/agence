@@ -446,9 +446,9 @@ describe("skill.ts: agent resolution", () => {
 // ─── 14. SKILL.md Loader ────────────────────────────────────────────────────
 
 describe("skill.ts: SKILL.md loading", () => {
-  test("skills exist at synthetic/skills/ root (SKILL-008)", () => {
+  test("skills exist at knowledge/@/skills/ root (SKILL-008)", () => {
     const { existsSync } = require("fs");
-    const skillsRoot = join(AGENCE_ROOT, "synthetic", "skills");
+    const skillsRoot = join(AGENCE_ROOT, "knowledge", "@", "skills");
     expect(existsSync(skillsRoot)).toBe(true);
 
     // Check a sample of known skills have SKILL.md

@@ -2,16 +2,17 @@
 // lib/recon.ts — ^recon: General-purpose crawler / indexer primitive (Bun)
 //
 // ^recon is the single primitive that crawls any target and produces:
-//   1. Index  → objectcode/<target>/  (persistent, chunk-per-file knowledge base)
-//   2. Analysis → objectcode/<target>/ANALYSIS.md  (human-readable brief)
+//   1. Index  → knowledge/{org}/<target>/  (persistent, chunk-per-file knowledge base)
+//   2. Analysis → knowledge/{org}/<target>/ANALYSIS.md  (human-readable brief)
+//   3. REPO.json → knowledge/{org}/<target>/REPO.json  (repo manifest, for git repos)
 //
 // Target types:
-//   .                   → objectcode/local/
-//   /path/to/dir        → objectcode/<dirname>/
-//   github:org/repo     → objectcode/<org>/<repo>/
-//   github:org          → objectcode/<org>/
-//   github:topics/tag   → globalcache/github.com/topics/<tag>/
-//   https://...         → globalcache/<domain>/
+//   .                   → knowledge/{org}/{origin-dns}/  (auto-detect via git remote)
+//   /path/to/dir        → knowledge/{org}/<dirname>/
+//   github:org/repo     → knowledge/{org}/github.com/<org>/<repo>/
+//   github:org          → knowledge/{org}/github.com/<org>/
+//   github:topics/tag   → knowledge/{org}/github.com/topics/<tag>/
+//   https://...         → knowledge/{org}/<domain>/
 //
 // Modes:
 //   (default)   full — crawl + index + analysis
@@ -46,12 +47,34 @@ const AGENCE_ROOT = process.env.AGENCE_ROOT
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** GitHub domain used for globalcache path construction. */
+/** GitHub domain used for knowledge path construction. */
 const GITHUB_DOMAIN = "github.com";
 
 /** Maximum source file size to index (bytes). Files larger than this are skipped
  *  to avoid memory pressure on very large generated files (e.g. minified bundles). */
 const MAX_FILE_BYTES = 500_000;
+
+/** Resolve the default org for knowledge/ paths via @ symlink. */
+function resolveDefaultOrg(): string {
+  const symlink = join(AGENCE_ROOT, "knowledge", "@");
+  try {
+    const target = readFileSync(symlink, "utf-8").trim(); // readlink
+    return basename(target);
+  } catch {
+    // Fallback: try to read symlink target directly
+    try {
+      const { readlinkSync } = require("fs");
+      return basename(readlinkSync(symlink));
+    } catch {
+      return "default";
+    }
+  }
+}
+
+/** Knowledge base root for the default org. */
+function knowledgeBase(): string {
+  return join(AGENCE_ROOT, "knowledge", resolveDefaultOrg());
+}
 
 
 
@@ -62,7 +85,7 @@ interface Target {
   kind: TargetKind;
   raw: string;
   label: string;       // human-readable
-  outputDir: string;   // absolute path to objectcode/… or globalcache/…
+  outputDir: string;   // absolute path to knowledge/{org}/…
 }
 
 interface ChunkMeta {
@@ -85,6 +108,8 @@ interface IndexJson {
 // ─── Target Resolution ───────────────────────────────────────────────────────
 
 function resolveTarget(raw: string): Target {
+  const kb = knowledgeBase();
+
   // GitHub topic
   if (raw.startsWith("github:topics/")) {
     const tag = raw.slice("github:topics/".length);
@@ -92,7 +117,7 @@ function resolveTarget(raw: string): Target {
       kind: "github-topic",
       raw,
       label: `GitHub topic: ${tag}`,
-      outputDir: join(AGENCE_ROOT, "globalcache", GITHUB_DOMAIN, "topics", tag),
+      outputDir: join(kb, GITHUB_DOMAIN, "topics", tag),
     };
   }
 
@@ -105,14 +130,14 @@ function resolveTarget(raw: string): Target {
         kind: "github-repo",
         raw,
         label: `GitHub repo: ${path}`,
-        outputDir: join(AGENCE_ROOT, "objectcode", ...parts),
+        outputDir: join(kb, GITHUB_DOMAIN, ...parts),
       };
     }
     return {
       kind: "github-org",
       raw,
       label: `GitHub organization: ${path}`,
-      outputDir: join(AGENCE_ROOT, "objectcode", path),
+      outputDir: join(kb, GITHUB_DOMAIN, path),
     };
   }
 
@@ -125,7 +150,7 @@ function resolveTarget(raw: string): Target {
         kind: "github-repo",
         raw,
         label: `GitHub repo: ${parts.join("/")}`,
-        outputDir: join(AGENCE_ROOT, "objectcode", ...parts),
+        outputDir: join(kb, GITHUB_DOMAIN, ...parts),
       };
     }
     if (parts.length === 1) {
@@ -133,7 +158,7 @@ function resolveTarget(raw: string): Target {
         kind: "github-org",
         raw,
         label: `GitHub org: ${parts[0]}`,
-        outputDir: join(AGENCE_ROOT, "objectcode", parts[0]),
+        outputDir: join(kb, GITHUB_DOMAIN, parts[0]),
       };
     }
   }
@@ -146,18 +171,31 @@ function resolveTarget(raw: string): Target {
       kind: "url",
       raw,
       label: `URL: ${domain}`,
-      outputDir: join(AGENCE_ROOT, "globalcache", domain),
+      outputDir: join(kb, domain),
     };
   }
 
-  // Local path (. or absolute/relative)
+  // Local path (. or absolute/relative) — try to detect git remote for DNS path
   const abs = raw === "." ? process.cwd() : resolve(raw);
-  const name = abs === AGENCE_ROOT ? "local" : basename(abs);
+  let outDir: string;
+  try {
+    const remote = execSync("git remote get-url origin", { cwd: abs, encoding: "utf-8" }).trim();
+    // Parse git remote URL → DNS path
+    const m = remote.match(/(?:https?:\/\/|git@)([^/:]+)[/:](.+?)(?:\.git)?$/);
+    if (m) {
+      outDir = join(kb, m[1], m[2]); // e.g. knowledge/l-agence.org/github.com/l-agence/agence
+    } else {
+      outDir = join(kb, basename(abs));
+    }
+  } catch {
+    const name = abs === AGENCE_ROOT ? "local" : basename(abs);
+    outDir = join(kb, name);
+  }
   return {
     kind: "local",
     raw,
     label: `Local: ${abs}`,
-    outputDir: join(AGENCE_ROOT, "objectcode", name),
+    outputDir: outDir,
   };
 }
 
@@ -344,6 +382,49 @@ function saveIndexJson(outputDir: string, data: IndexJson): void {
   writeFileSync(join(outputDir, "INDEX.json"), JSON.stringify(data, null, 2) + "\n", "utf-8");
 }
 
+/**
+ * Write REPO.json manifest for git repos — the repo identity file.
+ * `find knowledge/ -name REPO.json` gives every indexed repo instantly.
+ */
+function writeRepoManifest(target: Target, index: IndexJson, url?: string): void {
+  const repoUrl = url || target.raw;
+  // Extract origin DNS path from URL
+  let origin = "";
+  try {
+    const parsed = new URL(repoUrl.replace(/^git@/, "https://").replace(/:([^/])/, "/$1"));
+    origin = parsed.hostname + parsed.pathname.replace(/\.git$/, "");
+  } catch {
+    origin = target.label;
+  }
+
+  // Detect languages from index
+  const langCount: Record<string, number> = {};
+  for (const f of index.files) {
+    if (f.lang && f.lang !== "text") langCount[f.lang] = (langCount[f.lang] || 0) + 1;
+  }
+  const languages = Object.entries(langCount)
+    .sort((a, b) => b[1] - a[1])
+    .map(([lang]) => lang);
+
+  const manifest = {
+    kind: "repo",
+    url: repoUrl,
+    origin,
+    branch: "main",
+    sha: index.gitSHA || "",
+    lastIndexed: index.lastIndexed,
+    languages,
+    fileCount: index.fileCount,
+    chunkCount: index.files.length,
+  };
+
+  writeFileSync(
+    join(target.outputDir, "REPO.json"),
+    JSON.stringify(manifest, null, 2) + "\n",
+    "utf-8",
+  );
+}
+
 // ─── INDEX.md builder ────────────────────────────────────────────────────────
 
 function buildIndexMd(target: Target, files: ChunkMeta[], gitSHA?: string): string {
@@ -526,9 +607,9 @@ ${index.files
 // ─── Subcommand: list ────────────────────────────────────────────────────────
 
 function cmdList(): number {
+  // Scan knowledge/ tree for indexed targets (those with INDEX.json)
   const roots = [
-    join(AGENCE_ROOT, "objectcode"),
-    join(AGENCE_ROOT, "globalcache"),
+    knowledgeBase(),
   ];
 
   let found = 0;
@@ -646,6 +727,9 @@ function indexGitHubRepo(target: Target, mode: ReconMode): IndexJson | null {
   index.target = target.raw;
   index.kind = "github-repo";
   saveIndexJson(target.outputDir, index);
+
+  // Write REPO.json manifest for git repos
+  writeRepoManifest(target, index, cloneUrl);
 
   // Clean up tmp clone
   try {
@@ -834,13 +918,13 @@ function usage(): void {
   console.error(`recon — General-purpose crawler / indexer primitive
 
 Usage:
-  airun recon <target> [--index|--analyse|--update]
+  airun recon <target> [--index|--analyse|--update] [--depth N]
   airun recon list
   airun recon status <target>
   airun recon help
 
 Target types:
-  .                     Current directory
+  .                     Current directory (auto-detects git remote for DNS path)
   /path/to/dir          Local path
   github:org/repo       GitHub repository (clones, indexes, cleans up)
   github:org            GitHub organisation (enumerates repos via gh CLI)
@@ -852,12 +936,15 @@ Modes (default: full = index + analysis):
   --analyse             Analysis only (reads existing index)
   --update              Incremental: re-index changed files only
 
+Options:
+  --depth N             Recursion depth for URL crawling (default: 1)
+
 Output:
-  objectcode/<target>/INDEX.md      Entry point overview
-  objectcode/<target>/INDEX.json    Machine-readable index
-  objectcode/<target>/<file>.chunk.md  Per-file symbol chunks
-  objectcode/<target>/ANALYSIS.md   Human-readable brief (full mode)
-  globalcache/<domain>/             URL and topic targets`);
+  knowledge/{org}/<target>/INDEX.md      Entry point overview
+  knowledge/{org}/<target>/INDEX.json    Machine-readable index
+  knowledge/{org}/<target>/<file>.chunk.md  Per-file symbol chunks
+  knowledge/{org}/<target>/ANALYSIS.md   Human-readable brief (full mode)
+  knowledge/{org}/<target>/REPO.json     Repo manifest (git repos only)`);
 }
 
 const argv = process.argv.slice(2);
@@ -882,7 +969,7 @@ if (sub === "status") {
   process.exit(cmdStatus(argv[1]));
 }
 
-// recon <target> [--index|--analyse|--update]
+// recon <target> [--index|--analyse|--update] [--depth N]
 const targetRaw = sub;
 const modeFlag = argv.find(a => ["--index", "--analyse", "--update"].includes(a));
 const mode: ReconMode = modeFlag === "--index"
@@ -893,8 +980,12 @@ const mode: ReconMode = modeFlag === "--index"
       ? "update"
       : "full";
 
+// Parse --depth flag (for future URL crawl recursion)
+const depthIdx = argv.indexOf("--depth");
+const _crawlDepth = depthIdx >= 0 && argv[depthIdx + 1] ? parseInt(argv[depthIdx + 1], 10) : 1;
+
 const target = resolveTarget(targetRaw);
-console.error(`[recon] target: ${target.label}  mode: ${mode}`);
+console.error(`[recon] target: ${target.label}  mode: ${mode}  depth: ${_crawlDepth}`);
 
 let exitCode = 0;
 
@@ -910,6 +1001,11 @@ if (mode === "analyse") {
 } else if (target.kind === "local") {
   const index = indexLocal(target, mode);
   if (mode === "full") writeAnalysis(target, index);
+  // Write REPO.json if this is a git repo
+  const localAbs = targetRaw === "." ? process.cwd() : resolve(targetRaw);
+  if (existsSync(join(localAbs, ".git"))) {
+    writeRepoManifest(target, index);
+  }
 } else if (target.kind === "github-repo") {
   const index = indexGitHubRepo(target, mode);
   if (index) {

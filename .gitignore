@@ -14,7 +14,10 @@ nexus/.signal-secret
 nexus/sessions/*.meta.json
 nexus/sessions/*.awaiting
 nexus/sessions/*.typescript
-hermetic/
+nexus/memory/
+
+# Private knowledge (local-only, never shared)
+knowledge/private/
 .ailedger-upstream/
 @
 ^

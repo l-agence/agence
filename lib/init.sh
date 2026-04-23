@@ -61,7 +61,7 @@ mode_init() {
       return $?
       ;;
     "lesson")
-      # Knowledge: lessons learned (team-shared, synthetic)
+      # Knowledge: lessons learned (team-shared, knowledge)
       # Usage: agence ^lesson [list|show|add] [--org ORG]
       mode_knowledge "lesson" "$init_args"
       return $?
@@ -73,13 +73,13 @@ mode_init() {
       return $?
       ;;
     "plan")
-      # Strategic plans (team-shared, synthetic)
+      # Strategic plans (team-shared, knowledge)
       # Usage: agence ^plan [list|show|add] [--org ORG]
       mode_knowledge "plan" "$init_args"
       return $?
       ;;
     "todo")
-      # Personal todos (hermetic, local only)
+      # Personal todos (knowledge/private, local only)
       # Usage: agence ^todo [list|show|add] [--owner NAME]
       mode_knowledge "todo" "$init_args"
       return $?
@@ -92,7 +92,7 @@ mode_init() {
       return $?
       ;;
     "issue")
-      # Issues/discoveries (team-shared, synthetic)
+      # Issues/discoveries (team-shared, knowledge)
       # Usage: agence ^issue [list|show|add]
       mode_knowledge "issue" "$init_args"
       return $?
@@ -191,7 +191,7 @@ mode_init() {
         echo "Usage: agence ^recall <tags> [--source X] [--max N]" >&2
         echo "  Tags: comma-separated (e.g. jwt,auth)" >&2
         echo "  Sources: eidetic, semantic, episodic, kinesthetic, masonic" >&2
-        echo "  Legacy: plain text falls back to hermetic/ grep" >&2
+        echo "  Legacy: plain text falls back to knowledge/private/ grep" >&2
         return 1
       fi
       local _memory_ts="${AGENCE_ROOT}/lib/memory.ts"
@@ -200,8 +200,8 @@ mode_init() {
          && command -v bun &>/dev/null && [[ -f "$_memory_ts" ]]; then
         bun run "$_memory_ts" recall $init_args
       else
-        # Legacy fallback: figrep against hermetic/
-        "$AGENCE_BIN/figrep" "$AGENCE_ROOT/hermetic" $init_args
+        # Legacy fallback: figrep against knowledge/private/
+        "$AGENCE_BIN/figrep" "$AGENCE_ROOT/knowledge/private" $init_args
       fi
       return $?
       ;;
@@ -417,7 +417,7 @@ mode_init() {
 # Resolves scope path using @ symlink if present, falls back to explicit org.
 # Law 8: Use realpath() ONLY for validation — never create symlinks here.
 #
-# Usage: resolve_org_path "/path/to/synthetic" ["fallback-org"]
+# Usage: resolve_org_path "/path/to/knowledge" ["fallback-org"]
 # Returns: path to the active org directory under scope_root.
 # Resolution order: AGENCE_ORG env > @ symlink > @<org> named symlink > canonical dir
 resolve_org_path() {
@@ -431,21 +431,21 @@ resolve_org_path() {
   local canonical_path="$scope_root/$fallback_org"
 
   # Tier 1: @ symlink (user-set org context via jlink / system setup)
-  # e.g. synthetic/@ -> l-agence.org
+  # e.g. knowledge/@ -> l-agence.org
   if [[ -L "$symlink_path" ]]; then
     echo "$symlink_path"
     return 0
   fi
 
   # Tier 2: named @org SYMLINK only (explicit org routing via jlink)
-  # e.g. synthetic/@l-agence.org -> ../l-agence.org (user-created symlink)
+  # e.g. knowledge/@l-agence.org -> ../l-agence.org (user-created symlink)
   # NOTE: a plain @org directory is NOT a routing symlink (skip it)
   if [[ -L "$named_org_path" ]]; then
     echo "$named_org_path"
     return 0
   fi
 
-  # Tier 3: canonical org directory (e.g. synthetic/l-agence.org) — most common
+  # Tier 3: canonical org directory (e.g. knowledge/l-agence.org) — most common
   echo "$canonical_path"
   return 0
 }

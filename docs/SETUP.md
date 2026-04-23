@@ -238,7 +238,7 @@ All of these work reliably in WSL-Ubuntu bash. PowerShell on Windows host create
 ## References
 
 - [Microsoft WSL2 Documentation](https://learn.microsoft.com/en-us/windows/wsl/)
-- [Agence Architecture](../synthetic/l-agence.org/docs/ARCHITECTURE.md)
+- [Agence Architecture](../knowledge/l-agence.org/docs/ARCHITECTURE.md)
 - [Agence LAWS.md](./LAWS.md) — Path validation constraints
 - [Agence TAXONOMY.md](./TAXONOMY.md) — Scope model
 

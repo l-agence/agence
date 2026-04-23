@@ -90,7 +90,7 @@ jq '.exit_code, .lessons, .fault' < .aisessions/AISESSION_ID.meta.json > /tmp/ha
 # Share /tmp/handoff.json, never .typescript
 ```
 
-See [SESSION-PERSISTENCE.md](../synthetic/l-agence.org/docs/SESSION-PERSISTENCE.md) for details.
+See [SESSION-PERSISTENCE.md](../knowledge/l-agence.org/docs/SESSION-PERSISTENCE.md) for details.
 
 ---
 
@@ -127,7 +127,7 @@ APT_CORE=("gawk" "npm" "curl")  # Where did jq, gh, tmux go?
 ### Symlinks & Junctions (Routing Layer)
 
 - **Allowed**: User-created symlinks for `@` routing (local, `.gitignore`'d)
-  - Example: `synthetic/@ → l-agence.org` (context switching)
+  - Example: `knowledge/@ → l-agence.org` (context switching)
   - Used for: Agent routing, org routing, team routing
   - NEVER committed to Git
 

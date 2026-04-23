@@ -93,7 +93,7 @@ agence @peers ^review "Is this code production-ready?"
 # Memory operations
 agence ^retain "The auth module uses JWT with RS256" --tags auth,security
 agence ^recall auth
-agence ^glimpse              # Read mnemonic cache
+agence ^glimpse              # Read working memory cache
 agence ^distill --dry-run    # Preview memory promotion
 ```
 
@@ -132,7 +132,7 @@ agence ^audit trail          # View full decision audit trail
 3. **Git-native state** — no database, no server, `organic/` is the single source of truth
 4. **Mixed agent routing** — 4 agent types (persona/tool/loop/ensemble) with dot-notation
 5. **Peer consensus** — 3-LLM weighted voting based on MIT research (arXiv:2406.12708)
-6. **COGNOS memory** — 6-tier cognitive memory model (eidetic/semantic/episodic/kinesthetic/masonic/mnemonic)
+6. **COGNOS memory** — 3-store cognitive memory model (shared/private/working)
 
 ## Need Help?
 
