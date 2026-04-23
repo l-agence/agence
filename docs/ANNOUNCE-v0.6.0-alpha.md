@@ -37,14 +37,14 @@ All state lives in git. Tasks, workflows, projects, memory — all flat files in
 
 ## What else ships in v0.6.0-alpha
 
-- **Mixed agent routing**: 4-type dispatch — persona (LLM), tool (CLI binary), loop (iteration harness), ensemble (multi-LLM consensus)
-- **Dot-notation**: `@ralph.gpt4o` or `@ralph.aider` — override model or binary per-dispatch
+- **Mixed agent routing**: 4 agent types — persona (LLM), tool (CLI binary), loop (iteration harness), ensemble (multi-LLM consensus)
+- **Dot-notation**: `@ralph.gpt4o` or `@ralph.aider` — override model or binary per-agent
 - **COGNOS memory**: 6-tier cognitive memory model with retain/recall/cache/forget/promote/distill
 - **bin/loop**: Generic iteration primitive with backpressure validation between cycles
 - **Peer consensus**: 3-LLM weighted voting based on MIT research (arXiv:2406.12708)
 - **16 agents**: 11 personas + 4 tools + 1 loop + 2 ensembles
 - **28 skill commands**: `^fix`, `^build`, `^review`, `^hack`, `^recon`, `^design`, `^peers`, and more
-- **275 tests**: Security hardening, guard boundary, peer dispatch, memory operations
+- **275 tests**: Security hardening, guard boundary, peer routing, memory operations
 - **HMAC-signed IPC**: Human↔agent signals are cryptographically authenticated
 
 ## Quick start
