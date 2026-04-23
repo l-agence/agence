@@ -634,15 +634,15 @@
       "id": "MEM-005",
       "repo": "agence",
       "title": "^ken: Knowledge Extraction cycle (grasp + glimpse + recon + distill)",
-      "state": "+",
+      "state": "-",
       "priority": 3,
       "stars": 1,
       "heat": 0.3,
       "agent": null,
       "created": "2026-04-20T14:00:00Z",
-      "updated": "2026-04-20T14:00:00Z",
+      "updated": "2026-04-21T10:00:00Z",
       "source": "user request 2026-04-20",
-      "notes": "Orchestrator that chains: search→understand→retain→promote in one shot. v0.7 — primitives need to prove themselves first."
+      "notes": "Orchestrator: grasp→glimpse→recon→distill pipeline with non-fatal fallbacks. 7 tests, 175 lines. Shipped fe8ab73 (v0.6.0-alpha)."
     },
     {
       "id": "HARNESS-001",
@@ -657,6 +657,34 @@
       "updated": "2026-04-20T16:00:00Z",
       "source": "user observation 2026-04-20 (50-subprocess timeout incident)",
       "notes": "bin/loop: generic reusable iteration primitive. GHuntley Ralph Wiggum pattern with Principal Skinner backpressure. Max iterations, pipe-pane capture, ledger logging. Feeds prompt→agent→validate→repeat."
+    },
+    {
+      "id": "HARNESS-002",
+      "repo": "agence",
+      "title": "--backpressure-mode progressive for bin/loop (stall detection)",
+      "state": "-",
+      "priority": 3,
+      "stars": 1,
+      "heat": 0.4,
+      "agent": null,
+      "created": "2026-04-20T18:00:00Z",
+      "updated": "2026-04-21T10:00:00Z",
+      "source": "user observation 2026-04-20",
+      "notes": "Hybrid stall detection via sha256 output hash comparison. --max-stalls (default 3). Exit code 2 = stall abort. Strict mode (default) unchanged. +86 lines. Shipped 1e4acd5 (v0.6.0-alpha)."
+    },
+    {
+      "id": "MCP-001",
+      "repo": "agence",
+      "title": "MCP server — 10 tools + 3 resources over stdio",
+      "state": "-",
+      "priority": 4,
+      "stars": 2,
+      "heat": 0.6,
+      "agent": null,
+      "created": "2026-04-20T20:00:00Z",
+      "updated": "2026-04-21T10:00:00Z",
+      "source": "user design session 2026-04-20",
+      "notes": "lib/mcp.ts: MCP server over stdio. 10 tools (guard_check, guard_classify, skill_run, skill_list, memory_retain, memory_recall, memory_stats, peers_run, ledger_status, ledger_verify). 3 resources (agence://policy, agence://registry, agence://agents). All tools delegate to subprocess. 9 tests, ~303 lines. Shipped 5864d55 (v0.6.0-alpha)."
     },
     {
       "id": "WIRE-005",

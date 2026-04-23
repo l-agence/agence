@@ -94,7 +94,7 @@ nexus/sessions/
 # Sessions accessible via swarm orchestrator (future)
 ```
 
-**Future (v0.3.2+)**: Publish sanitized faults to `synthetic/lessons/` only after human review.
+**Note**: Sanitized faults can be published to `synthetic/lessons/` after human review (shipped v0.4.0+).
 
 ---
 
@@ -208,10 +208,10 @@ organic/
 ^job show ralph           # Ralph's current jobs
 ```
 
-**Future (v0.3.1+)**:
-- Agents merge task state via Git + custom merge strategy
-- Swarm computes priority (blocking impact) + complexity
+**Shipped (v0.5.0+)**:
+- matrix.ts computes priority (blocking impact) + complexity
 - Cost-aware routing: expensive models for urgent/complex tasks
+- Agents merge task state via Git + custom merge strategy
 
 ---
 
@@ -297,7 +297,7 @@ organic/
 
 ---
 
-## Future Integration: ailedger (v0.3.2+)
+## Integration: ailedger (shipped v0.3.0+)
 
 **Principle**: Append-only ledger with human-gated publishing
 

@@ -313,7 +313,7 @@ If the repo does not have the file a tangent needs, that tangent should not be d
 - Use ^plan to map the dependency and route to the correct owner
 - Use swarm to route to the shard/tangent that has access
 
-## Cognitive Memory — 6-tier COGNOS (v0.6.0)
+## Cognitive Memory — 6-tier COGNOS (shipped v0.6.0-alpha)
 
 ```
 PERSISTENT (indexed, durable — .jsonl per store)

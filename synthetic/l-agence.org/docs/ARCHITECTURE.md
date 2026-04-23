@@ -418,10 +418,14 @@ nexus/sessions/
 | Phase | Target | Features |
 |-------|--------|----------|
 | **V0.1** | ✅ Done | Session save, command routing, NEXUS/CODEX separation |
-| **V0.2** | 🔄 Current | Multi-agent coordination, session resume, architecture docs |
-| **V0.3** | 📋 Planned | Git-based sharding templates, cross-shard handoff |
-| **V0.4** | 📋 Planned | Full session recovery, circular buffers, archival |
-| **V1.0** | 📋 Planned | Production-ready, multi-org support, CLI polish |
+| **V0.2** | ✅ Done | Multi-agent coordination, session resume, architecture docs |
+| **V0.3** | ✅ Done | Git-based sharding, tmux 1+1, .ailedger, pipe-pane |
+| **V0.4** | ✅ Done | guard.ts, signal.ts, Docker, PS1, task IDs, ^regen |
+| **V0.5** | ✅ Done | Skills (29), peers, dispatch, mixed agent routing, security fixes |
+| **V0.6** | ✅ Done | First public release, cognitive memory (COGNOS), 291 tests |
+| **V0.7** | ✅ Done | Modular bin/agence split, MCP server, ^ken, ^recon, ledger auto-derive |
+| **V0.8** | 📍 Next | MLS enforcement + AIPOLICY capability tokens |
+| **V1.0** | 📋 Planned | Production-ready, Allegiance ledger, multi-org support |
 
 ---
 

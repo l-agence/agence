@@ -1,14 +1,14 @@
 # Agence Development Roadmap (2026 Q1–Q2)
 
-**Updated**: 2026-04-19
-**Status**: v0.5.0-dev (rich display, dispatch, ^ CLI, legend footer)
-**Current**: main @ 5a60e4f (v0.5.0-dev)
+**Updated**: 2026-04-21
+**Status**: v0.7.0-alpha (modular architecture, MCP, ^ken, ^recon, ledger auto-derive)
+**Current**: main @ 9576f42 (v0.7.0-alpha)
 
 ---
 
 ## 🎯 Vision: Multi-Agent Swarm Orchestration
 
-Path: **Single-Agent Stabilization** → **Routing + Ledger + Audit** → **Guard + Compute** → **Memory + Chunking** → **Distributed**
+Path: **Single-Agent Stabilization** → **Routing + Ledger + Audit** → **Guard + Compute** → **Skills + Peers + Memory** → **Modular Architecture** → **Distributed**
 
 ```
 v0.2.5 (RELEASED)     ← Stabilization, model routing, 91/91 tests
@@ -19,17 +19,19 @@ v0.3.1 (RELEASED)     ← router.ts, audit.ts, airun, CI, ledger IDs
     ↓
 v0.3.2 (RELEASED)     ← version strings, model routing, glossary
     ↓
-v0.4.0 (CURRENT)      ← guard.ts, signal.ts, TCB gates, Docker/Nomad
+v0.4.0 (RELEASED)     ← guard.ts, signal.ts, TCB gates, Docker/Nomad
     ↓
-v0.5.0 (IN PROGRESS)  ← dispatch, skills, peers, rich CLI, ^ symlink
+v0.5.0 (RELEASED)     ← dispatch, skills, peers, rich CLI, ^ symlink, security fixes
     ↓
-v0.5.0                 ← matrix.ts, Docker tangent tournaments, agentd
+v0.6.0-alpha (RELEASED) ← First public release — governance framework, 291 tests
     ↓
-v0.6.0                 ← MLS enforcement + MLS-POLICY.yml
+v0.7.0-alpha (CURRENT)  ← Modular bin/agence split, MCP server, ^ken, ^recon, ledger auto-derive
     ↓
-v0.7.0                 ← Skupper multi-cloud federation
+v0.8.0                 ← MLS enforcement + AIPOLICY capability tokens
     ↓
-v0.9.0                 ← Allegiance ledger (public append-only reputation)
+v0.9.0                 ← Skupper multi-cloud federation
+    ↓
+v1.0.0                 ← Production release — Allegiance ledger, multi-org support
 ```
 
 ---
@@ -45,12 +47,12 @@ v0.9.0                 ← Allegiance ledger (public append-only reputation)
 | **2.2** | v0.3.1 | Bun extraction (router.ts, audit.ts), CI, airun | 🟢 DONE |
 | **2.3** | v0.3.2 | Version strings, model routing, glossary | 🟢 DONE |
 | **3** | v0.4.0–v0.4.5 | guard.ts, signal.ts, Docker, PS1, task IDs, ^regen | 🟢 DONE |
-| **3.5** | v0.5.0-dev | routing layer, rich display, ^ CLI, skills infra, legend | 🟡 IN PROGRESS |
-| **3.1** | v0.4.1 | F.AST chunking, 6-layer memory skeleton (COGNOS) | 📍 NEXT |
-| **4** | v0.5.0 | matrix.ts, Docker tangent tournaments, agentd | 📍 PLANNED |
-| **5** | v0.6.0 | MLS enforcement + MLS-POLICY.yml + capability tokens | 📍 FUTURE |
-| **6** | v0.7.0 | Skupper multi-cloud federation | 📍 FUTURE |
-| **7** | v0.9.0 | Allegiance/Aillegiance (public reputation ledger) | 📍 FUTURE |
+| **4** | v0.5.0 | dispatch.ts, skills (29), peers, rich CLI, ^ symlink, security fixes | 🟢 DONE |
+| **5** | v0.6.0-alpha | First public release — governance framework, memory model, 291 tests | 🟢 DONE |
+| **6** | v0.7.0-alpha | Modular architecture — bin/agence split (9 lib/*.sh), MCP, ^ken, ^recon, ledger auto-derive | 🟢 DONE |
+| **7** | v0.8.0 | MLS enforcement + AIPOLICY capability tokens | 📍 NEXT |
+| **8** | v0.9.0 | Skupper multi-cloud federation | 📍 FUTURE |
+| **9** | v1.0.0 | Production release — Allegiance ledger, multi-org support | 📍 FUTURE |
 
 ---
 
@@ -87,21 +89,23 @@ $task           swarm coordinating
 
 ---
 
-## � Version Horizon & Parking
+## 🔮 Version Horizon
 
 | Version | Feature | Status | Notes |
 |---------|---------|--------|-------|
 | v0.4.0–v0.4.5 | guard.ts, signal.ts, Docker, PS1, task IDs, ^regen | 🟢 DONE | guard✅ signal✅ docker✅ overlay✅ aicmd✅ agentd-spawn✅ PS1✅ hex8-IDs✅ ^regen✅ |
-| v0.4.1 | F.AST chunking, 6-layer memory skeleton | 📍 NEXT | COGNOS: objectcode/organic/synthetic/globalcache/hermetic + mnemonic (runtime) |
-| v0.5.0 | matrix.ts, Docker tangent tournaments, agentd | 📍 PLANNED | |
-| v0.6.0 | MLS enforcement + MLS-POLICY.yml + capabilities | 🅿️ PARKED | Not critical until multi-tenant |
-| v0.7.0 | Skupper multi-cloud federation | 🅿️ PARKED | Build local swarm first |
-| v0.9.0 | Allegiance/Aillegiance (public reputation ledger) | 🅿️ PARKED | .ailedger per-shard is sufficient; reconcile later |
+| v0.5.0 | dispatch, skills (29), peers (3-tangent), mixed agent routing | 🟢 DONE | WIRE-001..005✅ SKILL-001..008✅ SEC-001..006✅ REL-001..002✅ |
+| v0.6.0-alpha | First public release — governance framework | 🟢 DONE | 291 tests, 750 expect(), GitHub public, MIT+CC |
+| v0.7.0-alpha | Modular architecture — bin/agence split, MCP, ^ken, ^recon | 🟢 DONE | 9 lib/*.sh, MCP 10 tools+3 resources, ledger auto-derive |
+| v0.8.0 | MLS enforcement + AIPOLICY capability tokens | 📍 NEXT | Not critical until multi-tenant |
+| v0.9.0 | Skupper multi-cloud federation | 🅿️ PARKED | Build local swarm first |
+| v1.0.0 | Production — Allegiance ledger, multi-org, CLI polish | 🅿️ PARKED | Aggregate reputation from per-shard .ailedger |
 
 ### Naming Changes (v0.4.0+)
 - **grimoire → hermetic/masonic** — no more grimoire; gated memory lives under hermetic
-- **allegiance/aillegiance** — separate from .ailedger; public append-only aggregate (parked v0.9)
+- **allegiance/aillegiance** — separate from .ailedger; public append-only aggregate (parked v1.0)
 - **6-layer memory** — mnemonic (runtime) is layer 6 atop 5 persistent COGNOS scopes
+- **synthesis → synthetic** — canonical scope name is `synthetic/` (team-shared knowledge)
 
 ---
 
@@ -111,7 +115,7 @@ $task           swarm coordinating
 - **[v0.2.4-docker-matrix.md](v0.2.4-docker-matrix.md)** — Container isolation + priority routing
 - **[v0.3.0-tiles.md](v0.3.0-tiles.md)** — Real-time observability + control  
 - **[v0.3.1-orchestrator.md](v0.3.1-orchestrator.md)** — Multi-agent scheduling
-- **[v0.3.2-skupper.md](v0.3.2-skupper.md)** — Multi-cloud distribution (parked → v0.7.0)
+- **[v0.3.2-skupper.md](v0.3.2-skupper.md)** — Multi-cloud distribution (parked → v0.9.0)
 - **[phases.json](phases.json)** — Structured phase data
 
 ---
@@ -124,10 +128,13 @@ $task           swarm coordinating
 - ✅ v0.3.1: Bun TS extraction, airun, router.ts
 - ✅ v0.3.2: Model routing, version strings, glossary
 - ✅ v0.4.0: TCB gates enforced, Docker containers running, PS1 finalized, ^regen dashboards
-- 📍 v0.4.1: F.AST indexes codebase, memory skeleton creates/reads all 6 layers
+- ✅ v0.5.0: 29 skills, @peers 3-tangent dispatch, 6 security fixes, mixed agent routing
+- ✅ v0.6.0-alpha: First public release — 291 tests, cognitive memory model (6-tier COGNOS)
+- ✅ v0.7.0-alpha: Modular bin/agence (4617→384 lines), MCP server, ^ken orchestrator, ^recon crawler, ledger auto-derive
+- 📍 v0.8.0: MLS enforcement, capability tokens, multi-tenant isolation
 
 ---
 
-**Last Updated**: 2026-04-19  
+**Last Updated**: 2026-04-21  
 **Owner**: l-agence team  
-**Next Review**: After v0.4.1 planning
+**Next Review**: After v0.8.0 planning

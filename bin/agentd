@@ -27,11 +27,29 @@ set -u
 
 AGENCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SESSION="${AGENTD_SESSION:-agence}"
-DEFAULT_AGENTS="copilot ralph sonya aider"
 DRIVER="${AGENTD_DRIVER:-stub}"
 
 # Source shell UI for tmux status bar + title management
 [[ -f "$AGENCE_ROOT/lib/shell-ui.sh" ]] && source "$AGENCE_ROOT/lib/shell-ui.sh"
+
+# ── Default agent list ───────────────────────────────────────────────────────
+# Read persona agents directly from codex/agents/registry.json via jq.
+# Falls back to a hardcoded list if jq or registry.json is unavailable.
+_resolve_default_agents() {
+  local _registry="${AGENCE_ROOT}/codex/agents/registry.json"
+  if command -v jq &>/dev/null && [[ -f "$_registry" ]]; then
+    local _list
+    _list=$(jq -r '.agents | to_entries[] | select(.value.type == "persona") | .key' "$_registry" 2>/dev/null | tr '\n' ' ')
+    if [[ -n "${_list// /}" ]]; then
+      echo "$_list"
+      return 0
+    fi
+  fi
+  # Fallback — matches the agent set in codex/agents/registry.json
+  echo "copilot ralph sonya aider"
+}
+
+DEFAULT_AGENTS="${AGENTD_AGENTS:-$(_resolve_default_agents)}"
 
 # ── Directories ─────────────────────────────────────────────────────────────
 

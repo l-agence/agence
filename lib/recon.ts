@@ -597,35 +597,276 @@ function cmdStatus(targetRaw: string): number {
   return 0;
 }
 
+// ─── GitHub Repo: clone to tmp, index, clean up ──────────────────────────────
+
+/** Resolve a GitHub repo slug (org/repo) from a Target. */
+function ghSlug(target: Target): string {
+  // target.raw is "github:org/repo" or a full URL
+  if (target.raw.startsWith("github:")) return target.raw.slice("github:".length);
+  try {
+    const url = new URL(target.raw);
+    return url.pathname.replace(/^\//, "").replace(/\.git$/, "");
+  } catch {
+    return target.raw;
+  }
+}
+
+function indexGitHubRepo(target: Target, mode: ReconMode): IndexJson | null {
+  const slug = ghSlug(target);
+  const cloneUrl = `https://github.com/${slug}.git`;
+  const tmpDir = join(AGENCE_ROOT, "nexus", "tmp", `recon-${slug.replace("/", "-")}-${Date.now()}`);
+
+  // If update mode and we have an existing index with a gitSHA, do a shallow clone + diff
+  const existing = loadIndexJson(target.outputDir);
+
+  try {
+    console.error(`[recon] cloning ${cloneUrl} → ${tmpDir}`);
+    mkdirSync(tmpDir, { recursive: true });
+    execSync(`git clone --depth 1 --single-branch ${cloneUrl} "${tmpDir}"`, {
+      stdio: ["ignore", "ignore", "pipe"],
+      timeout: 120_000,
+    });
+  } catch (err: any) {
+    console.error(`[recon] error: git clone failed for ${slug}`);
+    console.error(`  ${err.stderr?.toString().trim() || err.message}`);
+    return null;
+  }
+
+  // Create a temporary local target pointing at the clone
+  const cloneTarget: Target = {
+    kind: "local",
+    raw: tmpDir,
+    label: target.label,
+    outputDir: target.outputDir,
+  };
+
+  const index = indexLocal(cloneTarget, existing && mode === "update" ? "update" : "full");
+
+  // Patch the index to record the original target
+  index.target = target.raw;
+  index.kind = "github-repo";
+  saveIndexJson(target.outputDir, index);
+
+  // Clean up tmp clone
+  try {
+    execSync(`rm -rf "${tmpDir}"`, { stdio: "ignore" });
+  } catch { /* best effort */ }
+
+  return index;
+}
+
+// ─── GitHub Org: enumerate repos via gh CLI, index each ─────────────────────
+
+function indexGitHubOrg(target: Target, mode: ReconMode): number {
+  const org = target.raw.startsWith("github:") ? target.raw.slice("github:".length) : target.raw;
+
+  let repos: string[];
+  try {
+    const out = execSync(
+      `gh repo list ${org} --limit 50 --json nameWithOwner --jq '.[].nameWithOwner'`,
+      { stdio: ["ignore", "pipe", "ignore"], timeout: 30_000 },
+    ).toString().trim();
+    repos = out ? out.split("\n").filter(Boolean) : [];
+  } catch (err: any) {
+    console.error(`[recon] error: could not list repos for org '${org}'`);
+    console.error(`  Ensure 'gh' CLI is installed and authenticated.`);
+    return 1;
+  }
+
+  if (repos.length === 0) {
+    console.error(`[recon] no repositories found for org '${org}'`);
+    return 1;
+  }
+
+  console.error(`[recon] org '${org}': found ${repos.length} repos`);
+
+  // Create org-level INDEX.md
+  mkdirSync(target.outputDir, { recursive: true });
+  const orgIndex = `# GitHub Organization: ${org}\n\n` +
+    `**Repos**: ${repos.length}\n` +
+    `**Indexed**: ${new Date().toISOString()}\n\n` +
+    `## Repositories\n\n` +
+    repos.map(r => `- [\`${r}\`](./${r.split("/")[1] || r}/INDEX.md)`).join("\n") + "\n";
+  writeFileSync(join(target.outputDir, "INDEX.md"), orgIndex, "utf-8");
+
+  // Index each repo
+  let failures = 0;
+  for (const slug of repos) {
+    const repoTarget = resolveTarget(`github:${slug}`);
+    console.error(`[recon] ── indexing ${slug} ──`);
+    const result = indexGitHubRepo(repoTarget, mode);
+    if (!result) failures++;
+  }
+
+  console.error(`[recon] org '${org}': ${repos.length - failures}/${repos.length} repos indexed`);
+  return failures > 0 ? 1 : 0;
+}
+
+// ─── GitHub Topic: list repos by topic, create index ─────────────────────────
+
+function indexGitHubTopic(target: Target): number {
+  const tag = target.raw.startsWith("github:topics/")
+    ? target.raw.slice("github:topics/".length)
+    : target.raw;
+
+  let repos: Array<{ nameWithOwner: string; description: string; stargazerCount: number }>;
+  try {
+    const out = execSync(
+      `gh search repos --topic="${tag}" --limit=30 --json nameWithOwner,description,stargazerCount`,
+      { stdio: ["ignore", "pipe", "ignore"], timeout: 30_000 },
+    ).toString().trim();
+    repos = out ? JSON.parse(out) : [];
+  } catch {
+    console.error(`[recon] error: could not search topic '${tag}'. Ensure 'gh' is installed.`);
+    return 1;
+  }
+
+  if (repos.length === 0) {
+    console.error(`[recon] no repos found for topic '${tag}'`);
+    return 1;
+  }
+
+  console.error(`[recon] topic '${tag}': found ${repos.length} repos`);
+
+  mkdirSync(target.outputDir, { recursive: true });
+  const topicIndex = `# GitHub Topic: ${tag}\n\n` +
+    `**Repos found**: ${repos.length}\n` +
+    `**Indexed**: ${new Date().toISOString()}\n\n` +
+    `## Repositories (by stars)\n\n` +
+    `| Repo | Stars | Description |\n|------|-------|-------------|\n` +
+    repos
+      .sort((a, b) => b.stargazerCount - a.stargazerCount)
+      .map(r => `| [\`${r.nameWithOwner}\`](https://github.com/${r.nameWithOwner}) | ${r.stargazerCount} | ${(r.description || "").slice(0, 80)} |`)
+      .join("\n") + "\n";
+
+  writeFileSync(join(target.outputDir, "INDEX.md"), topicIndex, "utf-8");
+
+  const indexData: IndexJson = {
+    target: target.raw,
+    kind: "github-topic",
+    lastIndexed: new Date().toISOString(),
+    fileCount: repos.length,
+    files: repos.map(r => ({
+      file: r.nameWithOwner,
+      chunkFile: "",
+      symbols: [],
+      lines: r.stargazerCount,
+      lang: "github-repo",
+    })),
+  };
+  saveIndexJson(target.outputDir, indexData);
+  console.error(`[recon] ✓ topic index → ${target.outputDir}`);
+  return 0;
+}
+
+// ─── URL: fetch page, extract text, index ────────────────────────────────────
+
+function indexUrl(target: Target): IndexJson | null {
+  const url = target.raw;
+
+  let html: string;
+  try {
+    // Use curl for portability (available everywhere, no extra deps)
+    html = execSync(
+      `curl -fsSL --max-time 30 --max-filesize 2000000 -A "agence-recon/1.0" "${url}"`,
+      { stdio: ["ignore", "pipe", "ignore"], timeout: 35_000 },
+    ).toString();
+  } catch {
+    console.error(`[recon] error: could not fetch ${url}`);
+    return null;
+  }
+
+  mkdirSync(target.outputDir, { recursive: true });
+
+  // Strip HTML tags for a rough text extraction
+  const text = html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // Extract headings from the HTML
+  const headings: string[] = [];
+  const headingRe = /<h[1-3][^>]*>(.*?)<\/h[1-3]>/gi;
+  let m;
+  while ((m = headingRe.exec(html)) !== null) {
+    headings.push(m[1].replace(/<[^>]+>/g, "").trim());
+  }
+
+  // Extract page title
+  const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
+  const title = titleMatch ? titleMatch[1].trim() : new URL(url).hostname;
+
+  // Write as a single chunk
+  const chunkContent = `# ${title}\n\n**URL**: ${url}\n**Fetched**: ${new Date().toISOString()}\n\n` +
+    (headings.length > 0 ? `## Headings\n\n${headings.map(h => `- ${h}`).join("\n")}\n\n` : "") +
+    `## Content\n\n${text.slice(0, 50_000)}${text.length > 50_000 ? "\n\n… (truncated)" : ""}\n`;
+
+  const chunkFile = "page.chunk.md";
+  writeFileSync(join(target.outputDir, chunkFile), chunkContent, "utf-8");
+
+  const indexData: IndexJson = {
+    target: url,
+    kind: "url",
+    lastIndexed: new Date().toISOString(),
+    fileCount: 1,
+    files: [{
+      file: url,
+      chunkFile,
+      symbols: headings.slice(0, 20),
+      lines: text.split(/\n/).length,
+      lang: "html",
+    }],
+  };
+
+  saveIndexJson(target.outputDir, indexData);
+  writeFileSync(join(target.outputDir, "INDEX.md"),
+    buildIndexMd(target, indexData.files), "utf-8");
+
+  console.error(`[recon] ✓ URL indexed → ${target.outputDir}`);
+  return indexData;
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 function usage(): void {
-  console.error(`Usage: airun recon <target> [--index|--analyse|--update]
-       airun recon list
-       airun recon status <target>
+  console.error(`recon — General-purpose crawler / indexer primitive
+
+Usage:
+  airun recon <target> [--index|--analyse|--update]
+  airun recon list
+  airun recon status <target>
+  airun recon help
 
 Target types:
   .                     Current directory
   /path/to/dir          Local path
-  github:org/repo       GitHub repository
-  github:org            GitHub organisation
-  github:topics/<tag>   GitHub topic
-  https://...           URL / web target
+  github:org/repo       GitHub repository (clones, indexes, cleans up)
+  github:org            GitHub organisation (enumerates repos via gh CLI)
+  github:topics/<tag>   GitHub topic (searches repos, writes catalog)
+  https://...           URL / web target (fetches, extracts text)
 
 Modes (default: full = index + analysis):
   --index               Crawl + index only (no analysis)
   --analyse             Analysis only (reads existing index)
-  --update              Incremental: re-index changed files only`);
+  --update              Incremental: re-index changed files only
+
+Output:
+  objectcode/<target>/INDEX.md      Entry point overview
+  objectcode/<target>/INDEX.json    Machine-readable index
+  objectcode/<target>/<file>.chunk.md  Per-file symbol chunks
+  objectcode/<target>/ANALYSIS.md   Human-readable brief (full mode)
+  globalcache/<domain>/             URL and topic targets`);
 }
 
 const argv = process.argv.slice(2);
+const sub = argv[0] || "";
 
-if (argv.length === 0) {
+if (argv.length === 0 || sub === "help" || sub === "--help" || sub === "-h") {
   usage();
-  process.exit(1);
+  process.exit(argv.length === 0 ? 1 : 0);
 }
-
-const sub = argv[0];
 
 // list
 if (sub === "list") {
@@ -669,35 +910,23 @@ if (mode === "analyse") {
 } else if (target.kind === "local") {
   const index = indexLocal(target, mode);
   if (mode === "full") writeAnalysis(target, index);
-} else {
-  // Non-local targets (github, url) — create a stub index entry
-  // Full crawling requires network calls; agents handle that via their tools.
-  // We write a placeholder so status/list work correctly.
-  mkdirSync(target.outputDir, { recursive: true });
-
-  const stub: IndexJson = {
-    target: targetRaw,
-    kind: target.kind,
-    lastIndexed: new Date().toISOString(),
-    fileCount: 0,
-    files: [],
-  };
-
-  if (!existsSync(join(target.outputDir, "INDEX.json"))) {
-    saveIndexJson(target.outputDir, stub);
-    writeFileSync(
-      join(target.outputDir, "INDEX.md"),
-      `# ${target.label}\n\n**Status**: Stub — crawl pending\n\n` +
-      `This target requires agent-assisted crawling.\n` +
-      `Run this \`^recon\` command from an agent with web/GitHub access.\n\n` +
-      `**Target**: \`${targetRaw}\`  \n**Kind**: ${target.kind}\n`,
-      "utf-8",
-    );
-    console.error(`[recon] ✓ stub index created → ${target.outputDir}`);
-    console.error(`[recon] note: full crawl of ${target.kind} targets requires agent with network access`);
+} else if (target.kind === "github-repo") {
+  const index = indexGitHubRepo(target, mode);
+  if (index) {
+    if (mode === "full") writeAnalysis(target, index);
   } else {
-    console.error(`[recon] index already exists → ${target.outputDir}`);
-    console.error(`[recon] use --update to refresh`);
+    exitCode = 1;
+  }
+} else if (target.kind === "github-org") {
+  exitCode = indexGitHubOrg(target, mode);
+} else if (target.kind === "github-topic") {
+  exitCode = indexGitHubTopic(target);
+} else if (target.kind === "url") {
+  const index = indexUrl(target);
+  if (index) {
+    if (mode === "full") writeAnalysis(target, index);
+  } else {
+    exitCode = 1;
   }
 }
 
