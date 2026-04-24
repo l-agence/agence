@@ -449,13 +449,11 @@ function checkCommand(command: string): GuardDecision {
 
   // ── Default: T2 (unknown command — escalate, require human approval) ──
   // SEC-003: fail-closed. Unknown commands must not auto-allow.
-  // Override with AGENCE_GUARD_PERMISSIVE=1 for legacy T1 behavior.
-  const permissive = process.env.AGENCE_GUARD_PERMISSIVE === "1";
+  // SEC-010: Removed AGENCE_GUARD_PERMISSIVE env var — it was exploitable
+  // by agents who could set env vars before calling aido/guard.
   return {
-    approved: permissive, tier: permissive ? "T1" : "T2", command: trimmed,
-    reason: permissive
-      ? "Unknown command — allowed with flag (permissive mode)"
-      : "Unknown command — escalated (fail-closed default)",
+    approved: false, tier: "T2", command: trimmed,
+    reason: "Unknown command — escalated (fail-closed default)",
     rule: "default", agent, timestamp: ts,
   };
 }

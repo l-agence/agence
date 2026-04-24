@@ -324,6 +324,8 @@ _socket_stop() {
 }
 
 # Socket handler — reads command from stdin, sends to tmux pane
+# SEC-010: Added guard gate — socket handler previously executed commands
+# with no guard check, allowing direct bypass via socat socket.
 cmd__socket_handler() {
   local tangent_id="${1:-}"
   if [[ -z "$tangent_id" ]]; then
@@ -337,6 +339,20 @@ cmd__socket_handler() {
 
   if [[ -z "$cmd" ]]; then
     exit 0
+  fi
+
+  # Guard gate: classify command before execution
+  local _guard_ts="${AGENCE_ROOT}/lib/guard.ts"
+  if command -v bun &>/dev/null && [[ -f "$_guard_ts" ]]; then
+    eval "$(bun run "$_guard_ts" check "$cmd" 2>/dev/null)"
+    if [[ "${_GUARD_APPROVED:-0}" != "1" ]]; then
+      echo "✗ Guard denied: $cmd" >&2
+      echo "  Tier: ${_GUARD_TIER:-?}  Reason: ${_GUARD_REASON:-unknown}" >&2
+      exit 1
+    fi
+  else
+    echo "✗ Guard unavailable — denying socket command (fail-closed)" >&2
+    exit 1
   fi
 
   # Check if this tangent has a running Docker container
@@ -747,14 +763,20 @@ cmd_inject() {
   fi
 
   # Gate through guard.ts before injection (host-side TCB check)
+  # SEC-010: Fixed fail-open default — was _GUARD_APPROVED:-1 (default allow),
+  # now _GUARD_APPROVED:-0 (default deny). Removed || true that swallowed errors.
   local _guard_ts="${AGENCE_ROOT}/lib/guard.ts"
   if command -v bun &>/dev/null && [[ -f "$_guard_ts" ]]; then
-    eval "$(bun run "$_guard_ts" check $cmd 2>/dev/null)" || true
-    if [[ "${_GUARD_APPROVED:-1}" == "0" ]]; then
+    eval "$(bun run "$_guard_ts" check "$cmd" 2>/dev/null)"
+    if [[ "${_GUARD_APPROVED:-0}" != "1" ]]; then
       echo "✗ Guard denied: $cmd" >&2
       echo "  Tier: ${_GUARD_TIER:-?}  Reason: ${_GUARD_REASON:-unknown}" >&2
       exit 1
     fi
+  else
+    # Fail-closed: if guard is unavailable, deny injection
+    echo "✗ Guard unavailable — denying injection (fail-closed)" >&2
+    exit 1
   fi
 
   # Send command through socat socket

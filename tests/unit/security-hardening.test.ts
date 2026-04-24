@@ -421,3 +421,283 @@ describe("Cross-cutting security scenarios", () => {
     }
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SEC-008/009/010: GUARD BYPASS & ENV HARDENING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const GUARD = join(AGENCE_ROOT, "lib/guard.ts");
+
+// Helper: run guard.ts subcommand
+function runGuard(args: string[], env?: Record<string, string>): { stdout: string; stderr: string; exitCode: number } {
+  const result = Bun.spawnSync(["bun", "run", GUARD, ...args], {
+    cwd: AGENCE_ROOT,
+    env: { ...process.env, AGENCE_ROOT, ...env },
+  });
+  return {
+    stdout: result.stdout.toString().trim(),
+    stderr: result.stderr.toString().trim(),
+    exitCode: result.exitCode,
+  };
+}
+
+// Helper: run a shell script and capture output
+function runShell(script: string, args: string[], env?: Record<string, string>): { stdout: string; stderr: string; exitCode: number } {
+  const result = Bun.spawnSync(["bash", join(AGENCE_ROOT, script), ...args], {
+    cwd: AGENCE_ROOT,
+    env: { ...process.env, AGENCE_ROOT, AI_ROOT: AGENCE_ROOT, GIT_ROOT: AGENCE_ROOT, ...env },
+  });
+  return {
+    stdout: result.stdout.toString().trim(),
+    stderr: result.stderr.toString().trim(),
+    exitCode: result.exitCode,
+  };
+}
+
+describe("SEC-010: AGENCE_GUARD_PERMISSIVE removed", () => {
+
+  test("guard.ts ignores AGENCE_GUARD_PERMISSIVE=1 for unknown commands", () => {
+    // Unknown command should be T2 (escalate, denied) regardless of env var
+    const r = runGuard(["classify", "some-unknown-binary --flag"], {
+      AGENCE_GUARD_PERMISSIVE: "1",
+    });
+    expect(r.exitCode).toBe(0);
+    const parsed = JSON.parse(r.stdout);
+    expect(parsed.tier).toBe("T2");
+    expect(parsed.action).toBe("escalate");
+  });
+
+  test("guard.ts unknown command is T2 escalate (fail-closed)", () => {
+    const r = runGuard(["classify", "totally-unknown-cmd"]);
+    expect(r.exitCode).toBe(0);
+    const parsed = JSON.parse(r.stdout);
+    expect(parsed.tier).toBe("T2");
+    expect(parsed.action).toBe("escalate");
+  });
+
+  test("guard check denies unknown command (exit 1)", () => {
+    const r = runGuard(["check", "totally-unknown-cmd"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("_GUARD_APPROVED=0");
+  });
+
+  test("guard.ts source does not contain AGENCE_GUARD_PERMISSIVE logic", () => {
+    const src = readFileSync(GUARD, "utf-8");
+    // The env var read and permissive branch should be gone
+    expect(src).not.toContain('process.env.AGENCE_GUARD_PERMISSIVE');
+    expect(src).not.toContain('permissive ? "T1"');
+  });
+});
+
+describe("SEC-010: Guard classification correctness", () => {
+
+  test("T0 commands are auto-approved", () => {
+    const t0cmds = ["git status", "ls -la", "cat README.md", "echo hello"];
+    for (const cmd of t0cmds) {
+      const r = runGuard(["classify", cmd]);
+      const parsed = JSON.parse(r.stdout);
+      expect(parsed.tier).toBe("T0");
+      expect(parsed.action).toBe("allow");
+    }
+  });
+
+  test("T3 commands are denied", () => {
+    const t3cmds = ["rm -rf /tmp", "chmod 777 file", "sudo reboot"];
+    for (const cmd of t3cmds) {
+      const r = runGuard(["check", cmd]);
+      expect(r.exitCode).toBe(1);
+      expect(r.stdout).toContain("_GUARD_APPROVED=0");
+    }
+  });
+
+  test("T2 write commands require escalation", () => {
+    const t2cmds = ["git push", "git commit -m test", "mv a b"];
+    for (const cmd of t2cmds) {
+      const r = runGuard(["classify", cmd]);
+      const parsed = JSON.parse(r.stdout);
+      expect(parsed.tier).toBe("T2");
+      expect(parsed.action).toBe("escalate");
+    }
+  });
+
+  test("global blocks: shell operators are T3 denied", () => {
+    const operators = ["echo foo | bar", "cat file > out", "cmd1 && cmd2", "echo $(id)"];
+    for (const cmd of operators) {
+      const r = runGuard(["check", cmd]);
+      expect(r.exitCode).toBe(1);
+      expect(r.stdout).toContain("_GUARD_APPROVED=0");
+      expect(r.stdout).toContain("_GUARD_TIER=T3");
+    }
+  });
+
+  test("global blocks: env exposure commands are denied", () => {
+    const r1 = runGuard(["check", "printenv"]);
+    expect(r1.exitCode).toBe(1);
+    const r2 = runGuard(["check", "env"]);
+    expect(r2.exitCode).toBe(1);
+  });
+
+  test("path traversal is blocked", () => {
+    const r = runGuard(["check", "cat ../../../etc/passwd"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("_GUARD_TIER=T3");
+  });
+});
+
+describe("SEC-010: aicmd guard gate", () => {
+
+  test("aicmd source contains guard gate", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/aicmd"), "utf-8");
+    expect(src).toContain("guard.ts");
+    expect(src).toContain("_GUARD_APPROVED");
+    expect(src).toContain("SEC-010");
+  });
+
+  test("aicmd source fails closed when guard unavailable", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/aicmd"), "utf-8");
+    // Should deny when bun/guard.ts not found
+    expect(src).toContain("Guard unavailable");
+    expect(src).toContain("exit 1");
+  });
+});
+
+describe("SEC-010: aibash env sanitization", () => {
+
+  test("aibash unsets AGENCE_GUARD_PERMISSIVE", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/aibash"), "utf-8");
+    expect(src).toContain("unset AGENCE_GUARD_PERMISSIVE");
+  });
+
+  test("aibash unsets API keys", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/aibash"), "utf-8");
+    // Keys may be on same unset line — check each name appears in an unset context
+    for (const key of ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "AWS_SECRET_ACCESS_KEY"]) {
+      expect(src).toContain(key);
+      // Verify it appears on a line containing "unset"
+      const lines = src.split("\n").filter(l => l.includes(key));
+      expect(lines.some(l => l.includes("unset"))).toBe(true);
+    }
+  });
+
+  test("aibash unsets AGENCE_POLICY", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/aibash"), "utf-8");
+    expect(src).toContain("unset AGENCE_POLICY");
+  });
+});
+
+describe("SEC-010: aishell.ps1 hardening", () => {
+
+  test("aishell.ps1 does not have . on PATH", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/aishell.ps1"), "utf-8");
+    // Should NOT have ":." at end of PATH assignment
+    expect(src).not.toMatch(/\$env:PATH\s*=\s*"[^"]*:\."/);
+  });
+
+  test("aishell.ps1 has guard integration", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/aishell.ps1"), "utf-8");
+    expect(src).toContain("guard.ts");
+    expect(src).toContain("guardApproved");
+    expect(src).toContain("fail-closed");
+  });
+
+  test("aishell.ps1 does not claim CODEX whitelist", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/aishell.ps1"), "utf-8");
+    expect(src).not.toContain("CODEX whitelist");
+  });
+
+  test("aishell.ps1 unsets API keys", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/aishell.ps1"), "utf-8");
+    expect(src).toContain("ANTHROPIC_API_KEY");
+    expect(src).toContain("OPENAI_API_KEY");
+    expect(src).toContain("AGENCE_GUARD_PERMISSIVE");
+  });
+});
+
+describe("SEC-010: agentd fail-closed", () => {
+
+  test("agentd cmd_inject uses _GUARD_APPROVED:-0 (default deny)", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/agentd"), "utf-8");
+    // Check the actual guard eval lines (not comments) for fail-closed default
+    const guardLines = src.split("\n").filter(l => l.includes("_GUARD_APPROVED:-") && !l.trimStart().startsWith("#"));
+    // All non-comment guard lines should use :-0 (deny), not :-1 (allow)
+    for (const line of guardLines) {
+      expect(line).not.toContain("_GUARD_APPROVED:-1");
+      expect(line).toContain("_GUARD_APPROVED:-0");
+    }
+    expect(guardLines.length).toBeGreaterThan(0);
+  });
+
+  test("agentd cmd_inject does not swallow guard errors with || true", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/agentd"), "utf-8");
+    // Find guard eval lines in cmd_inject — they should NOT have || true
+    const injectSection = src.substring(
+      src.indexOf("cmd_inject()"),
+      src.indexOf("cmd_help()")
+    );
+    // Check specifically the eval "$(bun run ..." lines, not `shift || true`
+    const evalLines = injectSection.split("\n").filter(l => l.includes("eval") && l.includes("guard"));
+    for (const line of evalLines) {
+      expect(line).not.toContain("|| true");
+    }
+  });
+
+  test("agentd socket handler has guard gate", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/agentd"), "utf-8");
+    const socketSection = src.substring(
+      src.indexOf("cmd__socket_handler()"),
+      src.indexOf("cmd__socket_handler()") + 1500
+    );
+    expect(socketSection).toContain("guard.ts");
+    expect(socketSection).toContain("_GUARD_APPROVED");
+    expect(socketSection).toContain("fail-closed");
+  });
+
+  test("agentd quotes $cmd in guard check", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/agentd"), "utf-8");
+    // cmd_inject guard: should quote "$cmd" not bare $cmd
+    const injectSection = src.substring(
+      src.indexOf("cmd_inject()"),
+      src.indexOf("cmd_help()")
+    );
+    expect(injectSection).toContain('"$cmd"');
+  });
+});
+
+describe("SEC-010: aido fail-closed fallback", () => {
+
+  test("aido source does not fall back to T1 when guard unavailable", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/aido"), "utf-8");
+    expect(src).not.toContain("falling back to T1");
+    expect(src).toContain("fail-closed");
+  });
+
+  test("aido _guard_check denies when airun not found", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/aido"), "utf-8");
+    // When airun not found, should return 1 (deny)
+    const guardSection = src.substring(
+      src.indexOf("_guard_check()"),
+      src.indexOf("_gate_escalate()")
+    );
+    // First check: airun not found → return 1
+    expect(guardSection).toContain("falling back to deny");
+    expect(guardSection).toContain("return 1");
+  });
+});
+
+describe("SEC-010: docker.sh hardening", () => {
+
+  test("docker.sh does not use apparmor:unconfined", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/drivers/docker.sh"), "utf-8");
+    expect(src).not.toContain("apparmor:unconfined");
+  });
+
+  test("docker.sh uses no-new-privileges", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/drivers/docker.sh"), "utf-8");
+    expect(src).toContain("no-new-privileges");
+  });
+
+  test("docker.sh runs containers as non-root user", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/drivers/docker.sh"), "utf-8");
+    expect(src).toContain("--user");
+  });
+});

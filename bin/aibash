@@ -52,6 +52,16 @@ unset _restricted_path _bun_path _bun_dir
 # Unset risky env vars
 unset HISTFILE HISTSIZE HISTCONTROL HISTIGNORE PROMPT_COMMAND BASH_ENV ENV CDPATH
 
+# SEC-010: Unset security-critical env vars that agents must not access or override
+# Guard bypass: agents could set AGENCE_GUARD_PERMISSIVE=1 to weaken the guard
+unset AGENCE_GUARD_PERMISSIVE
+# API key exfiltration: agents could echo $*_API_KEY to steal credentials
+unset ANTHROPIC_API_KEY OPENAI_API_KEY GEMINI_API_KEY GOOGLE_API_KEY
+unset AZURE_OPENAI_API_KEY DEEPSEEK_API_KEY MISTRAL_API_KEY COHERE_API_KEY
+unset AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+# Prevent agent from overriding policy or root paths
+unset AGENCE_POLICY
+
 # Disable Bash features that allow escape
 set +o history
 set +o braceexpand
