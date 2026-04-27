@@ -29,6 +29,7 @@ function guardCheck(command: string): { stdout: string; stderr: string; exitCode
   const result = Bun.spawnSync(["bun", "run", GUARD, "check", command], {
     cwd: AGENCE_ROOT,
     env: { ...process.env, AGENCE_ROOT, AGENCE_TRACE: "0", AI_AGENT: "test-agent" },
+    timeout: 15_000,
   });
   return {
     stdout: result.stdout.toString().trim(),
@@ -42,6 +43,7 @@ function guardClassify(command: string): { tier: string; action: string; rule: s
   const result = Bun.spawnSync(["bun", "run", GUARD, "classify", command], {
     cwd: AGENCE_ROOT,
     env: { ...process.env, AGENCE_ROOT, AI_AGENT: "test-agent" },
+    timeout: 15_000,
   });
   return JSON.parse(result.stdout.toString().trim());
 }

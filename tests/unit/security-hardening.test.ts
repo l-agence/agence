@@ -23,6 +23,7 @@ function runSignal(args: string[], env?: Record<string, string>): { stdout: stri
   const result = Bun.spawnSync(["bun", "run", SIGNAL, ...args], {
     cwd: AGENCE_ROOT,
     env: { ...process.env, AGENCE_ROOT, TMUX: "", ...env },
+    timeout: 15_000,
   });
   return {
     stdout: result.stdout.toString().trim(),
@@ -36,6 +37,7 @@ function runSkill(args: string[], env?: Record<string, string>): { stdout: strin
   const result = Bun.spawnSync(["bun", "run", SKILL, ...args], {
     cwd: AGENCE_ROOT,
     env: { ...process.env, AGENCE_ROOT, ...env },
+    timeout: 15_000,
   });
   return {
     stdout: result.stdout.toString().trim(),
@@ -433,6 +435,7 @@ function runGuard(args: string[], env?: Record<string, string>): { stdout: strin
   const result = Bun.spawnSync(["bun", "run", GUARD, ...args], {
     cwd: AGENCE_ROOT,
     env: { ...process.env, AGENCE_ROOT, ...env },
+    timeout: 15_000,
   });
   return {
     stdout: result.stdout.toString().trim(),
@@ -446,6 +449,7 @@ function runShell(script: string, args: string[], env?: Record<string, string>):
   const result = Bun.spawnSync(["bash", join(AGENCE_ROOT, script), ...args], {
     cwd: AGENCE_ROOT,
     env: { ...process.env, AGENCE_ROOT, AI_ROOT: AGENCE_ROOT, GIT_ROOT: AGENCE_ROOT, ...env },
+    timeout: 15_000,
   });
   return {
     stdout: result.stdout.toString().trim(),

@@ -67,6 +67,13 @@ jobs:
           mkdir -p nexus/.aisessions
           bun run lib/session.ts list
 
+      # ── Bun unit tests ──────────────────────────────────────────
+      - name: bun test (312 unit tests)
+        env:
+          AI_ROOT: ${{ github.workspace }}
+          AGENCE_ROOT: ${{ github.workspace }}
+        run: bun test --timeout 60000
+
       # ── Ailedger chain integrity ─────────────────────────────────
       - name: ailedger_verify (if ledger exists)
         env:

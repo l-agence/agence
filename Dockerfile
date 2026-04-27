@@ -39,7 +39,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # ── Bun (standalone static binary — no npm) ──────────────────────────────
 
-ARG BUN_VERSION=1.2.9
+ARG BUN_VERSION=1.3.12
 RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash \
   && ln -sf /usr/local/bin/bun /usr/local/bin/bunx \
   && bun --version

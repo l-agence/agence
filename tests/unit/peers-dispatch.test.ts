@@ -32,6 +32,7 @@ function runPeers(args: string[], env?: Record<string, string>): { stdout: strin
   const result = Bun.spawnSync(["bun", "run", PEERS, ...args], {
     cwd: AGENCE_ROOT,
     env: { ...process.env, AGENCE_ROOT, ...env },
+    timeout: 15_000,
   });
   return {
     stdout: result.stdout.toString().trim(),
@@ -45,6 +46,7 @@ function runSkill(args: string[], env?: Record<string, string>): { stdout: strin
   const result = Bun.spawnSync(["bun", "run", SKILL, ...args], {
     cwd: AGENCE_ROOT,
     env: { ...process.env, AGENCE_ROOT, ...env },
+    timeout: 15_000,
   });
   return {
     stdout: result.stdout.toString().trim(),

@@ -1,0 +1,3 @@
+[test]
+timeout = 60000         # 60s per test (generous for routing tests ~40s)
+rerun-each = 0           # no automatic reruns
