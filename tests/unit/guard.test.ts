@@ -29,6 +29,7 @@ function guardCheck(command: string): { stdout: string; stderr: string; exitCode
   const result = Bun.spawnSync(["bun", "run", GUARD, "check", command], {
     cwd: AGENCE_ROOT,
     env: { ...process.env, AGENCE_ROOT, AGENCE_TRACE: "0", AI_AGENT: "test-agent" },
+    timeout: 15_000,
   });
   return {
     stdout: result.stdout.toString().trim(),
@@ -42,6 +43,7 @@ function guardClassify(command: string): { tier: string; action: string; rule: s
   const result = Bun.spawnSync(["bun", "run", GUARD, "classify", command], {
     cwd: AGENCE_ROOT,
     env: { ...process.env, AGENCE_ROOT, AI_AGENT: "test-agent" },
+    timeout: 15_000,
   });
   return JSON.parse(result.stdout.toString().trim());
 }
@@ -224,14 +226,16 @@ describe("SEC-003: Fail-closed default", () => {
     expect(v._GUARD_TIER).toBe("T2");
   });
 
-  test("permissive mode override → T1 allow", () => {
+  test("AGENCE_GUARD_PERMISSIVE env var is ignored (SEC-010: removed)", () => {
+    // SEC-010: AGENCE_GUARD_PERMISSIVE was removed — setting it should have no effect.
+    // Unknown commands must always be T2 (escalate), never T1 (permissive allow).
     const result = Bun.spawnSync(["bun", "run", GUARD, "classify", "xyzzy-unknown-perm"], {
       cwd: AGENCE_ROOT,
       env: { ...process.env, AGENCE_ROOT, AI_AGENT: "test", AGENCE_GUARD_PERMISSIVE: "1" },
     });
     const c = JSON.parse(result.stdout.toString().trim());
-    expect(c.tier).toBe("T1");
-    expect(c.action).toBe("flag");
+    expect(c.tier).toBe("T2");
+    expect(c.action).toBe("escalate");
   });
 
   test("permissive mode not set → stays T2", () => {

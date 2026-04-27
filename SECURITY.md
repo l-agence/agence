@@ -1,6 +1,6 @@
 # Security Policy
 
-**Version**: v0.6.0-alpha · April 20, 2026
+**Version**: v0.7.0-alpha · April 27, 2026
 
 ## Reporting Vulnerabilities
 
@@ -60,51 +60,47 @@ Human↔agent communication via `nexus/signals/` uses:
 
 ### Test Coverage
 
-275 unit tests covering security boundaries:
-- 126 guard boundary tests (tier escalation, AIPOLICY parsing, eval safety)
-- 36 security hardening tests (HMAC, signal forgery, injection prevention)
-- 56 memory operation tests (tier isolation, store boundaries)
-- 57 peer dispatch tests (agent routing, consensus validation)
+312 unit tests (804 expect() assertions) covering security boundaries:
+- 132 guard boundary tests (tier escalation, AIPOLICY parsing, eval safety)
+- 64 security hardening tests (HMAC, signal forgery, injection prevention, SEC-010 regressions)
+- 62 memory operation tests (tier isolation, store boundaries)
+- 53 peer dispatch tests (agent routing, consensus validation)
+- 9 MCP server tests (tool/resource surface verification)
 
 ---
 
-## Known Limitations (v0.6.0-alpha)
+## Known Limitations (v0.7.0-alpha)
 
-These are documented here for transparency. They are tracked as SEC-007..010 (perpetual security improvement loop) and targeted for v0.7+.
+These are documented here for transparency. They are tracked via the perpetual SEC-007..011 security improvement loop.
 
-### 1. `aicmd` Unguarded Execution Path
-
-`aicmd` is a direct command execution utility that **does not pass through guard.ts**. In the current architecture, agents with shell access could bypass the tiered command policy via `aicmd`.
-
-**Mitigation**: `aicmd` is not on the default agent PATH. Agents use `aido` (which routes through the guard) for all command execution.
-
-**Planned**: AppArmor/SELinux profile to restrict `aicmd` access, or removal from the agent plane entirely.
-
-### 2. `agentd` Fail-Open Default
-
-The agent daemon (`agentd`) uses `|| true` fallbacks and defaults to "approved" if the guard is unreachable. This is a liveness-over-safety tradeoff for development.
-
-**Mitigation**: In production deployments, set `AGENCE_GUARD_STRICT=1` to fail-closed.
-
-**Planned**: Default to fail-closed in v0.7, with explicit opt-in for fail-open mode.
-
-### 3. `AGENCE_GUARD_PERMISSIVE` Environment Variable
-
-An agent with env access can set `AGENCE_GUARD_PERMISSIVE=1` to bypass guard enforcement.
-
-**Mitigation**: The variable is not set by any agence code. Docker container agents run with a sanitized environment.
-
-**Planned**: Remove this variable entirely, or require it to be set only by the TCB.
-
-### 4. Perpetual Security Loop (SEC-007..010)
+### 1. Perpetual Security Loop (SEC-007..011)
 
 Security is a process, not a product. The following probes are designed to run continuously against released versions:
 
 - **SEC-008** (`^break`): Non-destructive stress testing of guard bypass paths
 - **SEC-009** (`^hack`): Red-team privilege escalation and self-modification probes
 - **SEC-010** (`^integrate`): Fix, verify, and regression test findings
+- **SEC-011+**: Next cycle (perpetual)
 
 These are perpetual tasks — they intentionally never complete. Each cycle feeds the next.
+
+---
+
+## Resolved in v0.7.0-alpha (SEC-010)
+
+The following vulnerabilities were identified by SEC-008/009 and fixed in SEC-010:
+
+| Fix | Severity | Detail |
+|-----|----------|--------|
+| `aicmd` guard gate | P0 | All commands now pass through guard.ts. Previously `aicmd` could bypass the tiered policy. |
+| `AGENCE_GUARD_PERMISSIVE` removed | P0 | Environment variable eliminated entirely. Unknown commands always T2 (fail-closed). |
+| `aibash` env sanitization | P0 | 14 sensitive vars (API keys, guard vars, policy path) unset before agent shell entry. |
+| `aishell.ps1` guard + PATH | P0 | PowerShell agent loop now guard-gated; '.' removed from PATH. |
+| `agentd` fail-closed | P1 | Default deny on inject. `|| true` fallbacks removed. Socket handler guard-gated. |
+| Docker `no-new-privileges` | P1 | Container runs `--user 1000:1000`, `apparmor:unconfined` removed. |
+| `aido` fail-closed fallback | P2 | Deny when bun unavailable (was T1 allow). |
+
+28 regression tests added to prevent re-introduction of these vectors.
 
 ---
 

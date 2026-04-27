@@ -10,11 +10,11 @@ param(
 
 
 # --- SECURITY HARDENING ---
-# Restrict PATH to minimal safe binaries, include $env:AI_BIN and . if set
+# SEC-010: Restrict PATH to minimal safe binaries — removed '.' (planted binary attack vector)
 if ($env:AI_BIN) {
-	$env:PATH = "/usr/bin:/bin:$($env:AI_BIN):."
+	$env:PATH = "/usr/bin:/bin:$($env:AI_BIN)"
 } else {
-	$env:PATH = "/usr/bin:/bin:."
+	$env:PATH = "/usr/bin:/bin"
 }
 # Unset risky env vars
 $env:HISTFILE = $null
@@ -25,6 +25,17 @@ $env:PROMPT_COMMAND = $null
 $env:BASH_ENV = $null
 $env:ENV = $null
 $env:CDPATH = $null
+# SEC-010: Unset security-critical env vars (guard bypass + API key exfiltration)
+$env:AGENCE_GUARD_PERMISSIVE = $null
+$env:ANTHROPIC_API_KEY = $null
+$env:OPENAI_API_KEY = $null
+$env:GEMINI_API_KEY = $null
+$env:GOOGLE_API_KEY = $null
+$env:AZURE_OPENAI_API_KEY = $null
+$env:DEEPSEEK_API_KEY = $null
+$env:AWS_SECRET_ACCESS_KEY = $null
+$env:AWS_SESSION_TOKEN = $null
+$env:AGENCE_POLICY = $null
 # Block signals (PowerShell: trap EXIT, etc.)
 trap { return 0 } EXIT
 # Source aipolicy if present
@@ -99,16 +110,38 @@ Write-Host ""
 # Start interactive agentic shell
 Set-Location -Path $GIT_ROOT | Out-Null
 Write-Host "aishell@agent ready. Type 'help' for commands." -ForegroundColor Gray
-Write-Host "Commands are validated against CODEX whitelist." -ForegroundColor Gray
+Write-Host "Commands are validated through guard.ts (fail-closed)." -ForegroundColor Gray
 Write-Host ""
 
-# Keep shell interactive (exit only when user types 'exit')
+# SEC-010: Guard-gated command loop — replaced raw Invoke-Expression
+# with guard.ts classification before execution
+$guardTs = Join-Path $GIT_ROOT 'lib/guard.ts'
+$airunPath = Join-Path $GIT_ROOT 'bin/airun'
 while ($true) {
     $input = Read-Host
     if ($input -eq "exit") { break }
+    if ([string]::IsNullOrWhiteSpace($input)) { continue }
+    # Gate through guard.ts
+    $guardApproved = $false
     try {
-        Invoke-Expression $input
+        if ((Test-Path $airunPath) -and (Get-Command bun -ErrorAction SilentlyContinue)) {
+            $guardOutput = & bun run $guardTs classify $input 2>$null | ConvertFrom-Json
+            if ($guardOutput.action -eq "allow" -or $guardOutput.action -eq "flag") {
+                $guardApproved = $true
+            } else {
+                Write-Host "[AISHELL] ✗ Guard $($guardOutput.tier) $($guardOutput.action): $($guardOutput.reason)" -ForegroundColor Red
+            }
+        } else {
+            Write-Host "[AISHELL] ✗ Guard unavailable — denying (fail-closed)" -ForegroundColor Red
+        }
     } catch {
-        Write-Host "[AISHELL] ✗ Command failed: $_" -ForegroundColor Red
+        Write-Host "[AISHELL] ✗ Guard error — denying (fail-closed): $_" -ForegroundColor Red
+    }
+    if ($guardApproved) {
+        try {
+            Invoke-Expression $input
+        } catch {
+            Write-Host "[AISHELL] ✗ Command failed: $_" -ForegroundColor Red
+        }
     }
 }

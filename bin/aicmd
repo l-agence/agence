@@ -15,6 +15,22 @@ source "$AI_ROOT/lib/aicmd-lib.sh"
 # Universal agentic wrapper logic
 set -e
 
+# SEC-010: Guard gate — all commands must pass through guard.ts before execution
+# Without this, aicmd was a complete guard bypass (P0 vulnerability)
+_guard_ts="${AI_ROOT}/lib/guard.ts"
+if command -v bun &>/dev/null && [[ -f "$_guard_ts" ]]; then
+  eval "$(bun run "$_guard_ts" check "$@" 2>/dev/null)"
+  if [[ "${_GUARD_APPROVED:-0}" != "1" ]]; then
+    echo "[aicmd] ✗ Guard denied: $*" >&2
+    echo "  Tier: ${_GUARD_TIER:-?}  Reason: ${_GUARD_REASON:-unknown}" >&2
+    exit 1
+  fi
+else
+  # Fail-closed: if guard is unavailable, deny execution
+  echo "[aicmd] ✗ Guard unavailable (bun or guard.ts not found) — denying" >&2
+  exit 1
+fi
+
 # Generate unique session ID with agent prefix
 _agent="${AI_AGENT:-copilot}"
 session_id="${_agent}-$(date +%H%M%S)-$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')"

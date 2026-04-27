@@ -1,7 +1,7 @@
 # 🤖 l'Agence (^) —  Agentic Engineering Collaboration Environment
 
 **Author**: Stephane Korning · 2026 · [MIT + Commons Clause](LICENSE.md)  
-**Version**: v0.6.0-alpha · *First public release — the first governance framework for agentic CLI*
+**Version**: v0.7.0-alpha · *Guard hardening, MCP server, integration tests*
 
 > *The first git-native, governed, auditable multi-agent swarm for software engineering.*
 > 
@@ -346,17 +346,19 @@ AIDO_NO_VERIFY=1 tests/lib/shellspec/shellspec --shell bash tests/unit/agence_sp
 
 ```bash
 # Run full test suite (bun:test)
-bun test tests/unit/
+bun run test
 ```
 
-> ✅ **Current status (v0.6.0-alpha)**: **275 tests**, **0 failures**, 695 expect() calls.
+> ✅ **Current status (v0.7.0-alpha)**: **321 tests**, **0 failures**, 822 expect() calls.
 >
 > | Suite | Tests | Coverage |
 > |---|---|---|
-> | `guard.test.ts` | 126 | Command gate, tier escalation, AIPOLICY parsing |
-> | `peers-dispatch.test.ts` | 57 | Peer consensus, mixed routing, bin/loop |
-> | `memory.test.ts` | 56 | COGNOS 3-store: retain/recall/cache/forget/promote/distill |
-> | `security-hardening.test.ts` | 36 | HMAC signing, signal forgery, injection hardening |
+> | `guard.test.ts` | 132 | Command gate, tier escalation, AIPOLICY parsing |
+> | `security-hardening.test.ts` | 64 | HMAC signing, signal forgery, SEC-010 regressions |
+> | `memory.test.ts` | 62 | COGNOS 3-store: retain/recall/cache/forget/promote/distill |
+> | `peers-dispatch.test.ts` | 53 | Peer consensus, mixed routing, bin/loop |
+> | `mcp.test.ts` | 9 | MCP tool/resource surface verification |
+> | `guard-roundtrip.test.ts` | 9 | Integration: guard→shell eval, socket→guard flow |
 >
 > Legacy shellspec tests also available:
 > ```bash

@@ -49,7 +49,8 @@ _driver_spawn() {
     --hostname "$tangent_id" \
     --device /dev/fuse \
     --cap-add SYS_ADMIN \
-    --security-opt apparmor:unconfined \
+    --security-opt no-new-privileges \
+    --user "1000:1000" \
     -v "${AGENCE_ROOT}/.git:/repo/.git-lower:ro" \
     -v "${wt_gitdir}:/repo/.git-lower/worktrees/${tangent_id}" \
     -v "${worktree_path}:/workspace" \
