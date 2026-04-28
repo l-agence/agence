@@ -705,3 +705,322 @@ describe("SEC-010: docker.sh hardening", () => {
     expect(src).toContain("--user");
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SEC-012: Integrate findings from SEC-011 ^break
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("SEC-012: MCP shell injection prevention", () => {
+
+  test("mcp.ts does not use bash -c for tool execution", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/mcp.ts"), "utf-8");
+    // Must not construct shell commands via template literal + bash -c
+    expect(src).not.toMatch(/spawnSync\(\s*["']bash["']\s*,\s*\[["']-c["']/);
+  });
+
+  test("mcp.ts uses runSafe (argument arrays) not run (shell strings)", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/mcp.ts"), "utf-8");
+    // No remaining run() calls (old shell-based helper)
+    expect(src).not.toMatch(/\brun\(`/);
+    // Must have runSafe
+    expect(src).toContain("runSafe(");
+  });
+
+  test("mcp.ts validates skill name format", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/mcp.ts"), "utf-8");
+    expect(src).toContain("Invalid skill name");
+  });
+
+  test("mcp.ts validates agent name format", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/mcp.ts"), "utf-8");
+    expect(src).toContain("Invalid agent name");
+  });
+});
+
+describe("SEC-012: Guard newline bypass prevention", () => {
+
+  test("guard.ts blocks embedded newlines", () => {
+    const r = runGuard(["classify", "echo hello\nrm -rf /"]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T3");
+    expect(c.reason).toContain("Global block");
+  });
+
+  test("guard.ts blocks embedded carriage returns", () => {
+    const r = runGuard(["classify", "echo hello\rrm -rf /"]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T3");
+  });
+
+  test("guard.ts allows trailing newline (trimmed, not a bypass)", () => {
+    const r = runGuard(["classify", "git status\n"]);
+    const c = JSON.parse(r.stdout);
+    // Trailing newline is trimmed by checkCommand — this is safe
+    expect(c.tier).toBe("T0");
+  });
+});
+
+describe("SEC-012: Destructive T0 command reclassification", () => {
+
+  test("sed (read-only) is T0 allow", () => {
+    const r = runGuard(["classify", "sed 's/foo/bar/' file.txt"]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T0");
+    expect(c.action).toBe("allow");
+  });
+
+  test("sed -i (in-place write) is T2 escalate", () => {
+    const r = runGuard(["classify", "sed -i 's/foo/bar/' file.txt"]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T2");
+    expect(c.action).toBe("escalate");
+  });
+
+  test("find (read-only) is T0 allow", () => {
+    const r = runGuard(["classify", "find . -name '*.ts'"]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T0");
+    expect(c.action).toBe("allow");
+  });
+
+  test("find -exec (write) is T2 escalate", () => {
+    const r = runGuard(["classify", "find . -exec rm {} +"]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T2");
+    expect(c.action).toBe("escalate");
+  });
+
+  test("find -delete is T2 escalate", () => {
+    const r = runGuard(["classify", "find /tmp -delete"]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T2");
+    expect(c.action).toBe("escalate");
+  });
+});
+
+describe("SEC-012: Signal inject guard gate", () => {
+
+  test("signal.ts imports spawnSync for guard check", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/signal.ts"), "utf-8");
+    expect(src).toContain("spawnSync");
+    expect(src).toContain("SEC-012");
+  });
+
+  test("signal.ts doInject gates agentic callers through guard", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/signal.ts"), "utf-8");
+    expect(src).toContain("AI_ROLE");
+    expect(src).toContain("guard.ts");
+    expect(src).toContain("classify");
+  });
+});
+
+describe("SEC-012: Docker container hardening", () => {
+
+  test("docker.sh drops all capabilities before adding SYS_ADMIN", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/drivers/docker.sh"), "utf-8");
+    expect(src).toContain("--cap-drop ALL");
+  });
+
+  test("docker.sh uses read-only root filesystem", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/drivers/docker.sh"), "utf-8");
+    expect(src).toContain("--read-only");
+  });
+
+  test("docker.sh uses noexec tmpfs", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/drivers/docker.sh"), "utf-8");
+    expect(src).toContain("--tmpfs");
+    expect(src).toContain("noexec");
+  });
+});
+
+describe("SEC-012: aibash AGENCE_ROOT pinning", () => {
+
+  test("aibash pins AGENCE_ROOT from script location", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/aibash"), "utf-8");
+    expect(src).toContain("BASH_SOURCE");
+    expect(src).toContain("SEC-012");
+  });
+});
+
+describe("SEC-012: aido newline rejection", () => {
+
+  test("aido rejects commands with embedded newlines", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/aido"), "utf-8");
+    expect(src).toContain("SEC-012");
+    expect(src).toContain("newline");
+  });
+});
+
+describe("SEC-012: aishell.ps1 audit trail", () => {
+
+  test("aishell.ps1 calls guard check for ledger audit", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/aishell.ps1"), "utf-8");
+    expect(src).toContain("check");
+    expect(src).toContain("SEC-012");
+  });
+});
+
+describe("SEC-012: guard.ts AIPOLICY.yaml dead code removed", () => {
+
+  test("guard.ts does not readFileSync AIPOLICY.yaml content", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/guard.ts"), "utf-8");
+    // The old pattern: const raw = readFileSync(POLICY_PATH, "utf-8")
+    // Should NOT exist — only existsSync check remains
+    expect(src).not.toMatch(/readFileSync\(POLICY_PATH/);
+  });
+});
+
+// SEC-013: ^hack red-team findings integration
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("SEC-013: H1 — logDecision uses spawnSync (no shell interpolation)", () => {
+
+  test("guard.ts does not import execSync", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/guard.ts"), "utf-8");
+    // logDecision was the only execSync caller — import should be gone
+    expect(src).not.toMatch(/import\s*\{[^}]*\bexecSync\b/);
+    expect(src).toContain("SEC-013");
+  });
+
+  test("guard.ts logDecision uses spawnSync with argument array", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/guard.ts"), "utf-8");
+    // Must use spawnSync(airunPath, [...args]) pattern
+    expect(src).toMatch(/spawnSync\(airunPath,\s*\[/);
+  });
+
+  test("guard.ts check mode does not expand $() in denied commands", () => {
+    const r = runGuard(["check", "$(echo pwned)"]);
+    // Command should be denied (globalBlocks catches $() )
+    expect(r.exitCode).not.toBe(0);
+    expect(r.stdout).toContain("_GUARD_APPROVED=0");
+  });
+});
+
+describe("SEC-013: H2 — ledger cmdAdd uses spawnSync (no shell interpolation)", () => {
+
+  test("ledger.ts cmdAdd uses spawnSync not shell template", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/ledger.ts"), "utf-8");
+    // cmdAdd must use spawnSync argument array, not execSync/runOrFail template
+    expect(src).toMatch(/spawnSync\(airun,\s*\["ailedger",\s*"append"/);
+    expect(src).toContain("SEC-013");
+  });
+
+  test("ledger.ts cmdAdd uses spawnSync argument array", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/ledger.ts"), "utf-8");
+    expect(src).toMatch(/spawnSync\(airun,\s*\["ailedger",\s*"append"/);
+  });
+});
+
+describe("SEC-013: H3+H8 — awk/sed/find dangerous subcommands blocked", () => {
+
+  test("awk system() is T2 escalate", () => {
+    const r = runGuard(["classify", `awk 'BEGIN{system("id")}' /dev/null`]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T2");
+    expect(c.action).toBe("escalate");
+  });
+
+  test("awk getline is T2 escalate", () => {
+    // Note: avoid | and ; in input — globalBlocks catches those before awk rule
+    const r = runGuard(["classify", "awk '{getline line}' file.txt"]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T2");
+    expect(c.action).toBe("escalate");
+  });
+
+  test("awk (read-only) is still T0 allow", () => {
+    const r = runGuard(["classify", "awk '{print $1}' file.txt"]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T0");
+    expect(c.action).toBe("allow");
+  });
+
+  test("sed 'e cmd' (execute) is T2 escalate", () => {
+    const r = runGuard(["classify", "sed 'e id'"]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T2");
+    expect(c.action).toBe("escalate");
+  });
+
+  test("sed 'w file' (write) is T2 escalate", () => {
+    const r = runGuard(["classify", "sed 'w /tmp/exfil' /etc/passwd"]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T2");
+    expect(c.action).toBe("escalate");
+  });
+
+  test("sed 's/foo/bar/e' (execute flag) is T2 escalate", () => {
+    const r = runGuard(["classify", "sed 's/foo/bar/e'"]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T2");
+    expect(c.action).toBe("escalate");
+  });
+
+  test("sed 's/foo/bar/' (safe substitution) is still T0 allow", () => {
+    const r = runGuard(["classify", "sed 's/foo/bar/' file.txt"]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T0");
+    expect(c.action).toBe("allow");
+  });
+
+  test("find -fls (file output) is T2 escalate", () => {
+    const r = runGuard(["classify", "find / -name passwd -fls /tmp/found"]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T2");
+    expect(c.action).toBe("escalate");
+  });
+
+  test("find -fprintf (file output) is T2 escalate", () => {
+    const r = runGuard(["classify", "find . -fprintf /tmp/out '%p\\n'"]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T2");
+    expect(c.action).toBe("escalate");
+  });
+});
+
+describe("SEC-013: H4 — watch.ts fireSignal uses spawnSync", () => {
+
+  test("watch.ts uses spawnSync for signal notify", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/watch.ts"), "utf-8");
+    // fireSignal must use spawnSync argument array, not execSync template
+    expect(src).toMatch(/spawnSync\("bun",\s*\["run",\s*signalTs,\s*"notify"/);
+    expect(src).toContain("SEC-013");
+  });
+});
+
+describe("SEC-013: H5 — process substitution blocked", () => {
+
+  test("cat <(id) is T3 deny (process substitution)", () => {
+    const r = runGuard(["classify", "cat <(id)"]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T3");
+    expect(c.action).toBe("deny");
+  });
+
+  test("echo >(tee /tmp/x) is T3 deny (output process substitution)", () => {
+    const r = runGuard(["classify", "echo >(tee /tmp/x)"]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T3");
+    expect(c.action).toBe("deny");
+  });
+});
+
+describe("SEC-013: H6 — shellSafe strips newlines", () => {
+
+  test("signal.ts shellSafe strips \\n (0x0a)", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/signal.ts"), "utf-8");
+    // The regex should include \x0a in the strip range
+    expect(src).toMatch(/\\x0a/);
+    expect(src).toContain("SEC-013");
+  });
+});
+
+describe("SEC-013: H7 — heredoc operator blocked", () => {
+
+  test("cat << EOF is T3 deny (heredoc)", () => {
+    const r = runGuard(["classify", "cat << EOF"]);
+    const c = JSON.parse(r.stdout);
+    expect(c.tier).toBe("T3");
+    expect(c.action).toBe("deny");
+  });
+});

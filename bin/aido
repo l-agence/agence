@@ -170,6 +170,12 @@ _guard_check() {
     local command="$1"
     local airun="$AI_BIN/airun"
 
+    # SEC-012: Reject commands with embedded newlines (command separator bypass)
+    if [[ "$command" == *$'\n'* ]] || [[ "$command" == *$'\r'* ]]; then
+        echo "[AIDO] ✗ Command contains newline — denied (SEC-012)" >&2
+        return 1
+    fi
+
     if [[ ! -x "$airun" ]]; then
         echo "[AIDO] ⚠ Guard unavailable (airun not found) — falling back to deny" >&2
         return 1

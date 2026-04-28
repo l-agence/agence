@@ -27,7 +27,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, watchFile, unwatchFile, chmodSync } from "fs";
 import { join, basename } from "path";
-import { execSync } from "child_process";
+import { execSync, spawnSync } from "child_process";
 import { createHmac } from "crypto";
 
 // ─── Environment ─────────────────────────────────────────────────────────────
@@ -133,10 +133,12 @@ function validateEnvelopeFields(env: any): env is SignalEnvelope {
 }
 
 function shellSafe(s: string): string {
-  // SEC-005: Strip control characters (0x00-0x1f except \n\t) that could
+  // SEC-005: Strip control characters (0x00-0x1f except \t) that could
   // be interpreted as tmux key sequences or terminal escape codes.
+  // SEC-013: Also strip \n (0x0a) — in tmux send-keys, newlines inside
+  // single quotes split into multiple commands (command injection).
   // Then single-quote escape for shell: replace ' with '\''.
-  const stripped = s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "");
+  const stripped = s.replace(/[\x00-\x08\x0a\x0b\x0c\x0e-\x1f\x7f]/g, "");
   return stripped.replace(/'/g, "'\\''");
 }
 
@@ -285,6 +287,30 @@ function fileWaitForResponse(signalId: string, timeoutMs: number): PromptRespons
 function doInject(agent: string, text: string): number {
   const transport = detectTransport();
   const id = signalId();
+
+  // SEC-012: Guard-gate injected commands before sending to agent panes.
+  // Only gate if caller is agentic (human callers bypass — they ARE the authority).
+  if (process.env.AI_ROLE === "agentic") {
+    const guardTs = join(AGENCE_ROOT, "lib/guard.ts");
+    if (existsSync(guardTs)) {
+      const gResult = spawnSync("bun", ["run", guardTs, "classify", text], {
+        cwd: AGENCE_ROOT, timeout: 10_000,
+        env: { ...process.env, AGENCE_ROOT },
+      });
+      try {
+        const decision = JSON.parse(gResult.stdout?.toString("utf-8") ?? "{}");
+        if (decision.action === "escalate" || decision.action === "deny") {
+          process.stderr.write(`[signal] SEC-012: inject blocked by guard (${decision.tier} ${decision.action}): ${text.slice(0, 60)}\n`);
+          return 1;
+        }
+      } catch {
+        // Guard parse failure → fail-closed
+        process.stderr.write(`[signal] SEC-012: inject blocked — guard unavailable (fail-closed)\n`);
+        return 1;
+      }
+    }
+  }
+
   const envelope: SignalEnvelope = {
     type: "inject", from: "human", to: agent,
     payload: text, timestamp: isoNow(), id,

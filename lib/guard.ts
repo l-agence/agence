@@ -33,7 +33,7 @@
 
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
-import { execSync } from "child_process";
+import { spawnSync } from "child_process";
 
 // ─── Environment ─────────────────────────────────────────────────────────────
 
@@ -85,16 +85,20 @@ function loadPolicy(): LoadedPolicy {
     process.exit(2);
   }
 
-  const raw = readFileSync(POLICY_PATH, "utf-8");
+  // NOTE: AIPOLICY.yaml existence is verified (config anchor) but rules are code-defined.
+  // Dynamic policy loading from YAML is planned for v0.8+.
   const rules: PolicyRule[] = [];
   const globalBlocks: RegExp[] = [];
 
   // ── Parse global_rules.shell_safety ──
-  // Block operators: >, >>, |, &&, ;, $(, `
-  const blockOps = [">", ">>", "|", "&&", ";", "$(", "`"];
+  // Block operators: >, >>, |, &&, ;, $(, `, <(, >(, <<
+  const blockOps = [">", ">>", "|", "&&", ";", "$(", "`", "<(", ">(", "<<"];
   for (const op of blockOps) {
     globalBlocks.push(new RegExp(escapeRegex(op)));
   }
+
+  // SEC-012: Block embedded newlines/carriage returns (command separator bypass)
+  globalBlocks.push(/[\n\r]/);
 
   // Block privilege escalation
   const blockPrivesc = ["sudo", "doas", "runas"];
@@ -192,6 +196,30 @@ function loadPolicy(): LoadedPolicy {
   });
 
   // Linux shell read-only
+  // SEC-012: Block destructive flags for commands that are otherwise T0 read-only
+  // SEC-013: Extend to awk exec, sed exec/write, find file-output
+  const destructivePatterns: Array<{ pattern: string; regex: RegExp; source: string }> = [
+    { pattern: "sed -i", regex: /^sed\s+.*-i/, source: "blacklist.linux_destructive" },
+    { pattern: "sed 'e' (execute)", regex: /^sed\s+.*['"]e/, source: "blacklist.linux_destructive" },
+    { pattern: "sed 'w' (write)", regex: /^sed\s+.*['"]w/, source: "blacklist.linux_destructive" },
+    { pattern: "sed s///e (execute flag)", regex: /^sed\s+.*\/\w*e\w*['"]/, source: "blacklist.linux_destructive" },
+    { pattern: "find -exec", regex: /^find\s+.*-exec/, source: "blacklist.linux_destructive" },
+    { pattern: "find -delete", regex: /^find\s+.*-delete/, source: "blacklist.linux_destructive" },
+    { pattern: "find -ok", regex: /^find\s+.*-ok/, source: "blacklist.linux_destructive" },
+    { pattern: "find -fls", regex: /^find\s+.*-fls/, source: "blacklist.linux_destructive" },
+    { pattern: "find -fprintf", regex: /^find\s+.*-fprintf/, source: "blacklist.linux_destructive" },
+    { pattern: "awk system()", regex: /^awk\s+.*system\s*\(/, source: "blacklist.linux_destructive" },
+    { pattern: "awk getline", regex: /^awk\s+.*\bgetline\b/, source: "blacklist.linux_destructive" },
+  ];
+  for (const dp of destructivePatterns) {
+    rules.push({
+      tier: "T2", action: "escalate",
+      pattern: dp.pattern,
+      regex: dp.regex,
+      source: dp.source,
+    });
+  }
+
   const linuxRead = [
     "ls", "stat", "file", "cat", "less", "head", "tail", "wc", "du", "df", "tree",
     "grep", "egrep", "fgrep", "awk", "sed", "cut", "sort", "uniq", "tr",
@@ -473,10 +501,12 @@ function logDecision(decision: GuardDecision): void {
     const cmd = decision.command.length > 120
       ? decision.command.slice(0, 117) + "..."
       : decision.command;
-    execSync(
-      `"${airunPath}" ailedger append guard "${tag}" "" "${cmd.replace(/"/g, '\\"')}" ${exitCode}`,
-      { cwd: AGENCE_ROOT, timeout: 5000, stdio: "ignore" },
-    );
+    // SEC-013: Use spawnSync argument array — no shell interpolation.
+    // Old execSync template literal allowed $() and backtick expansion
+    // in denied commands (the denial path was itself the exploit vector).
+    spawnSync(airunPath, ["ailedger", "append", "guard", tag, "", cmd, String(exitCode)], {
+      cwd: AGENCE_ROOT, timeout: 5000, stdio: "ignore",
+    });
   } catch {
     // Best-effort — don't block execution if ledger fails
     console.error("[guard] Warning: failed to write ledger entry");
