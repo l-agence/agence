@@ -128,6 +128,8 @@ while ($true) {
             $guardOutput = & bun run $guardTs classify $input 2>$null | ConvertFrom-Json
             if ($guardOutput.action -eq "allow" -or $guardOutput.action -eq "flag") {
                 $guardApproved = $true
+                # SEC-012: Run check (not classify) to write audit trail to ledger
+                & bun run $guardTs check $input 2>$null | Out-Null
             } else {
                 Write-Host "[AISHELL] ✗ Guard $($guardOutput.tier) $($guardOutput.action): $($guardOutput.reason)" -ForegroundColor Red
             }

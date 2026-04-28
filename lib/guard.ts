@@ -85,7 +85,8 @@ function loadPolicy(): LoadedPolicy {
     process.exit(2);
   }
 
-  const raw = readFileSync(POLICY_PATH, "utf-8");
+  // NOTE: AIPOLICY.yaml existence is verified (config anchor) but rules are code-defined.
+  // Dynamic policy loading from YAML is planned for v0.8+.
   const rules: PolicyRule[] = [];
   const globalBlocks: RegExp[] = [];
 
@@ -95,6 +96,9 @@ function loadPolicy(): LoadedPolicy {
   for (const op of blockOps) {
     globalBlocks.push(new RegExp(escapeRegex(op)));
   }
+
+  // SEC-012: Block embedded newlines/carriage returns (command separator bypass)
+  globalBlocks.push(/[\n\r]/);
 
   // Block privilege escalation
   const blockPrivesc = ["sudo", "doas", "runas"];
@@ -192,6 +196,22 @@ function loadPolicy(): LoadedPolicy {
   });
 
   // Linux shell read-only
+  // SEC-012: Block destructive flags for commands that are otherwise T0 read-only
+  const destructivePatterns: Array<{ pattern: string; regex: RegExp; source: string }> = [
+    { pattern: "sed -i", regex: /^sed\s+.*-i/, source: "blacklist.linux_destructive" },
+    { pattern: "find -exec", regex: /^find\s+.*-exec/, source: "blacklist.linux_destructive" },
+    { pattern: "find -delete", regex: /^find\s+.*-delete/, source: "blacklist.linux_destructive" },
+    { pattern: "find -ok", regex: /^find\s+.*-ok/, source: "blacklist.linux_destructive" },
+  ];
+  for (const dp of destructivePatterns) {
+    rules.push({
+      tier: "T2", action: "escalate",
+      pattern: dp.pattern,
+      regex: dp.regex,
+      source: dp.source,
+    });
+  }
+
   const linuxRead = [
     "ls", "stat", "file", "cat", "less", "head", "tail", "wc", "du", "df", "tree",
     "grep", "egrep", "fgrep", "awk", "sed", "cut", "sort", "uniq", "tr",

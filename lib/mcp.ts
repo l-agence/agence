@@ -45,10 +45,10 @@ const AGENCE_ROOT = process.env.AGENCE_ROOT
 
 const BUN = process.env.BUN_PATH || "bun";
 
-// Helper: run a subprocess and return { stdout, stderr, exitCode }
-function run(cmd: string, timeoutMs = 30_000): { stdout: string; stderr: string; exitCode: number } {
+// Helper: run a subprocess safely using argument arrays (no shell interpolation)
+function runSafe(args: string[], timeoutMs = 30_000): { stdout: string; stderr: string; exitCode: number } {
   try {
-    const result = spawnSync("bash", ["-c", cmd], {
+    const result = spawnSync(args[0], args.slice(1), {
       cwd: AGENCE_ROOT,
       env: { ...process.env, AGENCE_ROOT },
       timeout: timeoutMs,
@@ -79,7 +79,7 @@ server.tool(
   "Check a command against AIPOLICY.yaml and return the guard decision (tier, approved/denied, reason). Every command an agent runs should pass through this gate first.",
   { command: z.string().describe("The shell command to check (e.g. 'git push origin main')") },
   async ({ command }) => {
-    const r = run(`${BUN} run lib/guard.ts classify "${command.replace(/"/g, '\\"')}"`);
+    const r = runSafe([BUN, "run", "lib/guard.ts", "classify", command]);
     try {
       const decision = JSON.parse(r.stdout);
       return { content: [{ type: "text" as const, text: JSON.stringify(decision, null, 2) }] };
@@ -95,7 +95,7 @@ server.tool(
   "Classify a command's AIPOLICY tier without logging to the ledger. Returns JSON with tier (T0-T3), action, and matched rule.",
   { command: z.string().describe("The shell command to classify") },
   async ({ command }) => {
-    const r = run(`${BUN} run lib/guard.ts classify "${command.replace(/"/g, '\\"')}"`);
+    const r = runSafe([BUN, "run", "lib/guard.ts", "classify", command]);
     try {
       const decision = JSON.parse(r.stdout);
       return { content: [{ type: "text" as const, text: JSON.stringify(decision, null, 2) }] };
@@ -117,11 +117,21 @@ server.tool(
     noSave: z.boolean().optional().describe("Don't save the artifact to synthetic/"),
   },
   async ({ skill, query, agent, peers, noSave }) => {
-    let cmd = `${BUN} run lib/skill.ts ${skill} "${query.replace(/"/g, '\\"')}"`;
-    if (agent) cmd += ` --agent ${agent}`;
-    if (peers) cmd += ` --peers`;
-    if (noSave) cmd += ` --no-save`;
-    const r = run(cmd, 120_000);  // skills can take a while
+    // SEC-012: Validate skill name (alphanumeric + hyphen only)
+    if (!/^[a-zA-Z][a-zA-Z0-9-]*$/.test(skill)) {
+      return { content: [{ type: "text" as const, text: `Invalid skill name: ${skill}` }], isError: true };
+    }
+    const args = [BUN, "run", "lib/skill.ts", skill, query];
+    if (agent) {
+      // SEC-012: Validate agent name (@ prefix + alphanumeric/dot)
+      if (!/^@[a-zA-Z][a-zA-Z0-9.]*$/.test(agent)) {
+        return { content: [{ type: "text" as const, text: `Invalid agent name: ${agent}` }], isError: true };
+      }
+      args.push("--agent", agent);
+    }
+    if (peers) args.push("--peers");
+    if (noSave) args.push("--no-save");
+    const r = runSafe(args, 120_000);  // skills can take a while
     return {
       content: [{ type: "text" as const, text: r.stdout || r.stderr || "Skill execution completed" }],
       isError: r.exitCode !== 0,
@@ -135,7 +145,7 @@ server.tool(
   "List all available agence skills with their groups and descriptions.",
   {},
   async () => {
-    const r = run(`${BUN} run lib/skill.ts list`);
+    const r = runSafe([BUN, "run", "lib/skill.ts", "list"]);
     return { content: [{ type: "text" as const, text: r.stdout || "No skills found" }] };
   }
 );
@@ -152,9 +162,9 @@ server.tool(
     importance: z.number().min(0).max(1).optional().describe("Importance score 0-1 (default: 0.5)"),
   },
   async ({ source, tags, content, importance }) => {
-    let cmd = `${BUN} run lib/memory.ts retain ${source} "${tags}" "${content.replace(/"/g, '\\"')}"`;
-    if (importance !== undefined) cmd += ` --importance ${importance}`;
-    const r = run(cmd);
+    const args = [BUN, "run", "lib/memory.ts", "retain", source, tags, content];
+    if (importance !== undefined) args.push("--importance", String(importance));
+    const r = runSafe(args);
     return {
       content: [{ type: "text" as const, text: r.stdout || r.stderr || "Memory retained" }],
       isError: r.exitCode !== 0,
@@ -173,10 +183,10 @@ server.tool(
     max: z.number().optional().describe("Maximum results to return (default: 10)"),
   },
   async ({ tags, source, max }) => {
-    let cmd = `${BUN} run lib/memory.ts recall "${tags}"`;
-    if (source) cmd += ` --source ${source}`;
-    if (max) cmd += ` --max ${max}`;
-    const r = run(cmd);
+    const args = [BUN, "run", "lib/memory.ts", "recall", tags];
+    if (source) args.push("--source", source);
+    if (max) args.push("--max", String(max));
+    const r = runSafe(args);
     return { content: [{ type: "text" as const, text: r.stdout || "No memories found" }] };
   }
 );
@@ -187,7 +197,7 @@ server.tool(
   "Show memory statistics across all COGNOS tiers — row counts per store.",
   {},
   async () => {
-    const r = run(`${BUN} run lib/memory.ts stats`);
+    const r = runSafe([BUN, "run", "lib/memory.ts", "stats"]);
     return { content: [{ type: "text" as const, text: r.stdout || "No stats available" }] };
   }
 );
@@ -203,9 +213,9 @@ server.tool(
       .describe("Model flavor: code (default), light, heavy, or pair (2-peer)"),
   },
   async ({ skill, query, flavor }) => {
-    let cmd = `${BUN} run lib/peers.ts ${skill} "${query.replace(/"/g, '\\"')}"`;
-    if (flavor) cmd += ` --flavor ${flavor}`;
-    const r = run(cmd, 120_000);
+    const args = [BUN, "run", "lib/peers.ts", skill, query];
+    if (flavor) args.push("--flavor", flavor);
+    const r = runSafe(args, 120_000);
     return {
       content: [{ type: "text" as const, text: r.stdout || r.stderr || "Peer consensus completed" }],
       isError: r.exitCode !== 0,
@@ -219,7 +229,7 @@ server.tool(
   "Show the Merkle-chained audit ledger status — entry count, chain validity, last entry.",
   {},
   async () => {
-    const r = run(`${BUN} run lib/ledger.ts status`);
+    const r = runSafe([BUN, "run", "lib/ledger.ts", "status"]);
     return { content: [{ type: "text" as const, text: r.stdout || r.stderr || "Ledger status unavailable" }] };
   }
 );
@@ -230,7 +240,7 @@ server.tool(
   "Verify the Merkle chain integrity of the audit ledger. Returns OK if chain is valid, or reports the first broken link.",
   {},
   async () => {
-    const r = run(`bin/ailedger verify`);
+    const r = runSafe(["bash", "bin/ailedger", "verify"]);
     return {
       content: [{ type: "text" as const, text: r.stdout || r.stderr || "Verification complete" }],
       isError: r.exitCode !== 0,

@@ -27,7 +27,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, watchFile, unwatchFile, chmodSync } from "fs";
 import { join, basename } from "path";
-import { execSync } from "child_process";
+import { execSync, spawnSync } from "child_process";
 import { createHmac } from "crypto";
 
 // ─── Environment ─────────────────────────────────────────────────────────────
@@ -285,6 +285,30 @@ function fileWaitForResponse(signalId: string, timeoutMs: number): PromptRespons
 function doInject(agent: string, text: string): number {
   const transport = detectTransport();
   const id = signalId();
+
+  // SEC-012: Guard-gate injected commands before sending to agent panes.
+  // Only gate if caller is agentic (human callers bypass — they ARE the authority).
+  if (process.env.AI_ROLE === "agentic") {
+    const guardTs = join(AGENCE_ROOT, "lib/guard.ts");
+    if (existsSync(guardTs)) {
+      const gResult = spawnSync("bun", ["run", guardTs, "classify", text], {
+        cwd: AGENCE_ROOT, timeout: 10_000,
+        env: { ...process.env, AGENCE_ROOT },
+      });
+      try {
+        const decision = JSON.parse(gResult.stdout?.toString("utf-8") ?? "{}");
+        if (decision.action === "escalate" || decision.action === "deny") {
+          process.stderr.write(`[signal] SEC-012: inject blocked by guard (${decision.tier} ${decision.action}): ${text.slice(0, 60)}\n`);
+          return 1;
+        }
+      } catch {
+        // Guard parse failure → fail-closed
+        process.stderr.write(`[signal] SEC-012: inject blocked — guard unavailable (fail-closed)\n`);
+        return 1;
+      }
+    }
+  }
+
   const envelope: SignalEnvelope = {
     type: "inject", from: "human", to: agent,
     payload: text, timestamp: isoNow(), id,

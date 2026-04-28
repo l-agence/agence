@@ -48,9 +48,13 @@ _driver_spawn() {
     --name "$container_name" \
     --hostname "$tangent_id" \
     --device /dev/fuse \
+    --cap-drop ALL \
     --cap-add SYS_ADMIN \
+    --cap-add FOWNER \
     --security-opt no-new-privileges \
     --user "1000:1000" \
+    --read-only \
+    --tmpfs /tmp:rw,noexec,nosuid,size=256m \
     -v "${AGENCE_ROOT}/.git:/repo/.git-lower:ro" \
     -v "${wt_gitdir}:/repo/.git-lower/worktrees/${tangent_id}" \
     -v "${worktree_path}:/workspace" \
