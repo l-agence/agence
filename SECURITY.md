@@ -1,6 +1,6 @@
 # Security Policy
 
-**Version**: v0.7.0-alpha · April 27, 2026
+**Version**: v0.8.0-alpha · April 28, 2026
 
 ## Reporting Vulnerabilities
 
@@ -60,31 +60,54 @@ Human↔agent communication via `nexus/signals/` uses:
 
 ### Test Coverage
 
-312 unit tests (804 expect() assertions) covering security boundaries:
+361 unit tests (893 expect() assertions) covering security boundaries:
 - 132 guard boundary tests (tier escalation, AIPOLICY parsing, eval safety)
-- 64 security hardening tests (HMAC, signal forgery, injection prevention, SEC-010 regressions)
+- 105 security hardening tests (HMAC, signal forgery, injection prevention, SEC-010/012/013 regressions)
 - 62 memory operation tests (tier isolation, store boundaries)
 - 53 peer dispatch tests (agent routing, consensus validation)
 - 9 MCP server tests (tool/resource surface verification)
 
 ---
 
-## Known Limitations (v0.7.0-alpha)
+## Known Limitations (v0.8.0-alpha)
 
-These are documented here for transparency. They are tracked via the perpetual SEC-007..011 security improvement loop.
+These are documented here for transparency. They are tracked via the perpetual security improvement loop.
 
-### 1. Perpetual Security Loop (SEC-007..011)
+### 1. Perpetual Security Loop
 
 Security is a process, not a product. The following probes are designed to run continuously against released versions:
 
-- **SEC-008** (`^break`): Non-destructive stress testing of guard bypass paths
-- **SEC-009** (`^hack`): Red-team privilege escalation and self-modification probes
-- **SEC-010** (`^integrate`): Fix, verify, and regression test findings
-- **SEC-011+**: Next cycle (perpetual)
+- **`^break`**: Non-destructive stress testing of guard bypass paths
+- **`^hack`**: Red-team privilege escalation and self-modification probes
+- **`^integrate`**: Fix, verify, and regression test findings
 
 These are perpetual tasks — they intentionally never complete. Each cycle feeds the next.
 
+### 2. AIPOLICY Rules Are Code-Defined
+
+Guard rules are currently defined in `lib/guard.ts` source code, not dynamically loaded from `AIPOLICY.yaml`. The YAML file serves as the config anchor (existence check) but content is not parsed. Dynamic policy loading is planned for a future version.
+
 ---
+
+## Resolved in v0.8.0-alpha (SEC-012/013)
+
+SEC-012 fixed 10 findings from SEC-011 `^break`. SEC-013 fixed 8 findings from `^hack` red-team probes — including 3 confirmed P0 RCE vectors where **the denial/logging path itself executed attacker payloads** via shell expansion.
+
+| Fix | Severity | Detail |
+|-----|----------|--------|
+| `logDecision` shell injection | P0 | `guard.ts` used `execSync` template literal to log denied commands — `$()` and backticks expanded during logging. Fixed: `spawnSync` argument array. |
+| `ledger cmdAdd` shell injection | P0 | `ledger.ts` interpolated caller args into `execSync` template. Fixed: `spawnSync` argument array. |
+| `awk system()` / `sed e` / `find -fls` T0 bypass | P0 | Commands whitelisted as "read-only" that can execute arbitrary code or write files. Fixed: T2 deny rules for dangerous subcommands. |
+| MCP `bash -c` shell injection | P0 | MCP tool execution used `spawnSync("bash", ["-c", cmd])` with template interpolation. Fixed: `runSafe()` argument arrays + input validation. |
+| `watch.ts fireSignal` injection | P1 | Same `execSync` template pattern in watch match notification. Fixed: `spawnSync` argument array. |
+| Process substitution `<()` bypass | P1 | `cat <(id)` passed guard as T0. Fixed: `<(`, `>(` added to globalBlocks. |
+| Guard newline bypass | P1 | `\n`/`\r` not in globalBlocks allowed command separator injection. Fixed: added to globalBlocks. |
+| Signal inject bypass | P1 | `doInject()` had no guard gate for agentic callers. Fixed: guard classify check with fail-closed. |
+| Docker capability exposure | P1 | SYS_ADMIN without cap-drop, writable root, exec-capable tmpfs. Fixed: `--cap-drop ALL`, `--read-only`, `noexec` tmpfs. |
+| `shellSafe` newline passthrough | P2 | `\n` preserved in tmux `send-keys` → command splitting. Fixed: strip `\n` (0x0a). |
+| Heredoc `<<` passes guard | P2 | Added to globalBlocks. |
+
+40 regression tests added (21 for SEC-012 + 19 for SEC-013).
 
 ## Resolved in v0.7.0-alpha (SEC-010)
 
@@ -125,3 +148,9 @@ No Python. No pip. No npm install of untrusted packages in the critical path.
 | 2026-04-20 | All 7 findings fixed: SEC-001..006 (critical shell injection, API key exposure, signal forgery, injection hardening) |
 | 2026-04-20 | 275 security + boundary tests added |
 | 2026-04-20 | v0.6.0-alpha public release |
+| 2026-04-21 | v0.7.0-alpha release (MCP server, ^ken orchestrator, SEC-010 fixes, 312 tests) |
+| 2026-04-27 | SEC-011 `^break` audit: 10 findings (1×P0, 3×P1, 6×P2) |
+| 2026-04-27 | SEC-012 `^integrate`: all 10 findings fixed, 21 regression tests |
+| 2026-04-28 | `^hack` red-team probe: 31 probes, 8 findings (3×P0 RCE, 2×P1, 3×P2) |
+| 2026-04-28 | SEC-013 `^integrate`: all 8 findings fixed, 19 regression tests |
+| 2026-04-28 | v0.8.0-alpha release (361 tests, 893 assertions) |
