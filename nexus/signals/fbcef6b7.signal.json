@@ -1,9 +1,0 @@
-{
-  "type": "notify",
-  "from": "sec005",
-  "to": "human",
-  "payload": "test-escape-bell-vtab",
-  "timestamp": "2026-04-22T01:13:21Z",
-  "id": "fbcef6b7",
-  "hmac": "8b4f3fb02e4b6784d9e73d10bd369dc22df268264982a792ee76ef25758e0335"
-}

@@ -1,9 +1,0 @@
-{
-  "type": "notify",
-  "from": "quoter",
-  "to": "human",
-  "payload": "it's a test with 'quotes'",
-  "timestamp": "2026-04-20T19:55:10Z",
-  "id": "4ad83763",
-  "hmac": "81e7b42b2874a50beda1b702d666c1aa414c04ef2270dd12fa3f1c1c88c72d64"
-}

@@ -1,9 +1,0 @@
-{
-  "type": "notify",
-  "from": "test-agent",
-  "to": "human",
-  "payload": "test-hmac-check",
-  "timestamp": "2026-04-21T00:30:32Z",
-  "id": "fe01a8d1",
-  "hmac": "f1666f190e9625bd78694da40334106f517c1f4f19758e1c4152307d67438bc4"
-}

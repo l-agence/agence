@@ -1,9 +1,0 @@
-{
-  "type": "notify",
-  "from": "tester",
-  "to": "human",
-  "payload": "field-check",
-  "timestamp": "2026-04-20T18:42:24Z",
-  "id": "e30df0a0",
-  "hmac": "51dff5d208c0cad124111719d9793590f986c7337e9285b5392030ea27476fe0"
-}

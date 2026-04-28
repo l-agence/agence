@@ -1,9 +1,0 @@
-{
-  "type": "notify",
-  "from": "inject-test",
-  "to": "human",
-  "payload": "test && cat /etc/passwd",
-  "timestamp": "2026-04-22T21:31:09Z",
-  "id": "829f2481",
-  "hmac": "e9a1e28acd95fed42e6c24dd6de1e703c842caa048f366e574aedd33f90387a0"
-}
