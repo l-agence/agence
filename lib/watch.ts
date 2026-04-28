@@ -31,7 +31,7 @@
 
 import { existsSync, readFileSync, writeFileSync, appendFileSync, statSync } from "fs";
 import { join, basename } from "path";
-import { execSync } from "child_process";
+import { execSync, spawnSync } from "child_process";
 
 // ─── Environment ─────────────────────────────────────────────────────────────
 
@@ -181,10 +181,12 @@ function fireSignal(match: WatchMatch, agent?: string): void {
   try {
     const signalTs = join(AGENCE_ROOT, "lib", "signal.ts");
     if (existsSync(signalTs)) {
-      execSync(
-        `bun run "${signalTs}" notify "${msg.replace(/"/g, '\\"')}"`,
-        { timeout: 5000, stdio: "pipe" }
-      );
+      // SEC-013: Use spawnSync argument array — no shell interpolation.
+      // Old pattern: execSync(`bun run "${signalTs}" notify "${msg.replace(...)}"`) 
+      // allowed $() expansion in watch match text.
+      spawnSync("bun", ["run", signalTs, "notify", msg], {
+        timeout: 5000, stdio: "pipe",
+      });
     } else {
       // Fallback: write signal file
       const sigDir = join(AGENCE_ROOT, "nexus", "signals");

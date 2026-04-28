@@ -133,10 +133,12 @@ function validateEnvelopeFields(env: any): env is SignalEnvelope {
 }
 
 function shellSafe(s: string): string {
-  // SEC-005: Strip control characters (0x00-0x1f except \n\t) that could
+  // SEC-005: Strip control characters (0x00-0x1f except \t) that could
   // be interpreted as tmux key sequences or terminal escape codes.
+  // SEC-013: Also strip \n (0x0a) — in tmux send-keys, newlines inside
+  // single quotes split into multiple commands (command injection).
   // Then single-quote escape for shell: replace ' with '\''.
-  const stripped = s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "");
+  const stripped = s.replace(/[\x00-\x08\x0a\x0b\x0c\x0e-\x1f\x7f]/g, "");
   return stripped.replace(/'/g, "'\\''");
 }
 

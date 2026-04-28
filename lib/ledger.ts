@@ -21,7 +21,7 @@
 
 import { existsSync, readFileSync, mkdirSync, copyFileSync, readdirSync } from "fs";
 import { join } from "path";
-import { execSync } from "child_process";
+import { execSync, spawnSync } from "child_process";
 
 const AGENCE_ROOT = process.env.AGENCE_ROOT
   || process.env.AI_ROOT
@@ -257,8 +257,15 @@ function cmdAdd(args: string[]): number {
   // Delegate to ailedger.ts append — same positional args
   const airun = join(import.meta.dir, "..", "bin", "airun");
   try {
-    const result = runOrFail(`"${airun}" ailedger append ${args.map(a => `"${a}"`).join(" ")}`);
-    console.log(result);
+    // SEC-013: Use spawnSync argument array — no shell interpolation.
+    // Old pattern: runOrFail(`"${airun}" ailedger append ${args.map(...)}`)
+    // allowed $() expansion in caller-supplied args.
+    const result = spawnSync(airun, ["ailedger", "append", ...args], {
+      cwd: AGENCE_ROOT, encoding: "utf-8", timeout: 10_000,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    if (result.status !== 0) throw new Error(result.stderr?.toString() || "append failed");
+    console.log(result.stdout?.toString().trim());
     return 0;
   } catch {
     stderr("[ledger] Failed to append entry. Check: airun ailedger append --help");
