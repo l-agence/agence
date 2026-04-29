@@ -207,9 +207,8 @@ save_session() {
   local session_id="${AGENCE_SESSION_ID:-$(generate_shell_session_id save)}"
   local log_id="save-$(date +%Y%m%d_%H%M%S)-$(printf '%x' $((RANDOM * RANDOM)))"
   local saves_dir="${AGENCE_ROOT}/nexus/.aisaves"
-  local sessions_dir="${AGENCE_ROOT}/nexus/sessions"
   local lessons_dir="$(resolve_org_path "${AGENCE_ROOT}/synthetic")/lessons"
-  mkdir -p "$saves_dir" "$sessions_dir" 2>/dev/null
+  mkdir -p "$saves_dir" 2>/dev/null
 
   local branch; branch=$(git -C "$AGENCE_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
   local commit; commit=$(git -C "$AGENCE_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")

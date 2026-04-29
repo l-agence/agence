@@ -25,7 +25,7 @@
 //   airun signal output '{"status":"ok","tests":91}'
 //   airun signal help
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, watchFile, unwatchFile, chmodSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, unlinkSync, statSync, watchFile, unwatchFile, chmodSync } from "fs";
 import { join, basename } from "path";
 import { execSync, spawnSync } from "child_process";
 import { createHmac } from "crypto";
@@ -593,6 +593,46 @@ function doPoll(sigId: string): number {
   }
 }
 
+// ─── Signal Prune ────────────────────────────────────────────────────────────
+
+function doSignalPrune(args: string[]): number {
+  let days = 3;
+  let dryRun = false;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--days" && args[i + 1]) days = parseInt(args[++i], 10);
+    if (args[i] === "--dry-run") dryRun = true;
+  }
+
+  if (!existsSync(SIGNAL_DIR)) {
+    process.stderr.write(`[signal] No signals directory\n`);
+    return 0;
+  }
+
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  let pruned = 0;
+  let total = 0;
+
+  for (const f of readdirSync(SIGNAL_DIR)) {
+    const full = join(SIGNAL_DIR, f);
+    try {
+      const st = statSync(full);
+      if (!st.isFile()) continue;
+      total++;
+      if (st.mtimeMs < cutoff) {
+        if (dryRun) {
+          process.stderr.write(`  [dry-run] ${f}\n`);
+        } else {
+          unlinkSync(full);
+        }
+        pruned++;
+      }
+    } catch { /* skip */ }
+  }
+
+  process.stderr.write(`[signal] ${dryRun ? "[dry-run] " : ""}Pruned: ${pruned}/${total} signals (older than ${days} days)\n`);
+  return 0;
+}
+
 // ─── CLI Dispatch ────────────────────────────────────────────────────────────
 
 const [cmd, ...args] = process.argv.slice(2);
@@ -653,6 +693,9 @@ switch (cmd) {
     process.exit(doPoll(pollId));
     break;
   }
+  case "prune":
+    process.exit(doSignalPrune(args));
+    break;
   case "--help":
   case "help":
     console.error(`Usage: airun signal <command> [args...]
@@ -671,6 +714,7 @@ Utilities:
   list                          Show pending signals
   respond <signal-id> <answer>  Human responds to a ^prompt or ^ask
   poll <signal-id>              Agent checks if ^prompt response arrived
+  prune [--days N] [--dry-run]  Remove old signals (default: 3 days)
 
 Transport: auto-detects tmux ($TMUX), falls back to file-based signaling.
 

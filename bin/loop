@@ -8,7 +8,7 @@
 #   - Feeds a prompt file to a CLI agent on each iteration
 #   - Captures output via tmux pipe-pane (if in tmux) or script(1) fallback
 #   - Optional backpressure: runs validation command between iterations
-#   - Writes iteration logs to nexus/.aisessions/
+#   - Writes iteration logs to nexus/logs/{DD}/
 #   - IMPLEMENTATION_PLAN.md on disk = shared state between iterations
 #
 # Usage:
@@ -43,6 +43,7 @@ DRY_RUN=false
 VERBOSE=false
 
 SESSION_DIR="${AGENCE_ROOT}/nexus/.aisessions"
+LOGS_DIR="${AGENCE_ROOT}/nexus/logs"
 TMP_DIR="${AGENCE_ROOT}/nexus/tmp"
 
 # ─── Parse Args ───────────────────────────────────────────────────────────────
@@ -148,10 +149,25 @@ fi
 
 # ─── Session Setup ────────────────────────────────────────────────────────────
 
-mkdir -p "$SESSION_DIR" "$TMP_DIR"
+# Loop logs go to nexus/logs/{DD}/ with 31-day monthly rotation
+LOG_DAY_DIR="${LOGS_DIR}/$(date +%d)"
+mkdir -p "$SESSION_DIR" "$LOG_DAY_DIR" "$TMP_DIR"
+
+# Monthly rotation: recycle stale files from previous month
+_log_month_marker="${LOG_DAY_DIR}/.month"
+_current_month="$(date +%Y-%m)"
+if [[ -f "$_log_month_marker" ]]; then
+  _stored_month="$(cat "$_log_month_marker")"
+  if [[ "$_stored_month" != "$_current_month" ]]; then
+    find "$LOG_DAY_DIR" -maxdepth 1 -type f ! -name '.month' -delete 2>/dev/null
+    echo "$_current_month" > "$_log_month_marker"
+  fi
+else
+  echo "$_current_month" > "$_log_month_marker"
+fi
 
 LOOP_ID="loop-${AGENT}-$(date +%s)-$$"
-LOOP_LOG="${SESSION_DIR}/${LOOP_ID}.log"
+LOOP_LOG="${LOG_DAY_DIR}/${LOOP_ID}.log"
 ITERATION=0
 CURRENT_BRANCH=""
 
@@ -235,7 +251,7 @@ teardown_pipe_pane() {
 
 # Hash the iteration output for progressive stall detection
 _output_hash() {
-  local log_file="${SESSION_DIR}/${LOOP_ID}-iter${ITERATION}.typescript"
+  local log_file="${LOG_DAY_DIR}/${LOOP_ID}-iter${ITERATION}.typescript"
   if [[ -f "$log_file" ]]; then
     sha256sum "$log_file" 2>/dev/null | cut -d' ' -f1
   else

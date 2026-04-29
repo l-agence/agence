@@ -11,9 +11,10 @@ nexus/agentd/*.json
 nexus/agentd/sockets/*.sock
 nexus/agentd/worktrees/
 nexus/.signal-secret
-nexus/sessions/*.meta.json
-nexus/sessions/*.awaiting
-nexus/sessions/*.typescript
+nexus/sessions/
+nexus/signals/
+nexus/logs/
+nexus/tmp/
 nexus/memory/
 
 # Private knowledge (local-only, never shared)

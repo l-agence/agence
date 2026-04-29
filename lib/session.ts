@@ -10,7 +10,7 @@
 //
 // Exit codes: 0 = success, 1 = error
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync, copyFileSync, unlinkSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync, copyFileSync, unlinkSync, rmdirSync } from "fs";
 import { join, basename } from "path";
 import { execSync } from "child_process";
 import { resolveOrg } from "./org.ts";
@@ -275,11 +275,10 @@ function sessionPrune(args: string[]): number {
     if (args[i] === "--dry-run") dryRun = true;
   }
 
-  // Scan both session directories:
-  //   nexus/.aisessions/ — aisession-created .meta.json + .typescript files
-  //   nexus/sessions/    — aibash/signal .awaiting markers + legacy .meta.json
-  const LEGACY_SESSION_DIR = join(AI_ROOT, "nexus", "sessions");
-  const sessionDirs = [SESSION_BASE, LEGACY_SESSION_DIR].filter(d => existsSync(d));
+  // Session files live in nexus/.aisessions/ (day-sharded {DD}/ subdirs + top-level)
+  const SIGNAL_DIR = join(AI_ROOT, "nexus", "signals");
+  const LOGS_DIR = join(AI_ROOT, "nexus", "logs");
+  const sessionDirs = [SESSION_BASE].filter(d => existsSync(d));
 
   if (sessionDirs.length === 0) {
     console.error(`[SESSION] No sessions directory found`);
@@ -366,6 +365,83 @@ function sessionPrune(args: string[]): number {
 
   const remaining = totalFiles - removed;
   console.error(`  ${dryRun ? "[dry-run] " : ""}Removed: ${removed} files | ${archive ? `Archived: ${archived} | ` : ""}Remaining: ${remaining}`);
+
+  // ── Signal pruning (flat dir, age-based sweep) ──
+  let signalsPruned = 0;
+  const signalDays = Math.min(days, 3); // signals expire faster: min(requested, 3 days)
+  const signalCutoff = Date.now() - signalDays * 24 * 60 * 60 * 1000;
+  if (existsSync(SIGNAL_DIR)) {
+    for (const f of readdirSync(SIGNAL_DIR)) {
+      const full = join(SIGNAL_DIR, f);
+      try {
+        const st = statSync(full);
+        if (!st.isFile()) continue;
+        if (st.mtimeMs < signalCutoff) {
+          if (dryRun) {
+            console.error(`  [dry-run] signal: ${f}`);
+          } else {
+            unlinkSync(full);
+          }
+          signalsPruned++;
+        }
+      } catch { /* skip */ }
+    }
+    if (signalsPruned > 0) {
+      console.error(`  ${dryRun ? "[dry-run] " : ""}Signals pruned: ${signalsPruned} (older than ${signalDays} days)`);
+    }
+  }
+
+  // ── Log pruning (nexus/logs/{DD}/ dirs, same rotation as sessions) ──
+  let logsPruned = 0;
+  if (existsSync(LOGS_DIR)) {
+    for (const entry of readdirSync(LOGS_DIR, { withFileTypes: true })) {
+      if (!entry.isDirectory()) {
+        // Top-level log files
+        const full = join(LOGS_DIR, entry.name);
+        try {
+          const st = statSync(full);
+          if (st.mtimeMs < cutoff) {
+            if (!dryRun) unlinkSync(full);
+            logsPruned++;
+          }
+        } catch { /* skip */ }
+        continue;
+      }
+      // DD subdirs
+      const subdir = join(LOGS_DIR, entry.name);
+      for (const f of readdirSync(subdir)) {
+        if (f === ".month") continue;
+        const full = join(subdir, f);
+        try {
+          const st = statSync(full);
+          if (!st.isFile()) continue;
+          if (st.mtimeMs < cutoff) {
+            if (!dryRun) unlinkSync(full);
+            logsPruned++;
+          }
+        } catch { /* skip */ }
+      }
+    }
+    if (logsPruned > 0) {
+      console.error(`  ${dryRun ? "[dry-run] " : ""}Logs pruned: ${logsPruned} (older than ${days} days)`);
+    }
+  }
+
+  // ── Clean empty DD subdirs in .aisessions and logs ──
+  for (const dir of [SESSION_BASE, LOGS_DIR]) {
+    if (!existsSync(dir)) continue;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const subdir = join(dir, entry.name);
+      const contents = readdirSync(subdir).filter(f => f !== ".month");
+      if (contents.length === 0) {
+        if (!dryRun) {
+          try { unlinkSync(join(subdir, ".month")); } catch { /* skip */ }
+          try { rmdirSync(subdir); } catch { /* skip */ }
+        }
+      }
+    }
+  }
 
   return 0;
 }
