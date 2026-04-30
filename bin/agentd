@@ -91,6 +91,30 @@ _validate_tangent_id() {
   fi
 }
 
+# SEC-017 HACK-03: Validate task IDs to prevent injection via --task arg.
+# task_id is interpolated unquoted into the tmux new-window command string
+# and raw into the Python registry heredoc, so it must be hex8 only.
+_validate_task_id() {
+  local id="$1"
+  if [[ ! "$id" =~ ^[0-9a-f]{8}$ ]]; then
+    echo "✗ Invalid task ID format: '$id'" >&2
+    echo "  Expected: 8 lowercase hex digits (e.g. a1b2c3d4)" >&2
+    exit 1
+  fi
+}
+
+# SEC-017 HACK-03: Validate agent name to prevent injection.
+# agent is interpolated unquoted into the tmux new-window command string
+# and raw into the Python registry heredoc.
+_validate_agent_name() {
+  local name="$1"
+  if [[ ! "$name" =~ ^[a-z][a-z0-9_-]{0,31}$ ]]; then
+    echo "✗ Invalid agent name: '$name'" >&2
+    echo "  Expected: lowercase alphanumeric, hyphens, underscores (max 32 chars)" >&2
+    exit 1
+  fi
+}
+
 # ── PID File Management ────────────────────────────────────────────────────
 
 _write_pid() {
@@ -609,12 +633,16 @@ cmd_tangent_create() {
 
   # SEC-017: validate tangent ID format before filesystem operations
   _validate_tangent_id "$tangent_id"
+  # SEC-017 HACK-03: validate agent name before it is interpolated into tmux command + registry
+  _validate_agent_name "$agent"
 
   # Auto-generate task ID if not supplied
   if [[ -z "$task_id" ]]; then
     task_id=$(_generate_task_id)
     echo "[agentd] Auto-assigned task: $task_id"
   fi
+  # SEC-017 HACK-03: validate user-supplied task ID before tmux command + registry interpolation
+  _validate_task_id "$task_id"
 
   _require_tmux
   _require_socat

@@ -1239,3 +1239,129 @@ describe("SEC-015: AGENCE.md boundary markers + marker stripping (H7/H8)", () =>
     expect(src).toContain("SEC-015");
   });
 });
+
+describe("SEC-017 HACK-03: task_id and agent_name injection hardening", () => {
+  // _validate_task_id and _validate_agent_name guard against unquoted
+  // interpolation of these values into the tmux new-window command string
+  // and the Python registry heredoc in _tangent_register.
+
+  function runAgentd(args: string[]): { stdout: string; stderr: string; exitCode: number } {
+    const result = Bun.spawnSync([join(AGENCE_ROOT, "bin", "agentd"), ...args], {
+      cwd: AGENCE_ROOT,
+      env: { ...process.env, AGENCE_ROOT, PATH: process.env.PATH ?? "/usr/bin:/bin" },
+      timeout: 10_000,
+    });
+    return {
+      stdout: result.stdout.toString().trim(),
+      stderr: result.stderr.toString().trim(),
+      exitCode: result.exitCode,
+    };
+  }
+
+  // ── _validate_task_id ────────────────────────────────────────────────────
+
+  test("tangent create rejects task_id with semicolon (command injection)", () => {
+    const r = runAgentd(["tangent", "create", "--task", "abcd1234;evil", "a1b2c3d4-0", "copilot"]);
+    expect(r.exitCode).not.toBe(0);
+    expect(r.stderr).toContain("Invalid task ID");
+  });
+
+  test("tangent create rejects task_id with path traversal", () => {
+    const r = runAgentd(["tangent", "create", "--task", "../../etc/passwd", "a1b2c3d4-0", "copilot"]);
+    expect(r.exitCode).not.toBe(0);
+    expect(r.stderr).toContain("Invalid task ID");
+  });
+
+  test("tangent create rejects task_id with single quote (Python heredoc escape)", () => {
+    const r = runAgentd(["tangent", "create", "--task", "abc'def1", "a1b2c3d4-0", "copilot"]);
+    expect(r.exitCode).not.toBe(0);
+    expect(r.stderr).toContain("Invalid task ID");
+  });
+
+  test("tangent create rejects task_id with spaces", () => {
+    const r = runAgentd(["tangent", "create", "--task", "abcd 123", "a1b2c3d4-0", "copilot"]);
+    expect(r.exitCode).not.toBe(0);
+    expect(r.stderr).toContain("Invalid task ID");
+  });
+
+  test("tangent create rejects task_id that is too short", () => {
+    const r = runAgentd(["tangent", "create", "--task", "abcd", "a1b2c3d4-0", "copilot"]);
+    expect(r.exitCode).not.toBe(0);
+    expect(r.stderr).toContain("Invalid task ID");
+  });
+
+  test("tangent create rejects task_id with uppercase hex", () => {
+    const r = runAgentd(["tangent", "create", "--task", "ABCD1234", "a1b2c3d4-0", "copilot"]);
+    expect(r.exitCode).not.toBe(0);
+    expect(r.stderr).toContain("Invalid task ID");
+  });
+
+  test("tangent create accepts valid hex8 task_id (fails later at session check)", () => {
+    const r = runAgentd(["tangent", "create", "--task", "a1b2c3d4", "a1b2c3d4-0", "copilot"]);
+    // Should NOT fail with "Invalid task ID" — will fail later (no tmux session)
+    expect(r.stderr).not.toContain("Invalid task ID");
+  });
+
+  // ── _validate_agent_name ─────────────────────────────────────────────────
+
+  test("tangent create rejects agent name with semicolon", () => {
+    const r = runAgentd(["tangent", "create", "a1b2c3d4-0", "copilot;evil"]);
+    expect(r.exitCode).not.toBe(0);
+    expect(r.stderr).toContain("Invalid agent name");
+  });
+
+  test("tangent create rejects agent name with path traversal", () => {
+    const r = runAgentd(["tangent", "create", "a1b2c3d4-0", "../evil"]);
+    expect(r.exitCode).not.toBe(0);
+    expect(r.stderr).toContain("Invalid agent name");
+  });
+
+  test("tangent create rejects agent name with single quote", () => {
+    const r = runAgentd(["tangent", "create", "a1b2c3d4-0", "cop'ilot"]);
+    expect(r.exitCode).not.toBe(0);
+    expect(r.stderr).toContain("Invalid agent name");
+  });
+
+  test("tangent create rejects agent name with uppercase", () => {
+    const r = runAgentd(["tangent", "create", "a1b2c3d4-0", "Copilot"]);
+    expect(r.exitCode).not.toBe(0);
+    expect(r.stderr).toContain("Invalid agent name");
+  });
+
+  test("tangent create accepts valid agent names (fails later at session check)", () => {
+    for (const name of ["copilot", "claude", "aider", "my-agent", "agent_1"]) {
+      const r = runAgentd(["tangent", "create", "a1b2c3d4-0", name]);
+      expect(r.stderr).not.toContain("Invalid agent name");
+    }
+  });
+
+  // ── Code-level assertions (defense-in-depth) ────────────────────────────
+
+  test("agentd defines _validate_task_id function", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin", "agentd"), "utf-8");
+    expect(src).toContain("_validate_task_id");
+    expect(src).toContain("SEC-017 HACK-03");
+  });
+
+  test("agentd defines _validate_agent_name function", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin", "agentd"), "utf-8");
+    expect(src).toContain("_validate_agent_name");
+  });
+
+  test("agentd calls _validate_task_id in cmd_tangent_create", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin", "agentd"), "utf-8");
+    // Both the function definition and call site must be present
+    const defIdx = src.indexOf("_validate_task_id()");
+    const callIdx = src.indexOf('_validate_task_id "$task_id"');
+    expect(defIdx).toBeGreaterThan(-1);
+    expect(callIdx).toBeGreaterThan(defIdx);
+  });
+
+  test("agentd calls _validate_agent_name in cmd_tangent_create", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin", "agentd"), "utf-8");
+    const defIdx = src.indexOf("_validate_agent_name()");
+    const callIdx = src.indexOf('_validate_agent_name "$agent"');
+    expect(defIdx).toBeGreaterThan(-1);
+    expect(callIdx).toBeGreaterThan(defIdx);
+  });
+});
