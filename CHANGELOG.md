@@ -2,6 +2,57 @@
 
 All notable changes to l'Agence are documented here.
 
+## [1.0.0] — 2026-04-30
+
+### Added
+- `sequent` tournament tangent orchestrator — parallel agent tournament execution with ranked output
+- 12 sequent tests (compilation, CLI dispatch, delegation)
+
+### Security
+- SEC-014 (`^break` audit): 4 P1 findings fixed — `doStream` agent name validation, `AI_ROLE` readonly enforcement, MCP response size cap (1MB), MCP call timeout (30s AbortController)
+- SEC-015 (`^hack` red-team): 7 findings fixed — `router.sh` AGENCE.md boundary markers, marker injection stripping, `GIT_ROOT ../` traversal guard, `^input`/`^stream` guard bypass hardening
+
+### Test Coverage
+- 413 tests, 0 failures, 989 expect() calls across 7 files (22 new regression tests for SEC-014/015)
+
+---
+
+## [0.9.2] — 2026-04-29
+
+### Added
+- MCP client (`lib/mcp-client.ts`): guard-gated tool execution, env sanitization, config validation
+- `^input` / `^stream` commands for real-time agent I/O
+- `AGENCE.md` project instructions convention (`[PROJECT-INSTRUCTIONS-BEGIN/END]` boundary markers)
+- 10 MCP client tests
+
+### Security — SEC-014/015
+- 22 regression tests for SEC-014 (4 findings) and SEC-015 (7 findings)
+
+### Test Coverage
+- 401 tests, 0 failures, 968 expect() calls across 6 files
+
+---
+
+## [0.8.0-alpha] — 2026-04-28
+
+### Security — SEC-012/013
+- **P0**: `logDecision` shell injection — `execSync` template replaced with `spawnSync` argument array
+- **P0**: `ledger cmdAdd` shell injection — same fix
+- **P0**: `awk system()` / `sed e` / `find -fls` T0 bypass — demoted to T2
+- **P0**: MCP `bash -c` shell injection — `runSafe()` argument arrays + input validation
+- **P1**: `watch.ts fireSignal` injection — `spawnSync` fix
+- **P1**: Process substitution `<()` / `>()` bypass — added to globalBlocks
+- **P1**: Guard newline bypass (`\n`/`\r`) — added to globalBlocks
+- **P1**: `doInject()` guard gate — fail-closed for agentic callers
+- **P1**: Docker capability exposure — `--cap-drop ALL`, `--read-only`, `noexec` tmpfs
+- **P2**: `shellSafe` newline passthrough (`\n` → `send-keys` splitting) fixed
+- **P2**: Heredoc `<<` passes guard — added to globalBlocks
+
+### Test Coverage
+- 361 tests, 0 failures, 893 expect() calls (40 new regression tests: 21 for SEC-012, 19 for SEC-013)
+
+---
+
 ## [0.7.0-alpha] — 2026-04-27
 
 ### Security — SEC-010: Guard Perimeter Hardening
