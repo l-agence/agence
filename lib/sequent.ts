@@ -62,11 +62,25 @@ function ensureDir(dir: string): void {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
 }
 
+// SEC-016: Validate IDs to prevent path traversal (only hex8 or hex8-N format)
+const SEQUENT_ID_RE = /^[0-9a-f]{8}$/;
+const TANGENT_ID_RE = /^[0-9a-f]{8}-\d{1,2}$/;
+
+function isValidSequentId(id: string): boolean {
+  return SEQUENT_ID_RE.test(id);
+}
+
+function isValidTangentId(id: string): boolean {
+  return TANGENT_ID_RE.test(id);
+}
+
 function sequentPath(id: string): string {
+  if (!isValidSequentId(id)) throw new Error(`Invalid sequent ID: ${id}`);
   return join(SEQUENT_DIR, `${id}.json`);
 }
 
 function loadSequent(id: string): Sequent | null {
+  if (!isValidSequentId(id)) return null;
   const p = sequentPath(id);
   if (!existsSync(p)) return null;
   try { return JSON.parse(readFileSync(p, "utf-8")); }
@@ -135,6 +149,12 @@ function agentdTangentDestroy(tangentId: string): void {
 // This is the tournament judge — simple heuristic, extensible.
 
 function scoreTangent(seq: Sequent, tangent: SequentTangent): number {
+  // SEC-016: validate tangent ID before constructing filesystem path
+  if (!isValidTangentId(tangent.id)) {
+    process.stderr.write(`[sequent] Invalid tangent ID in stored data: ${tangent.id}\n`);
+    tangent.score = 0;
+    return 0;
+  }
   const worktreePath = join(AGENCE_ROOT, "nexus", "agentd", "worktrees", tangent.id);
 
   // Count commits ahead of parent
@@ -175,6 +195,11 @@ function scoreTangent(seq: Sequent, tangent: SequentTangent): number {
 // Extract the winning tangent's commits back to the parent branch.
 
 function cherryPickResultant(seq: Sequent, tangentId: string): boolean {
+  // SEC-016: validate tangent ID before path construction
+  if (!isValidTangentId(tangentId)) {
+    process.stderr.write(`[sequent] Invalid tangent ID: ${tangentId}\n`);
+    return false;
+  }
   const worktreePath = join(AGENCE_ROOT, "nexus", "agentd", "worktrees", tangentId);
   if (!existsSync(worktreePath)) {
     process.stderr.write(`[sequent] Worktree not found: ${worktreePath}\n`);
@@ -317,6 +342,12 @@ function cmdStatus(args: string[]): number {
     return cmdList();
   }
 
+  // SEC-016: validate ID before filesystem access
+  if (!isValidSequentId(id)) {
+    process.stderr.write(`[sequent] Invalid sequent ID format: ${id}\n`);
+    return 1;
+  }
+
   const seq = loadSequent(id);
   if (!seq) {
     process.stderr.write(`[sequent] Not found: ${id}\n`);
@@ -343,7 +374,7 @@ function cmdStatus(args: string[]): number {
 
 function cmdList(): number {
   ensureDir(SEQUENT_DIR);
-  const files = readdirSync(SEQUENT_DIR).filter(f => f.endsWith(".json"));
+  const files = readdirSync(SEQUENT_DIR).filter(f => f.endsWith(".json") && SEQUENT_ID_RE.test(f.replace(".json", "")));
   if (files.length === 0) {
     console.log("[sequent] No active sequents.");
     return 0;
@@ -366,6 +397,12 @@ function cmdScore(args: string[]): number {
   if (!id) {
     process.stderr.write("Usage: airun sequent score <sequent-id>\n");
     return 2;
+  }
+
+  // SEC-016: validate ID before filesystem access
+  if (!isValidSequentId(id)) {
+    process.stderr.write(`[sequent] Invalid sequent ID format: ${id}\n`);
+    return 1;
   }
 
   const seq = loadSequent(id);
@@ -422,6 +459,16 @@ function cmdPick(args: string[]): number {
     return 2;
   }
 
+  // SEC-016: validate IDs before any filesystem/git operation
+  if (!isValidSequentId(id)) {
+    process.stderr.write(`[sequent] Invalid sequent ID format: ${id}\n`);
+    return 1;
+  }
+  if (!isValidTangentId(tangentId)) {
+    process.stderr.write(`[sequent] Invalid tangent ID format: ${tangentId}\n`);
+    return 1;
+  }
+
   const seq = loadSequent(id);
   if (!seq) {
     process.stderr.write(`[sequent] Not found: ${id}\n`);
@@ -469,6 +516,12 @@ function cmdDestroy(args: string[]): number {
   if (!id) {
     process.stderr.write("Usage: airun sequent destroy <sequent-id>\n");
     return 2;
+  }
+
+  // SEC-016: validate ID before filesystem access
+  if (!isValidSequentId(id)) {
+    process.stderr.write(`[sequent] Invalid sequent ID format: ${id}\n`);
+    return 1;
   }
 
   const seq = loadSequent(id);

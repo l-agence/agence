@@ -79,6 +79,18 @@ _require_socat() {
   fi
 }
 
+# SEC-017: Validate tangent/sequent IDs to prevent path traversal.
+# Only allow hex8-N format (sequent tangents) or hex8 (bare sequent IDs).
+# Rejects: ../, absolute paths, spaces, shell metacharacters.
+_validate_tangent_id() {
+  local id="$1"
+  if [[ ! "$id" =~ ^[0-9a-f]{8}(-[0-9]{1,2})?$ ]]; then
+    echo "✗ Invalid tangent ID format: '$id'" >&2
+    echo "  Expected: hex8 or hex8-N (e.g. a1b2c3d4 or a1b2c3d4-0)" >&2
+    exit 1
+  fi
+}
+
 # ── PID File Management ────────────────────────────────────────────────────
 
 _write_pid() {
@@ -595,6 +607,9 @@ cmd_tangent_create() {
     exit 1
   fi
 
+  # SEC-017: validate tangent ID format before filesystem operations
+  _validate_tangent_id "$tangent_id"
+
   # Auto-generate task ID if not supplied
   if [[ -z "$task_id" ]]; then
     task_id=$(_generate_task_id)
@@ -682,6 +697,9 @@ cmd_tangent_destroy() {
     exit 1
   fi
 
+  # SEC-017: validate tangent ID format before filesystem operations
+  _validate_tangent_id "$tangent_id"
+
   echo "[agentd] Destroying tangent: $tangent_id"
 
   # Read socket PID from registry before unregistering
@@ -749,6 +767,9 @@ cmd_inject() {
     echo "Usage: agentd inject <tangent-id> <command...>" >&2
     exit 1
   fi
+
+  # SEC-017: validate tangent ID format before socket path construction
+  _validate_tangent_id "$tangent_id"
 
   _require_socat
 
