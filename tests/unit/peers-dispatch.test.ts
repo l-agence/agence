@@ -450,7 +450,13 @@ describe("skill.ts: agent resolution", () => {
 describe("skill.ts: SKILL.md loading", () => {
   test("skills exist at knowledge/@/skills/ root (SKILL-008)", () => {
     const { existsSync } = require("fs");
-    const skillsRoot = join(AGENCE_ROOT, "knowledge", "@", "skills");
+    // knowledge/@ is a user-created symlink (knowledge/@ → l-agence.org) set up by
+    // `agence init`.  In CI the symlink is absent, so fall back to the resolved
+    // org directory knowledge/l-agence.org/skills/ directly.
+    const atLink = join(AGENCE_ROOT, "knowledge", "@");
+    const skillsRoot = existsSync(atLink)
+      ? join(atLink, "skills")
+      : join(AGENCE_ROOT, "knowledge", "l-agence.org", "skills");
     expect(existsSync(skillsRoot)).toBe(true);
 
     // Check a sample of known skills have SKILL.md
