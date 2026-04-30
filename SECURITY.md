@@ -1,6 +1,6 @@
 # Security Policy
 
-**Version**: v0.8.0-alpha · April 28, 2026
+**Version**: v1.0.0 · April 29, 2026
 
 ## Reporting Vulnerabilities
 
@@ -60,12 +60,14 @@ Human↔agent communication via `nexus/signals/` uses:
 
 ### Test Coverage
 
-361 unit tests (893 expect() assertions) covering security boundaries:
+413 unit tests (989 expect() assertions) covering security boundaries:
 - 132 guard boundary tests (tier escalation, AIPOLICY parsing, eval safety)
-- 105 security hardening tests (HMAC, signal forgery, injection prevention, SEC-010/012/013 regressions)
+- 134 security hardening tests (HMAC, signal forgery, injection prevention, SEC-010/012/013/014/015 regressions)
 - 62 memory operation tests (tier isolation, store boundaries)
 - 53 peer dispatch tests (agent routing, consensus validation)
-- 9 MCP server tests (tool/resource surface verification)
+- 10 MCP client tests (guard-gating, env sanitization, config validation)
+- 10 MCP server tests (tool/resource surface verification)
+- 12 sequent tests (compilation, CLI dispatch, delegation)
 
 ---
 
@@ -86,6 +88,24 @@ These are perpetual tasks — they intentionally never complete. Each cycle feed
 ### 2. AIPOLICY Rules Are Code-Defined
 
 Guard rules are currently defined in `lib/guard.ts` source code, not dynamically loaded from `AIPOLICY.yaml`. The YAML file serves as the config anchor (existence check) but content is not parsed. Dynamic policy loading is planned for a future version.
+
+---
+
+## Resolved in v0.9.2 (SEC-014/015)
+
+SEC-014 fixed 4 P1 findings from `^break` targeting new v0.9.x code. SEC-015 fixed 7 findings from `^hack` red-team (3×P1, 4×P2) targeting MCP client, ^stream, ^input guard bypass, and AGENCE.md injection surfaces.
+
+| Fix | Severity | Detail |
+|-----|----------|--------|
+| `doStream` agent name unvalidated | P1 | `^stream` passed user-controlled agent name directly to tmux `-t` target. Fixed: same SEC-014 regex as `doInput`. |
+| `AI_ROLE` not readonly | P1 | Agent could `unset AI_ROLE` to bypass `^input` guard gate. Fixed: `readonly AI_ROLE` in aibash. |
+| MCP no response size limit | P2 | Hostile MCP server could return unbounded data, causing OOM. Fixed: 1MB cap with truncation. |
+| MCP no call timeout | P2 | Hostile MCP server could hang `callTool` forever. Fixed: 30s AbortController timeout. |
+| router.sh no boundary markers | P2 | AGENCE.md injected into prompt without delimiters — LLM prompt injection surface. Fixed: `[PROJECT-INSTRUCTIONS-BEGIN/END]` markers. |
+| Marker injection in AGENCE.md | P2 | Content containing boundary marker strings could confuse LLM parsing. Fixed: marker strings stripped/replaced before embedding (both skill.ts and router.sh). |
+| GIT_ROOT `..` traversal | P1 | `loadProjectInstructions` and router.sh could load AGENCE.md from outside repo via `../` in GIT_ROOT. Fixed: reject `..` in path. |
+
+22 regression tests added (11 for SEC-014 + 11 for SEC-015).
 
 ---
 
@@ -154,3 +174,8 @@ No Python. No pip. No npm install of untrusted packages in the critical path.
 | 2026-04-28 | `^hack` red-team probe: 31 probes, 8 findings (3×P0 RCE, 2×P1, 3×P2) |
 | 2026-04-28 | SEC-013 `^integrate`: all 8 findings fixed, 19 regression tests |
 | 2026-04-28 | v0.8.0-alpha release (361 tests, 893 assertions) |
+| 2026-04-29 | v0.9.0–0.9.2: MCP client, ^input/^stream, AGENCE.md convention (390 tests) |
+| 2026-04-29 | SEC-014 `^break` audit: 13 probes, 4×P1 findings fixed, 11 regression tests |
+| 2026-04-29 | SEC-015 `^hack` red-team: 22 probes, 7 findings (3×P1, 4×P2), all fixed, 11 regression tests |
+| 2026-04-29 | v0.9.2 hardened (401 tests, 968 assertions) |
+| 2026-04-30 | v1.0.0 release: tournament tangents (sequent), 413 tests, 989 assertions |

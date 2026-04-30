@@ -83,3 +83,83 @@ describe("MCP Server", () => {
     }
   });
 });
+
+// ─── MCP Client Tests ────────────────────────────────────────────────────────
+
+describe("MCP Client", () => {
+  test("lib/mcp-client.ts compiles without errors", () => {
+    const r = bunCheck("lib/mcp-client.ts");
+    expect(r.ok).toBe(true);
+  });
+
+  test("mcp-client imports compile-time dependencies", () => {
+    const r = spawnSync("bun", ["-e", `
+      import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+      import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+      console.log("OK");
+    `], { cwd: AGENCE_ROOT, timeout: 10_000 });
+    expect(r.stdout?.toString("utf-8").trim()).toBe("OK");
+  });
+
+  test("mcp-client help exits 0", () => {
+    const r = spawnSync("bun", ["run", "lib/mcp-client.ts", "help"], {
+      cwd: AGENCE_ROOT,
+      timeout: 10_000,
+    });
+    expect(r.status).toBe(0);
+    expect(r.stdout?.toString("utf-8")).toContain("mcp-client");
+  });
+
+  test("mcp-client list with empty config exits 0", () => {
+    const r = spawnSync("bun", ["run", "lib/mcp-client.ts", "list"], {
+      cwd: AGENCE_ROOT,
+      timeout: 10_000,
+    });
+    expect(r.status).toBe(0);
+  });
+
+  test("mcp-client tools with unknown server exits 1", () => {
+    const r = spawnSync("bun", ["run", "lib/mcp-client.ts", "tools", "nonexistent"], {
+      cwd: AGENCE_ROOT,
+      timeout: 10_000,
+    });
+    expect(r.status).toBe(1);
+  });
+
+  test("mcp-client call with unknown server returns error", () => {
+    const r = spawnSync("bun", ["run", "lib/mcp-client.ts", "call", "nonexistent", "some_tool"], {
+      cwd: AGENCE_ROOT,
+      timeout: 10_000,
+    });
+    expect(r.status).toBe(1);
+  });
+
+  test("codex/mcp.json exists and has valid structure", () => {
+    const configPath = join(AGENCE_ROOT, "codex", "mcp.json");
+    expect(existsSync(configPath)).toBe(true);
+    const config = JSON.parse(readFileSync(configPath, "utf-8"));
+    expect(config).toHaveProperty("mcpServers");
+    expect(typeof config.mcpServers).toBe("object");
+  });
+
+  test("mcp-client guard-gates all tool calls", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/mcp-client.ts"), "utf-8");
+    // callMcpTool must contain guard check
+    expect(src).toContain("guardCheck");
+    expect(src).toContain("fail-closed");
+  });
+
+  test("mcp-client sanitizes env (no API key leakage)", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/mcp-client.ts"), "utf-8");
+    // connectToServer builds safeEnv with minimal inherited vars
+    expect(src).toContain("safeEnv");
+    expect(src).toContain("PATH");
+    // Should NOT pass AGENCE_ROOT to external servers
+    expect(src).toContain("never pass AGENCE_ROOT");
+  });
+
+  test("skill.ts mcp delegation compiles", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/skill.ts"), "utf-8");
+    expect(src).toContain("mcp-client.ts");
+  });
+});

@@ -68,7 +68,7 @@ function runSafe(args: string[], timeoutMs = 30_000): { stdout: string; stderr: 
 
 const server = new McpServer({
   name: "agence",
-  version: "0.6.0-alpha",
+  version: "1.0.0",
 });
 
 // ─── Tools ───────────────────────────────────────────────────────────────────

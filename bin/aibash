@@ -66,6 +66,10 @@ unset AGENCE_POLICY
 export AGENCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export AI_ROOT="${AI_ROOT:-$AGENCE_ROOT}"
 
+# SEC-015: Pin AI_ROLE so agents cannot unset/override to bypass guard gates
+export AI_ROLE="${AI_ROLE:-agentic}"
+readonly AI_ROLE
+
 # Disable Bash features that allow escape
 set +o history
 set +o braceexpand

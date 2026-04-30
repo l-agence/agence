@@ -1,140 +1,146 @@
-# 🤖 l'Agence (^) —  Agentic Engineering Collaboration Environment
+# l'Agence — Agentic Engineering Co-Environments
 
 **Author**: Stephane Korning · 2026 · [MIT + Commons Clause](LICENSE.md)  
-**Version**: v0.7.0-alpha · *Guard hardening, MCP server, integration tests*
+**Version**: v1.0.0 · April 2026
 
-> *The first git-native, governed, auditable multi-agent swarm for software engineering.*
-> 
-> Every agent action Merkle-chained. Every command policy-gated. Consensus from 3 independent LLMs, not one.
+> **The governance layer for AI coding agents.**  
+> Every agent action classified, gated, and cryptographically logged — regardless of which LLM or tool runs it.
 
 ---
 
-## Introduction 
+## The Problem
 
-**l'Agence** is a framework that turns your git repo into a **collaborative agent workspace** — with audit trails, session persistence, and safe multi-agent coordination and governance built in from the start.
+Your AI coding agents can write code. They can commit, push, delete, refactor.
 
-Unlike single-agent tools (Claude Code, Copilot, aider), agence coordinates **multiple agents in parallel**, each isolated, observable, and governed by the same CODEX rules.
+**But who's watching them?**
 
-| Capability | How |
+Claude Code has no audit trail. Aider trusts the user. Codex sandboxes everything and hopes for the best. LangChain gives you building blocks but no guardrails.
+
+Agence exists because **advisory guardrails aren't guardrails at all.** It's the layer that sits between any AI agent and your filesystem and says *"not without approval."*
+
+---
+
+## What Agence Does
+
+Agence is an **agent-agnostic governance stack** for software engineering. It doesn't replace your coding agent — it governs, orchestrates, and audits all of them from a single control plane.
+
+**Command Gating** — Every shell command is classified before execution:
+
+| Tier | Gate | Example |
+|------|------|---------|
+| T0 | Auto-execute | `git status`, `ls`, `cat` |
+| T1 | Logged | `git add`, `git commit` |
+| T2 | Human approval required | `git push`, `git reset` |
+| T3 | Blocked | `rm -rf`, `chmod 777`, `kill` |
+
+Unknown commands default to T2. Not T0. **Fail-closed.** The guard runs as a separate process — agents cannot bypass their own policy.
+
+**Cryptographic Audit** — Every agent decision is logged to a Merkle-chained, append-only ledger. Each entry links to the previous via SHA-256. Tamper with one entry and the chain breaks. Verify with: `agence ^ledger verify`.
+
+**Multi-Agent Orchestration** — 18 agents across 4 types (persona, tool, loop, ensemble). Route with `@agent` syntax. Override models with dot-notation: `@ralph.gpt4o`. Dispatch to Aider, Claude Code, Copilot, or your own tools — all governed by the same policy.
+
+**Peer Consensus** — Route any question to 3 independent LLMs and get weighted consensus. Your architecture review shouldn't depend on one model's blind spots.
+
+**Session Persistence** — Save, resume, and hand off sessions between agents. Full context survives restarts. Automatic tmux capture of stdout/stdin/stderr — no 16KB buffer limits.
+
+**Git-Native** — No database. No server. State lives in git worktrees and flat files. Knowledge is sharded, gated, and selectively routed — you decide what gets shared.
+
+---
+
+## By the Numbers
+
+| | |
 |---|---|
-| Multi-agent swarm | tmux tiles — one agent per pane, human hypervisor |
-| Mixed agent routing | 4 agent types: persona, tool, loop, ensemble |
-| Dot-notation | `@ralph.gpt4o` — per-agent model/binary override |
-| Session persistence | `^save` / `^resume` — context survives restarts |
-| Safe handoffs | `^handoff @ralph` — full context transfer between agents |
-| Merkle audit trail | `nexus/.ailedger` — append-only HMAC-signed decision log |
-| Tiered governance | `AIPOLICY.yaml` → T0 (free) → T4 (gated) command tiers |
-| Peer consensus | `@peers ^review` — 3-LLM weighted consensus (arXiv:2406.12708) |
-| Cognitive memory | COGNOS 3-store: shared/private/working |
-| Tool-agnostic | Works with claude, copilot, aider, aish, or your own agent |
-| LLM-agnostic | Anthropic, OpenAI, Gemini, GitHub Copilot, OpenRouter, Ollama |
-| Git-native | No DB, no server — just git worktrees and flat files |
-| 291 tests | Security hardening, guard boundary, peer routing, memory ops |
-
+| **16,258** | Lines of code (9,939 TypeScript + 6,319 bash) |
+| **361** | Tests with 893 assertions |
+| **237** | Security-specific tests (132 guard + 105 hardening) |
+| **5** | Red-team cycles completed (SEC-008 through SEC-013) |
+| **25** | Orchestration skills (`^fix`, `^review`, `^hack`, `^peers`, `^ken`...) |
+| **18** | Registered agents (10 persona, 5 tool, 1 loop, 2 ensemble) |
+| **12** | LLM providers (Anthropic, OpenAI, Azure, Google, Mistral, Groq, Ollama...) |
+| **10** | MCP tools + 3 MCP resources (Model Context Protocol server) |
+| **3** | Dependencies total (MCP SDK, Bun, Zod) |
+| **0** | Databases required |
 
 ---
 
-## What is l'Agence?
+## Who This Is For
 
-Welcome to **Agence**, an agentic engineering collaboration environment.
-L'agence is a tool and model agnostic framework for human/agentic and multi-agentic development & collaboration. L'agence achieves this with a philosophy of simplicity. For example in agence there is no vectored database, no state machines. Where possible, everything including swarm and task states, workflows, RAG and DWM, are managed based on git. L'agence scales and remembers  using **Git-based sharding**. 
+- **Teams using multiple AI coding agents** who need one policy governing all of them
+- **Enterprises** requiring audit trails for AI-generated code changes
+- **Security-conscious developers** who want fail-closed gating, not fail-open trust
+- **Anyone who's had an AI agent break something** and wished there was a layer between the agent and `rm -rf`
 
-L'agence is deployed both as a portable git submodule (.agence) living in any project's repo, and one or more 'team shards' existing as that .agence submodule origin. This way agence lives in an active context inside each project, but also shares upstream to a team based shard. However L'agence gates all knowledge, and so it allows you to selectively route and share. YOU DECIDE where and how to share. 
+## Who This Is NOT For
 
-Unlike other agentic models that aim for full AI autonomy, L'agence aims for human supervised workflows. It is human gated first by design. It incorporates strong, explicit and immutable safeguards via its CODEX: the laws, principles, rules, and most importantly an EBNF grammar-based universal tiered access AIPOLICY.
+- If you want an AI pair programmer → use Aider
+- If you want IDE autocomplete → use Continue or Copilot
+- If you want to build any kind of agent → use LangChain/LangGraph
+- If you want cloud-hosted async tasks → use OpenAI Codex
 
-Governance is a central concept in L'agence. Agence is the first such system with a full agentic audit trail based on immutable append only merkle ailedger. The ailedger is implemented as a sister repository to each shard. AI commands are logged , auditable and replayable for RCA or accountability. 
-
-l 'agence implements a human control plane with multiple agent shells as needed. But full agent sessions must always be accesible via terminal panes or session replay or audits. 
-
-In agence, agent state is local, but knowledge and metadata is selectively sharded. Full local agent session states are preserved, allowing for local session save, resume and even handoff to other agents. L'agence does automatic full session capture of stdout, stdin, stderr, exit codes and everything via tmux pipe with fallback to unix script typescript logs. 
-This allows for full agentic access to the entire session, bypassing VScode 16kb buffer limits and reducing hallucinations and token wastage. 
-
-Full session data is never shared verbatim to the shard.  This is gated such that we do not leak unless a human asks. 
-As well, agence's knowledge bases are tiered and segregated between private (local user knowledge in knowledge/private/) and shared team knowledge (in knowledge/).
-
-L'agence uses an innovative and deterministic routing system that is flexible and secure. It allows uses to select where knowledge and lessons are shared. Efforts have been made to gate guard your data from unecessary disclosure. 
-
-By design l'agence is tooling agnostic. It already comes pre-loaded with multiple agentic personas and external agent support and encourages these such as: 'aider, claude-code, aishell, copilot-cli, local ollama cluster,etc'. In fact out-of-the-box we support 13 other agents but rolling your own agent is also encouraged.
-
-L' agence makes use of a strong linear algrebra matrix-based task and workflow model which allows for atomic and idempotent task and swarm state management . This means swarms instantly recompute task states. As well , this enables deterministic  task scheduling which is selected on needs, LLM capabilities and LLM token costs. 
-
+Agence **governs all of the above**.
 
 ---
 
-## ⚡ Install (60 seconds)
+## Install
 
-### As a git submodule (recommended — keeps agence separate from your project)
+### As a git submodule (recommended)
 
 ```bash
-# 1. Add agence to your repo
 git submodule add https://github.com/l-agence/agence .agence
-
-# 2. Initialize
 git submodule update --init --recursive
-
-# 3. Set up agence in your repo (creates .agencerc, checks dependencies)
 bash .agence/bin/agence ^init
-
-# 4. Add agence to your PATH (add this to your .bashrc / .zshrc)
 export PATH="$PWD/.agence/bin:$PATH"
-
-# 5. Commit
-git add .gitmodules .agence && git commit -m "Add agence agent framework"
 ```
 
-### Or: run directly (no install, no submodule)
+### Or: clone directly
 
 ```bash
 git clone https://github.com/l-agence/agence .agence
+cd .agence && bun install
+./bin/agence ^init
 export PATH="$PWD/.agence/bin:$PATH"
-agence --help
 ```
 
 ### Prerequisites
 
 | Tool | Required | Install |
 |---|---|---|
-| `bash` 4+ | ✅ Yes | built-in on Linux/macOS/WSL |
-| `git` 2.30+ | ✅ Yes | `sudo apt install git` |
-| `tmux` | For `agentd` swarm | `sudo apt install tmux` |
-| `script` (util-linux) | For session logging | `sudo apt install util-linux` |
-| `jq` | For JSON ledger queries | `sudo apt install jq` |
-| `bun` | For TypeScript modules | [bun.sh](https://bun.sh) |
+| `bash` 4+ | Yes | Built-in on Linux/macOS/WSL |
+| `git` 2.30+ | Yes | `sudo apt install git` |
+| `bun` 1.3+ | Yes | [bun.sh](https://bun.sh) |
+| `tmux` | For swarm | `sudo apt install tmux` |
+| `jq` | For ledger queries | `sudo apt install jq` |
 
-> **Windows**: Use WSL (Ubuntu recommended). All tools above available via `sudo apt install`.
+> **Windows**: Use WSL (Ubuntu recommended).
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
-# Chat with an agent about your task
+# Chat with an agent
 agence "How should I structure this feature?"
 
-# Save session state (resume later or hand off)
-agence ^save "Implementing OAuth2, halfway through token validation"
+# Route to a specific agent
+agence @sonya "Review this auth module"
 
-# Launch a named agent in an aibash session
-agence !ralph                    # persona agent (learning + reliability)
-agence !claude                   # Claude Code CLI
-agence !pilot                    # GitHub Copilot CLI
-agence !aider                    # aider (code patches)
-agence !aish                     # Microsoft AI Shell
+# Launch an agent shell
+agence !ralph                    # Persona: autonomous iteration
+agence !claude                   # Tool: Claude Code CLI
+agence !aider                    # Tool: aider (code patches)
 
-# Run a pre-approved git command
-agence /git-status
-agence /git-log
+# Save session (resume later or hand off to another agent)
+agence ^save "OAuth2: done token validation, next: refresh flow"
+agence ^resume
+agence ^handoff @sonya
 
-# Record a decision in the audit ledger
-agence ^ledger append "Deployed v0.4.0"
+# Audit trail
 agence ^ledger verify            # Verify Merkle chain integrity
-agence ^audit trail              # View full decision audit trail
+agence ^audit trail              # View full decision history
 
-# Run a Bun TypeScript module directly (router, audit, ledger, etc.)
-airun audit trail
-airun router resolve-route
-airun --list                     # List all available modules
+# Peer consensus (3 independent LLMs)
+agence @peers "Should we use Redis or Postgres for session storage?"
 
 # See all commands
 agence --help
@@ -142,73 +148,36 @@ agence --help
 
 ---
 
-## 📐 Architecture
+## Architecture
 
 ```
 YOUR REPO/
-└── .agence/                     ← agence lives here (submodule or clone)
-    ├── bin/
-    │   ├── agence               # Main CLI entry point
-    │   ├── aibash               # Agent plane shell (observable)
-    │   ├── ibash                # Human plane shell (hypervisor)
-    │   └── aido                 # Autonomous task runner
-    ├── codex/                   # Immutable governance (committed, shared)
-    │   ├── PRINCIPLES.md        # Philosophical maxims
-    │   ├── LAWS.md              # Hard constraints (must not)
-    │   ├── RULES.md             # Best practices (should)
-    │   ├── AIPOLICY.yaml        # Command tier whitelist (T0–T4)
-    │   └── agents/              # Agent personas (ralph, sonya, claude…)
-    ├── nexus/                   # Local operational state (gitignored)
-    │   ├── .ailedger            # Append-only decision audit log (JSONL)
-    │   ├── faults/              # Incident tracking
-    │   └── sessions/            # Persisted agent context
-    ├── knowledge/               # Team-shared knowledge (committed)
-    │   ├── @                    # → symlink to active org (e.g. l-agence.org)
-    │   ├── l-agence.org/
-    │   │   ├── docs/            # Architecture, routing, swarm docs
-    │   │   ├── lessons/         # Captured insights
-    │   │   └── plans/           # Project roadmap
+└── .agence/                     ← lives here (submodule or clone)
+    ├── bin/                     # CLI: agence, aibash, ibash, aido, agentd
+    ├── codex/                   # Governance: AIPOLICY.yaml, Laws, Principles, agents/
+    ├── nexus/                   # Local state: .ailedger, sessions, faults (gitignored)
+    ├── knowledge/               # Team knowledge: docs, lessons, plans (committed)
     │   └── private/             # Private knowledge (gitignored, never shared)
-    │       ├── @                # → symlink to active org
-    │       └── l-agence.org/
-    │           ├── todos/       # Personal task tracking
-    │           └── brainstorms/ # Design notes, analysis
-    ├── organic/                 # Swarm coordination (tasks, jobs, workflows)
-    │   ├── tasks/               # In-progress agent work items
-    │   ├── jobs/                # Scheduled background work
-    │   └── workflows/           # Multi-step orchestration definitions
-    └── lib/
-        ├── env.sh               # Canonical env bootstrap (sourced by all bin/)
-        ├── router.sh            # LLM provider routing
-        ├── format.sh            # Output formatting
-        ├── shell-ui.sh          # PS1 state colors, tmux titles
-        ├── session.ts           # Session CRUD (Bun TS)
-        ├── guard.ts             # Non-bypassable command gate (Bun TS)
-        ├── signal.ts            # Human↔agent IPC + ^ask (Bun TS)
-        └── matrix.ts            # Task DAG + scoring engine (Bun TS)
+    ├── organic/                 # Swarm coordination: tasks, jobs, workflows
+    └── lib/                     # Core: guard.ts, signal.ts, skill.ts, memory.ts, peers.ts
 ```
 
-### The `@` Symlink (Org Routing)
+**COGNOS** — Four pillars:
 
-Inside `knowledge/` and `knowledge/private/`, the `@` symlink points to the **active organization directory**:
+| Pillar | Purpose | Location |
+|--------|---------|----------|
+| **CODEX** | Immutable governance — Laws, Principles, Rules, AIPOLICY | `codex/` |
+| **KNOWLEDGE** | Team-shared docs, lessons, plans — selectively routed via `@` symlinks | `knowledge/` |
+| **NEXUS** | Local operational state — sessions, ledger, signals | `nexus/` (gitignored) |
+| **ORGANIC** | Swarm orchestration — tasks, workflows, matrix scheduling | `organic/` |
 
-```
-knowledge/@         → knowledge/l-agence.org/
-knowledge/private/@ → knowledge/private/l-agence.org/
-```
+**Runtime**: Bun + bash. No Python. No pip. No npm install of untrusted packages in the critical path.
 
-This lets all commands resolve paths like `knowledge/@/docs/ARCHITECTURE.md` without hardcoding the org name. When you add agence to a different org's repo, just point `@` at that org's directory:
-
-```bash
-# In your-company's repo:
-ln -s knowledge/your-company.com knowledge/@
-```
-
-The `^init` command checks and reports `@` symlink status. If missing, it tells you what to create.
+**MCP**: Agence exposes itself as an MCP server (10 tools, 3 resources) so any MCP-compatible client can use agence's governance layer. Agence also acts as an MCP client — consuming tools from external MCP servers.
 
 ---
 
-## 🎯 Command Reference
+## Command Reference
 
 | Prefix | Mode | Example | Use When |
 |---|---|---|---|
@@ -222,148 +191,86 @@ The `^init` command checks and reports `@` symlink status. If missing, it tells 
 
 ---
 
-## 🤖 Agent Roster
+## Agent Roster
 
-| Agent | Type | Best For | Model |
-|---|---|---|---|
-| Agent | Type | Best For | Model |
-|---|---|---|---|
-| `@ralph` | **Loop** | Autonomous iteration with backpressure | Claude Sonnet |
-| `@sonya` | Persona | Architecture, code review | Claude Sonnet |
-| `@claudia` | Persona | Deep reasoning, critical decisions | Claude Opus |
-| `@aiko` | Persona | Fast analysis, cheap queries | Claude Haiku |
-| `@chad` | Persona | DevOps, infra, CI/CD | GPT-4o |
-| `@linus` | Persona | Harsh code review (Torvalds-inspired) | Claude Sonnet |
-| `@feynman` | Persona | Explainer, teaching | Claude Sonnet |
-| `@aleph` | Persona | Red team, security analysis | Claude Sonnet |
-| `@claude` | **Tool** | Claude Code CLI (headless spawn) | Anthropic |
-| `@aider` | **Tool** | Code patches, git diffs | OpenRouter/local |
-| `@pilot` | **Tool** | GitHub Copilot CLI | GitHub Copilot |
-| `@aish` | **Tool** | Windows shell, Azure CLI | AI Shell |
-| `@peers` | **Ensemble** | 3-LLM weighted consensus | Claude+GPT+Gemini |
-| `@pair` | **Ensemble** | 2-LLM lightweight consensus | Claude+GPT |
+| Agent | Type | Best For |
+|---|---|---|
+| `@ralph` | **Loop** | Autonomous iteration with backpressure |
+| `@sonya` | Persona | Architecture, code review |
+| `@claudia` | Persona | Deep reasoning, critical decisions |
+| `@chad` | Persona | DevOps, infra, CI/CD |
+| `@aleph` | Persona | Red team, security analysis |
+| `@claude` | **Tool** | Claude Code CLI (headless spawn) |
+| `@aider` | **Tool** | Code patches, git diffs |
+| `@pilot` | **Tool** | GitHub Copilot CLI |
+| `@peers` | **Ensemble** | 3-LLM weighted consensus |
+| `@pair` | **Ensemble** | 2-LLM lightweight consensus |
 
-### Dot-notation (model/binary override)
+Override models with dot-notation: `@ralph.gpt4o`, `@sonya.opus`, `@ralph.aider`
+
+---
+
+## Governance
+
+Agence uses a 5-tier command policy. The guard runs as a **separate process** — agents cannot bypass their own policy.
+
+| Tier | Gate | Example |
+|---|---|---|
+| T0 | Auto-execute | `git status`, `ls`, `cat` |
+| T1 | Logged | `git add`, `git commit` |
+| T2 | Human approval | `git push`, `git reset` |
+| T3 | Blocked | `rm -rf`, `chmod 777` |
+| T4 | Never | Force push main, drop DB |
+
+Unknown commands default to T2. **Fail-closed.** 120+ rules across git, GitHub CLI, AWS, Terraform, and shell.
+
+All decisions logged to `nexus/.ailedger` — append-only, Merkle-chained, HMAC-signed.
+
+See [SECURITY.md](SECURITY.md) for full security architecture, red-team findings, and disclosure timeline.
+
+---
+
+## Swarm (agentd)
 
 ```bash
-@ralph.gpt4o          # Ralph loop using GPT-4o instead of default Sonnet
-@ralph.aider          # Ralph loop wrapping aider CLI instead of claude
-@sonya.opus           # Sonya persona with Opus model
-@haiku.flash          # Haiku persona with Gemini Flash
+agentd start ralph claude aider   # Launch 3 agents in tmux
+agentd tangent create fix-auth    # Isolated worktree + container
+agentd inject fix-auth "run tests"  # Send command via socat socket
+agentd status                     # View all agents + tangents
 ```
+
+Each tangent gets: isolated git worktree, optional Docker container (`--cap-drop ALL`, `--read-only`, `--no-new-privileges`), socat socket for IPC, tmux pane for observability.
 
 ---
 
-## 🔄 How Sessions Work
+## Tests
 
-**Before agence:**
-```
-Session 1: Agent works on OAuth2 → context lost at end
-Session 2: Start over, re-explain everything → wasted time
+```bash
+bun test                          # Full suite
 ```
 
-**With agence:**
-```
-Session 1: agence ^save "OAuth2: done token validation, next: refresh flow"
-Session 2: agence ^resume → agent picks up exactly where you left off
-         or: agence ^handoff @sonya → different agent, full context
-```
+**361 tests**, 893 assertions, 0 failures:
+
+| Suite | Tests | Coverage |
+|---|---|---|
+| `guard.test.ts` | 132 | Command gate, tier escalation, eval safety |
+| `security-hardening.test.ts` | 105 | HMAC, signal forgery, injection prevention, SEC-010/012/013 |
+| `memory.test.ts` | 62 | COGNOS 3-store: retain/recall/cache/forget/promote/distill |
+| `peers-dispatch.test.ts` | 53 | Peer consensus, mixed routing |
+| `mcp.test.ts` | 9 | MCP tool/resource surface verification |
 
 ---
 
-## 🔐 Governance Model
-
-Agence uses a 5-tier command policy (`codex/AIPOLICY.yaml`):
-
-| Tier | Level | Example Commands | Gate |
-|---|---|---|---|
-| T0 | Free | `git status`, `git log` | None |
-| T1 | Soft confirm | `git add`, `git commit` | Logged |
-| T2 | Hard confirm | `git push`, `git reset` | Human approval |
-| T3 | Restricted | `git clean`, `rm -rf` | Explicit flag required |
-| T4 | Blocked | Force push to main, drop DB | Never without override |
-
-All decisions are logged to `nexus/.ailedger` (local, gitignored, append-only).
-
----
-
-### AIPOLICY.yml 
-Agence implements a universal tiered agentic security policy by design.  This uses EBNF grammar rules and presets to determine safe (whitelist) , unsafe (blacklist), and nuanced (greylist) commands needing human approval. 
-
-
-### aido 
-While I now know that the aido name is not unique, in agence it is something different. at its base in agence aido is like the oppposite of sudo . Where sudo aims to execute with privilege , aido aims to execute with the least privilege.  It allows command whitelists, block command blacklists, and implements a human prompt escalation for greylists where human permission is required. 
-
---- 
-## The Agence Lexicon
-
-### COGNOS foundation
-Agence is built on a foundational architecture with 4 core pillars:
-
-CODEX: This forms the stronng and immutable governance layer of agence. It contains the Laws of Agentic : Laws, principles rules, as well as the AIPOLICY.
-
-KNOWLEDGE: (`knowledge/`) This is the unified knowledge layer. It contains team-shared derived world knowledge, org-specific code references (with AST chunking memory index), RAG sources (.md and .json files indexed via Dewey-Decimal-like formtags), architecture docs, lessons, and plans — all committed to git and selectively routed via `@` symlinks. External sources in knowledge are distinct from DWM so we don't assume truth unless gated by a human.
-
-NEXUS:  This is the local state machine. It is intentionally not shared to the shard.  Agenst states are preserved vi a mix of tmux pipe-pan and script typescript as fallback. This allows for full agentic session view, session audits and vene session replay. 
-
-ORGANIC:  This is the SWARM or Orchestration layer. This contains our unique matrix-based task and workflow and project system. It also includes the Shard based team shared dahsboards to view these. In time this will be more sophisticated. But the general idea is that each shard head becomes a git based dashboard into the state of all the tasks, workflows, projects. 
-
-Knowledge is gated by routing rules — you decide where and how to share. This enforces a compromise between sharing and data leakage.
-
-### Memory stores
-
-3 memory stores: **shared** (`knowledge/@/memory/shared.jsonl`), **private** (`knowledge/private/memory/private.jsonl`), **working** (`nexus/memory/working.jsonl`).
-
-### Other layers: 
-
-PRIVATE: (`knowledge/private/`) This is the intentionally private, local-only knowledge layer. It is gitignored and never shared. Useful for strategic vision, personal todos, and personal notes.
-
-WORKING: (`nexus/memory/working.jsonl`) This is a fast-access, ephemeral memory cache. It is intended to be an index that can be regenerated on the fly from canonical and persistent knowledge. This bit is still in development and not fully tested but as our datasets grow this will become important.
-
-
-
-## 📚 Documentation
+## Documentation
 
 | Doc | What it covers |
 |---|---|
-| [Architecture](knowledge/l-agence.org/docs/ARCHITECTURE.md) | How agence works end-to-end |
+| [Architecture](knowledge/l-agence.org/docs/ARCHITECTURE.md) | End-to-end system design |
 | [Swarm](knowledge/l-agence.org/docs/SWARM.md) | agentd, tangents, tmux model |
-| [Routing](codex/agents/ROUTING.md) | LLM provider selection, tiers, blast_radius |
-| [Agents](codex/agents/AGENTS.md) | Full agent roster and system prompts |
 | [Commands](bin/COMMANDS.md) | Complete CLI reference |
-| [Principles](codex/PRINCIPLES.md) | Core maxims (why) |
-| [Laws](codex/LAWS.md) | Hard constraints (must not) |
-| [Rules](codex/RULES.md) | Best practices (should) |
-
----
-
-## 🧪 Tests
-
-```bash
-# Run full suite
-AIDO_NO_VERIFY=1 tests/lib/shellspec/shellspec --shell bash tests/unit/agence_spec.sh
-```
-
-```bash
-# Run full test suite (bun:test)
-bun run test
-```
-
-> ✅ **Current status (v0.7.0-alpha)**: **321 tests**, **0 failures**, 822 expect() calls.
->
-> | Suite | Tests | Coverage |
-> |---|---|---|
-> | `guard.test.ts` | 132 | Command gate, tier escalation, AIPOLICY parsing |
-> | `security-hardening.test.ts` | 64 | HMAC signing, signal forgery, SEC-010 regressions |
-> | `memory.test.ts` | 62 | COGNOS 3-store: retain/recall/cache/forget/promote/distill |
-> | `peers-dispatch.test.ts` | 53 | Peer consensus, mixed routing, bin/loop |
-> | `mcp.test.ts` | 9 | MCP tool/resource surface verification |
-> | `guard-roundtrip.test.ts` | 9 | Integration: guard→shell eval, socket→guard flow |
->
-> Legacy shellspec tests also available:
-> ```bash
-> AIDO_NO_VERIFY=1 tests/lib/shellspec/shellspec --shell bash tests/unit/agence_spec.sh
-> ```
+| [Security](SECURITY.md) | TCB, red-team findings, disclosure timeline |
+| [Tutorial](docs/TUTORIAL.md) | Getting started walkthrough |
+| [Setup](docs/SETUP.md) | Detailed installation guide |
 
 ---
 
@@ -373,3 +280,6 @@ MIT + Commons Clause — free to use, modify, and self-host.
 Commercial redistribution requires a separate agreement.  
 See [LICENSE.md](LICENSE.md).
 
+---
+
+*Built by Stephane Korning. Hardened by 5 red-team cycles. Governed by its own CODEX.*

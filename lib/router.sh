@@ -424,6 +424,31 @@ $(head -n "$_lim" "$file")
     _inject_codex_file "Agence Rules (best practices)"                  "$codex_dir/RULES.md"
   fi
 
+  # AGENCE.md convention: inject project-level instructions from git repo root
+  # SEC-014: Reject path traversal in GIT_ROOT, reject symlinks, quote content safely
+  local _agence_md=""
+  local _git_root="${GIT_ROOT:-$(pwd)}"
+  # SEC-014: Block .. in path
+  if [[ "$_git_root" == *..* ]]; then
+    : # skip — path traversal attempt
+  elif [[ -f "$_git_root/AGENCE.md" && ! -L "$_git_root/AGENCE.md" ]]; then
+    _agence_md="$_git_root/AGENCE.md"
+  elif [[ -f "$_git_root/.agence.md" && ! -L "$_git_root/.agence.md" ]]; then
+    _agence_md="$_git_root/.agence.md"
+  fi
+  if [[ -n "$_agence_md" ]]; then
+    local _agence_content
+    # SEC-014: Read content into variable safely (no globbing/splitting on assignment)
+    _agence_content="$(head -c 32768 "$_agence_md" | tr -d '\000')"
+    # SEC-015: Strip boundary marker strings from content (prevent marker injection)
+    _agence_content="${_agence_content//\[PROJECT-INSTRUCTIONS-BEGIN\]/[PROJECT-INSTRUCTIONS-BEGIN (stripped)]}"
+    _agence_content="${_agence_content//\[PROJECT-INSTRUCTIONS-END\]/[PROJECT-INSTRUCTIONS-END (stripped)]}"
+    # SEC-015: Use boundary markers (matching skill.ts format) to delimit untrusted content
+    prompt+=$'\n[PROJECT-INSTRUCTIONS-BEGIN]\n'
+    prompt+="${_agence_content}"
+    prompt+=$'\n[PROJECT-INSTRUCTIONS-END]\n\n'
+  fi
+
   prompt+="Respond clearly and concisely. Obey the Laws above without exception. Apply Principles and Rules where relevant."
   echo "$prompt"
 }

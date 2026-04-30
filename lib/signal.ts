@@ -359,6 +359,118 @@ function doInstruct(agent: string, text: string): number {
   return 0;
 }
 
+// ^input — Send input to an agent tangent via agentd socat socket.
+// Unlike ^inject (tmux send-keys), this uses the socket IPC path
+// which respects the tangent's isolation boundary (Docker or tmux).
+function doInput(agent: string, text: string): number {
+  const cleanAgent = agent.replace(/^@/, "");
+
+  // SEC-014: Validate agent name (prevent path traversal via ../../../ etc)
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$/.test(cleanAgent)) {
+    process.stderr.write(`[signal] SEC-014: rejected invalid agent/tangent name: ${agent}\n`);
+    return 1;
+  }
+
+  // SEC-014: Guard gate — classify the text being sent (if agentic caller)
+  if (process.env.AI_ROLE === "agentic") {
+    const guardTs = join(AGENCE_ROOT, "lib/guard.ts");
+    if (existsSync(guardTs)) {
+      const gResult = spawnSync("bun", ["run", guardTs, "classify", text], {
+        cwd: AGENCE_ROOT, timeout: 10_000,
+        env: { ...process.env, AGENCE_ROOT },
+      });
+      try {
+        const decision = JSON.parse(gResult.stdout?.toString("utf-8") ?? "{}");
+        if (decision.action === "deny") {
+          process.stderr.write(`[signal] SEC-014: ^input blocked by guard (${decision.tier} deny): ${text.slice(0, 60)}\n`);
+          return 1;
+        }
+      } catch {
+        process.stderr.write(`[signal] SEC-014: ^input blocked — guard unavailable (fail-closed)\n`);
+        return 1;
+      }
+    }
+  }
+
+  const socketsDir = join(AGENCE_ROOT, "nexus", "agentd", "sockets");
+  const sockPath = join(socketsDir, `${cleanAgent}.sock`);
+
+  // SEC-014: Verify resolved socket path stays within sockets dir
+  const resolvedSock = require("path").resolve(sockPath);
+  const resolvedDir = require("path").resolve(socketsDir);
+  if (!resolvedSock.startsWith(resolvedDir)) {
+    process.stderr.write(`[signal] SEC-014: socket path traversal blocked: ${sockPath}\n`);
+    return 1;
+  }
+
+  if (!existsSync(sockPath)) {
+    process.stderr.write(`[signal] ^input: no socket for ${agent} at ${sockPath}\n`);
+    process.stderr.write(`  Is the tangent running? Try: agentd tangent list\n`);
+    return 1;
+  }
+
+  // Send via socat to the tangent's socket
+  const result = spawnSync("socat", ["-", `UNIX-CONNECT:${sockPath}`], {
+    input: text + "\n",
+    timeout: 10_000,
+    encoding: "utf-8",
+  });
+
+  if (result.status !== 0) {
+    process.stderr.write(`[signal] ^input: socat failed: ${result.stderr || "connection refused"}\n`);
+    return 1;
+  }
+
+  const envelope: SignalEnvelope = {
+    type: "input", from: "human", to: agent,
+    payload: text, timestamp: isoNow(), id: signalId(),
+  };
+  fileWriteSignal(envelope); // audit trail
+
+  const response = (result.stdout || "").trim();
+  if (response) {
+    process.stdout.write(response + "\n");
+  }
+  process.stderr.write(`[signal] ^input → ${agent} via socket: ${text.slice(0, 60)}\n`);
+  return 0;
+}
+
+// ^stream — Capture live output from an agent's tmux pane.
+// Returns the current pane content (last N lines). Non-blocking.
+// This is the streaming primitive — callers can poll to get incremental output.
+function doStream(agent: string, lines: number = 50): number {
+  const cleanAgent = agent.replace(/^@/, "");
+
+  // SEC-015: Validate agent name (same regex as doInput)
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$/.test(cleanAgent)) {
+    process.stderr.write(`[signal] SEC-015: rejected invalid agent/tangent name for stream: ${agent}\n`);
+    return 1;
+  }
+
+  const session = process.env.AGENCE_TMUX_SESSION || "agence";
+
+  // Try tangent pane first, then agent window
+  const targets = [
+    `${session}:@${cleanAgent}`,
+    `${session}:${cleanAgent}`,
+  ];
+
+  for (const paneTarget of targets) {
+    const result = spawnSync("tmux", [
+      "capture-pane", "-t", paneTarget, "-p", "-S", `-${lines}`,
+    ], { encoding: "utf-8", timeout: 5_000 });
+
+    if (result.status === 0 && result.stdout) {
+      process.stdout.write(result.stdout);
+      return 0;
+    }
+  }
+
+  process.stderr.write(`[signal] ^stream: no pane found for ${agent}\n`);
+  process.stderr.write(`  Tried: ${targets.join(", ")}\n`);
+  return 1;
+}
+
 // UPLINK: Agent → Human (guard-gated)
 
 // ^ask — Focused boolean authorization (quick y/n with session ref)
@@ -652,6 +764,20 @@ switch (cmd) {
     process.exit(doInstruct(agent, text));
     break;
   }
+  case "input": {
+    const agent = args[0];
+    const text = args.slice(1).join(" ");
+    if (!agent || !text) { console.error("Usage: airun signal input <agent|tangent> <text...>"); process.exit(2); }
+    process.exit(doInput(agent, text));
+    break;
+  }
+  case "stream": {
+    const agent = args[0];
+    if (!agent) { console.error("Usage: airun signal stream <agent|tangent> [lines]"); process.exit(2); }
+    const lines = parseInt(args[1] || "50", 10);
+    process.exit(doStream(agent, lines));
+    break;
+  }
   case "ask": {
     const summary = args.join(" ");
     if (!summary) { console.error("Usage: airun signal ask <summary...>"); process.exit(2); }
@@ -703,6 +829,8 @@ switch (cmd) {
 Human Control Plane (downlink):
   inject <agent> <text...>      Send text to agent pane (tmux send-keys)
   instruct <agent> <text...>    Write instructions file, notify agent
+  input <agent> <text...>       Send input via agentd socket (tangent-aware)
+  stream <agent> [lines]        Capture live output from agent pane (default: 50 lines)
   
 Agent Signal Plane (uplink):
   ask <summary...>              BLOCKING boolean auth (y/n, 15s, session ref)

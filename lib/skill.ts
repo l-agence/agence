@@ -34,6 +34,7 @@ const AGENCE_ROOT = process.env.AGENCE_ROOT
   || process.env.AI_ROOT
   || join(import.meta.dir, "..");
 
+const BUN = process.env.BUN_PATH || "bun";
 const ORG = resolveOrg(AGENCE_ROOT);
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -264,6 +265,46 @@ const MAX_PERSONA_SIZE = 64 * 1024;
 
 // SEC-006: Maximum skill.md file size (128KB)
 const MAX_SKILL_MD_SIZE = 128 * 1024;
+
+// Maximum AGENCE.md project instruction file size (32KB)
+const MAX_PROJECT_INSTRUCTIONS_SIZE = 32 * 1024;
+
+// ─── Project Instructions Loader (AGENCE.md convention) ──────────────────────
+// Load project-level instructions from AGENCE.md at the git repo root.
+// This lets projects declare how agence should behave in their context.
+// Lookup order: AGENCE.md, .agence.md (both at GIT_ROOT, not AGENCE_ROOT).
+
+function loadProjectInstructions(): string | undefined {
+  const gitRoot = process.env.GIT_ROOT || process.env.PWD || process.cwd();
+  // SEC-014: Reject GIT_ROOT containing path traversal components
+  if (gitRoot.includes("..") || !resolve(gitRoot).startsWith("/")) {
+    process.stderr.write(`[skill] SEC-014: rejected GIT_ROOT with path traversal: ${gitRoot}\n`);
+    return undefined;
+  }
+  for (const name of ["AGENCE.md", ".agence.md"]) {
+    const filePath = join(gitRoot, name);
+    // Verify the resolved path stays within gitRoot (no symlink escape)
+    if (!resolve(filePath).startsWith(resolve(gitRoot))) continue;
+    // SEC-014: Reject symlinks (prevent symlink-to-arbitrary-file attacks)
+    try {
+      const stat = require("fs").lstatSync(filePath);
+      if (stat.isSymbolicLink()) {
+        process.stderr.write(`[skill] SEC-014: rejected symlinked AGENCE.md: ${filePath}\n`);
+        continue;
+      }
+    } catch { continue; }
+    if (existsSync(filePath)) {
+      const content = readFileSync(filePath, "utf-8");
+      if (content.length > MAX_PROJECT_INSTRUCTIONS_SIZE) {
+        process.stderr.write(`[skill] AGENCE.md exceeds size limit (${content.length} > ${MAX_PROJECT_INSTRUCTIONS_SIZE}), truncated\n`);
+        return content.slice(0, MAX_PROJECT_INSTRUCTIONS_SIZE);
+      }
+      process.stderr.write(`[skill] Loaded project instructions from ${name}\n`);
+      return content;
+    }
+  }
+  return undefined;
+}
 
 // ─── SKILL.md Loader ─────────────────────────────────────────────────────────
 // SKILL-008: Skills live at synthetic/skills/ (root, not org-scoped).
@@ -928,6 +969,16 @@ async function runSkill(
     systemPrompt += `\n\n[SKILL-REF-BEGIN skill=${skillName}]\n${skillMd}\n[SKILL-REF-END]`;
   }
 
+  // AGENCE.md convention: inject project-level instructions
+  const projectInstructions = loadProjectInstructions();
+  if (projectInstructions) {
+    // SEC-015: Strip boundary marker strings from content to prevent marker injection
+    const sanitized = projectInstructions
+      .replace(/\[PROJECT-INSTRUCTIONS-BEGIN\]/g, "[PROJECT-INSTRUCTIONS-BEGIN (stripped)]")
+      .replace(/\[PROJECT-INSTRUCTIONS-END\]/g, "[PROJECT-INSTRUCTIONS-END (stripped)]");
+    systemPrompt += `\n\n[PROJECT-INSTRUCTIONS-BEGIN]\n${sanitized}\n[PROJECT-INSTRUCTIONS-END]`;
+  }
+
   // MEM-003: Inject relevant memory context for memory-aware skills
   const memoryContext = buildMemoryContext(skillName, query);
   if (memoryContext) {
@@ -1080,6 +1131,28 @@ async function main(): Promise<number> {
 
   if (args[0] === "list") {
     return cmdList();
+  }
+
+  // MCP client delegation: airun skill mcp <subcommand> [args...]
+  if (args[0] === "mcp") {
+    const mcpArgs = args.slice(1);
+    const result = spawnSync(BUN, ["run", join(AGENCE_ROOT, "lib", "mcp-client.ts"), ...mcpArgs], {
+      cwd: AGENCE_ROOT,
+      env: { ...process.env, AGENCE_ROOT },
+      stdio: "inherit",
+    });
+    return result.status ?? 1;
+  }
+
+  // Sequent (tournament tangents) delegation: airun skill sequent <subcommand> [args...]
+  if (args[0] === "sequent") {
+    const seqArgs = args.slice(1);
+    const result = spawnSync(BUN, ["run", join(AGENCE_ROOT, "lib", "sequent.ts"), ...seqArgs], {
+      cwd: AGENCE_ROOT,
+      env: { ...process.env, AGENCE_ROOT },
+      stdio: "inherit",
+    });
+    return result.status ?? 1;
   }
 
   const skillName = args[0];

@@ -1024,3 +1024,218 @@ describe("SEC-013: H7 — heredoc operator blocked", () => {
     expect(c.action).toBe("deny");
   });
 });
+
+// ─── v0.9.2: ^input and ^stream signal commands ─────────────────────────────
+
+describe("signal ^input and ^stream commands", () => {
+
+  test("signal.ts has doInput function", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/signal.ts"), "utf-8");
+    expect(src).toContain("function doInput");
+    expect(src).toContain("socat");
+    expect(src).toContain("UNIX-CONNECT");
+  });
+
+  test("signal.ts has doStream function", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/signal.ts"), "utf-8");
+    expect(src).toContain("function doStream");
+    expect(src).toContain("capture-pane");
+  });
+
+  test("^input requires agent and text args", () => {
+    const r = runSignal(["input"]);
+    expect(r.exitCode).toBe(2);
+  });
+
+  test("^input with missing socket returns 1 (not crash)", () => {
+    const r = runSignal(["input", "@nonexistent-agent", "test input"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("no socket");
+  });
+
+  test("^stream requires agent arg", () => {
+    const r = runSignal(["stream"]);
+    expect(r.exitCode).toBe(2);
+  });
+
+  test("^stream with no tmux session returns 1 (not crash)", () => {
+    const r = runSignal(["stream", "@nonexistent"]);
+    expect(r.exitCode).toBe(1);
+  });
+
+  test("^input writes audit trail envelope", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/signal.ts"), "utf-8");
+    // doInput must call fileWriteSignal for audit
+    const inputFn = src.slice(src.indexOf("function doInput"));
+    expect(inputFn).toContain("fileWriteSignal");
+  });
+
+  test("signal help shows input and stream commands", () => {
+    const r = runSignal(["help"]);
+    expect(r.stderr).toContain("input");
+    expect(r.stderr).toContain("stream");
+  });
+});
+
+// ─── SEC-014: ^break findings fixed ─────────────────────────────────────────
+
+describe("SEC-014: AGENCE.md path traversal hardening", () => {
+
+  test("skill.ts rejects GIT_ROOT containing ..", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/skill.ts"), "utf-8");
+    expect(src).toContain("SEC-014");
+    expect(src).toContain('includes("..")');
+  });
+
+  test("skill.ts rejects symlinked AGENCE.md", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/skill.ts"), "utf-8");
+    expect(src).toContain("isSymbolicLink");
+    expect(src).toContain("rejected symlinked AGENCE.md");
+  });
+
+  test("router.sh rejects .. in GIT_ROOT", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/router.sh"), "utf-8");
+    expect(src).toContain("SEC-014");
+    expect(src).toContain("..*");
+  });
+
+  test("router.sh rejects symlinked AGENCE.md", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/router.sh"), "utf-8");
+    expect(src).toContain("! -L");
+  });
+
+  test("router.sh strips null bytes from AGENCE.md content", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/router.sh"), "utf-8");
+    expect(src).toContain("tr -d");
+    expect(src).toContain("\\000");
+  });
+});
+
+describe("SEC-014: ^input guard gate + agent name validation", () => {
+
+  test("doInput validates agent name with regex", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/signal.ts"), "utf-8");
+    const doInput = src.substring(src.indexOf("function doInput"));
+    expect(doInput).toContain("SEC-014");
+    expect(doInput).toContain("/^[a-zA-Z0-9]");
+  });
+
+  test("doInput has guard gate for agentic callers", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/signal.ts"), "utf-8");
+    const doInput = src.substring(src.indexOf("function doInput"));
+    expect(doInput).toContain("AI_ROLE");
+    expect(doInput).toContain("guard.ts");
+    expect(doInput).toContain("classify");
+  });
+
+  test("doInput verifies socket path stays within sockets dir", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/signal.ts"), "utf-8");
+    const doInput = src.substring(src.indexOf("function doInput"));
+    expect(doInput).toContain("startsWith(resolvedDir)");
+    expect(doInput).toContain("socket path traversal blocked");
+  });
+
+  test("^input rejects path traversal in agent name", () => {
+    const r = runSignal(["input", "../../../etc/passwd", "test"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("SEC-014");
+  });
+
+  test("^input rejects agent name with special chars", () => {
+    const r = runSignal(["input", "agent;id", "test"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("SEC-014");
+  });
+
+  test("^input rejects agent name with dots (path separator attempt)", () => {
+    const r = runSignal(["input", "agent.evil.sock", "test"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("SEC-014");
+  });
+});
+
+// ─── SEC-015: ^hack findings fixed ──────────────────────────────────────────
+
+describe("SEC-015: ^stream agent name validation (H1/H2)", () => {
+
+  test("doStream validates agent name with regex", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/signal.ts"), "utf-8");
+    const doStream = src.substring(src.indexOf("function doStream"));
+    expect(doStream).toContain("SEC-015");
+    expect(doStream).toContain("/^[a-zA-Z0-9]");
+  });
+
+  test("^stream rejects path traversal in agent name", () => {
+    const r = runSignal(["stream", "../../../etc"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("SEC-015");
+  });
+
+  test("^stream rejects agent name with special chars", () => {
+    const r = runSignal(["stream", "evil;id"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("SEC-015");
+  });
+
+  test("^stream rejects agent name with dots", () => {
+    const r = runSignal(["stream", "agent.evil.sock"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("SEC-015");
+  });
+});
+
+describe("SEC-015: AI_ROLE readonly in aibash (H9)", () => {
+
+  test("aibash makes AI_ROLE readonly", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/aibash"), "utf-8");
+    expect(src).toContain("readonly AI_ROLE");
+    expect(src).toContain("SEC-015");
+  });
+
+  test("aibash sets AI_ROLE before readonly", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "bin/aibash"), "utf-8");
+    const roleExport = src.indexOf("export AI_ROLE=");
+    const roleReadonly = src.indexOf("readonly AI_ROLE");
+    expect(roleExport).toBeGreaterThan(-1);
+    expect(roleReadonly).toBeGreaterThan(roleExport);
+  });
+});
+
+describe("SEC-015: MCP response size + timeout (H4/H18)", () => {
+
+  test("callMcpTool has response size limit", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/mcp-client.ts"), "utf-8");
+    expect(src).toContain("MAX_RESPONSE_SIZE");
+    expect(src).toContain("1024 * 1024");
+    expect(src).toContain("truncated");
+  });
+
+  test("callMcpTool has call timeout via AbortController", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/mcp-client.ts"), "utf-8");
+    expect(src).toContain("AbortController");
+    expect(src).toContain("CALL_TIMEOUT");
+    expect(src).toContain("timed out");
+  });
+});
+
+describe("SEC-015: AGENCE.md boundary markers + marker stripping (H7/H8)", () => {
+
+  test("router.sh uses PROJECT-INSTRUCTIONS boundary markers", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/router.sh"), "utf-8");
+    expect(src).toContain("PROJECT-INSTRUCTIONS-BEGIN");
+    expect(src).toContain("PROJECT-INSTRUCTIONS-END");
+    expect(src).toContain("SEC-015");
+  });
+
+  test("router.sh strips marker strings from AGENCE.md content", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/router.sh"), "utf-8");
+    expect(src).toContain("(stripped)");
+  });
+
+  test("skill.ts strips marker strings from project instructions content", () => {
+    const src = readFileSync(join(AGENCE_ROOT, "lib/skill.ts"), "utf-8");
+    const injection = src.indexOf("PROJECT-INSTRUCTIONS-BEGIN (stripped)");
+    expect(injection).toBeGreaterThan(-1);
+    expect(src).toContain("SEC-015");
+  });
+});

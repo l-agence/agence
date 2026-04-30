@@ -854,6 +854,11 @@ case "${1:-help}" in
         ;;
     esac
     ;;
+  sequent)
+    # Tournament tangents: delegate to lib/sequent.ts
+    shift
+    exec bun run "${AGENCE_ROOT}/lib/sequent.ts" "$@"
+    ;;
   inject)  shift; cmd_inject "$@" ;;
   _socket_handler) shift; cmd__socket_handler "$@" ;;
   _driver_logs_pane)
