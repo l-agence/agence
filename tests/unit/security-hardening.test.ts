@@ -1298,8 +1298,9 @@ describe("SEC-017 HACK-03: task_id and agent_name injection hardening", () => {
 
   test("tangent create accepts valid hex8 task_id (fails later at session check)", () => {
     const r = runAgentd(["tangent", "create", "--task", "a1b2c3d4", "a1b2c3d4-0", "copilot"]);
-    // Should NOT fail with "Invalid task ID" — will fail later (no tmux session)
+    // Should NOT fail with "Invalid task ID" — validation passes; fails downstream at tmux/socat check
     expect(r.stderr).not.toContain("Invalid task ID");
+    expect(r.exitCode).not.toBe(0); // non-zero because tmux/socat not available in CI
   });
 
   // ── _validate_agent_name ─────────────────────────────────────────────────
@@ -1331,7 +1332,9 @@ describe("SEC-017 HACK-03: task_id and agent_name injection hardening", () => {
   test("tangent create accepts valid agent names (fails later at session check)", () => {
     for (const name of ["copilot", "claude", "aider", "my-agent", "agent_1"]) {
       const r = runAgentd(["tangent", "create", "a1b2c3d4-0", name]);
+      // Should NOT fail with "Invalid agent name" — validation passes; fails downstream at tmux/socat check
       expect(r.stderr).not.toContain("Invalid agent name");
+      expect(r.exitCode).not.toBe(0); // non-zero because tmux/socat not available in CI
     }
   });
 
