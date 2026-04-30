@@ -1248,7 +1248,12 @@ describe("SEC-017 HACK-03: task_id and agent_name injection hardening", () => {
   function runAgentd(args: string[]): { stdout: string; stderr: string; exitCode: number } {
     const result = Bun.spawnSync([join(AGENCE_ROOT, "bin", "agentd"), ...args], {
       cwd: AGENCE_ROOT,
-      env: { ...process.env, AGENCE_ROOT, PATH: process.env.PATH ?? "/usr/bin:/bin" },
+      env: {
+        ...process.env,
+        AGENCE_ROOT,
+        PATH: process.env.PATH ?? "/usr/bin:/bin",
+        AGENTD_SESSION: `sec017-test-${process.pid}-${Date.now()}`,
+      },
       timeout: 10_000,
     });
     return {
