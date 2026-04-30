@@ -810,7 +810,7 @@ router_call_copilot() {
   _router_call_oai_compat \
     "https://api.githubcopilot.com" "${_copilot_token}" \
     "$system_prompt" "$user_message" "$model" "$max_tokens" \
-    "Editor-Version: agence/0.3" "copilot"
+    "Editor-Version: agence/1.0.0" "copilot"
 }
 
 router_call_cline() {

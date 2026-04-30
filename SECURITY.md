@@ -71,7 +71,7 @@ Human↔agent communication via `nexus/signals/` uses:
 
 ---
 
-## Known Limitations (v0.8.0-alpha)
+## Known Limitations (v1.0.0)
 
 These are documented here for transparency. They are tracked via the perpetual security improvement loop.
 

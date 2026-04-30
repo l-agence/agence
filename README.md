@@ -52,9 +52,9 @@ Unknown commands default to T2. Not T0. **Fail-closed.** The guard runs as a sep
 | | |
 |---|---|
 | **16,258** | Lines of code (9,939 TypeScript + 6,319 bash) |
-| **361** | Tests with 893 assertions |
-| **237** | Security-specific tests (132 guard + 105 hardening) |
-| **5** | Red-team cycles completed (SEC-008 through SEC-013) |
+| **413** | Tests with 989 assertions |
+| **266** | Security-specific tests (132 guard + 134 hardening) |
+| **7** | Red-team cycles completed (SEC-008 through SEC-015) |
 | **25** | Orchestration skills (`^fix`, `^review`, `^hack`, `^peers`, `^ken`...) |
 | **18** | Registered agents (10 persona, 5 tool, 1 loop, 2 ensemble) |
 | **12** | LLM providers (Anthropic, OpenAI, Azure, Google, Mistral, Groq, Ollama...) |
@@ -249,15 +249,17 @@ Each tangent gets: isolated git worktree, optional Docker container (`--cap-drop
 bun test                          # Full suite
 ```
 
-**361 tests**, 893 assertions, 0 failures:
+**413 tests**, 989 assertions, 0 failures:
 
 | Suite | Tests | Coverage |
 |---|---|---|
 | `guard.test.ts` | 132 | Command gate, tier escalation, eval safety |
-| `security-hardening.test.ts` | 105 | HMAC, signal forgery, injection prevention, SEC-010/012/013 |
+| `security-hardening.test.ts` | 134 | HMAC, signal forgery, injection prevention, SEC-010/012/013/014/015 regressions |
 | `memory.test.ts` | 62 | COGNOS 3-store: retain/recall/cache/forget/promote/distill |
 | `peers-dispatch.test.ts` | 53 | Peer consensus, mixed routing |
-| `mcp.test.ts` | 9 | MCP tool/resource surface verification |
+| `mcp-client.test.ts` | 10 | MCP client guard-gating, env sanitization, config validation |
+| `mcp.test.ts` | 10 | MCP tool/resource surface verification |
+| `sequent.test.ts` | 12 | Compilation, CLI dispatch, delegation |
 
 ---
 
