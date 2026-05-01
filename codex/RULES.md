@@ -1,4 +1,13 @@
-# CODEX: RULES
+3. watch.ts ↔ agentd Wiring — ✅ RESOLVED (c7a4771+)
+agentd tangent create now: (a) enables tmux pipe-pane to capture typescript log,
+(b) launches watch.ts tail in background with --signal and @error/@prompt/@complete patterns,
+(c) stores watch PID in nexus/watches/<id>.pid, (d) cleans up on tangent destroy.
+
+4. ^integrate MANUAL_VERIFY Flow — Output gap
+The ^integrate skill generates a JSON array of findings including status: "MANUAL_VERIFY" items that require human execution. There's no tooling to present, track, or ACK these outstanding items. They're just emitted to stdout. A nexus/manual-verify/ queue and a ^verify list command would close this.
+
+5. .airuns/ Task-Session Linkage — Audit gap
+SESSION-PERSISTENCE.md still marks .airuns/ as ⏳ placeholder. AIDO_TASK_ID env var isn't plumbed through from matrix claim → aibash → session metadata. Needed for "show me everything that ran during TASK-042."# CODEX: RULES
 
 **Prescriptive guidance and best practices for using Agence.**
 

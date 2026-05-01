@@ -704,7 +704,27 @@ cmd_tangent_create() {
     exit 1
   fi
 
-  # 5. Register in tangent registry
+  # 5. Pipe-pane + watch.ts background watcher
+  #    Captures tangent output to a typescript log and launches pattern watcher
+  #    so ^expect/^notify fire automatically from tangent activity.
+  local _watch_log_dir _watch_log _watch_pid_file watch_pid
+  _watch_log_dir="${AGENCE_ROOT}/nexus/.aisessions/$(date -u +%d)"
+  mkdir -p "$_watch_log_dir"
+  _watch_log="${_watch_log_dir}/${tangent_id}.typescript"
+  _watch_pid_file="${AGENCE_ROOT}/nexus/watches/${tangent_id}.pid"
+  mkdir -p "${AGENCE_ROOT}/nexus/watches"
+
+  # Enable tmux pipe-pane to capture tangent window output
+  tmux pipe-pane -t "${SESSION}:${window}" -o "cat >> ${_watch_log}"
+
+  # Launch watch.ts in background: tail the typescript log, fire signals on pattern match
+  bun run "${AGENCE_ROOT}/lib/watch.ts" tail "$_watch_log" \
+    --signal --agent "$agent" --pattern @error --pattern @prompt --pattern @complete \
+    > /dev/null 2>&1 &
+  watch_pid=$!
+  echo "$watch_pid" > "$_watch_pid_file"
+
+  # 6. Register in tangent registry
   local sock
   sock=$(_socket_path "$tangent_id")
   _tangent_register "$tangent_id" "$agent" "$worktree_path" "$sock" "$socat_pid" "$task_id"
@@ -714,6 +734,7 @@ cmd_tangent_create() {
   echo "  Socket:   $sock"
   echo "  Task:     $task_id"
   echo "  Worktree: $worktree_path"
+  echo "  Watch:    pid=$watch_pid log=${_watch_log}"
   echo "  Inject:   agentd inject $tangent_id <command>"
 }
 
@@ -741,20 +762,31 @@ print(t.get('pid',''))
 " 2>/dev/null)
   fi
 
-  # 1. Kill socat listener
+  # 1. Kill watch.ts background watcher
+  local _watch_pid_file="${AGENCE_ROOT}/nexus/watches/${tangent_id}.pid"
+  if [[ -f "$_watch_pid_file" ]]; then
+    local _watch_pid
+    _watch_pid=$(cat "$_watch_pid_file" 2>/dev/null)
+    if [[ -n "$_watch_pid" ]] && kill -0 "$_watch_pid" 2>/dev/null; then
+      kill "$_watch_pid" 2>/dev/null || true
+    fi
+    rm -f "$_watch_pid_file"
+  fi
+
+  # 2. Kill socat listener
   _socket_stop "$tangent_id" "$socat_pid"
 
-  # 2. Kill tmux window
+  # 3. Kill tmux window
   local window="@${tangent_id}"
   tmux kill-window -t "${SESSION}:${window}" 2>/dev/null
 
-  # 3. Destroy container (via driver)
+  # 4. Destroy container (via driver)
   _driver_destroy "$tangent_id"
 
-  # 4. Remove git worktree
+  # 5. Remove git worktree
   _worktree_destroy "$tangent_id"
 
-  # 5. Unregister
+  # 6. Unregister
   _tangent_unregister "$tangent_id"
 
   echo "[agentd] Tangent '$tangent_id' destroyed."

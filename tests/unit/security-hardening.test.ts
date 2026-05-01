@@ -1373,3 +1373,59 @@ describe("SEC-017 HACK-03: task_id and agent_name injection hardening", () => {
     expect(callIdx).toBeGreaterThan(defIdx);
   });
 });
+
+// ─── watch.ts ↔ agentd Integration ──────────────────────────────────────────
+
+describe("watch.ts ↔ agentd tangent wiring", () => {
+  const agentdSrc = readFileSync(join(AGENCE_ROOT, "bin", "agentd"), "utf-8");
+
+  test("cmd_tangent_create enables tmux pipe-pane for typescript capture", () => {
+    expect(agentdSrc).toContain('tmux pipe-pane -t "${SESSION}:${window}"');
+    expect(agentdSrc).toContain(".typescript");
+  });
+
+  test("cmd_tangent_create launches watch.ts tail in background", () => {
+    expect(agentdSrc).toContain('bun run "${AGENCE_ROOT}/lib/watch.ts" tail');
+    expect(agentdSrc).toContain("--signal");
+    expect(agentdSrc).toContain("--agent");
+    expect(agentdSrc).toContain("--pattern @error");
+  });
+
+  test("cmd_tangent_create stores watch PID in nexus/watches/", () => {
+    expect(agentdSrc).toContain("nexus/watches/${tangent_id}.pid");
+    expect(agentdSrc).toContain("watch_pid=$!");
+  });
+
+  test("cmd_tangent_destroy kills watch process and removes PID file", () => {
+    const destroySection = agentdSrc.slice(agentdSrc.indexOf("cmd_tangent_destroy()"));
+    expect(destroySection).toContain("nexus/watches/${tangent_id}.pid");
+    expect(destroySection).toContain('kill "$_watch_pid"');
+    expect(destroySection).toContain('rm -f "$_watch_pid_file"');
+  });
+
+  test("watch.ts compile check", () => {
+    const result = Bun.spawnSync(["bun", "build", "lib/watch.ts", "--no-bundle"], {
+      cwd: AGENCE_ROOT,
+    });
+    expect(result.exitCode).toBe(0);
+  });
+
+  test("watch.ts help exits 0", () => {
+    const result = Bun.spawnSync(["bun", "run", "lib/watch.ts", "help"], {
+      cwd: AGENCE_ROOT,
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.toString()).toContain("Pipe-pane");
+  });
+
+  test("watch.ts patterns command shows built-in library", () => {
+    const result = Bun.spawnSync(["bun", "run", "lib/watch.ts", "patterns"], {
+      cwd: AGENCE_ROOT,
+    });
+    expect(result.exitCode).toBe(0);
+    const out = result.stdout.toString();
+    expect(out).toContain("error");
+    expect(out).toContain("prompt");
+    expect(out).toContain("complete");
+  });
+});
