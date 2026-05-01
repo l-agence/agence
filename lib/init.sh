@@ -423,6 +423,17 @@ mode_init() {
       fi
       return $?
       ;;
+    "setup")
+      # Interactive onboarding wizard: agence ^setup [org|keys|recon|registry|project|status|help]
+      local _setup_ts="${AGENCE_ROOT}/lib/setup.ts"
+      if command -v bun &>/dev/null && [[ -f "$_setup_ts" ]]; then
+        bun run "$_setup_ts" $init_args
+      else
+        echo "Error: ^setup requires bun + lib/setup.ts" >&2
+        return 1
+      fi
+      return $?
+      ;;
     *)
       # ── Skill command dispatch ───────────────────────────────────────────
       # If init_cmd matches a known skill, route through lib/skill.ts
@@ -453,7 +464,7 @@ mode_init() {
       fi
 
       echo "Error: Unknown init command: $init_cmd" >&2
-      echo "Available: help, init, reload, install, save, learn, commit, push, session," >&2
+      echo "Available: help, init, reload, install, setup, save, learn, commit, push, session," >&2
       echo "           lesson, log, plan, todo, note, fault, issue, task, job, workflow, project," >&2
       echo "           swarm, audit, recall, retain, cache, forget, promote, distill, memory," >&2
       echo "           handoff, pickup, pause, resume, index, reindex, regen, state, aido," >&2
