@@ -368,6 +368,61 @@ mode_init() {
       fi
       return $?
       ;;
+    "btw")
+      # Steering notes: agence ^btw <text>
+      local _btw_ts="${AGENCE_ROOT}/lib/btw.ts"
+      if command -v bun &>/dev/null && [[ -f "$_btw_ts" ]]; then
+        bun run "$_btw_ts" $init_args
+      else
+        echo "Error: ^btw requires bun + lib/btw.ts" >&2
+        return 1
+      fi
+      return $?
+      ;;
+    "queue")
+      # Work queue: agence ^queue show|add|rm|done|next|switch|last|compact|status
+      local _queue_ts="${AGENCE_ROOT}/lib/queue.ts"
+      if command -v bun &>/dev/null && [[ -f "$_queue_ts" ]]; then
+        bun run "$_queue_ts" $init_args
+      else
+        echo "Error: ^queue requires bun + lib/queue.ts" >&2
+        return 1
+      fi
+      return $?
+      ;;
+    "routes")
+      # Routing context: agence ^routes
+      local _router_ts="${AGENCE_ROOT}/lib/router.ts"
+      if command -v bun &>/dev/null && [[ -f "$_router_ts" ]]; then
+        bun run "$_router_ts" routes $init_args
+      else
+        echo "Error: ^routes requires bun + lib/router.ts" >&2
+        return 1
+      fi
+      return $?
+      ;;
+    "diff")
+      # Colored diff: agence ^diff <file-a> <file-b>
+      local _diff_ts="${AGENCE_ROOT}/lib/diff.ts"
+      if command -v bun &>/dev/null && [[ -f "$_diff_ts" ]]; then
+        bun run "$_diff_ts" $init_args
+      else
+        echo "Error: ^diff requires bun + lib/diff.ts" >&2
+        return 1
+      fi
+      return $?
+      ;;
+    "verify")
+      # MANUAL_VERIFY queue: agence ^verify list|show|ack|reject|add|ingest|compact|status
+      local _verify_ts="${AGENCE_ROOT}/lib/verify.ts"
+      if command -v bun &>/dev/null && [[ -f "$_verify_ts" ]]; then
+        bun run "$_verify_ts" $init_args
+      else
+        echo "Error: ^verify requires bun + lib/verify.ts" >&2
+        return 1
+      fi
+      return $?
+      ;;
     *)
       # ── Skill command dispatch ───────────────────────────────────────────
       # If init_cmd matches a known skill, route through lib/skill.ts

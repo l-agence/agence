@@ -1045,6 +1045,17 @@ async function runSkill(
     retainReconFindings(output, query);
   }
 
+  // AUTO-PIPE: ^integrate output → ^verify ingest (queue MANUAL_VERIFY items)
+  if (skillName === "integrate" && output) {
+    try {
+      const { ingestFindings } = await import("./verify.ts");
+      const { added, skipped } = ingestFindings(output, "integrate");
+      if (added > 0) {
+        console.error(`[skill] Auto-ingested: ${added} MANUAL_VERIFY items queued (${skipped} skipped)`);
+      }
+    } catch { /* verify module not available — skip */ }
+  }
+
   console.error(`[skill] Done in ${latencyMs}ms`);
   return 0;
 }
@@ -1204,6 +1215,17 @@ async function main(): Promise<number> {
   if (args[0] === "diff") {
     const diffArgs = args.slice(1);
     const result = spawnSync(BUN, ["run", join(AGENCE_ROOT, "lib", "diff.ts"), ...diffArgs], {
+      cwd: AGENCE_ROOT,
+      env: { ...process.env, AGENCE_ROOT },
+      stdio: "inherit",
+    });
+    return result.status ?? 1;
+  }
+
+  // Btw delegation: airun skill btw <args...>
+  if (args[0] === "btw") {
+    const btwArgs = args.slice(1);
+    const result = spawnSync(BUN, ["run", join(AGENCE_ROOT, "lib", "btw.ts"), ...btwArgs], {
       cwd: AGENCE_ROOT,
       env: { ...process.env, AGENCE_ROOT },
       stdio: "inherit",

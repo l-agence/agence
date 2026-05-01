@@ -19,7 +19,7 @@
 //
 // Exit codes: 0 = success, 1 = error
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync, copyFileSync, unlinkSync, rmdirSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync, statSync, copyFileSync, unlinkSync, rmdirSync } from "fs";
 import { join, basename } from "path";
 import { execSync } from "child_process";
 import { resolveOrg } from "./org.ts";
@@ -291,6 +291,82 @@ function sessionResume(sid: string): number {
   console.error(`  Exit Code: ${meta.exit_code ?? "?"}`);
   console.error("");
 
+  return 0;
+}
+
+// ─── End/Finalize ────────────────────────────────────────────────────────────
+
+export function sessionEnd(sid: string, exitCode?: number): number {
+  if (!sid) {
+    // Try env
+    sid = process.env.AI_SESSION || "";
+    if (!sid) {
+      console.error("Usage: session end <sessionid> [exit_code]");
+      return 1;
+    }
+  }
+
+  const metaFile = findMetaPath(sid);
+  if (!metaFile) {
+    console.error(`[SESSION] ✗ Session not found: ${sid}`);
+    return 1;
+  }
+
+  const meta: SessionMeta = JSON.parse(readFileSync(metaFile, "utf-8"));
+  meta.exit_code = exitCode ?? null;
+  meta.status = "ended";
+  meta.verification_status = exitCode === 0 ? "passed" : exitCode != null ? "failed" : "unverified";
+  writeFileSync(metaFile, JSON.stringify(meta, null, 2) + "\n");
+
+  // Update .airuns/ task→session index
+  if (meta.task_id) {
+    updateAirunsIndex(meta.task_id, sid, meta);
+  }
+
+  console.log(`[SESSION] ✓ Ended: ${sid}  exit=${exitCode ?? "?"} status=${meta.verification_status}`);
+  return 0;
+}
+
+// ─── .airuns/ Task→Session Index ─────────────────────────────────────────────
+
+const AIRUNS_DIR = join(AI_ROOT, ".airuns");
+
+/** Append a session record to the task index file (.airuns/<task_id>.jsonl) */
+function updateAirunsIndex(taskId: string, sessionId: string, meta: SessionMeta): void {
+  // SEC: validate taskId as hex before using as filename
+  if (!/^[a-f0-9]{4,16}$/.test(taskId)) return;
+  if (!existsSync(AIRUNS_DIR)) mkdirSync(AIRUNS_DIR, { recursive: true });
+  const indexFile = join(AIRUNS_DIR, `${taskId}.jsonl`);
+  const record = {
+    session_id: sessionId,
+    agent: meta.agent,
+    exit_code: meta.exit_code,
+    timestamp: meta.timestamp,
+    ended: new Date().toISOString(),
+  };
+  appendFileSync(indexFile, JSON.stringify(record) + "\n");
+}
+
+/** List sessions for a task (reads .airuns/<task_id>.jsonl) */
+export function listTaskSessions(taskId: string): number {
+  if (!taskId || !/^[a-f0-9]{4,16}$/.test(taskId)) {
+    console.error("Usage: session airuns <task_id>  (hex, 4-16 chars)");
+    return 1;
+  }
+  const indexFile = join(AIRUNS_DIR, `${taskId}.jsonl`);
+  if (!existsSync(indexFile)) {
+    console.log(`[airuns] No sessions recorded for task ${taskId}`);
+    return 0;
+  }
+  const lines = readFileSync(indexFile, "utf-8").split("\n").filter(Boolean);
+  console.log(`[airuns] Sessions for task ${taskId}:\n`);
+  for (const line of lines) {
+    try {
+      const r = JSON.parse(line);
+      const exit = r.exit_code === 0 ? "✓" : r.exit_code != null ? "✗" : "?";
+      console.log(`  ${r.session_id.padEnd(40)} ${exit} @${r.agent || "?"}  ${r.ended || ""}`);
+    } catch {}
+  }
   return 0;
 }
 
@@ -687,6 +763,12 @@ if (import.meta.main) {
       break;
     case "status":
       exitCode = sessionStatus(args[0]);
+      break;
+    case "end":
+      exitCode = sessionEnd(args[0], args[1] != null ? parseInt(args[1], 10) : undefined);
+      break;
+    case "airuns":
+      exitCode = listTaskSessions(args[0] || process.env.AGENCE_TASK_ID || "");
       break;
     case "resume":
       exitCode = sessionResume(args[0]);

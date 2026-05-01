@@ -638,8 +638,19 @@ cmd_tangent_create() {
 
   # Auto-generate task ID if not supplied
   if [[ -z "$task_id" ]]; then
-    task_id=$(_generate_task_id)
-    echo "[agentd] Auto-assigned task: $task_id"
+    # Try to pull from ^queue active task
+    if command -v bun &>/dev/null && [[ -f "${AGENCE_ROOT}/lib/queue.ts" ]]; then
+      local _queue_active
+      _queue_active=$(bun run "${AGENCE_ROOT}/lib/queue.ts" status 2>/dev/null | grep "active:" | grep -oP '[a-f0-9]{8}')
+      if [[ -n "$_queue_active" ]]; then
+        task_id="$_queue_active"
+        echo "[agentd] Task from queue: $task_id"
+      fi
+    fi
+    if [[ -z "$task_id" ]]; then
+      task_id=$(_generate_task_id)
+      echo "[agentd] Auto-assigned task: $task_id"
+    fi
   fi
   # SEC-017 HACK-03: validate user-supplied task ID before tmux command + registry interpolation
   _validate_task_id "$task_id"
