@@ -1168,6 +1168,17 @@ async function main(): Promise<number> {
     return result.status ?? 1;
   }
 
+  // Verify delegation: airun skill verify <subcommand> [args...]
+  if (args[0] === "verify") {
+    const verifyArgs = args.slice(1);
+    const result = spawnSync(BUN, ["run", join(AGENCE_ROOT, "lib", "verify.ts"), ...verifyArgs], {
+      cwd: AGENCE_ROOT,
+      env: { ...process.env, AGENCE_ROOT },
+      stdio: "inherit",
+    });
+    return result.status ?? 1;
+  }
+
   const skillName = args[0];
 
   // WIRE-003: normalize spelling aliases
