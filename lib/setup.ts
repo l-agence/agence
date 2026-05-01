@@ -6,6 +6,7 @@
 //   agence ^setup org             Set/change org namespace only
 //   agence ^setup keys            Configure API keys only
 //   agence ^setup recon           Launch initial recon scans only
+//   agence ^setup vault            Configure hermetic vault only
 //   agence ^setup status          Show current configuration
 //   agence ^setup help            This help
 //
@@ -16,6 +17,7 @@
 //   4. LLM API keys (Anthropic, OpenAI, etc.)
 //   5. Artifact registry (JFrog, npm, etc.)
 //   6. Project keys (JIRA, Linear, etc.)
+//   7. Hermetic vault (user-private knowledge repo)
 
 import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -462,6 +464,7 @@ function showStatus(): void {
     ["AGENCE_GITLAB_URL", "GitLab URL"],
     ["AGENCE_BITBUCKET_URL", "Bitbucket URL"],
     ["NPM_REGISTRY_URL", "npm registry"],
+    ["AGENCE_VAULT_USER", "Vault user"],
   ];
 
   for (const [key, label] of vars) {
@@ -476,6 +479,68 @@ function showStatus(): void {
     }
   }
   console.error("");
+}
+
+// ─── Step 7: Hermetic vault ──────────────────────────────────────────────────
+
+async function setupVault(rl: readline.Interface): Promise<void> {
+  console.error("");
+  console.error("  ╔══════════════════════════════════════╗");
+  console.error("  ║  Step 7/7: Hermetic Vault            ║");
+  console.error("  ╚══════════════════════════════════════╝");
+  console.error("");
+  console.error("  The hermetic vault backs knowledge/private/ with a user-owned");
+  console.error("  private GitHub repo (github.com/<you>/agence-vault).");
+  console.error("  Content remains private — shared only via explicit ^vault commands.");
+  console.error("");
+
+  const wantVault = await askYN(rl, "Set up hermetic vault?", true);
+  if (!wantVault) {
+    console.error("  ⏭  Skipped vault setup.");
+    return;
+  }
+
+  // Resolve GitHub user
+  let user = getRCVar("AGENCE_VAULT_USER") || "";
+  if (!user) {
+    try {
+      user = spawnSync("gh", ["api", "user", "--jq", ".login"], {
+        encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"]
+      }).stdout?.trim() || "";
+    } catch { /* gh unavailable */ }
+  }
+
+  user = await ask(rl, "GitHub username for vault", user);
+  if (!user) {
+    console.error("  ✗ No username — skipping vault.");
+    return;
+  }
+
+  // Validate
+  if (!/^[a-zA-Z0-9]([a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/.test(user)) {
+    console.error("  ✗ Invalid GitHub username.");
+    return;
+  }
+
+  setRCVar("AGENCE_VAULT_USER", user);
+  process.env.AGENCE_VAULT_USER = user;
+
+  // Run vault init
+  console.error(`  Initializing vault for ${user}...`);
+  const result = spawnSync(BUN, ["run", join(ROOT, "lib", "vault.ts"), "init", "--user", user], {
+    cwd: ROOT,
+    env: { ...process.env, AGENCE_ROOT: ROOT, AGENCE_VAULT_USER: user },
+    stdio: ["pipe", "pipe", "pipe"],
+    timeout: 30_000,
+  });
+
+  const out = result.stderr?.toString() || "";
+  if (out) console.error(out);
+  if (result.status === 0) {
+    console.error(`  ✓ Vault ready: github.com/${user}/agence-vault`);
+  } else {
+    console.error("  ⚠ Vault init had issues — run 'agence ^vault init' to retry.");
+  }
 }
 
 // ─── Full wizard ─────────────────────────────────────────────────────────────
@@ -495,6 +560,7 @@ async function runWizard(): Promise<void> {
     await setupKeys(rl);
     await setupRegistry(rl);
     await setupProjectKeys(rl);
+    await setupVault(rl);
 
     console.error("");
     console.error("  ══════════════════════════════════════");
@@ -528,6 +594,7 @@ Usage:
   agence ^setup registry        Configure artifact registry
   agence ^setup project         Configure project tracking
   agence ^setup status          Show current configuration
+  agence ^setup vault           Configure hermetic vault
   agence ^setup help            This help`);
       break;
 
@@ -568,6 +635,12 @@ Usage:
       break;
     }
 
+    case "vault": {
+      const rl = createRL();
+      try { await setupVault(rl); } finally { rl.close(); }
+      break;
+    }
+
     case "":
       await runWizard();
       break;
@@ -587,6 +660,7 @@ export {
   setupWikiRecon,
   setupRegistry,
   setupProjectKeys,
+  setupVault,
   showStatus,
   setRCVar,
   getRCVar,
