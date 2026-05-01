@@ -270,3 +270,127 @@ describe("skill delegation", () => {
     expect(r.status).toBe(0);
   });
 });
+
+// ─── Dashboard ───────────────────────────────────────────────────────────────
+
+describe("dashboard", () => {
+  const run = (...args: string[]) =>
+    spawnSync(BUN, ["run", "lib/queue.ts", ...args], {
+      cwd: join(import.meta.dir, "../.."),
+      env: { ...process.env, AGENCE_QUEUE_DIR: TMP },
+    });
+
+  test("renders empty dashboard", () => {
+    const r = run("dashboard");
+    expect(r.stdout.toString()).toContain("QUEUE DASHBOARD");
+    expect(r.stdout.toString()).toContain("ACTIVE TASK");
+    expect(r.stdout.toString()).toContain("PENDING (0)");
+    expect(r.stdout.toString()).toContain("RECENTLY DONE (0 total)");
+    expect(r.status).toBe(0);
+  });
+
+  test("shows active task details", () => {
+    const t = addTask("Dashboard test task", { agent: "ralph", tags: ["demo"] });
+    switchTask(t.id);
+    const r = run("dashboard");
+    const out = r.stdout.toString();
+    expect(out).toContain("Dashboard test task");
+    expect(out).toContain("@ralph");
+    expect(out).toContain("demo");
+    expect(out).toContain("Running:");
+    expect(r.status).toBe(0);
+  });
+
+  test("shows pending and done sections", () => {
+    const a = addTask("Pending item");
+    const b = addTask("Done item");
+    doneTask(b.id);
+    const r = run("dashboard");
+    const out = r.stdout.toString();
+    expect(out).toContain("PENDING (1)");
+    expect(out).toContain("Pending item");
+    expect(out).toContain("RECENTLY DONE (1 total)");
+    expect(out).toContain("Done item");
+    expect(r.status).toBe(0);
+  });
+
+  test("dash alias works", () => {
+    const r = run("dash");
+    expect(r.stdout.toString()).toContain("QUEUE DASHBOARD");
+    expect(r.status).toBe(0);
+  });
+});
+
+// ─── GitHub Issues bridge ────────────────────────────────────────────────────
+
+describe("GitHub issue bridge", () => {
+  const run = (...args: string[]) =>
+    spawnSync(BUN, ["run", "lib/queue.ts", ...args], {
+      cwd: join(import.meta.dir, "../.."),
+      env: { ...process.env, AGENCE_QUEUE_DIR: TMP },
+    });
+
+  test("link associates issue with task", () => {
+    const t = addTask("Linkable task");
+    const r = run("link", t.id, "l-agence/agence#42");
+    expect(r.stdout.toString()).toContain("Linked:");
+    expect(r.stdout.toString()).toContain("l-agence/agence#42");
+    expect(r.status).toBe(0);
+
+    // Verify persisted
+    const tasks = readTasks();
+    expect(tasks[0].github_issue).toBe("l-agence/agence#42");
+  });
+
+  test("unlink removes issue association", () => {
+    const t = addTask("Unlinkable task");
+    // Manually set github_issue
+    const tasks = readTasks();
+    tasks[0].github_issue = "l-agence/agence#99";
+    writeFileSync(join(TMP, "tasks.jsonl"), tasks.map(t => JSON.stringify(t)).join("\n") + "\n");
+
+    const r = run("unlink", t.id);
+    expect(r.stdout.toString()).toContain("Unlinked:");
+    expect(r.status).toBe(0);
+    expect(readTasks()[0].github_issue).toBeUndefined();
+  });
+
+  test("unlink fails for task without issue", () => {
+    const t = addTask("No issue task");
+    const r = run("unlink", t.id);
+    expect(r.stderr.toString()).toContain("has no issue link");
+    expect(r.status).toBe(1);
+  });
+
+  test("link fails for non-existent task", () => {
+    const r = run("link", "deadbeef", "#42");
+    expect(r.stderr.toString()).toContain("Task not found");
+    expect(r.status).toBe(1);
+  });
+
+  test("link validates issue reference format", () => {
+    const t = addTask("Bad ref task");
+    const r = run("link", t.id, "not-an-issue-ref!!!");
+    expect(r.stderr.toString()).toContain("Invalid issue reference");
+    expect(r.status).toBe(1);
+  });
+
+  test("import without argument shows usage", () => {
+    const r = run("import");
+    expect(r.stderr.toString()).toContain("Usage:");
+    expect(r.status).toBe(2);
+  });
+
+  test("dashboard shows github_issue on linked task", () => {
+    const t = addTask("Linked dashboard task");
+    switchTask(t.id);
+    // Set issue link
+    const tasks = readTasks();
+    tasks[0].github_issue = "l-agence/agence#7";
+    writeFileSync(join(TMP, "tasks.jsonl"), tasks.map(t => JSON.stringify(t)).join("\n") + "\n");
+
+    const r = run("dashboard");
+    expect(r.stdout.toString()).toContain("l-agence/agence#7");
+    expect(r.status).toBe(0);
+  });
+});

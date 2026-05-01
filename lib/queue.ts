@@ -9,6 +9,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "fs";
 import { join } from "path";
 import { randomBytes } from "crypto";
+import { spawnSync } from "child_process";
 
 // ─── Environment (lazy for testability) ──────────────────────────────────────
 
@@ -34,6 +35,7 @@ export interface Task {
   agent?: string;
   tags?: string[];
   notes?: string;
+  github_issue?: string;  // e.g. "owner/repo#42" or "#42"
 }
 
 // ─── Queue Operations ────────────────────────────────────────────────────────
@@ -234,14 +236,38 @@ function cmdDone(args: string[]): number {
     if (!current) { console.error("[queue] No active task to complete."); return 1; }
     doneTask(current.id);
     console.log(`[queue] ✓ Done: ${current.id} — ${current.title}`);
+    maybeCloseIssue(current);
     return 0;
   }
+  const tasks = readTasks();
+  const task = tasks.find(t => t.id === id || t.id.startsWith(id));
   if (doneTask(id)) {
     console.log(`[queue] ✓ Done: ${id}`);
+    if (task) maybeCloseIssue(task);
     return 0;
   }
   console.error(`[queue] Not found or already resolved: ${id}`);
   return 1;
+}
+
+/** Auto-close linked GitHub issue when task is done */
+function maybeCloseIssue(task: Task): void {
+  if (!task.github_issue) return;
+  const parsed = parseIssueRef(task.github_issue);
+  if (!parsed) return;
+  const repo = resolveRepo(parsed.repo);
+  if (!repo) return;
+
+  const result = spawnSync("gh", ["issue", "close", String(parsed.number), "--repo", repo, "--comment", `Closed via agence task ${task.id}`], {
+    stdio: ["pipe", "pipe", "pipe"],
+    timeout: 15_000,
+  });
+
+  if (result.status === 0) {
+    console.log(`[queue]   → Closed ${repo}#${parsed.number}`);
+  } else {
+    console.error(`[queue]   ⚠ Could not auto-close ${repo}#${parsed.number}: ${result.stderr?.toString().trim() || "unknown error"}`);
+  }
 }
 
 function cmdNext(): number {
@@ -299,6 +325,268 @@ function cmdCompact(): number {
   return 0;
 }
 
+// ─── Dashboard ───────────────────────────────────────────────────────────────
+
+function cmdDashboard(): number {
+  const tasks = readTasks();
+  const stats = queueStats();
+  const current = activeTask();
+
+  console.log("");
+  console.log("  ╔══════════════════════════════════════════════════════════╗");
+  console.log("  ║              QUEUE DASHBOARD                            ║");
+  console.log("  ╚══════════════════════════════════════════════════════════╝");
+  console.log("");
+
+  // Active task
+  console.log("  ▶ ACTIVE TASK");
+  if (current) {
+    const elapsed = current.started_at
+      ? formatElapsed(Date.now() - new Date(current.started_at).getTime())
+      : "?";
+    console.log(`    ${current.id}  ${current.title}`);
+    if (current.agent) console.log(`    Agent: @${current.agent}`);
+    if (current.tags?.length) console.log(`    Tags:  ${current.tags.join(", ")}`);
+    if (current.github_issue) console.log(`    Issue: ${current.github_issue}`);
+    console.log(`    Running: ${elapsed}`);
+  } else {
+    console.log("    (none — run '^queue next' to activate)");
+  }
+  console.log("");
+
+  // Pending queue
+  const pending = tasks.filter(t => t.status === "pending");
+  console.log(`  ⏳ PENDING (${pending.length})`);
+  if (pending.length === 0) {
+    console.log("    (empty)");
+  } else {
+    for (const t of pending.slice(0, 10)) {
+      const issue = t.github_issue ? ` [${t.github_issue}]` : "";
+      const agent = t.agent ? ` @${t.agent}` : "";
+      console.log(`    ${t.id}  ${t.title.slice(0, 50)}${agent}${issue}`);
+    }
+    if (pending.length > 10) console.log(`    ... and ${pending.length - 10} more`);
+  }
+  console.log("");
+
+  // Recent completions
+  const done = tasks
+    .filter(t => t.status === "done")
+    .sort((a, b) => (b.done_at || "").localeCompare(a.done_at || ""))
+    .slice(0, 5);
+  console.log(`  ✓ RECENTLY DONE (${stats.done} total)`);
+  if (done.length === 0) {
+    console.log("    (none)");
+  } else {
+    for (const t of done) {
+      const ago = t.done_at ? formatElapsed(Date.now() - new Date(t.done_at).getTime()) + " ago" : "";
+      const issue = t.github_issue ? ` [${t.github_issue}]` : "";
+      console.log(`    ✓ ${t.id}  ${t.title.slice(0, 45)}  ${ago}${issue}`);
+    }
+  }
+  console.log("");
+
+  // Dropped
+  if (stats.dropped > 0) {
+    console.log(`  ✗ DROPPED: ${stats.dropped}`);
+    console.log("");
+  }
+
+  // Session counts per active/pending task (read .airuns if available)
+  const airunsDir = join(getRoot(), "nexus", ".airuns");
+  if (existsSync(airunsDir) && (current || pending.length > 0)) {
+    const activeTasks = [current, ...pending].filter(Boolean) as Task[];
+    let hasSessionData = false;
+    for (const t of activeTasks.slice(0, 5)) {
+      const indexFile = join(airunsDir, `${t.id}.jsonl`);
+      if (existsSync(indexFile)) {
+        const lines = readFileSync(indexFile, "utf-8").split("\n").filter(Boolean);
+        if (lines.length > 0) {
+          if (!hasSessionData) {
+            console.log("  📋 SESSIONS");
+            hasSessionData = true;
+          }
+          console.log(`    ${t.id}: ${lines.length} session(s)`);
+        }
+      }
+    }
+    if (hasSessionData) console.log("");
+  }
+
+  // Summary bar
+  console.log("  ─────────────────────────────────────────────────────────");
+  console.log(`  pending: ${stats.pending}  active: ${stats.active}  done: ${stats.done}  dropped: ${stats.dropped}  total: ${stats.total}`);
+  console.log("");
+
+  return 0;
+}
+
+function formatElapsed(ms: number): string {
+  if (ms < 0) return "0s";
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ${mins % 60}m`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ${hrs % 24}h`;
+}
+
+// ─── GitHub Issues Bridge ────────────────────────────────────────────────────
+
+/** Parse issue reference: "#42", "owner/repo#42", "https://github.com/owner/repo/issues/42" */
+function parseIssueRef(ref: string): { repo: string; number: number } | null {
+  // Full URL: https://github.com/owner/repo/issues/42
+  const urlMatch = ref.match(/^https?:\/\/github\.com\/([^/]+\/[^/]+)\/issues\/(\d+)/);
+  if (urlMatch) return { repo: urlMatch[1], number: parseInt(urlMatch[2], 10) };
+
+  // owner/repo#N
+  const fullMatch = ref.match(/^([a-zA-Z0-9\-_.]+\/[a-zA-Z0-9\-_.]+)#(\d+)$/);
+  if (fullMatch) return { repo: fullMatch[1], number: parseInt(fullMatch[2], 10) };
+
+  // #N (current repo)
+  const shortMatch = ref.match(/^#?(\d+)$/);
+  if (shortMatch) return { repo: "", number: parseInt(shortMatch[1], 10) };
+
+  return null;
+}
+
+/** Resolve repo slug from git remote if not specified */
+function resolveRepo(repo: string): string {
+  if (repo) return repo;
+  const result = spawnSync("git", ["remote", "get-url", "origin"], { cwd: getRoot(), stdio: ["pipe", "pipe", "pipe"] });
+  const url = result.stdout?.toString().trim() || "";
+  // https://github.com/owner/repo.git or git@github.com:owner/repo.git
+  const m = url.match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
+  return m ? m[1] : "";
+}
+
+function cmdImport(args: string[]): number {
+  const ref = args[0];
+  if (!ref) {
+    console.error("Usage: airun queue import <issue#>  (e.g. #42, owner/repo#42)");
+    return 2;
+  }
+
+  const parsed = parseIssueRef(ref);
+  if (!parsed) {
+    console.error(`[queue] Invalid issue reference: ${ref}`);
+    return 1;
+  }
+
+  const repo = resolveRepo(parsed.repo);
+  if (!repo) {
+    console.error("[queue] Could not resolve repo — use owner/repo#N format");
+    return 1;
+  }
+
+  // Fetch issue title via gh CLI
+  const ghArgs = ["issue", "view", String(parsed.number), "--repo", repo, "--json", "title,state,labels"];
+  const result = spawnSync("gh", ghArgs, { stdio: ["pipe", "pipe", "pipe"], timeout: 15_000 });
+
+  if (result.status !== 0) {
+    const err = result.stderr?.toString().trim() || "unknown error";
+    console.error(`[queue] gh issue view failed: ${err}`);
+    return 1;
+  }
+
+  let issueData: { title: string; state: string; labels: { name: string }[] };
+  try {
+    issueData = JSON.parse(result.stdout?.toString() || "{}");
+  } catch {
+    console.error("[queue] Failed to parse gh output");
+    return 1;
+  }
+
+  if (!issueData.title) {
+    console.error(`[queue] Issue ${repo}#${parsed.number} not found`);
+    return 1;
+  }
+
+  // Check for duplicate
+  const existing = readTasks().find(t => t.github_issue === `${repo}#${parsed.number}`);
+  if (existing) {
+    console.error(`[queue] Already linked: task ${existing.id} → ${repo}#${parsed.number}`);
+    return 1;
+  }
+
+  // Create task from issue
+  const tags = issueData.labels?.map(l => l.name) || [];
+  const task = addTask(issueData.title, { tags: tags.length ? tags : undefined });
+
+  // Set github_issue field
+  const tasks = readTasks();
+  const created = tasks.find(t => t.id === task.id);
+  if (created) {
+    created.github_issue = `${repo}#${parsed.number}`;
+    writeTasks(tasks);
+  }
+
+  console.log(`[queue] + ${task.id}: ${issueData.title}`);
+  console.log(`[queue]   Linked to ${repo}#${parsed.number}`);
+  if (tags.length) console.log(`[queue]   Labels: ${tags.join(", ")}`);
+  return 0;
+}
+
+function cmdLink(args: string[]): number {
+  const [id, ref] = args;
+  if (!id || !ref) {
+    console.error("Usage: airun queue link <task-id> <issue#>");
+    return 2;
+  }
+
+  const parsed = parseIssueRef(ref);
+  if (!parsed) {
+    console.error(`[queue] Invalid issue reference: ${ref}`);
+    return 1;
+  }
+
+  const repo = resolveRepo(parsed.repo);
+  if (!repo) {
+    console.error("[queue] Could not resolve repo — use owner/repo#N format");
+    return 1;
+  }
+
+  const tasks = readTasks();
+  const task = tasks.find(t => t.id === id || t.id.startsWith(id));
+  if (!task) {
+    console.error(`[queue] Task not found: ${id}`);
+    return 1;
+  }
+
+  task.github_issue = `${repo}#${parsed.number}`;
+  writeTasks(tasks);
+  console.log(`[queue] ✓ Linked: ${task.id} → ${repo}#${parsed.number}`);
+  return 0;
+}
+
+function cmdUnlink(args: string[]): number {
+  const id = args[0];
+  if (!id) {
+    console.error("Usage: airun queue unlink <task-id>");
+    return 2;
+  }
+
+  const tasks = readTasks();
+  const task = tasks.find(t => t.id === id || t.id.startsWith(id));
+  if (!task) {
+    console.error(`[queue] Task not found: ${id}`);
+    return 1;
+  }
+
+  if (!task.github_issue) {
+    console.error(`[queue] Task ${task.id} has no issue link`);
+    return 1;
+  }
+
+  const old = task.github_issue;
+  delete task.github_issue;
+  writeTasks(tasks);
+  console.log(`[queue] ✓ Unlinked: ${task.id} (was ${old})`);
+  return 0;
+}
+
 function cmdHelp(): number {
   console.log(`queue — Work queue for task lifecycle
 
@@ -312,11 +600,19 @@ Usage:
   airun queue last                  Show last completed task
   airun queue compact               Remove resolved tasks
   airun queue status                Show queue statistics
+  airun queue dashboard             Rich overview with sessions & cost
+  airun queue import <issue#>       Import GitHub issue as a task
+  airun queue link <id> <issue#>    Link existing task to GitHub issue
+  airun queue unlink <id>           Remove GitHub issue link from task
   airun queue help                  This help
 
 Add options:
   --agent <name>        Assign agent
   --tag <tag>           Add tag (repeatable)
+
+Issue format:
+  #42                   Issue in current repo
+  owner/repo#42         Issue in specific repo
 
 Environment:
   AGENCE_QUEUE_DIR     Queue directory (default: nexus/queue/)
@@ -343,6 +639,11 @@ if (import.meta.main) {
     case "last":    exitCode = cmdLast(); break;
     case "compact": exitCode = cmdCompact(); break;
     case "status":  exitCode = cmdStatus(); break;
+    case "dashboard":
+    case "dash":    exitCode = cmdDashboard(); break;
+    case "import":  exitCode = cmdImport(args); break;
+    case "link":    exitCode = cmdLink(args); break;
+    case "unlink":  exitCode = cmdUnlink(args); break;
     case "help":
     case "--help":
     case "-h":      exitCode = cmdHelp(); break;
