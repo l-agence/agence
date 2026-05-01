@@ -34,6 +34,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { createHash, randomBytes } from "crypto";
+import { claimTask } from "./scope.ts";
 
 // ─── Environment ─────────────────────────────────────────────────────────────
 
@@ -64,6 +65,7 @@ interface Task {
   agent: string | null;
   created: string;     // ISO timestamp
   updated: string;
+  scope?: string[];    // file paths this task owns (scope collision prevention)
 }
 
 interface DepEdge {
@@ -656,18 +658,19 @@ function cmdSet(id: string, field: string, value: string): void {
 }
 
 function cmdAssign(id: string, agent: string): void {
-  const data = loadTasks();
-  const task = data.tasks.find(t => t.id === id);
-  if (!task) {
-    process.stderr.write(`error: task '${id}' not found\n`);
+  const result = claimTask(id, agent);
+  if (!result.success) {
+    if (result.conflicts && result.conflicts.length > 0) {
+      process.stderr.write(`error: scope collision for '${id}':\n`);
+      for (const c of result.conflicts) {
+        process.stderr.write(`  ${c.task_id} (${c.agent}): ${c.overlapping_paths.join(", ")}\n`);
+      }
+    } else {
+      process.stderr.write(`error: ${result.reason}\n`);
+    }
     process.exit(1);
   }
-
-  task.agent = agent.startsWith("@") ? agent : `@${agent}`;
-  task.state = "%";  // agent-assigned
-  task.updated = isoNow();
-  saveJSON(TASKS_FILE, data);
-  console.log(`% ${id} → ${task.agent}`);
+  console.log(`% ${id} → ${result.agent}`);
 }
 
 function cmdComplete(id: string): void {
