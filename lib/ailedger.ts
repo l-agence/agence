@@ -121,7 +121,7 @@ interface LocalEntry {
   seq: number;
   timestamp: string;
   session_id: string;
-  decision_type: string;
+  decision_type: string;  // route|execute|guard|handoff|design|run:start|run:end|sequent|tangent|resultant|cost
   agent: string;
   rationale_tag: string;
   task_id: string;
@@ -129,7 +129,18 @@ interface LocalEntry {
   exit_code: number;
   commit?: string;        // git HEAD at entry time (if available)
   prev_hash: string;
+  // Extended fields (optional, per decision_type)
+  step?: number;          // sequent: step N of plan
+  parent_id?: string;     // tangent: branched from which sequent
+  outcome?: string;       // run:end/resultant: completed|failed|paused|handed-off
+  artifact?: string;      // resultant: commit hash, filename, path
+  model?: string;         // cost: which model was used
+  tokens_in?: number;     // cost: input tokens
+  tokens_out?: number;    // cost: output tokens
+  cost_usd?: number;      // cost: calculated USD
 }
+
+export type { LocalEntry as LedgerEntry };
 
 interface ShardEntry extends LocalEntry {
   local_hash: string;      // SHA-256 of the full local entry (provenance)
@@ -168,12 +179,24 @@ function getLastHash(file: string, hashField: string): string {
 
 // ─── Append ──────────────────────────────────────────────────────────────────
 
-function append(
+export interface AppendExtras {
+  step?: number;
+  parent_id?: string;
+  outcome?: string;
+  artifact?: string;
+  model?: string;
+  tokens_in?: number;
+  tokens_out?: number;
+  cost_usd?: number;
+}
+
+export function append(
   decisionType: string,
   rationaleTag: string,
   taskId: string,
   command: string,
   exitCode: number,
+  extras?: AppendExtras,
 ): { localEntry: string; shardEntry: string | null; redacted: boolean; rejected: boolean } {
   mkdirSync(LOCAL_DIR, { recursive: true });
 
@@ -209,6 +232,7 @@ function append(
     exit_code: exitCode,
     ...(commitId ? { commit: commitId } : {}),
     prev_hash: prevHash,
+    ...(extras || {}),
   };
 
   const localLine = JSON.stringify(local);
@@ -402,7 +426,45 @@ function prune(retentionMonths: number, dryRun: boolean): { removed: string[]; k
   return { removed, kept };
 }
 
+// ─── Query Helpers ───────────────────────────────────────────────────────────
+// Read ledger entries for programmatic access (used by lib/runs.ts, lib/audit.ts)
+
+export function readShardEntries(): LocalEntry[] {
+  if (!existsSync(SHARD_FILE)) return [];
+  const lines = readFileSync(SHARD_FILE, "utf-8").trimEnd().split("\n").filter(Boolean);
+  const entries: LocalEntry[] = [];
+  for (const line of lines) {
+    try { entries.push(JSON.parse(line)); } catch { /* skip malformed */ }
+  }
+  return entries;
+}
+
+export function readLocalEntries(): LocalEntry[] {
+  const lf = localFile();
+  if (!existsSync(lf)) return [];
+  const lines = readFileSync(lf, "utf-8").trimEnd().split("\n").filter(Boolean);
+  const entries: LocalEntry[] = [];
+  for (const line of lines) {
+    try { entries.push(JSON.parse(line)); } catch { /* skip malformed */ }
+  }
+  return entries;
+}
+
+export function queryByTaskId(taskId: string): LocalEntry[] {
+  return readShardEntries().filter(e => e.task_id === taskId);
+}
+
+export function queryBySessionId(sessionId: string): LocalEntry[] {
+  return readShardEntries().filter(e => e.session_id === sessionId);
+}
+
+export function queryByType(decisionType: string): LocalEntry[] {
+  return readShardEntries().filter(e => e.decision_type === decisionType);
+}
+
 // ─── CLI Dispatch ────────────────────────────────────────────────────────────
+
+if (import.meta.main) {
 
 const [subCmd, ...args] = process.argv.slice(2);
 
@@ -525,3 +587,5 @@ switch (subCmd) {
 }
 
 process.exit(exitCode);
+
+} // end if (import.meta.main)
