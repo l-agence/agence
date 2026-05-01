@@ -7,6 +7,15 @@
 //   airun session init <session-id> [role] [agent] [shell] [git-root]
 //   airun session resume <session-id>
 //   airun session prune [--days N] [--archive] [--dry-run]
+//   airun session gc [--dry-run]          Circular buffer eviction
+//   airun session gc-status               Show buffer usage vs caps
+//
+// Circular buffer caps (env or defaults):
+//   AGENCE_CAP_SESSIONS=200    max session files (.meta.json + .typescript pairs)
+//   AGENCE_CAP_SIGNALS=500     max signal files
+//   AGENCE_CAP_LOGS=100        max log files
+//   AGENCE_CAP_COST=90         max cost JSONL files (days)
+//   AGENCE_CAP_TOTAL_MB=100    max total nexus ephemeral size (MB)
 //
 // Exit codes: 0 = success, 1 = error
 
@@ -446,35 +455,237 @@ function sessionPrune(args: string[]): number {
   return 0;
 }
 
-// ─── Main Router ─────────────────────────────────────────────────────────────
+// ─── Circular Buffer ─────────────────────────────────────────────────────────
+// Enforces hard caps on ephemeral directories. Evicts oldest files first (LRU by mtime).
 
-const [cmd, ...args] = process.argv.slice(2);
+const CAP_SESSIONS = parseInt(process.env.AGENCE_CAP_SESSIONS || "200", 10);
+const CAP_SIGNALS = parseInt(process.env.AGENCE_CAP_SIGNALS || "500", 10);
+const CAP_LOGS = parseInt(process.env.AGENCE_CAP_LOGS || "100", 10);
+const CAP_COST = parseInt(process.env.AGENCE_CAP_COST || "90", 10);
+const CAP_TOTAL_MB = parseInt(process.env.AGENCE_CAP_TOTAL_MB || "100", 10);
 
-let exitCode = 0;
-switch (cmd) {
-  case "list":
-    exitCode = sessionList();
-    break;
-  case "init":
-    exitCode = sessionInit(args[0], args[1], args[2], args[3], args[4]);
-    break;
-  case "status":
-    exitCode = sessionStatus(args[0]);
-    break;
-  case "resume":
-    exitCode = sessionResume(args[0]);
-    break;
-  case "prune":
-    exitCode = sessionPrune(args);
-    break;
-  default:
-    // Treat unknown arg as session ID (backward compat)
-    if (cmd) {
-      exitCode = sessionStatus(cmd);
-    } else {
-      console.error("Usage: airun session <list|init|status|resume|prune> [args...]");
-      exitCode = 1;
-    }
+const SIGNAL_DIR = join(AI_ROOT, "nexus", "signals");
+const LOGS_DIR = join(AI_ROOT, "nexus", "logs");
+const COST_DIR = join(AI_ROOT, "nexus", "cost");
+
+interface FileEntry {
+  path: string;
+  mtime: number;
+  size: number;
 }
 
-process.exit(exitCode);
+/** Collect all files recursively from a dir, sorted oldest-first */
+function collectFiles(dir: string, filter?: (name: string) => boolean): FileEntry[] {
+  if (!existsSync(dir)) return [];
+  const entries: FileEntry[] = [];
+
+  function walk(d: string): void {
+    for (const ent of readdirSync(d, { withFileTypes: true })) {
+      if (ent.name === ".month" || ent.name === ".git" || ent.name === ".gitignore") continue;
+      const full = join(d, ent.name);
+      if (ent.isDirectory()) {
+        walk(full);
+      } else {
+        if (filter && !filter(ent.name)) continue;
+        try {
+          const st = statSync(full);
+          entries.push({ path: full, mtime: st.mtimeMs, size: st.size });
+        } catch { /* skip */ }
+      }
+    }
+  }
+
+  walk(dir);
+  entries.sort((a, b) => a.mtime - b.mtime); // oldest first
+  return entries;
+}
+
+export interface EvictResult {
+  dir: string;
+  before: number;
+  after: number;
+  evicted: number;
+  freed_bytes: number;
+}
+
+/** Evict oldest files from a directory until count is within cap */
+export function circularEvict(dir: string, cap: number, dryRun: boolean = false, filter?: (name: string) => boolean): EvictResult {
+  const files = collectFiles(dir, filter);
+  const before = files.length;
+
+  if (before <= cap) {
+    return { dir, before, after: before, evicted: 0, freed_bytes: 0 };
+  }
+
+  const toEvict = files.slice(0, before - cap);
+  let freedBytes = 0;
+
+  for (const f of toEvict) {
+    if (!dryRun) {
+      try { unlinkSync(f.path); } catch { /* skip */ }
+    }
+    freedBytes += f.size;
+  }
+
+  return { dir, before, after: before - toEvict.length, evicted: toEvict.length, freed_bytes: freedBytes };
+}
+
+/** Evict oldest files until total size is within a byte cap */
+export function circularEvictBySize(dir: string, maxBytes: number, dryRun: boolean = false): EvictResult {
+  const files = collectFiles(dir);
+  const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+
+  if (totalSize <= maxBytes) {
+    return { dir, before: files.length, after: files.length, evicted: 0, freed_bytes: 0 };
+  }
+
+  let freedBytes = 0;
+  let evicted = 0;
+
+  for (const f of files) {
+    if (totalSize - freedBytes <= maxBytes) break;
+    if (!dryRun) {
+      try { unlinkSync(f.path); } catch { /* skip */ }
+    }
+    freedBytes += f.size;
+    evicted++;
+  }
+
+  return { dir, before: files.length, after: files.length - evicted, evicted, freed_bytes: freedBytes };
+}
+
+export interface GCReport {
+  sessions: EvictResult;
+  signals: EvictResult;
+  logs: EvictResult;
+  cost: EvictResult;
+  total_size: EvictResult;
+  total_freed_bytes: number;
+  total_evicted: number;
+}
+
+/** Run full garbage collection across all ephemeral dirs */
+export function runGC(dryRun: boolean = false): GCReport {
+  // Phase 1: per-directory count caps
+  const sessions = circularEvict(SESSION_BASE, CAP_SESSIONS, dryRun, (f) => f.endsWith(".meta.json") || f.endsWith(".typescript"));
+  const signals = circularEvict(SIGNAL_DIR, CAP_SIGNALS, dryRun);
+  const logs = circularEvict(LOGS_DIR, CAP_LOGS, dryRun);
+  const cost = circularEvict(COST_DIR, CAP_COST, dryRun);
+
+  // Phase 2: total size cap across all nexus ephemeral
+  const NEXUS_DIR = join(AI_ROOT, "nexus");
+  const maxBytes = CAP_TOTAL_MB * 1024 * 1024;
+  const totalSize = circularEvictBySize(NEXUS_DIR, maxBytes, dryRun);
+
+  const totalFreed = sessions.freed_bytes + signals.freed_bytes + logs.freed_bytes + cost.freed_bytes + totalSize.freed_bytes;
+  const totalEvicted = sessions.evicted + signals.evicted + logs.evicted + cost.evicted + totalSize.evicted;
+
+  return { sessions, signals, logs, cost, total_size: totalSize, total_freed_bytes: totalFreed, total_evicted: totalEvicted };
+}
+
+/** Show buffer usage status */
+export function gcStatus(): { sessions: { count: number; cap: number }; signals: { count: number; cap: number }; logs: { count: number; cap: number }; cost: { count: number; cap: number }; total_mb: { size: number; cap: number } } {
+  const sessFiles = collectFiles(SESSION_BASE, (f) => f.endsWith(".meta.json") || f.endsWith(".typescript"));
+  const sigFiles = collectFiles(SIGNAL_DIR);
+  const logFiles = collectFiles(LOGS_DIR);
+  const costFiles = collectFiles(COST_DIR);
+
+  const nexusDir = join(AI_ROOT, "nexus");
+  const allNexus = collectFiles(nexusDir);
+  const totalBytes = allNexus.reduce((sum, f) => sum + f.size, 0);
+
+  return {
+    sessions: { count: sessFiles.length, cap: CAP_SESSIONS },
+    signals: { count: sigFiles.length, cap: CAP_SIGNALS },
+    logs: { count: logFiles.length, cap: CAP_LOGS },
+    cost: { count: costFiles.length, cap: CAP_COST },
+    total_mb: { size: Math.round(totalBytes / 1024 / 1024 * 100) / 100, cap: CAP_TOTAL_MB },
+  };
+}
+
+function cmdGC(args: string[]): number {
+  const dryRun = args.includes("--dry-run");
+  const report = runGC(dryRun);
+
+  if (report.total_evicted === 0) {
+    process.stderr.write("[gc] All buffers within caps. Nothing to evict.\n");
+    return 0;
+  }
+
+  const prefix = dryRun ? "[dry-run] " : "";
+
+  if (report.sessions.evicted > 0)
+    process.stderr.write(`${prefix}sessions: evicted ${report.sessions.evicted} (${report.sessions.before} → ${report.sessions.after}, cap=${CAP_SESSIONS})\n`);
+  if (report.signals.evicted > 0)
+    process.stderr.write(`${prefix}signals:  evicted ${report.signals.evicted} (${report.signals.before} → ${report.signals.after}, cap=${CAP_SIGNALS})\n`);
+  if (report.logs.evicted > 0)
+    process.stderr.write(`${prefix}logs:     evicted ${report.logs.evicted} (${report.logs.before} → ${report.logs.after}, cap=${CAP_LOGS})\n`);
+  if (report.cost.evicted > 0)
+    process.stderr.write(`${prefix}cost:     evicted ${report.cost.evicted} (${report.cost.before} → ${report.cost.after}, cap=${CAP_COST})\n`);
+  if (report.total_size.evicted > 0)
+    process.stderr.write(`${prefix}total:    evicted ${report.total_size.evicted} (size cap ${CAP_TOTAL_MB}MB)\n`);
+
+  const freedMB = (report.total_freed_bytes / 1024 / 1024).toFixed(2);
+  process.stderr.write(`${prefix}Freed: ${freedMB} MB (${report.total_evicted} files)\n`);
+
+  console.log(JSON.stringify(report, null, 2));
+  return 0;
+}
+
+function cmdGCStatus(): number {
+  const status = gcStatus();
+  const pctSess = ((status.sessions.count / status.sessions.cap) * 100).toFixed(0);
+  const pctSig = ((status.signals.count / status.signals.cap) * 100).toFixed(0);
+  const pctLog = ((status.logs.count / status.logs.cap) * 100).toFixed(0);
+  const pctCost = ((status.cost.count / status.cost.cap) * 100).toFixed(0);
+  const pctTotal = ((status.total_mb.size / status.total_mb.cap) * 100).toFixed(0);
+
+  console.log(`[gc] Buffer usage:`);
+  console.log(`  sessions: ${status.sessions.count}/${status.sessions.cap} (${pctSess}%)`);
+  console.log(`  signals:  ${status.signals.count}/${status.signals.cap} (${pctSig}%)`);
+  console.log(`  logs:     ${status.logs.count}/${status.logs.cap} (${pctLog}%)`);
+  console.log(`  cost:     ${status.cost.count}/${status.cost.cap} (${pctCost}%)`);
+  console.log(`  total:    ${status.total_mb.size}MB/${status.total_mb.cap}MB (${pctTotal}%)`);
+  return 0;
+}
+
+// ─── Main Router ─────────────────────────────────────────────────────────────
+
+if (import.meta.main) {
+  const [cmd, ...args] = process.argv.slice(2);
+
+  let exitCode = 0;
+  switch (cmd) {
+    case "list":
+      exitCode = sessionList();
+      break;
+    case "init":
+      exitCode = sessionInit(args[0], args[1], args[2], args[3], args[4]);
+      break;
+    case "status":
+      exitCode = sessionStatus(args[0]);
+      break;
+    case "resume":
+      exitCode = sessionResume(args[0]);
+      break;
+    case "prune":
+      exitCode = sessionPrune(args);
+      break;
+    case "gc":
+      exitCode = cmdGC(args);
+      break;
+    case "gc-status":
+      exitCode = cmdGCStatus();
+      break;
+    default:
+      // Treat unknown arg as session ID (backward compat)
+      if (cmd) {
+        exitCode = sessionStatus(cmd);
+      } else {
+        console.error("Usage: airun session <list|init|status|resume|prune|gc|gc-status> [args...]");
+        exitCode = 1;
+      }
+  }
+
+  process.exit(exitCode);
+}
