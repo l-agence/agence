@@ -393,4 +393,18 @@ describe("GitHub issue bridge", () => {
     expect(r.stdout.toString()).toContain("l-agence/agence#7");
     expect(r.status).toBe(0);
   });
+
+  test("^break: parseIssueRef rejects #0 (invalid issue number)", () => {
+    const t = addTask("Zero issue task");
+    const r = run("link", t.id, "#0");
+    expect(r.stderr.toString()).toContain("Invalid issue reference");
+    expect(r.status).toBe(1);
+  });
+
+  test("^break: parseIssueRef rejects bare 0", () => {
+    const t = addTask("Zero bare task");
+    const r = run("link", t.id, "0");
+    expect(r.stderr.toString()).toContain("Invalid issue reference");
+    expect(r.status).toBe(1);
+  });
 });

@@ -76,19 +76,40 @@ function readRC(): string {
   return "";
 }
 
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function escapeShellValue(s: string): string {
+  // Escape all shell metacharacters for double-quoted context
+  return s
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\$/g, "\\$")
+    .replace(/`/g, "\\`")
+    .replace(/\n/g, "\\n");
+}
+
 function setRCVar(key: string, value: string): void {
+  // SEC: validate key is a safe env var name
+  if (!/^[A-Z][A-Z0-9_]*$/.test(key) || key.length > 256) {
+    console.error(`  ✗ Invalid env var name: ${key}`);
+    return;
+  }
   let rc = readRC();
-  const exportLine = `export ${key}="${value}"`;
-  const commentedPattern = new RegExp(`^#\\s*export ${key}=`, "m");
-  const activePattern = new RegExp(`^export ${key}=.*$`, "m");
+  const safeValue = escapeShellValue(value);
+  const exportLine = `export ${key}="${safeValue}"`;
+  const escapedKey = escapeRegex(key);
+  const commentedPattern = new RegExp(`^#\\s*export ${escapedKey}=`, "m");
+  const activePattern = new RegExp(`^export ${escapedKey}=.*$`, "m");
 
   if (activePattern.test(rc)) {
     // Replace existing active line
     rc = rc.replace(activePattern, exportLine);
   } else if (commentedPattern.test(rc)) {
     // Uncomment and set
-    rc = rc.replace(commentedPattern, `export ${key}=`);
-    rc = rc.replace(new RegExp(`^export ${key}=.*$`, "m"), exportLine);
+    rc = rc.replace(commentedPattern, `export ${escapedKey}=`);
+    rc = rc.replace(new RegExp(`^export ${escapedKey}=.*$`, "m"), exportLine);
   } else {
     // Append
     rc = rc.trimEnd() + "\n" + exportLine + "\n";
@@ -117,8 +138,8 @@ async function setupOrg(rl: readline.Interface): Promise<string> {
   const currentOrg = getRCVar("AGENCE_ORG") || "l-agence.org";
   const org = await ask(rl, "Org namespace", currentOrg);
 
-  // Validate: must look like a domain or simple name
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9.\-]{1,63}$/.test(org)) {
+  // Validate: must look like a domain or simple name (min 1 char)
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9.\-]{0,63}$/.test(org)) {
     console.error("  ✗ Invalid org name — use alphanumeric + dots/hyphens");
     return currentOrg;
   }

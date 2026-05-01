@@ -765,7 +765,18 @@ if (import.meta.main) {
       exitCode = sessionStatus(args[0]);
       break;
     case "end":
-      exitCode = sessionEnd(args[0], args[1] != null ? parseInt(args[1], 10) : undefined);
+      {
+        let parsedExit: number | undefined;
+        if (args[1] != null) {
+          parsedExit = parseInt(args[1], 10);
+          if (isNaN(parsedExit)) {
+            console.error(`[SESSION] ✗ Invalid exit code: ${args[1]}`);
+            exitCode = 2;
+            break;
+          }
+        }
+        exitCode = sessionEnd(args[0], parsedExit);
+      }
       break;
     case "airuns":
       exitCode = listTaskSessions(args[0] || process.env.AGENCE_TASK_ID || "");

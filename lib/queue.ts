@@ -445,9 +445,13 @@ function parseIssueRef(ref: string): { repo: string; number: number } | null {
   const fullMatch = ref.match(/^([a-zA-Z0-9\-_.]+\/[a-zA-Z0-9\-_.]+)#(\d+)$/);
   if (fullMatch) return { repo: fullMatch[1], number: parseInt(fullMatch[2], 10) };
 
-  // #N (current repo)
+  // #N (current repo) — must be >= 1
   const shortMatch = ref.match(/^#?(\d+)$/);
-  if (shortMatch) return { repo: "", number: parseInt(shortMatch[1], 10) };
+  if (shortMatch) {
+    const num = parseInt(shortMatch[1], 10);
+    if (num < 1) return null;
+    return { repo: "", number: num };
+  }
 
   return null;
 }

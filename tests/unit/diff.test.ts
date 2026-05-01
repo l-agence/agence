@@ -132,3 +132,26 @@ describe("skill delegation", () => {
     expect(r.status).toBe(0);
   });
 });
+
+// ─── ^break regression: file size limit ──────────────────────────────────────
+
+describe("^break regression", () => {
+  const TMP2 = join(import.meta.dir, ".tmp-diff-break");
+
+  test("rejects files larger than 2MB", () => {
+    mkdirSync(TMP2, { recursive: true });
+    const fa = join(TMP2, "huge-a.txt");
+    const fb = join(TMP2, "huge-b.txt");
+    // Create 3MB files (over 2MB limit)
+    const bigContent = "x".repeat(3 * 1024 * 1024);
+    writeFileSync(fa, bigContent);
+    writeFileSync(fb, bigContent);
+    const r = spawnSync(BUN, ["run", "lib/diff.ts", fa, fb], {
+      cwd: join(import.meta.dir, "../.."),
+      env: process.env,
+    });
+    expect(r.stderr.toString()).toContain("too large");
+    expect(r.status).toBe(1);
+    rmSync(TMP2, { recursive: true, force: true });
+  });
+});

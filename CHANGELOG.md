@@ -2,7 +2,45 @@
 
 All notable changes to l'Agence are documented here.
 
-## [1.0.0] — 2026-04-30
+## [1.0.0] — 2026-05-01
+
+### Added
+- `^setup` interactive onboarding wizard — 6-step guided setup (org namespace, repo/wiki recon, LLM keys, artifact registry, project tracking)
+- `^btw` steering notes — persistent JSONL context injection for active sessions (`addNote`, `readNotes`, `clearNotes`)
+- `^queue dashboard` — rich overview with active task, pending queue, recent completions, elapsed time, session counts
+- `^queue import/link/unlink` — GitHub Issues ↔ task bridge (import issue as task, link/unlink, auto-close on done)
+- `^verify` MANUAL_VERIFY queue — structured verification lifecycle (`add`, `ack`, `reject`, `ingest`, `compact`)
+- `^diff` colored diff — unified diff output for file comparison
+- `^routes` task-ID routing — session→task linkage with hex-validated IDs
+- `^redoc` doc versioning — save/version/publish pipeline with manifest tracking
+- `^integrate` → `^verify` auto-pipe — post-hook ingests findings into MANUAL_VERIFY queue
+- Session `end` command — `sessionEnd()` with exit code, status, verification tracking
+- `.airuns/` per-task session index — `updateAirunsIndex()`, `listTaskSessions()` for task→session aggregation
+- `sequent` tournament tangent orchestrator — parallel agent tournament execution with ranked output
+- Scope collision prevention with horde lock
+- Circular buffer GC for ephemeral directories
+- Cost tracking module with matrix scorer integration
+- Dynamic AIPOLICY cascade loader (4-layer policy merge)
+- `watch.ts` wired into agentd tangent create
+- Ledger-first task-session linkage with SWE stats
+- `Task.github_issue` field for issue tracking integration
+- 12 new modules: `btw.ts`, `setup.ts`, `verify.ts`, `diff.ts`, `queue.ts`, `router.ts`, `redoc.ts`, `cost.ts`, `scope.ts`, `gc.ts`, `watch.ts`, `runs.ts`
+
+### Security
+- SEC-014/015: 11 P0/P1 findings fixed (guard bypass, shell injection, traversal hardening)
+- Hex validation on `.airuns/` task IDs (`/^[a-f0-9]{4,16}$/`)
+- Null-byte rejection on `^diff` file paths
+- Context ID sanitization on `^btw` (`/[^a-zA-Z0-9\-_.]/g`)
+- JIRA project key format validation in `^setup`
+- GitHub issue ref parsing with URL/slug/short format validation
+
+### Test Coverage
+- 723 tests, 1705 expect() calls across 20 test files (28 test suites)
+- 310 new tests since v0.9.2
+
+---
+
+## [1.0.0-rc] — 2026-04-30
 
 ### Added
 - `sequent` tournament tangent orchestrator — parallel agent tournament execution with ranked output

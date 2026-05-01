@@ -91,3 +91,35 @@ describe("setup security", () => {
     expect(r.status).toBe(0);
   });
 });
+
+// ─── ^break regression: setRCVar safety ──────────────────────────────────────
+
+describe("^break regression", () => {
+  test("status handles env values with special chars safely", () => {
+    const r = runSetup(["status"], { AGENCE_ORG: "acme.io", ANTHROPIC_API_KEY: 'sk-ant-"quoted"value' });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain("acme.io");
+  });
+
+  test("single-char org name accepted", () => {
+    const r = runSetup(["status"], { AGENCE_ORG: "x" });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain("x");
+  });
+});
+
+// ─── SEC-018 regression tests ────────────────────────────────────────────────
+
+describe("SEC-018 regression", () => {
+  test("status does not leak full API keys", () => {
+    const r = runSetup(["status"], { ANTHROPIC_API_KEY: "sk-ant-secret-very-long-key-value" });
+    expect(r.stderr).toContain("sk-ant****");
+    expect(r.stderr).not.toContain("secret-very-long-key-value");
+  });
+
+  test("status masks tokens containing shell metacharacters", () => {
+    const r = runSetup(["status"], { JFROG_API_TOKEN: '$(whoami)' });
+    expect(r.stderr).toContain("$(whoa****");
+    expect(r.stderr).not.toContain("$(whoami)");
+  });
+});

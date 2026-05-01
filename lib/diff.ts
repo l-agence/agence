@@ -163,12 +163,27 @@ function cmdDiff(args: string[]): number {
     return 2;
   }
 
+  // SEC: reject null bytes in paths
+  if (fileA.includes("\0") || fileB.includes("\0")) {
+    console.error("[diff] Invalid path");
+    return 1;
+  }
+
   if (!existsSync(fileA)) {
     console.error(`[diff] File not found: ${fileA}`);
     return 1;
   }
   if (!existsSync(fileB)) {
     console.error(`[diff] File not found: ${fileB}`);
+    return 1;
+  }
+
+  // SEC: reject files too large for LCS (O(m*n) memory)
+  const MAX_DIFF_BYTES = 2 * 1024 * 1024; // 2 MB
+  const sizeA = Bun.file(fileA).size;
+  const sizeB = Bun.file(fileB).size;
+  if (sizeA > MAX_DIFF_BYTES || sizeB > MAX_DIFF_BYTES) {
+    console.error(`[diff] File too large for diff (max ${MAX_DIFF_BYTES / 1024 / 1024}MB). Use 'diff' or 'git diff' instead.`);
     return 1;
   }
 

@@ -24,8 +24,8 @@ export function getBtwDir(): string {
 function getContextId(): string {
   // Prefer task → session → "default"
   const raw = process.env.AGENCE_TASK_ID || process.env.AI_SESSION || "default";
-  // SEC: sanitize for use as filename — only allow alnum, dash, underscore, dot
-  return raw.replace(/[^a-zA-Z0-9\-_.]/g, "_").slice(0, 64);
+  // SEC: sanitize for use as filename — only allow alnum, dash, underscore (no dots)
+  return raw.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
 }
 function getBtwFile(): string {
   return join(getBtwDir(), `${getContextId()}.jsonl`);

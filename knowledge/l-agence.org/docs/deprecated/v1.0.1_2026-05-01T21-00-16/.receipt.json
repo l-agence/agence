@@ -1,11 +1,10 @@
 {
+  "saved_at": "2026-05-01T21:00:17.044Z",
   "version": "1.0.1",
-  "timestamp": "2026-05-01T21:00:17.218Z",
   "files": [
     "AGENCE.md",
     "AGENTS-ROUTING.md",
     "ANNOUNCE-v0.6.0-alpha.md",
-    "ANNOUNCE-v1.0.0.md",
     "ARCHITECTURE.md",
     "DASHBOARDS.md",
     "FIRST-RUN.md",
@@ -25,7 +24,5 @@
     "TAXONOMY.md",
     "TUTORIAL.md",
     "VERIFICATION-ARCHITECTURE.md"
-  ],
-  "saved_from": "/home/steff/git/.agence/knowledge/l-agence.org/docs",
-  "saved_to": "/home/steff/git/.agence/docs"
+  ]
 }

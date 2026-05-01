@@ -104,3 +104,13 @@ describe("session airuns (CLI)", () => {
     expect(r.status).toBe(0);
   });
 });
+
+// ─── ^break regression: exit code validation ─────────────────────────────────
+
+describe("^break regression", () => {
+  test("rejects non-numeric exit code", () => {
+    const r = runSession("end", "some-session", "not_a_number");
+    expect(r.stderr.toString()).toContain("Invalid exit code");
+    expect(r.status).toBe(2);
+  });
+});
