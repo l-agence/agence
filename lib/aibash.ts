@@ -120,9 +120,13 @@ function cmdInit(argv: string[]): number {
   const sessionLog = join(dayDir, `${sessionId}.typescript`);
   const sessionMeta = join(dayDir, `${sessionId}.meta.json`);
 
+  // Task/tangent linkage (set by agentd tangent create)
+  const taskId = process.env.AGENCE_TASK_ID || "";
+  const tangentId = process.env.AGENCE_TANGENT_ID || "";
+
   // Write session metadata (same schema as session.ts init)
   if (!existsSync(sessionMeta)) {
-    const meta = {
+    const meta: Record<string, unknown> = {
       session_id: sessionId,
       agent,
       role,
@@ -133,6 +137,8 @@ function cmdInit(argv: string[]): number {
       exit_code: null,
       verification_status: "unverified",
     };
+    if (taskId) meta.task_id = taskId;
+    if (tangentId) meta.tangent_id = tangentId;
     writeFileSync(sessionMeta, JSON.stringify(meta, null, 2) + "\n");
     process.stderr.write(`[aibash.ts] session ${sessionId.slice(0, 8)} initialized\n`);
   }
@@ -147,6 +153,8 @@ function cmdInit(argv: string[]): number {
     shellExport("SESSION_LOG", sessionLog),
     shellExport("SESSION_META", sessionMeta),
   ];
+  if (taskId) exports.push(shellExport("AGENCE_TASK_ID", taskId));
+  if (tangentId) exports.push(shellExport("AGENCE_TANGENT_ID", tangentId));
 
   // Pass command through if present
   if (parsed.command.length > 0) {

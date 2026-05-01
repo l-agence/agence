@@ -121,6 +121,9 @@ fi
 unset _bun_config
 
 export GIT_ROOT AI_ROLE AI_SESSION AI_AGENT SESSION_LOG SESSION_META
+# Propagate task/tangent linkage if set (from agentd tangent create)
+[[ -n "${AGENCE_TASK_ID:-}" ]] && export AGENCE_TASK_ID
+[[ -n "${AGENCE_TANGENT_ID:-}" ]] && export AGENCE_TANGENT_ID
 
 # ── SANDBOX PATH ENFORCEMENT ─────────────────────────────────────────────────
 

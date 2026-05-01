@@ -9,8 +9,10 @@ CLI: `airun verify {list,show,ack,reject,add,ingest,compact,status}`.
 ingestFindings() filters ^integrate JSON output, queuing only MANUAL_VERIFY items.
 Skill delegation: `^verify <cmd>` routes through lib/skill.ts. 33 tests.
 
-5. .airuns/ Task-Session Linkage — Audit gap
-SESSION-PERSISTENCE.md still marks .airuns/ as ⏳ placeholder. AIDO_TASK_ID env var isn't plumbed through from matrix claim → aibash → session metadata. Needed for "show me everything that ran during TASK-042."# CODEX: RULES
+5. .airuns/ Task-Session Linkage — ✅ RESOLVED
+AGENCE_TASK_ID + AGENCE_TANGENT_ID plumbed through agentd → aibash.ts → session .meta.json.
+SessionMeta interface extended with task_id/tangent_id fields.
+`session list --task <id>` filters sessions by task. cmdShow displays task/tangent IDs.# CODEX: RULES
 
 **Prescriptive guidance and best practices for using Agence.**
 

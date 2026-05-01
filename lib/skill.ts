@@ -1179,6 +1179,38 @@ async function main(): Promise<number> {
     return result.status ?? 1;
   }
 
+  // Queue delegation: airun skill queue <subcommand> [args...]
+  if (args[0] === "queue") {
+    const queueArgs = args.slice(1);
+    const result = spawnSync(BUN, ["run", join(AGENCE_ROOT, "lib", "queue.ts"), ...queueArgs], {
+      cwd: AGENCE_ROOT,
+      env: { ...process.env, AGENCE_ROOT },
+      stdio: "inherit",
+    });
+    return result.status ?? 1;
+  }
+
+  // Routes delegation: airun skill routes → router.ts routes
+  if (args[0] === "routes") {
+    const result = spawnSync(BUN, ["run", join(AGENCE_ROOT, "lib", "router.ts"), "routes"], {
+      cwd: AGENCE_ROOT,
+      env: { ...process.env, AGENCE_ROOT },
+      stdio: "inherit",
+    });
+    return result.status ?? 1;
+  }
+
+  // Diff delegation: airun skill diff <args...>
+  if (args[0] === "diff") {
+    const diffArgs = args.slice(1);
+    const result = spawnSync(BUN, ["run", join(AGENCE_ROOT, "lib", "diff.ts"), ...diffArgs], {
+      cwd: AGENCE_ROOT,
+      env: { ...process.env, AGENCE_ROOT },
+      stdio: "inherit",
+    });
+    return result.status ?? 1;
+  }
+
   const skillName = args[0];
 
   // WIRE-003: normalize spelling aliases

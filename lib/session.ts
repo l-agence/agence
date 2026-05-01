@@ -63,6 +63,8 @@ interface SessionMeta {
   verification_status: string;
   command?: string;
   typescript?: string;
+  task_id?: string;
+  tangent_id?: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -108,10 +110,18 @@ export function sessionDayDir(): string {
 
 // ─── Commands ────────────────────────────────────────────────────────────────
 
-function sessionList(): number {
+function sessionList(filterArgs?: string[]): number {
   if (!existsSync(SESSION_BASE)) {
     console.error(`[SESSION] ✗ No sessions directory: ${SESSION_BASE}`);
     return 1;
+  }
+
+  // Parse filter: --task <id>
+  let taskFilter: string | undefined;
+  if (filterArgs) {
+    for (let i = 0; i < filterArgs.length; i++) {
+      if (filterArgs[i] === "--task" && filterArgs[i + 1]) taskFilter = filterArgs[++i];
+    }
   }
 
   const metaFiles = findFiles(SESSION_BASE, (f) => f.endsWith(".meta.json")).sort().reverse();
@@ -124,26 +134,37 @@ function sessionList(): number {
   // Header
   const hdr = [
     "SESSION ID".padEnd(45),
-    "COMMAND".padEnd(40),
+    "TASK".padEnd(10),
+    "COMMAND".padEnd(35),
     "EXIT".padEnd(6),
     "TIMESTAMP",
   ].join(" ");
   console.log(hdr);
   console.log("=".repeat(125));
 
+  let shown = 0;
   for (const file of metaFiles) {
     const sid = basename(file, ".meta.json");
     const meta = readMeta(sid);
     if (!meta) continue;
 
-    const cmd = (meta.command || "").slice(0, 40);
+    // Apply task filter
+    if (taskFilter && meta.task_id !== taskFilter && !meta.task_id?.startsWith(taskFilter)) continue;
+
+    const task = (meta.task_id || "").slice(0, 8);
+    const cmd = (meta.command || "").slice(0, 35);
     const exit = meta.exit_code;
     const exitStr = exit === 0 ? `✓ ${exit}` : exit != null ? `✗ ${exit}` : "?";
     const ts = (meta.timestamp || "").slice(0, 20);
 
     console.log(
-      `${sid.padEnd(45)} ${cmd.padEnd(40)} ${exitStr.padEnd(6)} ${ts}`
+      `${sid.padEnd(45)} ${task.padEnd(10)} ${cmd.padEnd(35)} ${exitStr.padEnd(6)} ${ts}`
     );
+    shown++;
+  }
+
+  if (taskFilter && shown === 0) {
+    console.log(`(no sessions matching task ${taskFilter})`);
   }
 
   return 0;
@@ -225,6 +246,8 @@ function sessionStatus(sid: string): number {
   console.log(`Status:       ${meta.verification_status}`);
   console.log(`Agent:        ${meta.agent}`);
   console.log(`Role:         ${meta.role}`);
+  if (meta.task_id) console.log(`Task ID:      ${meta.task_id}`);
+  if (meta.tangent_id) console.log(`Tangent ID:   ${meta.tangent_id}`);
   console.log(`File:         ${typescriptFile}`);
   console.log(`Size:         ${stat.size} bytes`);
   console.log(`Lines:        ${lines}`);
@@ -657,7 +680,7 @@ if (import.meta.main) {
   let exitCode = 0;
   switch (cmd) {
     case "list":
-      exitCode = sessionList();
+      exitCode = sessionList(args);
       break;
     case "init":
       exitCode = sessionInit(args[0], args[1], args[2], args[3], args[4]);

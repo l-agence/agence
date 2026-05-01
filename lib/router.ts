@@ -395,6 +395,32 @@ switch (subCmd) {
     break;
   }
 
+  case "routes":
+  case "status": {
+    const route = resolveRoute();
+    const providers = listProviders();
+    const available = providers.filter(p => p.available);
+    console.log(`[routes] Current routing context:\n`);
+    console.log(`  Provider:     ${route.provider}`);
+    console.log(`  Model:        ${route.model}`);
+    console.log(`  Mode:         ${route.mode}`);
+    console.log(`  Cost tier:    ${route.costTier}`);
+    if (route.blastRadius) console.log(`  Blast radius: ${route.blastRadius}`);
+    console.log(`\n  Available providers (${available.length}/${providers.length}):`);
+    for (const p of providers) {
+      const mark = p.active ? "▶" : p.available ? "✓" : "✗";
+      console.log(`    ${mark} ${p.name.padEnd(14)} ${p.available ? p.keyVar : "(no key)"}`);
+    }
+    console.log(`\n  Model table (mode=${route.mode}, provider=${route.provider}):`);
+    for (const mode of ["query", "code", "plan", "small", "medium", "large", "critical"] as const) {
+      const key = `${mode}:${route.provider}`;
+      const model = MODEL_TABLE[key] || "-";
+      const active = mode === route.mode ? " ◀" : "";
+      console.log(`    ${mode.padEnd(10)} → ${model}${active}`);
+    }
+    break;
+  }
+
   default:
     console.error(`Error: Unknown command: ${subCmd}`);
     exitCode = 1;
