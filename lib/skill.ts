@@ -152,6 +152,8 @@ const SKILLS: Record<string, SkillDef> = {
                systemPrompt: "You are a deployment engineer. Plan and execute deployments safely: pre-flight checks, rollback strategy, health verification, and post-deploy validation." },
   brainstorm: { name: "brainstorm", artifact: "analysis", description: "Ideation and divergent thinking",
                systemPrompt: "You are a creative strategist. Generate diverse ideas, explore unconventional approaches, challenge assumptions, and map possibility space. Organize ideas by feasibility and impact." },
+  redoc:     { name: "redoc",     artifact: "document", description: "Save, version, and publish docs from source to docs/",
+               systemPrompt: "You are a documentation publisher. Run the ^redoc cycle to save previous doc versions, publish updated docs from the knowledge source, and produce a versioned manifest." },
   integrate: { name: "integrate", artifact: "report",   description: "CI/CD integration loop — find→break→fix→verify",
                systemPrompt: `You are a DevOps integration engineer running a continuous improvement loop.
 Your cycle: DISCOVER → BREAK → FIX → VERIFY → REPORT.
@@ -1148,6 +1150,17 @@ async function main(): Promise<number> {
   if (args[0] === "sequent") {
     const seqArgs = args.slice(1);
     const result = spawnSync(BUN, ["run", join(AGENCE_ROOT, "lib", "sequent.ts"), ...seqArgs], {
+      cwd: AGENCE_ROOT,
+      env: { ...process.env, AGENCE_ROOT },
+      stdio: "inherit",
+    });
+    return result.status ?? 1;
+  }
+
+  // Redoc delegation: airun skill redoc <subcommand> [args...]
+  if (args[0] === "redoc") {
+    const redocArgs = args.slice(1);
+    const result = spawnSync(BUN, ["run", join(AGENCE_ROOT, "lib", "redoc.ts"), ...redocArgs], {
       cwd: AGENCE_ROOT,
       env: { ...process.env, AGENCE_ROOT },
       stdio: "inherit",

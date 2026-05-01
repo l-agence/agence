@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "timestamp": "2026-05-01T15:18:55.989Z",
+  "files": [
+    "AGENCE.md",
+    "AGENTS-ROUTING.md",
+    "ANNOUNCE-v0.6.0-alpha.md",
+    "ARCHITECTURE.md",
+    "DASHBOARDS.md",
+    "FIRST-RUN.md",
+    "HANDOFF-HAIKU-TO-SONNET.md",
+    "INDEX.md",
+    "MATRICES.md",
+    "ROUTING.md",
+    "SEC-LABELS.md",
+    "SESSION-ARCHITECTURE.md",
+    "SESSION-PERSISTENCE.md",
+    "SETUP.md",
+    "SHARDING.md",
+    "SHELL_DETECTION.md",
+    "SWARM.md",
+    "SYMBOLS.md",
+    "SYMLINK-ROUTING.md",
+    "TAXONOMY.md",
+    "TUTORIAL.md",
+    "VERIFICATION-ARCHITECTURE.md"
+  ],
+  "saved_from": "/home/steff/git/.agence/knowledge/l-agence.org/docs",
+  "saved_to": "/home/steff/git/.agence/docs"
+}
