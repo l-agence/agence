@@ -16,6 +16,7 @@ nexus/signals/
 nexus/logs/
 nexus/tmp/
 nexus/memory/
+nexus/cost/
 
 # Private knowledge (local-only, never shared)
 knowledge/private/
