@@ -34,6 +34,7 @@
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { spawnSync } from "child_process";
+import { loadMergedPolicy, confirmDeescalation, type MergedPolicy, type PolicyOverride, type Tier as PolicyTier } from "./policy.ts";
 
 // ─── Environment ─────────────────────────────────────────────────────────────
 
@@ -80,334 +81,19 @@ let _cachedPolicy: LoadedPolicy | null = null;
 function loadPolicy(): LoadedPolicy {
   if (_cachedPolicy) return _cachedPolicy;
 
-  if (!existsSync(POLICY_PATH)) {
-    console.error(`[guard] FATAL: Policy not found: ${POLICY_PATH}`);
-    process.exit(2);
-  }
+  // Dynamic policy loading from YAML cascade (codex → org → shard → local)
+  const merged = loadMergedPolicy();
+  _cachedPolicy = {
+    globalBlocks: merged.globalBlocks,
+    rules: merged.rules.map(r => ({
+      tier: r.tier as Tier,
+      action: r.action as "allow" | "flag" | "escalate" | "deny",
+      pattern: r.pattern,
+      regex: r.regex,
+      source: r.source,
+    })),
+  };
 
-  // NOTE: AIPOLICY.yaml existence is verified (config anchor) but rules are code-defined.
-  // Dynamic policy loading from YAML is planned for v0.8+.
-  const rules: PolicyRule[] = [];
-  const globalBlocks: RegExp[] = [];
-
-  // ── Parse global_rules.shell_safety ──
-  // Block operators: >, >>, |, &&, ;, $(, `, <(, >(, <<
-  const blockOps = [">", ">>", "|", "&&", ";", "$(", "`", "<(", ">(", "<<"];
-  for (const op of blockOps) {
-    globalBlocks.push(new RegExp(escapeRegex(op)));
-  }
-
-  // SEC-012: Block embedded newlines/carriage returns (command separator bypass)
-  globalBlocks.push(/[\n\r]/);
-
-  // Block privilege escalation
-  const blockPrivesc = ["sudo", "doas", "runas"];
-  for (const cmd of blockPrivesc) {
-    globalBlocks.push(new RegExp(`(?:^|\\s)${cmd}(?:\\s|$)`));
-  }
-
-  // Block background execution
-  globalBlocks.push(/&\s*$/);
-
-  // Block interpreters
-  const blockInterp = ["bash -c", "sh -c", "python -c", "node -e"];
-  for (const interp of blockInterp) {
-    globalBlocks.push(new RegExp(`(?:^|\\s)${escapeRegex(interp)}(?:\\s|$)`));
-  }
-
-  // Block env exposure
-  const blockEnv = ["printenv", "env"];
-  for (const cmd of blockEnv) {
-    globalBlocks.push(new RegExp(`(?:^|\\s)${cmd}(?:\\s|$)`));
-  }
-
-  // ── Parse whitelists → T0 rules ──
-
-  // Git CLI whitelist
-  const gitSafe = [
-    "git status", "git log", "git show", "git diff", "git branch",
-    "git tag", "git reflog", "git describe", "git shortlog",
-    "git config --list", "git remote", "git rev-parse", "git symbolic-ref",
-    "git name-rev", "git show-ref", "git ls-files", "git ls-tree",
-    "git blame", "git grep", "git cat-file", "git fetch --dry-run",
-    "git ls-remote",
-  ];
-  for (const cmd of gitSafe) {
-    rules.push({
-      tier: "T0", action: "allow",
-      pattern: cmd,
-      regex: new RegExp(`^${escapeRegex(cmd)}(\\s|$)`),
-      source: "whitelist.git_cli",
-    });
-  }
-
-  // GitHub CLI whitelist
-  const ghSafe = [
-    "gh repo view", "gh repo list", "gh repo search",
-    "gh pr list", "gh pr view", "gh pr status", "gh pr checks",
-    "gh issue list", "gh issue view",
-    "gh run list", "gh run view", "gh run download",
-    "gh workflow list", "gh workflow view",
-    "gh auth status", "gh org list", "gh api GET",
-  ];
-  for (const cmd of ghSafe) {
-    rules.push({
-      tier: "T0", action: "allow",
-      pattern: cmd,
-      regex: new RegExp(`^${escapeRegex(cmd)}(\\s|$)`),
-      source: "whitelist.github_cli",
-    });
-  }
-
-  // AWS CLI whitelist (prefix-based)
-  const awsSafePrefixes = ["describe-", "get-", "list-", "head-"];
-  for (const prefix of awsSafePrefixes) {
-    rules.push({
-      tier: "T0", action: "allow",
-      pattern: `aws * ${prefix}*`,
-      regex: new RegExp(`^aws\\s+\\S+\\s+${escapeRegex(prefix)}`),
-      source: "whitelist.aws_cli",
-    });
-  }
-  // Also: aws s3 ls
-  rules.push({
-    tier: "T0", action: "allow",
-    pattern: "aws s3 ls",
-    regex: /^aws\s+s3\s+ls(\s|$)/,
-    source: "whitelist.aws_cli",
-  });
-
-  // Terraform whitelist
-  const tfSafe = ["terraform init", "terraform validate", "terraform plan"];
-  for (const cmd of tfSafe) {
-    rules.push({
-      tier: "T0", action: "allow",
-      pattern: cmd,
-      regex: new RegExp(`^${escapeRegex(cmd)}(\\s|$)`),
-      source: "whitelist.terraform",
-    });
-  }
-  // terraform init --upgrade → blocked (T3)
-  rules.push({
-    tier: "T3", action: "deny",
-    pattern: "terraform init --upgrade",
-    regex: /^terraform\s+init\s+.*--upgrade/,
-    source: "blacklist.terraform",
-  });
-
-  // Linux shell read-only
-  // SEC-012: Block destructive flags for commands that are otherwise T0 read-only
-  // SEC-013: Extend to awk exec, sed exec/write, find file-output
-  const destructivePatterns: Array<{ pattern: string; regex: RegExp; source: string }> = [
-    { pattern: "sed -i", regex: /^sed\s+.*-i/, source: "blacklist.linux_destructive" },
-    { pattern: "sed 'e' (execute)", regex: /^sed\s+.*['"]e/, source: "blacklist.linux_destructive" },
-    { pattern: "sed 'w' (write)", regex: /^sed\s+.*['"]w/, source: "blacklist.linux_destructive" },
-    { pattern: "sed s///e (execute flag)", regex: /^sed\s+.*\/\w*e\w*['"]/, source: "blacklist.linux_destructive" },
-    { pattern: "find -exec", regex: /^find\s+.*-exec/, source: "blacklist.linux_destructive" },
-    { pattern: "find -delete", regex: /^find\s+.*-delete/, source: "blacklist.linux_destructive" },
-    { pattern: "find -ok", regex: /^find\s+.*-ok/, source: "blacklist.linux_destructive" },
-    { pattern: "find -fls", regex: /^find\s+.*-fls/, source: "blacklist.linux_destructive" },
-    { pattern: "find -fprintf", regex: /^find\s+.*-fprintf/, source: "blacklist.linux_destructive" },
-    { pattern: "awk system()", regex: /^awk\s+.*system\s*\(/, source: "blacklist.linux_destructive" },
-    { pattern: "awk getline", regex: /^awk\s+.*\bgetline\b/, source: "blacklist.linux_destructive" },
-  ];
-  for (const dp of destructivePatterns) {
-    rules.push({
-      tier: "T2", action: "escalate",
-      pattern: dp.pattern,
-      regex: dp.regex,
-      source: dp.source,
-    });
-  }
-
-  const linuxRead = [
-    "ls", "stat", "file", "cat", "less", "head", "tail", "wc", "du", "df", "tree",
-    "grep", "egrep", "fgrep", "awk", "sed", "cut", "sort", "uniq", "tr",
-    "whoami", "id", "uname", "uptime", "date", "ps", "top", "htop", "free",
-    "lscpu", "lsblk", "ip addr", "netstat", "ss",
-    "apt list", "apt-cache policy", "rpm -qa", "dpkg -l",
-    "find", "which", "type", "command -v", "echo", "printf",
-  ];
-  for (const cmd of linuxRead) {
-    rules.push({
-      tier: "T0", action: "allow",
-      pattern: cmd,
-      regex: new RegExp(`^${escapeRegex(cmd)}(\\s|$)`),
-      source: "whitelist.linux_shell",
-    });
-  }
-
-  // PowerShell safe verbs
-  const psSafeVerbs = ["Get", "Test", "Measure", "Select", "Where", "Sort", "Group", "Compare"];
-  for (const verb of psSafeVerbs) {
-    rules.push({
-      tier: "T0", action: "allow",
-      pattern: `${verb}-*`,
-      regex: new RegExp(`^${verb}-\\w+`, "i"),
-      source: "whitelist.powershell",
-    });
-  }
-
-  // ── Parse blacklists → T2/T3 rules ──
-
-  // Git destructive (T3 = block)
-  const gitDestructive = [
-    "git clean", "git reset --hard", "git push --force",
-    "git filter-branch", "git gc", "git fsck",
-  ];
-  for (const cmd of gitDestructive) {
-    rules.push({
-      tier: "T3", action: "deny",
-      pattern: cmd,
-      regex: new RegExp(`^${escapeRegex(cmd)}(\\s|$)`),
-      source: "blacklist.git_cli",
-    });
-  }
-
-  // Git write (T2 = escalate — needs human)
-  const gitWrite = [
-    "git commit", "git push", "git pull", "git merge", "git rebase",
-    "git checkout", "git switch", "git add", "git stash",
-  ];
-  for (const cmd of gitWrite) {
-    rules.push({
-      tier: "T2", action: "escalate",
-      pattern: cmd,
-      regex: new RegExp(`^${escapeRegex(cmd)}(\\s|$)`),
-      source: "blacklist.git_cli",
-    });
-  }
-
-  // GitHub CLI destructive (T3)
-  const ghDestructive = [
-    "gh repo delete", "gh secret set", "gh variable set",
-  ];
-  for (const cmd of ghDestructive) {
-    rules.push({
-      tier: "T3", action: "deny",
-      pattern: cmd,
-      regex: new RegExp(`^${escapeRegex(cmd)}(\\s|$)`),
-      source: "blacklist.github_cli",
-    });
-  }
-
-  // GitHub CLI write (T2)
-  const ghWrite = [
-    "gh repo create", "gh pr merge", "gh pr close",
-    "gh issue close", "gh release create", "gh workflow run",
-  ];
-  for (const cmd of ghWrite) {
-    rules.push({
-      tier: "T2", action: "escalate",
-      pattern: cmd,
-      regex: new RegExp(`^${escapeRegex(cmd)}(\\s|$)`),
-      source: "blacklist.github_cli",
-    });
-  }
-
-  // AWS destructive prefixes (T3)
-  const awsDestructive = [
-    "delete-", "terminate-", "stop-",
-  ];
-  for (const prefix of awsDestructive) {
-    rules.push({
-      tier: "T3", action: "deny",
-      pattern: `aws * ${prefix}*`,
-      regex: new RegExp(`^aws\\s+\\S+\\s+${escapeRegex(prefix)}`),
-      source: "blacklist.aws_cli",
-    });
-  }
-
-  // AWS write prefixes (T2)
-  const awsWrite = [
-    "create-", "put-", "update-", "modify-", "attach-", "detach-", "start-",
-  ];
-  for (const prefix of awsWrite) {
-    rules.push({
-      tier: "T2", action: "escalate",
-      pattern: `aws * ${prefix}*`,
-      regex: new RegExp(`^aws\\s+\\S+\\s+${escapeRegex(prefix)}`),
-      source: "blacklist.aws_cli",
-    });
-  }
-
-  // Terraform destructive (T3)
-  const tfDestructive = ["terraform destroy", "terraform apply"];
-  for (const cmd of tfDestructive) {
-    rules.push({
-      tier: "T3", action: "deny",
-      pattern: cmd,
-      regex: new RegExp(`^${escapeRegex(cmd)}(\\s|$)`),
-      source: "blacklist.terraform",
-    });
-  }
-
-  // Linux shell destructive (T3)
-  const linuxDestructive = [
-    "rm", "chmod", "chown", "kill", "killall",
-    "systemctl", "service", "shutdown", "reboot", "umount",
-  ];
-  for (const cmd of linuxDestructive) {
-    rules.push({
-      tier: "T3", action: "deny",
-      pattern: cmd,
-      regex: new RegExp(`^${escapeRegex(cmd)}(\\s|$)`),
-      source: "blacklist.linux_shell",
-    });
-  }
-
-  // Linux shell write (T2)
-  const linuxWrite = ["mv", "cp", "mkdir", "touch", "tee"];
-  for (const cmd of linuxWrite) {
-    rules.push({
-      tier: "T2", action: "escalate",
-      pattern: cmd,
-      regex: new RegExp(`^${escapeRegex(cmd)}(\\s|$)`),
-      source: "blacklist.linux_shell",
-    });
-  }
-
-  // PowerShell destructive verbs (T3)
-  const psDestructive = ["Remove", "Clear", "Restart", "Stop", "Invoke"];
-  for (const verb of psDestructive) {
-    rules.push({
-      tier: "T3", action: "deny",
-      pattern: `${verb}-*`,
-      regex: new RegExp(`^${verb}-\\w+`, "i"),
-      source: "blacklist.powershell",
-    });
-  }
-
-  // PowerShell write verbs (T2)
-  const psWrite = ["Set", "New", "Add", "Start", "Write"];
-  for (const verb of psWrite) {
-    rules.push({
-      tier: "T2", action: "escalate",
-      pattern: `${verb}-*`,
-      regex: new RegExp(`^${verb}-\\w+`, "i"),
-      source: "blacklist.powershell",
-    });
-  }
-
-  // PowerShell dangerous cmdlets (T3)
-  const psDangerous = [
-    "Out-File", "Invoke-Expression", "Invoke-Command",
-  ];
-  for (const cmd of psDangerous) {
-    rules.push({
-      tier: "T3", action: "deny",
-      pattern: cmd,
-      regex: new RegExp(`^${escapeRegex(cmd)}(\\s|$)`, "i"),
-      source: "blacklist.powershell",
-    });
-  }
-
-  // Sort: T3 first (deny), then T2 (escalate), then T0 (allow)
-  // This ensures deny rules are checked before allow rules
-  const tierOrder: Record<Tier, number> = { T3: 0, T2: 1, T1: 2, T0: 3 };
-  rules.sort((a, b) => tierOrder[a.tier] - tierOrder[b.tier]);
-
-  _cachedPolicy = { globalBlocks, rules };
   return _cachedPolicy;
 }
 
@@ -446,6 +132,23 @@ function checkCommand(command: string): GuardDecision {
   // ── Match against classified rules (deny first, then escalate, then allow) ──
   for (const rule of policy.rules) {
     if (rule.regex.test(trimmed)) {
+      // Check for de-escalation override — requires merkle log + human confirm
+      if (rule.source.includes("[override:")) {
+        const merged = loadMergedPolicy();
+        const override = merged.overrides.find(o => trimmed.startsWith(o.command) || rule.pattern === o.command);
+        if (override) {
+          if (!confirmDeescalation(override, trimmed)) {
+            // Human denied the override — enforce original tier
+            return {
+              approved: false, tier: override.from as Tier, command: trimmed,
+              reason: `De-escalation denied by human (${override.from}→${override.to}): ${rule.pattern}`,
+              rule: rule.source, agent, timestamp: ts,
+            };
+          }
+          // Human approved — fall through to normal action
+        }
+      }
+
       switch (rule.action) {
         case "deny":
           return {

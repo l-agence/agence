@@ -19,6 +19,9 @@ global_rules:
       - ";"
       - "$("
       - "`"
+      - "<("
+      - ">("
+      - "<<"
     block_privilege_escalation:
       - "sudo"
       - "doas"
@@ -188,6 +191,12 @@ whitelist:
       - "du"
       - "df"
       - "tree"
+      - "find"
+      - "which"
+      - "type"
+      - "command -v"
+      - "echo"
+      - "printf"
 
     text_processing:
 
@@ -278,12 +287,19 @@ blacklist:
       - "git pull"
       - "git merge"
       - "git rebase"
-      - "git reset"
       - "git checkout"
       - "git switch"
       - "git add"
       - "git stash"
+
+    destructive_commands:
+
       - "git clean"
+      - "git reset --hard"
+      - "git push --force"
+      - "git filter-branch"
+      - "git gc"
+      - "git fsck"
 
 
   github_cli:
@@ -291,28 +307,34 @@ blacklist:
     unsafe_commands:
 
       - "gh repo create"
-      - "gh repo delete"
       - "gh pr merge"
       - "gh pr close"
       - "gh issue close"
       - "gh release create"
+      - "gh workflow run"
+
+    destructive_commands:
+
+      - "gh repo delete"
       - "gh secret set"
       - "gh variable set"
-      - "gh workflow run"
 
 
   aws_cli:
 
-    blocked_prefixes:
+    unsafe_prefixes:
 
       - "create-"
-      - "delete-"
       - "put-"
       - "update-"
       - "modify-"
       - "attach-"
       - "detach-"
       - "start-"
+
+    destructive_prefixes:
+
+      - "delete-"
       - "stop-"
       - "terminate-"
 
@@ -327,7 +349,7 @@ blacklist:
 
   terraform:
 
-    unsafe_commands:
+    destructive_commands:
 
       - "terraform destroy"
       - "terraform apply"
@@ -340,11 +362,17 @@ blacklist:
 
   linux_shell:
 
+    unsafe_commands:
+
+      - "mv"
+      - "cp"
+      - "mkdir"
+      - "touch"
+      - "tee"
+
     destructive_commands:
 
       - "rm"
-      - "mv"
-      - "cp"
       - "chmod"
       - "chown"
       - "kill"
@@ -359,23 +387,24 @@ blacklist:
 
   powershell:
 
-    blocked_verbs:
+    unsafe_commands:
 
       - "Set"
       - "New"
-      - "Remove"
       - "Add"
+      - "Start"
+      - "Write"
+
+    destructive_commands:
+
+      - "Remove"
       - "Clear"
       - "Restart"
       - "Stop"
-      - "Start"
       - "Invoke"
-      - "Write"
 
     dangerous_cmdlets:
 
       - "Out-File"
-      - "Export-*"
-      - "Import-*"
       - "Invoke-Expression"
       - "Invoke-Command"
