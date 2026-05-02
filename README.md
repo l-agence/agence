@@ -1,7 +1,7 @@
 # l'Agence — Agentic Engineering Co-Environments
 
 **Author**: Stephane Korning · 2026 · [MIT + Commons Clause](LICENSE.md)  
-**Version**: v1.0.0 · April 2026
+**Version**: v1.0.0 · May 2026
 
 > **The governance layer for AI coding agents.**  
 > Every agent action classified, gated, and cryptographically logged — regardless of which LLM or tool runs it.
@@ -51,11 +51,11 @@ Unknown commands default to T2. Not T0. **Fail-closed.** The guard runs as a sep
 
 | | |
 |---|---|
-| **16,258** | Lines of code (9,939 TypeScript + 6,319 bash) |
-| **413** | Tests with 989 assertions |
-| **266** | Security-specific tests (132 guard + 134 hardening) |
-| **7** | Red-team cycles completed (SEC-008 through SEC-015) |
-| **25** | Orchestration skills (`^fix`, `^review`, `^hack`, `^peers`, `^ken`...) |
+| **30,701** | Lines of production code (23.9K TypeScript + 6.8K bash) |
+| **751** | Tests with 1,768 assertions across 21 files |
+| **279** | Security-specific tests (guard + hardening + SEC regressions) |
+| **9** | Red-team cycles completed (SEC-008 through SEC-019) |
+| **33+** | Orchestration skills (`^fix`, `^review`, `^hack`, `^peers`, `^vault`...) |
 | **18** | Registered agents (10 persona, 5 tool, 1 loop, 2 ensemble) |
 | **12** | LLM providers (Anthropic, OpenAI, Azure, Google, Mistral, Groq, Ollama...) |
 | **10** | MCP tools + 3 MCP resources (Model Context Protocol server) |
@@ -249,17 +249,21 @@ Each tangent gets: isolated git worktree, optional Docker container (`--cap-drop
 bun test                          # Full suite
 ```
 
-**413 tests**, 989 assertions, 0 failures:
+**751 tests**, 1,768 assertions, 0 failures across 21 files:
 
 | Suite | Tests | Coverage |
 |---|---|---|
 | `guard.test.ts` | 132 | Command gate, tier escalation, eval safety |
-| `security-hardening.test.ts` | 134 | HMAC, signal forgery, injection prevention, SEC-010/012/013/014/015 regressions |
+| `security-hardening.test.ts` | 134 | HMAC, signal forgery, injection prevention, SEC-010→019 regressions |
 | `memory.test.ts` | 62 | COGNOS 3-store: retain/recall/cache/forget/promote/distill |
 | `peers-dispatch.test.ts` | 53 | Peer consensus, mixed routing |
-| `mcp-client.test.ts` | 10 | MCP client guard-gating, env sanitization, config validation |
+| `queue.test.ts` | 42 | Work queue, dashboard, GitHub Issues bridge |
+| `runs.test.ts` | 35 | SWE run lifecycle, aggregation, outcomes |
+| `vault.test.ts` | 20 | Hermetic vault init/sync/push/pull + SEC-019 security |
+| `setup.test.ts` | 10 | Interactive wizard, escaping, validation |
+| `mcp-client.test.ts` | 10 | MCP client guard-gating, env sanitization |
 | `mcp.test.ts` | 10 | MCP tool/resource surface verification |
-| `sequent.test.ts` | 12 | Compilation, CLI dispatch, delegation |
+| `sequent.test.ts` | 12 | Tournament tangents, CLI dispatch |
 
 ---
 
