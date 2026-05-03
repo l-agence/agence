@@ -1,5 +1,26 @@
 {
+  "name": "@l-agence/mcp-server-agence",
   "version": "1.0.0",
+  "description": "MCP server for Agence — AI governance framework with policy enforcement, skills, memory, and multi-LLM consensus",
+  "mcpName": "io.github.l-agence/agence",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/l-agence/agence.git"
+  },
+  "license": "MIT",
+  "bin": {
+    "mcp-server-agence": "lib/mcp.ts"
+  },
+  "files": [
+    "lib/mcp.ts",
+    "lib/*.ts",
+    "codex/AIPOLICY.yaml",
+    "agents/",
+    "skills/",
+    "README.md",
+    "MCP.md"
+  ],
+  "keywords": ["mcp", "mcp-server", "ai-governance", "policy-enforcement", "model-context-protocol"],
   "scripts": {
     "test": "bun test --timeout 60000"
   },
