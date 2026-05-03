@@ -103,6 +103,10 @@ Flavors: `code` (Claude + GPT-4o + Gemini), `light` (Haiku + GPT-4o-mini + Flash
 - Ledger entries are Merkle-chained (SHA-256) — tamper detection built in
 - No secrets exposed via MCP resources
 - AGENCE_ROOT validated at startup
+- **Transport: stdio only** — no network socket, no remote attack surface
+- API keys (`ANTHROPIC_API_KEY`, etc.) are runtime env vars, never persisted in the package
+
+> **Warning**: Do NOT expose this server over HTTP/SSE transport without adding an authentication layer. The stdio transport is inherently secure (only the spawning process can communicate), but a network transport would allow unauthenticated callers to invoke `peers_run` (consuming your LLM API credits) or `skill_run` (executing skills on your machine).
 
 ---
 
