@@ -173,7 +173,7 @@ YOUR REPO/
 
 **Runtime**: Bun + bash. No Python. No pip. No npm install of untrusted packages in the critical path.
 
-**MCP**: Agence exposes itself as an MCP server (10 tools, 3 resources) so any MCP-compatible client can use agence's governance layer. Agence also acts as an MCP client — consuming tools from external MCP servers.
+**MCP**: Agence exposes itself as an MCP server (10 tools, 3 resources) so any MCP-compatible client can use agence's governance layer. Agence also acts as an MCP client — consuming tools from external MCP servers. See [MCP.md](MCP.md) for integration guide.
 
 ---
 
