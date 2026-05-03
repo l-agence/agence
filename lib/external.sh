@@ -228,7 +228,7 @@ mode_external() {
       return $?
       ;;
     ghrun)
-      # GitHub CLI: run list/view (T0: auto-execute)
+      # GitHub CLI: run list/view/watch (T0: auto-execute)
       local ghrun_sub="${2:-list}"
       shift 2 2>/dev/null || shift 1 2>/dev/null || true
       case "$ghrun_sub" in
@@ -238,21 +238,91 @@ mode_external() {
         view)
           bash "$AGENCE_ROOT/bin/aido" gh run view "$@"
           ;;
+        watch)
+          bash "$AGENCE_ROOT/bin/aido" gh run watch "$@"
+          ;;
         *)
-          echo "Usage: agence /ghrun [list|view] [args...]" >&2
+          echo "Usage: agence /ghrun [list|view|watch] [args...]" >&2
           return 1
           ;;
       esac
       return $?
       ;;
+    ghview)
+      # GitHub CLI: view a run, PR, issue, or repo (T0: auto-execute)
+      local ghview_type="${2:-run}"
+      shift 2 2>/dev/null || shift 1 2>/dev/null || true
+      case "$ghview_type" in
+        run)
+          bash "$AGENCE_ROOT/bin/aido" gh run view "$@"
+          ;;
+        pr)
+          bash "$AGENCE_ROOT/bin/aido" gh pr view "$@"
+          ;;
+        issue)
+          bash "$AGENCE_ROOT/bin/aido" gh issue view "$@"
+          ;;
+        repo)
+          bash "$AGENCE_ROOT/bin/aido" gh repo view "$@"
+          ;;
+        *)
+          echo "Usage: agence /ghview [run|pr|issue|repo] [args...]" >&2
+          return 1
+          ;;
+      esac
+      return $?
+      ;;
+    ghwatch)
+      # GitHub CLI: watch a workflow run (T0: auto-execute)
+      bash "$AGENCE_ROOT/bin/aido" gh run watch "$@"
+      return $?
+      ;;
     ghflow)
-      # GitHub CLI: list workflows (T0: auto-execute)
-      bash "$AGENCE_ROOT/bin/aido" gh workflow list
+      # GitHub CLI: workflow list/view/run (T0/T2)
+      local ghflow_sub="${2:-list}"
+      shift 2 2>/dev/null || shift 1 2>/dev/null || true
+      case "$ghflow_sub" in
+        list)
+          bash "$AGENCE_ROOT/bin/aido" gh workflow list "$@"
+          ;;
+        view)
+          bash "$AGENCE_ROOT/bin/aido" gh workflow view "$@"
+          ;;
+        run)
+          echo "[T2] Triggering workflow run requires confirmation." >&2
+          bash "$AGENCE_ROOT/bin/aido" gh workflow run "$@"
+          ;;
+        *)
+          echo "Usage: agence /ghflow [list|view|run] [args...]" >&2
+          return 1
+          ;;
+      esac
       return $?
       ;;
     ghissue)
-      # GitHub CLI: list issues (T0: auto-execute)
-      bash "$AGENCE_ROOT/bin/aido" gh issue list
+      # GitHub CLI: issue list/view/create/close (T0/T2)
+      local ghissue_sub="${2:-list}"
+      shift 2 2>/dev/null || shift 1 2>/dev/null || true
+      case "$ghissue_sub" in
+        list)
+          bash "$AGENCE_ROOT/bin/aido" gh issue list "$@"
+          ;;
+        view)
+          bash "$AGENCE_ROOT/bin/aido" gh issue view "$@"
+          ;;
+        create)
+          echo "[T2] Creating issue requires confirmation." >&2
+          bash "$AGENCE_ROOT/bin/aido" gh issue create "$@"
+          ;;
+        close)
+          echo "[T2] Closing issue requires confirmation." >&2
+          bash "$AGENCE_ROOT/bin/aido" gh issue close "$@"
+          ;;
+        *)
+          echo "Usage: agence /ghissue [list|view|create|close] [args...]" >&2
+          return 1
+          ;;
+      esac
       return $?
       ;;
   esac
