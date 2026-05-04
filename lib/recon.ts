@@ -34,10 +34,10 @@
 
 import {
   existsSync, mkdirSync, readdirSync, readFileSync,
-  statSync, writeFileSync,
+  rmSync, statSync, writeFileSync,
 } from "fs";
 import { basename, dirname, extname, join, relative, resolve } from "path";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 
 // ─── Environment ─────────────────────────────────────────────────────────────
 
@@ -179,7 +179,7 @@ function resolveTarget(raw: string): Target {
   const abs = raw === "." ? process.cwd() : resolve(raw);
   let outDir: string;
   try {
-    const remote = execSync("git remote get-url origin", { cwd: abs, encoding: "utf-8" }).trim();
+    const remote = execFileSync("git", ["remote", "get-url", "origin"], { cwd: abs, encoding: "utf-8" }).trim();
     // Parse git remote URL → DNS path
     const m = remote.match(/(?:https?:\/\/|git@)([^/:]+)[/:](.+?)(?:\.git)?$/);
     if (m) {
@@ -352,7 +352,7 @@ function collectFiles(dir: string, base: string = dir): string[] {
 
 function getGitSHA(dir: string): string | undefined {
   try {
-    return execSync("git rev-parse HEAD", { cwd: dir, stdio: ["ignore", "pipe", "ignore"] })
+    return execFileSync("git", ["rev-parse", "HEAD"], { cwd: dir, stdio: ["ignore", "pipe", "ignore"] })
       .toString().trim();
   } catch {
     return undefined;
@@ -361,7 +361,7 @@ function getGitSHA(dir: string): string | undefined {
 
 function getChangedFilesSince(dir: string, sha: string): string[] {
   try {
-    const out = execSync(`git diff --name-only ${sha} HEAD`, {
+    const out = execFileSync("git", ["diff", "--name-only", sha, "HEAD"], {
       cwd: dir, stdio: ["ignore", "pipe", "ignore"],
     }).toString().trim();
     return out ? out.split("\n") : [];
@@ -703,7 +703,7 @@ function indexGitHubRepo(target: Target, mode: ReconMode): IndexJson | null {
   try {
     console.error(`[recon] cloning ${cloneUrl} → ${tmpDir}`);
     mkdirSync(tmpDir, { recursive: true });
-    execSync(`git clone --depth 1 --single-branch ${cloneUrl} "${tmpDir}"`, {
+    execFileSync("git", ["clone", "--depth", "1", "--single-branch", cloneUrl, tmpDir], {
       stdio: ["ignore", "ignore", "pipe"],
       timeout: 120_000,
     });
@@ -733,7 +733,7 @@ function indexGitHubRepo(target: Target, mode: ReconMode): IndexJson | null {
 
   // Clean up tmp clone
   try {
-    execSync(`rm -rf "${tmpDir}"`, { stdio: "ignore" });
+    rmSync(tmpDir, { recursive: true, force: true });
   } catch { /* best effort */ }
 
   return index;
@@ -746,8 +746,8 @@ function indexGitHubOrg(target: Target, mode: ReconMode): number {
 
   let repos: string[];
   try {
-    const out = execSync(
-      `gh repo list ${org} --limit 50 --json nameWithOwner --jq '.[].nameWithOwner'`,
+    const out = execFileSync(
+      "gh", ["repo", "list", org, "--limit", "50", "--json", "nameWithOwner", "--jq", ".[].nameWithOwner"],
       { stdio: ["ignore", "pipe", "ignore"], timeout: 30_000 },
     ).toString().trim();
     repos = out ? out.split("\n").filter(Boolean) : [];
@@ -795,8 +795,8 @@ function indexGitHubTopic(target: Target): number {
 
   let repos: Array<{ nameWithOwner: string; description: string; stargazerCount: number }>;
   try {
-    const out = execSync(
-      `gh search repos --topic="${tag}" --limit=30 --json nameWithOwner,description,stargazerCount`,
+    const out = execFileSync(
+      "gh", ["search", "repos", `--topic=${tag}`, "--limit=30", "--json", "nameWithOwner,description,stargazerCount"],
       { stdio: ["ignore", "pipe", "ignore"], timeout: 30_000 },
     ).toString().trim();
     repos = out ? JSON.parse(out) : [];
@@ -850,9 +850,9 @@ function indexUrl(target: Target): IndexJson | null {
 
   let html: string;
   try {
-    // Use curl for portability (available everywhere, no extra deps)
-    html = execSync(
-      `curl -fsSL --max-time 30 --max-filesize 2000000 -A "agence-recon/1.0" "${url}"`,
+    // Use curl with argument array — no shell interpretation of URL
+    html = execFileSync(
+      "curl", ["-fsSL", "--max-time", "30", "--max-filesize", "2000000", "-A", "agence-recon/1.0", url],
       { stdio: ["ignore", "pipe", "ignore"], timeout: 35_000 },
     ).toString();
   } catch {
@@ -971,6 +971,64 @@ if (sub === "status") {
 
 // recon <target> [--index|--analyse|--update] [--depth N]
 const targetRaw = sub;
+
+// ─── Input Validation ─────────────────────────────────────────────────────────
+// Reject targets containing shell metacharacters or path traversal sequences.
+// Even though we use execFileSync (no shell), validate for defense-in-depth.
+
+const UNSAFE_CHARS = /[;|&`$\\!><\r\n\x00-\x08\x0e-\x1f]/;
+if (UNSAFE_CHARS.test(targetRaw)) {
+  console.error(`[recon] error: target contains unsafe characters: ${JSON.stringify(targetRaw)}`);
+  process.exit(1);
+}
+
+// Validate GitHub slug format (org or org/repo)
+if (targetRaw.startsWith("github:")) {
+  const payload = targetRaw.slice("github:".length);
+  if (payload.startsWith("topics/")) {
+    const tag = payload.slice("topics/".length);
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/.test(tag)) {
+      console.error(`[recon] error: invalid topic tag: ${JSON.stringify(tag)}`);
+      process.exit(1);
+    }
+  } else if (!/^[a-zA-Z0-9._-]+(?:\/[a-zA-Z0-9._-]+)?$/.test(payload)) {
+    console.error(`[recon] error: invalid GitHub target: ${JSON.stringify(payload)}`);
+    process.exit(1);
+  }
+}
+
+// Validate URL targets
+if (targetRaw.startsWith("http://") || targetRaw.startsWith("https://")) {
+  try {
+    const parsed = new URL(targetRaw);
+    // Only allow http/https schemes
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new Error("invalid protocol");
+    }
+    // Block private/internal IPs (SSRF mitigation)
+    // Note: URL.hostname for IPv6 includes brackets, e.g. "[::1]"
+    const host = parsed.hostname;
+    const bareHost = host.replace(/^\[|\]$/g, ""); // strip IPv6 brackets
+    if (bareHost === "localhost" || bareHost === "127.0.0.1" || bareHost === "::1" ||
+        bareHost === "0.0.0.0" || bareHost === "0" ||
+        bareHost.startsWith("10.") || bareHost.startsWith("192.168.") ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(bareHost) || bareHost.endsWith(".local") ||
+        bareHost === "169.254.169.254" || bareHost === "metadata.google.internal" ||
+        bareHost.startsWith("169.254.") || bareHost.startsWith("fc00:") ||
+        bareHost.startsWith("fd") || bareHost.startsWith("fe80:")) {
+      console.error(`[recon] error: URL targets private/internal network: ${host}`);
+      process.exit(1);
+    }
+  } catch (e: any) {
+    if (e.message === "invalid protocol") {
+      console.error(`[recon] error: only http/https URLs are supported`);
+      process.exit(1);
+    }
+    console.error(`[recon] error: invalid URL: ${targetRaw}`);
+    process.exit(1);
+  }
+}
+
 const modeFlag = argv.find(a => ["--index", "--analyse", "--update"].includes(a));
 const mode: ReconMode = modeFlag === "--index"
   ? "index"

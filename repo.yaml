@@ -1,0 +1,65 @@
+# repo.yaml — Per-repository Agence configuration
+# This file is committed to git and declares what this repo needs from agence.
+# It replaces executable shell config (.agencerc) with a safe, declarative format.
+#
+# Loaded by: lib/config.ts → resolveRepoConfig()
+# Precedence: env vars > ~/.agence/config.yaml (user) > repo.yaml (this file)
+
+# ── Repository Identity ──────────────────────────────────────────────────────
+repo:
+  name: agence
+  org: l-agence
+  # Domain used in knowledge/ paths (auto-derived from git remote if unset)
+  domain: github.com/l-agence/agence
+
+# ── Shell Environment ────────────────────────────────────────────────────────
+# Declarative replacement for .agencerc shell exports.
+# These are set as env vars when agence spawns subprocesses.
+env:
+  # AI_DOCS: path to synthetic docs (relative to repo root)
+  AI_DOCS: .agence/synthetic/l-agence.org/docs
+  # Additional PATH entries (relative to repo root, prepended)
+  # AI_BIN is always auto-derived from agence location — do not set here.
+
+# ── Agents ───────────────────────────────────────────────────────────────────
+agents:
+  # Default agent for this repo (overrides global default)
+  default: "@"
+  # Allowed agents (empty = all from registry)
+  # allowed: ["@", "ralph", "claudia"]
+
+# ── Security ─────────────────────────────────────────────────────────────────
+security:
+  # Guard tier for unknown commands (T2 = escalate, T3 = deny)
+  unknown_command_tier: T2
+  # AIPOLICY.yaml path (relative to repo root; uses cascade if unset)
+  # policy: codex/AIPOLICY.yaml
+  # Max file size for recon indexing (bytes)
+  max_index_file_bytes: 500000
+  # URL allowlist for ^recon URL targets (empty = any non-private URL)
+  # recon_url_allowlist:
+  #   - "*.github.com"
+  #   - "*.npmjs.com"
+  #   - "*.socket.dev"
+
+# ── Shard (shared upstream ledger) ───────────────────────────────────────────
+# Auto-derived from git remote by replacing repo name with "ailedger".
+# Override: set AI_SHARD env var or uncomment below.
+# shard: https://github.com/l-agence/ailedger.git
+
+# ── Knowledge ────────────────────────────────────────────────────────────────
+knowledge:
+  # Org name for knowledge/ paths (auto-resolved from knowledge/@ symlink)
+  # org: l-agence.org
+  # Skip patterns for ^recon indexing (in addition to built-in SKIP_DIRS)
+  skip_dirs:
+    - .aider.tags.cache.v4
+    - .ailedger-upstream
+  skip_extensions:
+    - .history
+
+# ── LLM (repo-level overrides) ──────────────────────────────────────────────
+# These override config.yaml for this repo only.
+# llm:
+#   provider: anthropic
+#   model: claude-sonnet-4-5

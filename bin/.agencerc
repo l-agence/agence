@@ -149,8 +149,14 @@ export REPO_ROOT="$GIT_ROOT"
 
 # GitHub CLI detection
 if command -v gh &>/dev/null; then
-    # Get current gh user
-    export GITHUB_USER=$(gh auth status 2>&1 | grep "Logged in" | awk '{print $3}')
+    # Get current gh user (--active returns just the username on recent gh versions)
+    GITHUB_USER=$(gh api user --jq '.login' 2>/dev/null || echo "")
+    # Validate: must be a safe GitHub username
+    if [[ "$GITHUB_USER" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]]; then
+        export GITHUB_USER
+    else
+        export GITHUB_USER=""
+    fi
     export GH_AVAILABLE=true
 else
     export GH_AVAILABLE=false
@@ -166,6 +172,28 @@ if [[ "${AGENCE_DEBUG:-0}" == "1" ]]; then
     echo "[AGENCE] GIT_ROOT=$GIT_ROOT"
     echo "[AGENCE] AI_BIN=$AI_BIN"
     echo "[AGENCE] GITHUB_USER=$GITHUB_USER"
+fi
+
+# ============================================================================
+# STEP 4b: Load repo.yaml environment (declarative config)
+# ============================================================================
+# If repo.yaml exists and bun is available, load env vars from it.
+# This replaces arbitrary shell execution with validated YAML parsing.
+
+if [[ -f "$AI_ROOT/repo.yaml" ]] && command -v bun &>/dev/null; then
+    _repo_env=$(bun run "$AI_ROOT/lib/config.ts" 2>/dev/null | bun -e '
+      const data = JSON.parse(await Bun.stdin.text());
+      if (data?.env) for (const [k,v] of Object.entries(data.env)) console.log(k+"="+v);
+    ' 2>/dev/null) || true
+    if [[ -n "$_repo_env" ]]; then
+        while IFS='=' read -r _key _val; do
+            # Only export if key is a valid env var name and value has no shell metacharacters
+            if [[ "$_key" =~ ^[A-Z_][A-Z0-9_]*$ ]] && [[ ! "$_val" =~ [\$\`\|/\;/\&] ]]; then
+                export "$_key=$_val"
+            fi
+        done <<< "$_repo_env"
+    fi
+    unset _repo_env _key _val
 fi
 
 # ============================================================================

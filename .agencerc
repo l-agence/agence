@@ -22,11 +22,13 @@ export SHELL="${SHELL:-bash}"
 export SESSION="${SESSION:-unknown}"
 
 # Set default internal agence docs as an environment variable (synthetic DWM for agence itself)
-# Falls back to the repo-relative synthetic docs path; override by setting AI_DOCS before sourcing
+# Derive from AI_ROOT (set by bin/.agencerc bootstrap) — no command substitution needed.
 if [[ -z "${AI_DOCS:-}" ]]; then
-    _agence_root="${AGENCE_REPO:-$(git rev-parse --show-toplevel 2>/dev/null)}"
-    export AI_DOCS="${_agence_root}/.agence/synthetic/l-agence.org/docs"
-    unset _agence_root
+    if [[ -n "${AI_ROOT:-}" ]]; then
+        export AI_DOCS="${AI_ROOT}/synthetic/l-agence.org/docs"
+    elif [[ -n "${AGENCE_REPO:-}" ]]; then
+        export AI_DOCS="${AGENCE_REPO}/.agence/synthetic/l-agence.org/docs"
+    fi
 fi
 
 # ============================================================================
