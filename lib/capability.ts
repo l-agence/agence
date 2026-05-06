@@ -18,7 +18,7 @@
 //   If agent lacks required capability → T3 deny (even if tier allows)
 
 import { readFileSync, existsSync } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 
 // ─── Environment ─────────────────────────────────────────────────────────────
 
@@ -138,6 +138,10 @@ const CAPABILITY_RULES: CapabilityRule[] = [
 
 // ─── Capability Resolution ───────────────────────────────────────────────────
 
+// SEC: Shell metacharacters that indicate command chaining/injection.
+// If ANY of these appear unquoted, the command is NOT read-only regardless of prefix.
+const SHELL_METACHAR_RE = /[;|&`$(){}]/;
+
 export function requiredCapabilities(command: string): Capability[] {
   const trimmed = command.trim();
   const required: Set<Capability> = new Set();
@@ -149,7 +153,8 @@ export function requiredCapabilities(command: string): Capability[] {
   }
 
   // If no specific rule matched and command isn't read-only git/status,
-  // require CAP_EXEC_SHELL as baseline
+  // require CAP_EXEC_SHELL as baseline.
+  // SEC (B1): Commands with shell metacharacters are NEVER read-only.
   if (required.size === 0 && !isReadOnlyCommand(trimmed)) {
     required.add(CAPABILITIES.CAP_EXEC_SHELL);
   }
@@ -158,15 +163,20 @@ export function requiredCapabilities(command: string): Capability[] {
 }
 
 function isReadOnlyCommand(cmd: string): boolean {
+  // SEC (B1): Reject any command containing shell metacharacters — these can chain
+  // destructive operations after a read-only prefix (e.g., `git status; rm -rf /`).
+  if (SHELL_METACHAR_RE.test(cmd)) return false;
+
   const readOnly = [
     /^git\s+(status|log|show|diff|branch|tag|reflog|describe|remote|shortlog)/,
     /^ls\b/, /^cat\b/, /^head\b/, /^tail\b/, /^wc\b/, /^file\b/,
-    /^find\s+.*-type/, /^grep\b/, /^rg\b/, /^fd\b/, /^tree\b/,
+    // SEC (B2): find REMOVED — -exec/-delete/-fls provide RCE/file-write
+    /^grep\b/, /^rg\b/, /^fd\b/, /^tree\b/,
     /^echo\b/, /^printf\b/, /^date\b/, /^whoami\b/, /^pwd\b/,
     /^gh\s+(pr|issue|run|repo)\s+(list|view|status)/,
     /^aws\s+\S+\s+(describe|get|list|head)-/,
     /^terraform\s+(show|plan|output|state\s+list|validate|fmt)/,
-    /^bun\s+test\b/,
+    // SEC (B5): bun test REMOVED — executes arbitrary code
   ];
   return readOnly.some(r => r.test(cmd));
 }
@@ -365,9 +375,20 @@ export function checkDataAccess(agent: string, dataLevel: SecurityLevel): { allo
 // Maps file paths to their MLS security label based on directory hierarchy.
 
 export function pathSecurityLevel(filePath: string): SecurityLevel {
-  const rel = filePath.startsWith(AGENCE_ROOT)
-    ? filePath.slice(AGENCE_ROOT.length + 1)
-    : filePath;
+  // SEC (B7): Canonicalize to resolve ../ traversal before label matching.
+  // Without this, `organic/../../knowledge/private/x` would match organic/ → L1
+  // instead of its true target knowledge/private/ → L4.
+  const absPath = filePath.startsWith("/")
+    ? resolve(filePath)
+    : resolve(AGENCE_ROOT, filePath);
+
+  // SEC (B7): Paths resolving outside AGENCE_ROOT are treated as L4 (highest).
+  // A traversal like `organic/../../etc/passwd` escapes the managed tree —
+  // deny by default (fail-closed) rather than defaulting to L0_PUBLIC.
+  if (!absPath.startsWith(AGENCE_ROOT + "/") && absPath !== AGENCE_ROOT) {
+    return SECURITY_LEVELS.L4_HERMETIC;
+  }
+  const rel = absPath.slice(AGENCE_ROOT.length + 1);
 
   // Hermetic (L4) — private knowledge
   if (/^knowledge\/private\//.test(rel)) return SECURITY_LEVELS.L4_HERMETIC;

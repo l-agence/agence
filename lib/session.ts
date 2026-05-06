@@ -281,9 +281,12 @@ function sessionResume(sid: string): number {
   }
 
   // Output as eval-able shell exports
-  console.log(`export AI_CURRENT_SESSION="${sid}"`);
-  console.log(`export AI_LAST_COMMAND="${(meta.command || "").replace(/"/g, '\\"')}"`);
-  console.log(`export AI_LAST_EXIT="${meta.exit_code ?? ""}"`);
+  // SEC (B3): Use single-quote wrapping to prevent $() and backtick expansion.
+  // The POSIX idiom '...'\''...' safely handles embedded single quotes.
+  const shellEsc = (s: string) => "'" + s.replace(/'/g, "'\\''" ) + "'";
+  console.log(`export AI_CURRENT_SESSION=${shellEsc(sid)}`);
+  console.log(`export AI_LAST_COMMAND=${shellEsc(meta.command || "")}`);
+  console.log(`export AI_LAST_EXIT=${shellEsc(String(meta.exit_code ?? ""))}`);
 
   // Also print human-readable to stderr
   console.error("");
@@ -563,7 +566,8 @@ const CAP_SIGNALS = parseInt(process.env.AGENCE_CAP_SIGNALS || "500", 10);
 const CAP_LOGS = parseInt(process.env.AGENCE_CAP_LOGS || "100", 10);
 const CAP_COST = parseInt(process.env.AGENCE_CAP_COST || "90", 10);
 const CAP_TOTAL_MB = parseInt(process.env.AGENCE_CAP_TOTAL_MB || "100", 10);
-const CAP_TRANSCRIPTS_MB = parseInt(process.env.AGENCE_CAP_TRANSCRIPTS_MB || "2", 10);
+// SEC (B6): Floor at 1MB to prevent env-based mass deletion (CAP=0 evicts everything).
+const CAP_TRANSCRIPTS_MB = Math.max(1, parseInt(process.env.AGENCE_CAP_TRANSCRIPTS_MB || "2", 10));
 
 const SIGNAL_DIR = join(AI_ROOT, "nexus", "signals");
 const LOGS_DIR = join(AI_ROOT, "nexus", "logs");
@@ -587,7 +591,8 @@ function detectTranscriptDirs(): string[] {
     if (!existsSync(base)) continue;
     try {
       for (const ws of readdirSync(base, { withFileTypes: true })) {
-        if (!ws.isDirectory()) continue;
+        // SEC (B10): Skip symlinks to prevent evicting files outside expected dirs.
+        if (!ws.isDirectory() || ws.isSymbolicLink()) continue;
         const transcriptsDir = join(base, ws.name, "GitHub.copilot-chat", "transcripts");
         if (existsSync(transcriptsDir)) dirs.push(transcriptsDir);
       }
