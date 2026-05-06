@@ -16,6 +16,7 @@
 //   AGENCE_CAP_LOGS=100        max log files
 //   AGENCE_CAP_COST=90         max cost JSONL files (days)
 //   AGENCE_CAP_TOTAL_MB=100    max total nexus ephemeral size (MB)
+//   AGENCE_CAP_TRANSCRIPTS_MB=2 max single VS Code chat transcript size (MB)
 //
 // Exit codes: 0 = success, 1 = error
 
@@ -562,10 +563,80 @@ const CAP_SIGNALS = parseInt(process.env.AGENCE_CAP_SIGNALS || "500", 10);
 const CAP_LOGS = parseInt(process.env.AGENCE_CAP_LOGS || "100", 10);
 const CAP_COST = parseInt(process.env.AGENCE_CAP_COST || "90", 10);
 const CAP_TOTAL_MB = parseInt(process.env.AGENCE_CAP_TOTAL_MB || "100", 10);
+const CAP_TRANSCRIPTS_MB = parseInt(process.env.AGENCE_CAP_TRANSCRIPTS_MB || "2", 10);
 
 const SIGNAL_DIR = join(AI_ROOT, "nexus", "signals");
 const LOGS_DIR = join(AI_ROOT, "nexus", "logs");
 const COST_DIR = join(AI_ROOT, "nexus", "cost");
+
+/**
+ * Detect VS Code chat transcript directory.
+ * Scans ~/.vscode-server/data/User/workspaceStorage/ for copilot-chat transcripts.
+ * Returns all transcript directories found (may be multiple workspaces).
+ */
+function detectTranscriptDirs(): string[] {
+  const home = process.env.HOME || process.env.USERPROFILE || "";
+  const bases = [
+    join(home, ".vscode-server", "data", "User", "workspaceStorage"),
+    join(home, ".vscode", "data", "User", "workspaceStorage"),
+    join(home, "AppData", "Roaming", "Code", "User", "workspaceStorage"),
+  ];
+
+  const dirs: string[] = [];
+  for (const base of bases) {
+    if (!existsSync(base)) continue;
+    try {
+      for (const ws of readdirSync(base, { withFileTypes: true })) {
+        if (!ws.isDirectory()) continue;
+        const transcriptsDir = join(base, ws.name, "GitHub.copilot-chat", "transcripts");
+        if (existsSync(transcriptsDir)) dirs.push(transcriptsDir);
+      }
+    } catch { /* permission denied etc */ }
+  }
+  return dirs;
+}
+
+/**
+ * Evict VS Code chat transcripts exceeding the per-file size cap.
+ * Evicts largest-first (they cause the most pain on resume).
+ * Never evicts the most recent transcript (current session).
+ */
+export function evictTranscripts(maxFileMB: number, dryRun: boolean = false): EvictResult {
+  const maxBytes = maxFileMB * 1024 * 1024;
+  const dirs = detectTranscriptDirs();
+  let totalEvicted = 0;
+  let totalFreed = 0;
+  let totalBefore = 0;
+
+  for (const dir of dirs) {
+    const files = collectFiles(dir, (f) => f.endsWith(".jsonl"));
+    totalBefore += files.length;
+
+    if (files.length <= 1) continue; // never evict the only/last session
+
+    // Sort by size descending for eviction, but protect the newest file
+    const newest = files.reduce((a, b) => a.mtime > b.mtime ? a : b);
+    const oversized = files
+      .filter(f => f.size > maxBytes && f.path !== newest.path)
+      .sort((a, b) => b.size - a.size); // largest first
+
+    for (const f of oversized) {
+      if (!dryRun) {
+        try { unlinkSync(f.path); } catch { /* skip */ }
+      }
+      totalEvicted++;
+      totalFreed += f.size;
+    }
+  }
+
+  return {
+    dir: dirs.join(", ") || "(none found)",
+    before: totalBefore,
+    after: totalBefore - totalEvicted,
+    evicted: totalEvicted,
+    freed_bytes: totalFreed,
+  };
+}
 
 interface FileEntry {
   path: string;
@@ -658,6 +729,7 @@ export interface GCReport {
   signals: EvictResult;
   logs: EvictResult;
   cost: EvictResult;
+  transcripts: EvictResult;
   total_size: EvictResult;
   total_freed_bytes: number;
   total_evicted: number;
@@ -671,19 +743,22 @@ export function runGC(dryRun: boolean = false): GCReport {
   const logs = circularEvict(LOGS_DIR, CAP_LOGS, dryRun);
   const cost = circularEvict(COST_DIR, CAP_COST, dryRun);
 
-  // Phase 2: total size cap across all nexus ephemeral
+  // Phase 2: VS Code chat transcripts (per-file size cap)
+  const transcripts = evictTranscripts(CAP_TRANSCRIPTS_MB, dryRun);
+
+  // Phase 3: total size cap across all nexus ephemeral
   const NEXUS_DIR = join(AI_ROOT, "nexus");
   const maxBytes = CAP_TOTAL_MB * 1024 * 1024;
   const totalSize = circularEvictBySize(NEXUS_DIR, maxBytes, dryRun);
 
-  const totalFreed = sessions.freed_bytes + signals.freed_bytes + logs.freed_bytes + cost.freed_bytes + totalSize.freed_bytes;
-  const totalEvicted = sessions.evicted + signals.evicted + logs.evicted + cost.evicted + totalSize.evicted;
+  const totalFreed = sessions.freed_bytes + signals.freed_bytes + logs.freed_bytes + cost.freed_bytes + transcripts.freed_bytes + totalSize.freed_bytes;
+  const totalEvicted = sessions.evicted + signals.evicted + logs.evicted + cost.evicted + transcripts.evicted + totalSize.evicted;
 
-  return { sessions, signals, logs, cost, total_size: totalSize, total_freed_bytes: totalFreed, total_evicted: totalEvicted };
+  return { sessions, signals, logs, cost, transcripts, total_size: totalSize, total_freed_bytes: totalFreed, total_evicted: totalEvicted };
 }
 
 /** Show buffer usage status */
-export function gcStatus(): { sessions: { count: number; cap: number }; signals: { count: number; cap: number }; logs: { count: number; cap: number }; cost: { count: number; cap: number }; total_mb: { size: number; cap: number } } {
+export function gcStatus(): { sessions: { count: number; cap: number }; signals: { count: number; cap: number }; logs: { count: number; cap: number }; cost: { count: number; cap: number }; total_mb: { size: number; cap: number }; transcripts: { count: number; oversized: number; cap_mb: number } } {
   const sessFiles = collectFiles(SESSION_BASE, (f) => f.endsWith(".meta.json") || f.endsWith(".typescript"));
   const sigFiles = collectFiles(SIGNAL_DIR);
   const logFiles = collectFiles(LOGS_DIR);
@@ -699,6 +774,17 @@ export function gcStatus(): { sessions: { count: number; cap: number }; signals:
     logs: { count: logFiles.length, cap: CAP_LOGS },
     cost: { count: costFiles.length, cap: CAP_COST },
     total_mb: { size: Math.round(totalBytes / 1024 / 1024 * 100) / 100, cap: CAP_TOTAL_MB },
+    transcripts: (() => {
+      const dirs = detectTranscriptDirs();
+      let count = 0; let oversized = 0;
+      const maxBytes = CAP_TRANSCRIPTS_MB * 1024 * 1024;
+      for (const dir of dirs) {
+        const files = collectFiles(dir, (f) => f.endsWith(".jsonl"));
+        count += files.length;
+        oversized += files.filter(f => f.size > maxBytes).length;
+      }
+      return { count, oversized, cap_mb: CAP_TRANSCRIPTS_MB };
+    })(),
   };
 }
 
@@ -721,6 +807,8 @@ function cmdGC(args: string[]): number {
     process.stderr.write(`${prefix}logs:     evicted ${report.logs.evicted} (${report.logs.before} → ${report.logs.after}, cap=${CAP_LOGS})\n`);
   if (report.cost.evicted > 0)
     process.stderr.write(`${prefix}cost:     evicted ${report.cost.evicted} (${report.cost.before} → ${report.cost.after}, cap=${CAP_COST})\n`);
+  if (report.transcripts.evicted > 0)
+    process.stderr.write(`${prefix}transcripts: evicted ${report.transcripts.evicted} (${report.transcripts.before} → ${report.transcripts.after}, cap=${CAP_TRANSCRIPTS_MB}MB/file)\n`);
   if (report.total_size.evicted > 0)
     process.stderr.write(`${prefix}total:    evicted ${report.total_size.evicted} (size cap ${CAP_TOTAL_MB}MB)\n`);
 
@@ -740,11 +828,12 @@ function cmdGCStatus(): number {
   const pctTotal = ((status.total_mb.size / status.total_mb.cap) * 100).toFixed(0);
 
   console.log(`[gc] Buffer usage:`);
-  console.log(`  sessions: ${status.sessions.count}/${status.sessions.cap} (${pctSess}%)`);
-  console.log(`  signals:  ${status.signals.count}/${status.signals.cap} (${pctSig}%)`);
-  console.log(`  logs:     ${status.logs.count}/${status.logs.cap} (${pctLog}%)`);
-  console.log(`  cost:     ${status.cost.count}/${status.cost.cap} (${pctCost}%)`);
-  console.log(`  total:    ${status.total_mb.size}MB/${status.total_mb.cap}MB (${pctTotal}%)`);
+  console.log(`  sessions:    ${status.sessions.count}/${status.sessions.cap} (${pctSess}%)`);
+  console.log(`  signals:     ${status.signals.count}/${status.signals.cap} (${pctSig}%)`);
+  console.log(`  logs:        ${status.logs.count}/${status.logs.cap} (${pctLog}%)`);
+  console.log(`  cost:        ${status.cost.count}/${status.cost.cap} (${pctCost}%)`);
+  console.log(`  transcripts: ${status.transcripts.count} files, ${status.transcripts.oversized} oversized (cap=${status.transcripts.cap_mb}MB/file)`);
+  console.log(`  total:       ${status.total_mb.size}MB/${status.total_mb.cap}MB (${pctTotal}%)`);
   return 0;
 }
 
