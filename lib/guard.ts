@@ -35,6 +35,7 @@ import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { spawnSync } from "child_process";
 import { loadMergedPolicy, confirmDeescalation, type MergedPolicy, type PolicyOverride, type Tier as PolicyTier } from "./policy.ts";
+import { checkCapability, type CapabilityDecision } from "./capability.ts";
 
 // ─── Environment ─────────────────────────────────────────────────────────────
 
@@ -253,6 +254,22 @@ function cmdCheck(argv: string[]): number {
   }
 
   const decision = checkCommand(command);
+
+  // ── MLS Capability Check (v0.8.0) ──
+  // T0 commands are unconditionally safe (read-only) — no capability check needed.
+  // For T1+ approved commands, the agent must hold the required capabilities.
+  // Fail-closed: missing cap → T3 deny.
+  if (decision.approved && decision.tier !== "T0") {
+    const agent = process.env.AI_AGENT || "unknown";
+    const capDecision = checkCapability(agent, command);
+    if (!capDecision.allowed) {
+      decision.approved = false;
+      decision.tier = "T3";
+      decision.reason = `Capability denied: ${capDecision.reason}`;
+      decision.rule = `capability:${capDecision.missing.join(",")}`;
+    }
+  }
+
   logDecision(decision);
   emitShellExports(decision);
 
@@ -276,6 +293,19 @@ function cmdClassify(argv: string[]): number {
   }
 
   const decision = checkCommand(command);
+
+  // ── MLS Capability Check (T1+ only — T0 is unconditionally safe) ──
+  if (decision.approved && decision.tier !== "T0") {
+    const agent = process.env.AI_AGENT || "unknown";
+    const capDecision = checkCapability(agent, command);
+    if (!capDecision.allowed) {
+      decision.approved = false;
+      decision.tier = "T3";
+      decision.reason = `Capability denied: ${capDecision.reason}`;
+      decision.rule = `capability:${capDecision.missing.join(",")}`;
+    }
+  }
+
   // Output structured classification (no side effects, no ledger)
   const output = {
     command: decision.command,

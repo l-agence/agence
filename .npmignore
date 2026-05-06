@@ -1,0 +1,52 @@
+# Defense-in-depth: even if "files" field is removed from package.json,
+# these paths MUST NEVER be published to npm.
+#
+# The "files" whitelist in package.json is the primary gate.
+# This .npmignore is the secondary (belt-and-suspenders).
+
+# ─── SECURITY: Private data (Bell-LaPadula L3/L4) ─────────────────────────
+nexus/
+knowledge/private/
+knowledge/hermetic/
+organic/
+.ailedger/
+.agencerc
+bin/.agencerc
+
+# ─── Tests & dev infrastructure ───────────────────────────────────────────
+tests/
+spec/
+.shellspec
+.github/
+.vscode/
+.devcontainer/
+
+# ─── Build artifacts & runtime state ──────────────────────────────────────
+node_modules/
+*.tgz
+bun.lockb
+.env
+.env.*
+
+# ─── Agent workspaces (never publish container state) ─────────────────────
+nexus/agentd/
+nexus/.aisessions/
+nexus/signals/
+
+# ─── Git & editor ────────────────────────────────────────────────────────
+.git/
+.gitignore
+*.swp
+*.swo
+*~
+
+# ─── Docker (published separately to GHCR) ───────────────────────────────
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# ─── Workspace config ────────────────────────────────────────────────────
+repo.yaml
+bin/
+codex/agents/
+codex/AIPOLICY.schema.json
