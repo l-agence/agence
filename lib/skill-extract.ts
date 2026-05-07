@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// lib/skill-ken.ts — ^ken: Knowledge Extraction Cycle
+// lib/skill-extract.ts — ^extract: Knowledge Extraction Cycle
 //
 // MEM-005: Orchestrates grasp → glimpse → recon → distill in a compound pass.
 // 1. grasp:   recall from all persistent stores (prior knowledge)
@@ -23,14 +23,14 @@ interface SkillResult {
   latencyMs: number;
 }
 
-export async function runKen(
+export async function runExtract(
   query: string,
   opts: { agent?: string; peers?: boolean; flavor?: string; json?: boolean; save?: boolean }
 ): Promise<number> {
-  const def = SKILLS["ken"];
+  const def = SKILLS["extract"];
   if (!def) return 1;
 
-  console.error("[ken] MEM-005: Knowledge Extraction cycle starting…");
+  console.error("[extract] MEM-005: Knowledge Extraction cycle starting…");
   const start = Date.now();
 
   // Extract tags from query
@@ -45,10 +45,10 @@ export async function runKen(
   if (tags.length > 0) {
     try {
       graspRows = recall(tags, { max: 20 });
-      console.error(`[ken] grasp: ${graspRows.length} rows recalled from ${[...new Set(graspRows.map(r => r.source))].join(", ") || "∅"}`);
-    } catch { console.error("[ken] grasp: recall failed (non-fatal)"); }
+      console.error(`[extract] grasp: ${graspRows.length} rows recalled from ${[...new Set(graspRows.map(r => r.source))].join(", ") || "∅"}`);
+    } catch { console.error("[extract] grasp: recall failed (non-fatal)"); }
   } else {
-    console.error("[ken] grasp: no tags extracted — skipping recall");
+    console.error("[extract] grasp: no tags extracted — skipping recall");
   }
 
   // ── Step 2: GLIMPSE — read working memory cache ──
@@ -59,8 +59,8 @@ export async function runKen(
       const tagSet = new Set(tags);
       glimpseRows = glimpseRows.filter(r => r.tags.some(t => tagSet.has(t.toLowerCase())));
     }
-    console.error(`[ken] glimpse: ${glimpseRows.length} rows from working memory`);
-  } catch { console.error("[ken] glimpse: working memory read failed (non-fatal)"); }
+    console.error(`[extract] glimpse: ${glimpseRows.length} rows from working memory`);
+  } catch { console.error("[extract] glimpse: working memory read failed (non-fatal)"); }
 
   // ── Step 3: RECON — LLM synthesis with combined memory context ──
   const allRows = [...graspRows, ...glimpseRows];
@@ -79,10 +79,10 @@ export async function runKen(
   }
 
   // Resolve agent + build system prompt
-  const agent = resolveAgent("ken", opts.agent);
+  const agent = resolveAgent("extract", opts.agent);
   const agentName = agent?.name || "auto";
   const personaMd = loadPersona(agentName);
-  const skillMd = loadSkillMd("ken");
+  const skillMd = loadSkillMd("extract");
 
   let systemPrompt = "";
   if (personaMd) {
@@ -90,11 +90,11 @@ export async function runKen(
   }
   systemPrompt += def.systemPrompt;
   if (skillMd) {
-    systemPrompt += `\n\n[SKILL-REF-BEGIN skill=ken]\n${skillMd}\n[SKILL-REF-END]`;
+    systemPrompt += `\n\n[SKILL-REF-BEGIN skill=extract]\n${skillMd}\n[SKILL-REF-END]`;
   }
   if (memoryBlock) {
     systemPrompt += memoryBlock;
-    console.error(`[ken] recon: memory context injected (${allRows.length} rows)`);
+    console.error(`[extract] recon: memory context injected (${allRows.length} rows)`);
   }
 
   // Call LLM for synthesis
@@ -106,23 +106,23 @@ export async function runKen(
     } else if (agentType === "tool" && agent) {
       output = callTool(agent, systemPrompt, query);
     } else if (agentType === "loop" && agent) {
-      output = callLoop(agent, systemPrompt, query, "ken");
+      output = callLoop(agent, systemPrompt, query, "extract");
     } else {
       output = callRouter(systemPrompt, query, agent?.name);
     }
   } catch (err: any) {
-    console.error(`[ken] recon: LLM call failed: ${err.message}`);
+    console.error(`[extract] recon: LLM call failed: ${err.message}`);
     return 1;
   }
 
   if (!output) {
-    console.error("[ken] recon: empty response");
+    console.error("[extract] recon: empty response");
     return 1;
   }
 
   // Auto-retain recon findings to shared
   retainReconFindings(output, query);
-  console.error("[ken] recon: findings retained → shared");
+  console.error("[extract] recon: findings retained → shared");
 
   // ── Step 4: DISTILL — batch promote mature rows ──
   const distillPaths: Array<[MemorySource, MemorySource]> = [
@@ -136,14 +136,14 @@ export async function runKen(
       totalPromoted += result.promoted.length;
       totalDuplicates += result.duplicates;
       if (result.promoted.length > 0) {
-        console.error(`[ken] distill: ${result.promoted.length} promoted ${from}→${to} (${result.skipped} skipped, ${result.duplicates} dupes)`);
+        console.error(`[extract] distill: ${result.promoted.length} promoted ${from}→${to} (${result.skipped} skipped, ${result.duplicates} dupes)`);
       }
     } catch {
       // Non-fatal
     }
   }
   if (totalPromoted === 0) {
-    console.error("[ken] distill: nothing to promote (all recent or below threshold)");
+    console.error("[extract] distill: nothing to promote (all recent or below threshold)");
   }
 
   const latencyMs = Date.now() - start;
@@ -151,7 +151,7 @@ export async function runKen(
   // Output
   if (opts.json) {
     const result: SkillResult = {
-      skill: "ken",
+      skill: "extract",
       agent: agentName,
       model: opts.peers ? "peers" : "auto",
       output,
@@ -165,13 +165,13 @@ export async function runKen(
 
   // Save artifact
   if (opts.save !== false) {
-    const saved = saveArtifact(def.artifact, output, "ken");
-    if (saved) console.error(`[ken] Artifact saved: ${saved}`);
+    const saved = saveArtifact(def.artifact, output, "extract");
+    if (saved) console.error(`[extract] Artifact saved: ${saved}`);
   }
 
   // Summary
   const memStats = stats();
-  console.error(`[ken] MEM-005: cycle complete in ${latencyMs}ms | grasp:${graspRows.length} glimpse:${glimpseRows.length} promoted:${totalPromoted} dupes:${totalDuplicates}`);
-  console.error(`[ken] stores: ${Object.entries(memStats).map(([k, v]) => `${k}:${v}`).join(" ")}`);
+  console.error(`[extract] MEM-005: cycle complete in ${latencyMs}ms | grasp:${graspRows.length} glimpse:${glimpseRows.length} promoted:${totalPromoted} dupes:${totalDuplicates}`);
+  console.error(`[extract] stores: ${Object.entries(memStats).map(([k, v]) => `${k}:${v}`).join(" ")}`);
   return 0;
 }

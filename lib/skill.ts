@@ -18,7 +18,7 @@ import { spawnSync } from "child_process";
 import { SKILLS, ALIASES, resolveAgent, loadSkillMd, loadPersona, isValidAgentName } from "./skill-registry.ts";
 import { callRouter, callTool, callLoop, callPeers, buildMemoryContext, retainReconFindings } from "./skill-exec.ts";
 import { runBundle } from "./skill-bundle.ts";
-import { runKen } from "./skill-ken.ts";
+import { runExtract } from "./skill-extract.ts";
 import { saveArtifact } from "./skill-artifact.ts";
 
 // ─── Environment ─────────────────────────────────────────────────────────────
@@ -83,8 +83,8 @@ async function runSkill(
   query: string,
   opts: { agent?: string; peers?: boolean; flavor?: string; json?: boolean; save?: boolean }
 ): Promise<number> {
-  // MEM-005: ^ken has its own orchestrator
-  if (skillName === "ken") return runKen(query, opts);
+  // MEM-005: ^extract has its own orchestrator
+  if (skillName === "extract") return runExtract(query, opts);
 
   // ^bundle — local CI/CD pipeline (no LLM, just run the chain)
   if (skillName === "bundle") return runBundle();
@@ -222,7 +222,7 @@ function cmdList(): number {
     "Analysis":  ["analyse", "design", "pattern", "scope", "spec", "split"],
     "Peer":      ["peer-design", "peer-review", "peer-solve", "peer-analyse"],
     "Red Team":  ["hack", "break"],
-    "Knowledge": ["document", "test", "recon", "grasp", "glimpse", "ken"],
+    "Knowledge": ["document", "test", "recon", "grasp", "glimpse", "extract"],
     "Ops":       ["deploy", "bundle", "brainstorm", "integrate"],
   };
 

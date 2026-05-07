@@ -47,7 +47,7 @@ export interface AgentMeta {
 
 export const REAL_SKILLS: ReadonlySet<string> = new Set([
   "break", "hack", "integrate", "bundle", "recon", "redoc",
-  "verify", "ken", "consensus",
+  "verify", "extract", "consensus",
 ]);
 
 export const SKILLS: Record<string, SkillDef> = {
@@ -114,7 +114,7 @@ export const SKILLS: Record<string, SkillDef> = {
                systemPrompt: "You are a code comprehension expert. Rapidly understand the given code and explain: purpose, key abstractions, data flow, design decisions." },
   glimpse:   { name: "glimpse",   artifact: "analysis", description: "High-level overview", hasCode: false,
                systemPrompt: "You are an overview specialist. Provide a bird's-eye view: what this is, why it exists, how it fits." },
-  ken:       { name: "ken",       artifact: "analysis", description: "Knowledge Extraction cycle", hasCode: true,
+  extract:   { name: "extract",   artifact: "analysis", description: "Knowledge Extraction cycle (grasp+glimpse+recon+distill)", hasCode: true,
                systemPrompt: "You are a knowledge extraction specialist. Synthesize grasp + glimpse + recon into unified intelligence." },
 
   // Ops skills
@@ -254,8 +254,9 @@ export function listSkills(): { name: string; description: string; hasCode: bool
   }));
 }
 
-// Spelling aliases
+// Spelling aliases + legacy renames
 export const ALIASES: Record<string, string> = {
   "analyze": "analyse",
   "peer-analyze": "peer-analyse",
+  "ken": "extract",
 };

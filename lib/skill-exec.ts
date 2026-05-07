@@ -250,7 +250,7 @@ export function callPeers(peerSkill: string, query: string, flavor = "code"): st
 import { recall, readWorking, retain, parseTags } from "./memory.ts";
 import type { MemoryRow, MemorySource } from "./memory.ts";
 
-const MEMORY_SKILLS: ReadonlySet<string> = new Set(["grasp", "glimpse", "recon", "ken"]);
+const MEMORY_SKILLS: ReadonlySet<string> = new Set(["grasp", "glimpse", "recon", "extract"]);
 export const MAX_MEMORY_CONTEXT = 8 * 1024;
 
 export function buildMemoryContext(skillName: string, query: string): string {
