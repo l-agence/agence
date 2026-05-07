@@ -434,6 +434,17 @@ mode_init() {
       fi
       return $?
       ;;
+    "health")
+      # System health checks: agence ^health [--json] [--fix]
+      local _health_ts="${AGENCE_ROOT}/lib/health.ts"
+      if command -v bun &>/dev/null && [[ -f "$_health_ts" ]]; then
+        bun run "$_health_ts" $init_args
+      else
+        echo "Error: ^health requires bun + lib/health.ts" >&2
+        return 1
+      fi
+      return $?
+      ;;
     *)
       # ── Skill command dispatch ───────────────────────────────────────────
       # If init_cmd matches a known skill, route through lib/skill.ts
@@ -464,7 +475,7 @@ mode_init() {
       fi
 
       echo "Error: Unknown init command: $init_cmd" >&2
-      echo "Available: help, init, reload, install, setup, save, learn, commit, push, session," >&2
+      echo "Available: help, init, reload, install, setup, health, save, learn, commit, push, session," >&2
       echo "           lesson, log, plan, todo, note, fault, issue, task, job, workflow, project," >&2
       echo "           swarm, audit, recall, retain, cache, forget, promote, distill, memory," >&2
       echo "           handoff, pickup, pause, resume, index, reindex, regen, state, aido," >&2
