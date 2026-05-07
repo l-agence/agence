@@ -25,6 +25,7 @@ knowledge/private/
 ^
 .nogit
 .aider*
+!.aider.conf.yml
 *.log
 __pycache__/
 node_modules/
