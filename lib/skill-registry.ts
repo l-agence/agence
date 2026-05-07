@@ -34,6 +34,7 @@ export interface AgentMeta {
   tier: string;
   skills: string[];
   type?: "persona" | "tool" | "ensemble" | "loop";
+  category?: "agent" | "persona" | "harness" | "ensemble";
   binary?: string | string[];
   launchFlags?: string;
   modelFlag?: string;
@@ -146,6 +147,7 @@ export function loadAgents(): AgentMeta[] {
             tier: v.tier || "T2",
             skills: v.skills || [],
             type: v.type || "persona",
+            category: v.category || (v.type === "tool" ? "agent" : "persona"),
             binary: v.binary,
             launchFlags: v.launch_flags,
             modelFlag: v.model_flag,
