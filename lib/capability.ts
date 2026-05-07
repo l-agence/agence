@@ -192,6 +192,72 @@ interface AgentCapabilities {
 
 let _capCache: Map<string, AgentCapabilities> | null = null;
 
+// ─── Revocation List ─────────────────────────────────────────────────────────
+// Runtime revocations stored at nexus/mls/revocations.json.
+// Format: { revocations: [{ agent, capability, reason, timestamp, revokedBy }] }
+
+export interface Revocation {
+  agent: string;
+  capability: Capability;
+  reason: string;
+  timestamp: string;
+  revokedBy: string;
+}
+
+const REVOCATIONS_PATH = join(AGENCE_ROOT, "nexus", "mls", "revocations.json");
+let _revocCache: Revocation[] | null = null;
+
+export function loadRevocations(): Revocation[] {
+  if (_revocCache) return _revocCache;
+  if (!existsSync(REVOCATIONS_PATH)) return [];
+  try {
+    const data = JSON.parse(readFileSync(REVOCATIONS_PATH, "utf-8"));
+    _revocCache = Array.isArray(data.revocations) ? data.revocations : [];
+    return _revocCache;
+  } catch {
+    return [];
+  }
+}
+
+function saveRevocations(revocations: Revocation[]): void {
+  const { mkdirSync, writeFileSync } = require("fs");
+  const { dirname } = require("path");
+  mkdirSync(dirname(REVOCATIONS_PATH), { recursive: true });
+  writeFileSync(REVOCATIONS_PATH, JSON.stringify({ revocations }, null, 2) + "\n", "utf-8");
+  _revocCache = revocations;
+}
+
+export function revokeCapability(
+  agent: string, capability: Capability, reason: string, revokedBy = "human"
+): Revocation {
+  const revocations = loadRevocations();
+  // Check for duplicate
+  const existing = revocations.find(r => r.agent === agent && r.capability === capability);
+  if (existing) throw new Error(`Already revoked: ${agent} / ${capability}`);
+  const entry: Revocation = {
+    agent, capability, reason, revokedBy,
+    timestamp: new Date().toISOString(),
+  };
+  revocations.push(entry);
+  saveRevocations(revocations);
+  return entry;
+}
+
+export function unrevokeCapability(agent: string, capability: Capability): boolean {
+  const revocations = loadRevocations();
+  const idx = revocations.findIndex(r => r.agent === agent && r.capability === capability);
+  if (idx === -1) return false;
+  revocations.splice(idx, 1);
+  saveRevocations(revocations);
+  return true;
+}
+
+function getAgentRevocations(agent: string): Capability[] {
+  return loadRevocations()
+    .filter(r => r.agent === agent)
+    .map(r => r.capability);
+}
+
 export function loadAgentCapabilities(): Map<string, AgentCapabilities> {
   if (_capCache) return _capCache;
 
@@ -335,12 +401,20 @@ export function checkCapability(agent: string, command: string): CapabilityDecis
     };
   }
 
-  const missing = required.filter(cap => !agentEntry.capabilities.includes(cap));
+  // Apply revocations: subtract revoked caps from agent's effective set
+  const revoked = getAgentRevocations(agent);
+  const effectiveCaps = agentEntry.capabilities.filter(c => !revoked.includes(c));
+
+  const missing = required.filter(cap => !effectiveCaps.includes(cap));
 
   if (missing.length > 0) {
+    // Distinguish: missing due to revocation vs never granted
+    const revokedMissing = missing.filter(c => revoked.includes(c));
+    const reason = revokedMissing.length > 0
+      ? `Agent "${agent}" has revoked capabilities: ${revokedMissing.join(", ")}`
+      : `Agent "${agent}" missing capabilities: ${missing.join(", ")}`;
     return {
-      allowed: false, agent, command, required, missing,
-      reason: `Agent "${agent}" missing capabilities: ${missing.join(", ")}`,
+      allowed: false, agent, command, required, missing, reason,
     };
   }
 
@@ -413,6 +487,7 @@ export function pathSecurityLevel(filePath: string): SecurityLevel {
 
 export function resetCapabilityCache(): void {
   _capCache = null;
+  _revocCache = null;
 }
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
@@ -425,6 +500,9 @@ Subcommands:
   list [agent]                List capabilities for agent (or all)
   required <command>          Show capabilities required for a command
   labels <path>              Show security label for a path
+  revoke <agent> <cap> <reason>  Revoke a capability from an agent
+  unrevoke <agent> <cap>      Restore a revoked capability
+  revocations [agent]         List active revocations
   help                       Show this help`);
 }
 
@@ -502,6 +580,61 @@ function cmdLabels(args: string[]): void {
   console.log(`${args[0]} → ${names ? names[0] : `L${level}`} (level ${level})`);
 }
 
+function cmdRevoke(args: string[]): void {
+  if (args.length < 3) {
+    process.stderr.write("Usage: airun capability revoke <agent> <CAP_NAME> <reason>\n");
+    process.exit(2);
+  }
+  const [agent, cap, ...rest] = args;
+  const reason = rest.join(" ");
+  const validCaps = new Set(Object.values(CAPABILITIES));
+  if (!validCaps.has(cap as Capability)) {
+    process.stderr.write(`Unknown capability: ${cap}\nValid: ${[...validCaps].sort().join(", ")}\n`);
+    process.exit(2);
+  }
+  try {
+    const entry = revokeCapability(agent, cap as Capability, reason);
+    console.log(`✓ Revoked ${cap} from ${agent}`);
+    console.log(`  Reason: ${reason}`);
+    console.log(`  At: ${entry.timestamp}`);
+  } catch (e: any) {
+    console.error(`✗ ${e.message}`);
+    process.exit(1);
+  }
+}
+
+function cmdUnrevoke(args: string[]): void {
+  if (args.length < 2) {
+    process.stderr.write("Usage: airun capability unrevoke <agent> <CAP_NAME>\n");
+    process.exit(2);
+  }
+  const [agent, cap] = args;
+  if (unrevokeCapability(agent, cap as Capability)) {
+    console.log(`✓ Restored ${cap} for ${agent}`);
+  } else {
+    console.log(`No active revocation found for ${agent} / ${cap}`);
+    process.exit(1);
+  }
+}
+
+function cmdRevocations(args: string[]): void {
+  const revocations = loadRevocations();
+  const filtered = args.length > 0
+    ? revocations.filter(r => r.agent === args[0])
+    : revocations;
+
+  if (filtered.length === 0) {
+    console.log("No active revocations.");
+    return;
+  }
+
+  console.log(`Active revocations (${filtered.length}):\n`);
+  for (const r of filtered) {
+    console.log(`  ${r.agent.padEnd(12)} ${r.capability.padEnd(24)} ${r.reason}`);
+    console.log(`  ${"".padEnd(12)} revoked by ${r.revokedBy} at ${r.timestamp}`);
+  }
+}
+
 // ─── Main (only when run directly, not imported) ─────────────────────────────
 
 if (import.meta.main) {
@@ -513,6 +646,9 @@ if (import.meta.main) {
     case "list":     cmdList(args.slice(1)); break;
     case "required": cmdRequired(args.slice(1)); break;
     case "labels":   cmdLabels(args.slice(1)); break;
+    case "revoke":   cmdRevoke(args.slice(1)); break;
+    case "unrevoke": cmdUnrevoke(args.slice(1)); break;
+    case "revocations": cmdRevocations(args.slice(1)); break;
     case "help":
     case "--help":   printHelp(); break;
     default:

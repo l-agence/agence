@@ -445,6 +445,17 @@ mode_init() {
       fi
       return $?
       ;;
+    "revoke"|"unrevoke"|"revocations")
+      # MLS capability revocation: agence ^revoke <agent> <CAP> <reason>
+      local _cap_ts="${AGENCE_ROOT}/lib/capability.ts"
+      if command -v bun &>/dev/null && [[ -f "$_cap_ts" ]]; then
+        bun run "$_cap_ts" "$init_cmd" $init_args
+      else
+        echo "Error: ^${init_cmd} requires bun + lib/capability.ts" >&2
+        return 1
+      fi
+      return $?
+      ;;
     *)
       # ── Skill command dispatch ───────────────────────────────────────────
       # If init_cmd matches a known skill, route through lib/skill.ts
