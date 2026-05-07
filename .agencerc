@@ -81,3 +81,5 @@ esac
 
 [[ "${AGENCE_DEBUG:-0}" == "1" ]] && echo "[.agencerc] Profile loaded: AGENT=$AGENT SHELL=$SHELL"
 
+
+export AGENCE_ORG="l-agence.org"

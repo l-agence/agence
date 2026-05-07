@@ -1,0 +1,108 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  # ── Gate: full test suite must pass ──────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run tests
+        env:
+          AI_ROOT: ${{ github.workspace }}
+          AGENCE_ROOT: ${{ github.workspace }}
+        run: bun test --timeout 60000
+
+  # ── Publish to npm with provenance ──────────────────────────────────────
+  npm-publish:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Verify package contents (security audit)
+        run: |
+          echo "=== npm pack dry-run ==="
+          npm pack --dry-run 2>&1 | tee /tmp/pack-contents.txt
+          # SECURITY: fail if any private paths leak into the tarball
+          if grep -qiE 'nexus/|knowledge/private|knowledge/hermetic|\.ailedger|organic/' /tmp/pack-contents.txt; then
+            echo "::error::SECURITY VIOLATION: Private data detected in npm package!"
+            exit 1
+          fi
+          echo "✓ No private data in package"
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+          npm publish --access public --provenance
+
+  # ── Build and push Docker image to GHCR ─────────────────────────────────
+  docker-publish:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/agent:latest
+            ghcr.io/${{ github.repository }}/agent:${{ steps.version.outputs.version }}
+
+  # ── Create GitHub Release ───────────────────────────────────────────────
+  github-release:
+    needs: [npm-publish, docker-publish]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}

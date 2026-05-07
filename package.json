@@ -22,7 +22,9 @@
   ],
   "keywords": ["mcp", "mcp-server", "ai-governance", "policy-enforcement", "model-context-protocol"],
   "scripts": {
-    "test": "bun test --timeout 60000"
+    "test": "bun test --timeout 60000",
+    "prepack": "npm pack --dry-run 2>&1 | grep -qiE 'nexus/|knowledge/private|hermetic|ailedger|organic/' && { echo 'SECURITY: private data in package'; exit 1; } || true",
+    "prepublishOnly": "bun test --timeout 60000"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

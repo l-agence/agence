@@ -120,6 +120,15 @@
       "default_model": "sonnet",
       "tier": "T3",
       "skills": ["review", "simplify", "refactor", "precommit"],
+      "capabilities": [
+        "CAP_EXEC_SHELL",
+        "CAP_EXEC_BUILD",
+        "CAP_MUTATE_GIT",
+        "CAP_READ_NEXUS",
+        "CAP_READ_HERMETIC",
+        "CAP_WRITE_SYNTHETIC",
+        "CAP_WRITE_ORGANIC"
+      ],
       "description": "Harsh code reviewer — Torvalds-inspired"
     },
     "feynman": {
@@ -136,6 +145,14 @@
       "default_model": "sonnet",
       "tier": "T3",
       "skills": ["hack", "break", "recon"],
+      "capabilities": [
+        "CAP_EXEC_SHELL",
+        "CAP_NET_EGRESS",
+        "CAP_RED_TEAM",
+        "CAP_READ_NEXUS",
+        "CAP_POLICY_READ",
+        "CAP_WRITE_ORGANIC"
+      ],
       "description": "Red team / security analyst"
     },
     "copilot": {
@@ -152,6 +169,11 @@
       "default_model": "haiku",
       "tier": "T0",
       "skills": ["fix", "split", "build", "break", "glimpse"],
+      "capabilities": [
+        "CAP_EXEC_SHELL",
+        "CAP_EXEC_BUILD",
+        "CAP_WRITE_ORGANIC"
+      ],
       "description": "Fast/cheap Claude Haiku"
     },
     "azure": {
@@ -199,6 +221,13 @@
       "default_flavor": "code",
       "tangents": 2,
       "description": "2-tangent sequent — lightweight consensus pair"
+    },
+    "test-agent": {
+      "type": "persona",
+      "provider": "test",
+      "default_model": null,
+      "tier": "T4",
+      "description": "Test harness agent — full capabilities for integration tests"
     }
   }
 }

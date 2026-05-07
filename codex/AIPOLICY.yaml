@@ -407,4 +407,88 @@ blacklist:
 
       - "Out-File"
       - "Invoke-Expression"
+
+
+# ─── MLS Capability Tokens (v0.8.0) ──────────────────────────────────────────
+# POSIX-inspired capability model for agent access control.
+# Each capability gates a class of operations. Agents must hold the
+# required capability(ies) to execute a command — regardless of tier.
+#
+# Bell-LaPadula: no read up, no write down (confidentiality)
+# Biba: no read down, no write up (integrity)
+
+capabilities:
+
+  definitions:
+    CAP_READ_HERMETIC: "Access private/hermetic knowledge stores"
+    CAP_READ_NEXUS: "Access local state (sessions, ledger, signals)"
+    CAP_WRITE_SYNTHETIC: "Write to shared synthetic knowledge"
+    CAP_WRITE_ORGANIC: "Write to organic work artifacts"
+    CAP_EXEC_SHELL: "Execute shell commands"
+    CAP_EXEC_INFRA: "Run infrastructure tools (terraform, docker, k8s, aws)"
+    CAP_EXEC_BUILD: "Run build tools (npm, bun, make, cargo)"
+    CAP_NET_EGRESS: "Outbound network requests (curl, wget, ssh)"
+    CAP_SIGNAL_HUMAN: "Use IPC signals (^ask, ^notify, ^prompt)"
+    CAP_SPAWN_AGENT: "Launch sub-agents or tangents"
+    CAP_MUTATE_GIT: "Git write operations (push, commit, rebase)"
+    CAP_PUBLISH: "Package publishing (npm publish, gh release)"
+    CAP_RED_TEAM: "Security probing (^hack, ^break)"
+    CAP_POLICY_READ: "Read guard/policy internals"
+
+  security_levels:
+    L0_PUBLIC: "Unrestricted (README, help, public docs)"
+    L1_ORGANIC: "Team work artifacts (tasks, workflows)"
+    L2_SYNTHETIC: "Shared knowledge (plans, lessons, skills)"
+    L3_NEXUS: "Local state (sessions, ledger, signals)"
+    L4_HERMETIC: "Private (personal notes, brainstorms, secrets)"
+
+  tier_grants:
+    T0:
+      - CAP_EXEC_SHELL
+      - CAP_EXEC_BUILD
+      - CAP_READ_NEXUS
+      - CAP_WRITE_ORGANIC
+    T1:
+      - CAP_EXEC_SHELL
+      - CAP_EXEC_BUILD
+      - CAP_SIGNAL_HUMAN
+      - CAP_READ_NEXUS
+      - CAP_WRITE_ORGANIC
+    T2:
+      - CAP_EXEC_SHELL
+      - CAP_EXEC_BUILD
+      - CAP_NET_EGRESS
+      - CAP_SIGNAL_HUMAN
+      - CAP_MUTATE_GIT
+      - CAP_READ_NEXUS
+      - CAP_WRITE_SYNTHETIC
+      - CAP_WRITE_ORGANIC
+    T3:
+      - CAP_EXEC_SHELL
+      - CAP_EXEC_BUILD
+      - CAP_EXEC_INFRA
+      - CAP_NET_EGRESS
+      - CAP_SIGNAL_HUMAN
+      - CAP_MUTATE_GIT
+      - CAP_PUBLISH
+      - CAP_SPAWN_AGENT
+      - CAP_READ_NEXUS
+      - CAP_READ_HERMETIC
+      - CAP_WRITE_SYNTHETIC
+      - CAP_WRITE_ORGANIC
+    T4:
+      - CAP_READ_HERMETIC
+      - CAP_READ_NEXUS
+      - CAP_WRITE_SYNTHETIC
+      - CAP_WRITE_ORGANIC
+      - CAP_EXEC_SHELL
+      - CAP_EXEC_INFRA
+      - CAP_EXEC_BUILD
+      - CAP_NET_EGRESS
+      - CAP_SIGNAL_HUMAN
+      - CAP_SPAWN_AGENT
+      - CAP_MUTATE_GIT
+      - CAP_PUBLISH
+      - CAP_RED_TEAM
+      - CAP_POLICY_READ
       - "Invoke-Command"
