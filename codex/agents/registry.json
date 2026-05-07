@@ -180,7 +180,7 @@
         "CAP_WRITE_SYNTHETIC",
         "CAP_WRITE_ORGANIC"
       ],
-      "description": "GitHub Actions workflow identity for guard classification"
+      "description": "GitHub Actions workflow identity with an explicit capability bundle for guard classification"
     },
     "haiku": {
       "type": "persona",

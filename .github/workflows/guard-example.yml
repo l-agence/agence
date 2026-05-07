@@ -12,6 +12,9 @@ on:
         required: true
         default: 'git status'
 
+permissions:
+  contents: read
+
 jobs:
   # ── Example 1: Classify a single command ─────────────────────────────────
   classify:

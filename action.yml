@@ -103,7 +103,7 @@ runs:
         fi
 
         # Run classify (exits 0 always — no ledger side effects)
-        result=$(bun run lib/guard.ts classify "$AGENCE_CMD" 2>/dev/null)
+        result=$(bun run lib/guard.ts classify "$AGENCE_CMD")
         if [[ -z "$result" ]]; then
           echo "::error title=Agence Guard::classify returned no output for: $AGENCE_CMD"
           exit 1

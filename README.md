@@ -117,7 +117,9 @@ Gate AI agent commands in any CI workflow — one step, zero infrastructure:
 
 See [docs/marketplace/description.md](docs/marketplace/description.md) for full documentation.
 
-This PR starts with the **GitHub Action** path first; the **GitHub App** listing and webhook server can follow in a later phase or separate PR.
+This PR starts with the **GitHub Action** path first for fast per-repo adoption; the **GitHub App** listing and webhook server can follow in a later phase or separate PR for org-level rollout across many repositories.
+
+For enterprise adoption, the next layer after the GitHub App is **shard onboarding** so orgs can separate teams, policies, and knowledge boundaries cleanly instead of forcing one shared shard model.
 
 ---
 

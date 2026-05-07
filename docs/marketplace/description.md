@@ -46,7 +46,9 @@ Built-in capabilities include:
   run: echo "Tier: ${{ steps.guard.outputs.tier }}"
 ```
 
-The Marketplace rollout starts with the reusable **GitHub Action** first. The separate **GitHub App** listing and webhook server can ship afterward as Phase 2+.
+The Marketplace rollout starts with the reusable **GitHub Action** first for fast per-repo adoption. The separate **GitHub App** listing and webhook server can ship afterward for org-level rollout, where one installation can cover many repositories.
+
+For larger organizations, the next onboarding step after the GitHub App is shard bootstrap: giving teams a clean way to initialize separate shards, policies, and knowledge boundaries without manual repo-by-repo setup.
 
 ### Outputs
 
@@ -76,6 +78,7 @@ Bring your own `AIPOLICY.yaml`:
 - **751 tests** with 279 security-specific assertions
 - **9 red-team cycles** completed (SEC-008 through SEC-019)
 - **Fail-closed** — unknown input is never auto-approved
+- **Marketplace visibility** — Action + App listings make adoption easier in both open source and enterprise environments
 
 ---
 
