@@ -1,8 +1,8 @@
 # Agence Development Roadmap (2026 Q1–Q2)
 
-**Updated**: 2026-04-22
-**Status**: v0.7.0-alpha (modular architecture, MCP, ^ken, ^recon, consensus consolidation)
-**Current**: main @ 1637d5a (v0.7.0-alpha)
+**Updated**: 2026-05-06
+**Status**: v0.8.0-alpha (MLS capability engine, ^bundle, transcript eviction)
+**Current**: main @ 9747660 (v0.8.0-alpha)
 
 ---
 
@@ -25,9 +25,9 @@ v0.5.0 (RELEASED)     ← skill routing, peers, rich CLI, ^ symlink, security fi
     ↓
 v0.6.0-alpha (RELEASED) ← First public release — governance framework, 291 tests
     ↓
-v0.7.0-alpha (CURRENT)  ← Modular bin/agence split, MCP server, ^ken, ^recon, ledger auto-derive
+v0.7.0-alpha (RELEASED)  ← Modular bin/agence split, MCP server, ^ken, ^recon, ledger auto-derive
     ↓
-v0.8.0                 ← MLS enforcement + AIPOLICY capability tokens
+v0.8.0-alpha (CURRENT) ← MLS capability engine + ^bundle CI/CD + transcript eviction
     ↓
 v0.9.0                 ← Skupper multi-cloud federation
     ↓
@@ -50,7 +50,7 @@ v1.0.0                 ← Production release — Allegiance ledger, multi-org s
 | **4** | v0.5.0 | skill routing, skills (29), peers, rich CLI, ^ symlink, security fixes | 🟢 DONE |
 | **5** | v0.6.0-alpha | First public release — governance framework, memory model, 291 tests | 🟢 DONE |
 | **6** | v0.7.0-alpha | Modular architecture — bin/agence split (9 lib/*.sh), MCP, ^ken, ^recon, ledger auto-derive | 🟢 DONE |
-| **7** | v0.8.0 | MLS enforcement + AIPOLICY capability tokens | 📍 NEXT |
+| **7** | v0.8.0-alpha | MLS capability engine (14 caps, 5 levels), ^bundle CI/CD, transcript eviction, 7 security fixes | 🟢 DONE |
 | **8** | v0.9.0 | Skupper multi-cloud federation | 📍 FUTURE |
 | **9** | v1.0.0 | Production release — Allegiance ledger, multi-org support | 📍 FUTURE |
 
@@ -97,7 +97,7 @@ $task           swarm coordinating
 | v0.5.0 | skill routing, skills (29), peers (3-tangent), mixed agent routing | 🟢 DONE | WIRE-001..005✅ SKILL-001..008✅ SEC-001..006✅ REL-001..002✅ |
 | v0.6.0-alpha | First public release — governance framework | 🟢 DONE | 291 tests, 750 expect(), GitHub public, MIT+CC |
 | v0.7.0-alpha | Modular architecture — bin/agence split, MCP, ^ken, ^recon | 🟢 DONE | 9 lib/*.sh, MCP 10 tools+3 resources, ledger auto-derive, consensus 3-algo, dispatch.ts removed |
-| v0.8.0 | MLS enforcement + AIPOLICY capability tokens | 📍 NEXT | Not critical until multi-tenant |
+| v0.8.0-alpha | MLS capability engine + ^bundle + transcript eviction | 🟢 DONE | 14 caps, 5 security levels, Bell-LaPadula+Biba, ^break/^hack/^integrate cycle (7 fixes), 805 tests |
 | v0.9.0 | Skupper multi-cloud federation | 🅿️ PARKED | Build local swarm first |
 | v1.0.0 | Production — Allegiance ledger, multi-org, CLI polish | 🅿️ PARKED | Aggregate reputation from per-shard .ailedger |
 
@@ -131,10 +131,11 @@ $task           swarm coordinating
 - ✅ v0.5.0: 29 skills, @peers 3-tangent routing, 6 security fixes, mixed agent routing
 - ✅ v0.6.0-alpha: First public release — 291 tests, cognitive memory model (6-tier COGNOS)
 - ✅ v0.7.0-alpha: Modular bin/agence (4617→384 lines), MCP server, ^ken orchestrator, ^recon crawler, ledger auto-derive, consensus consolidation (winner/judge/merge), dispatch.ts removed, ^recon direct primitive
-- 📍 v0.8.0: MLS enforcement, capability tokens, multi-tenant isolation
+- ✅ v0.8.0-alpha: MLS capability engine (14 tokens, 5 levels, fail-closed), ^bundle CI/CD pipeline, transcript eviction, 7 security fixes from ^break/^hack cycle, 805 tests
+- 📍 v0.9.0: Skupper multi-cloud federation (parked)
 
 ---
 
-**Last Updated**: 2026-04-22  
+**Last Updated**: 2026-05-06  
 **Owner**: l-agence team  
-**Next Review**: After v0.8.0 planning
+**Next Review**: After v0.9.0 planning
