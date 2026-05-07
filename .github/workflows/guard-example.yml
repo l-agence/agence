@@ -22,7 +22,7 @@ jobs:
 
       - name: Gate command through Agence Guard
         id: guard
-        uses: l-agence/agence@main
+        uses: l-agence/agence@v1
         with:
           command: ${{ github.event.inputs.command }}
           agent: ci
@@ -45,14 +45,14 @@ jobs:
 
       # Safe read-only command — T0, auto-executes
       - name: Guard — git status (expected T0)
-        uses: l-agence/agence@main
+        uses: l-agence/agence@v1
         with:
           command: 'git status'
           fail_on_block: 'true'
 
       # Flagged command — T1, logged but allowed
       - name: Guard — git add (expected T1/T2)
-        uses: l-agence/agence@main
+        uses: l-agence/agence@v1
         with:
           command: 'git add .'
           fail_on_block: 'true'
@@ -61,7 +61,7 @@ jobs:
       # Blocked command — T3, should fail step
       - name: Guard — rm -rf /tmp (expected T3 block)
         id: dangerous
-        uses: l-agence/agence@main
+        uses: l-agence/agence@v1
         with:
           command: 'rm -rf /tmp/test'
           fail_on_block: 'true'
@@ -82,7 +82,7 @@ jobs:
 
       # If your repo has its own codex/AIPOLICY.yaml, pass it here
       - name: Guard with repo-local policy
-        uses: l-agence/agence@main
+        uses: l-agence/agence@v1
         with:
           command: 'terraform plan'
           policy: 'codex/AIPOLICY.yaml'   # path relative to GITHUB_WORKSPACE
