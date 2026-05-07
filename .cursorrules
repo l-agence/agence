@@ -1,0 +1,6 @@
+This repository uses Agence governance.
+
+Before any shell or git command, run:
+`airun guard classify "<command>"`
+
+Follow `AGENTS.md` for full policy behavior and escalation rules.
