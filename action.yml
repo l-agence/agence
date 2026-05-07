@@ -23,8 +23,8 @@ inputs:
   agent:
     description: |
       Agent name for MLS capability checks.
-      Must match an entry in codex/agents/registry.json, or use the
-      built-in "ci" identity (T1 tier, safe defaults).
+      Must match an entry in codex/agents/registry.json.
+      The bundled "ci" identity is intended for GitHub Actions workflows.
     required: false
     default: 'ci'
 

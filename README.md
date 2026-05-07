@@ -117,6 +117,8 @@ Gate AI agent commands in any CI workflow — one step, zero infrastructure:
 
 See [docs/marketplace/description.md](docs/marketplace/description.md) for full documentation.
 
+This PR starts with the **GitHub Action** path first; the **GitHub App** listing and webhook server can follow in a later phase or separate PR.
+
 ---
 
 ## Install

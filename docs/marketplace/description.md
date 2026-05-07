@@ -46,6 +46,8 @@ Built-in capabilities include:
   run: echo "Tier: ${{ steps.guard.outputs.tier }}"
 ```
 
+The Marketplace rollout starts with the reusable **GitHub Action** first. The separate **GitHub App** listing and webhook server can ship afterward as Phase 2+.
+
 ### Outputs
 
 | Output | Description |

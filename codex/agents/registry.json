@@ -163,6 +163,25 @@
       "skills": ["fix", "build", "feature", "refactor", "test"],
       "description": "GitHub Copilot chat agent"
     },
+    "ci": {
+      "type": "persona",
+      "provider": "github",
+      "default_model": null,
+      "tier": "T3",
+      "capabilities": [
+        "CAP_EXEC_SHELL",
+        "CAP_EXEC_BUILD",
+        "CAP_EXEC_INFRA",
+        "CAP_NET_EGRESS",
+        "CAP_SIGNAL_HUMAN",
+        "CAP_MUTATE_GIT",
+        "CAP_PUBLISH",
+        "CAP_READ_NEXUS",
+        "CAP_WRITE_SYNTHETIC",
+        "CAP_WRITE_ORGANIC"
+      ],
+      "description": "GitHub Actions workflow identity for guard classification"
+    },
     "haiku": {
       "type": "persona",
       "provider": "anthropic",

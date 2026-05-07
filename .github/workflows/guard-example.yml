@@ -86,6 +86,6 @@ jobs:
         with:
           command: 'terraform plan'
           policy: 'codex/AIPOLICY.yaml'   # path relative to GITHUB_WORKSPACE
-          agent: 'chad'
+          agent: 'ci'
           fail_on_block: 'true'
           fail_on_escalate: 'true'
