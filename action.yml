@@ -1,0 +1,141 @@
+name: 'Agence Guard'
+description: 'Gate AI agent commands through the Agence MLS policy engine — every command classified before it runs.'
+author: 'l-agence'
+
+branding:
+  icon: 'shield'
+  color: 'red'
+
+# ─── Inputs ──────────────────────────────────────────────────────────────────
+
+inputs:
+  command:
+    description: 'Shell command to classify (e.g. "git push origin main")'
+    required: true
+
+  policy:
+    description: |
+      Path to AIPOLICY.yaml, relative to GITHUB_WORKSPACE.
+      Defaults to the bundled Agence policy (codex/AIPOLICY.yaml).
+    required: false
+    default: ''
+
+  agent:
+    description: |
+      Agent name for MLS capability checks.
+      Must match an entry in codex/agents/registry.json.
+      The bundled "ci" identity is intended for GitHub Actions workflows.
+    required: false
+    default: 'ci'
+
+  fail_on_block:
+    description: 'Exit 1 when the command is T3-blocked (deny). Default: true.'
+    required: false
+    default: 'true'
+
+  fail_on_escalate:
+    description: 'Exit 1 when the command requires human escalation (T2). Default: false.'
+    required: false
+    default: 'false'
+
+# ─── Outputs ─────────────────────────────────────────────────────────────────
+
+outputs:
+  tier:
+    description: 'Trust tier: T0 (auto-exec) · T1 (flag) · T2 (escalate) · T3 (deny)'
+    value: ${{ steps.classify.outputs.tier }}
+
+  action:
+    description: 'Policy action: allow · flag · escalate · deny'
+    value: ${{ steps.classify.outputs.action }}
+
+  reason:
+    description: 'Human-readable reason for the guard decision'
+    value: ${{ steps.classify.outputs.reason }}
+
+  rule:
+    description: 'Policy rule that matched (e.g. whitelist.git_cli, blacklist.linux_shell)'
+    value: ${{ steps.classify.outputs.rule }}
+
+# ─── Runner ──────────────────────────────────────────────────────────────────
+
+runs:
+  using: composite
+  steps:
+
+    # 1. Bun runtime (reuses cache on subsequent runs)
+    - name: Set up Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+
+    # 2. Install Agence dependencies (bun.lock ensures reproducibility)
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: bun install --frozen-lockfile
+
+    # 3. Run guard classify — pure classification, no side effects, no ledger write
+    - name: Classify command
+      id: classify
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        # Resolve Agence root to the action's own directory so lib/ is found
+        AGENCE_ROOT: ${{ github.action_path }}
+        # Agent identity for MLS capability checks
+        AI_AGENT: ${{ inputs.agent }}
+        # Pass inputs via env to avoid shell injection from ${{ }} in run: blocks
+        AGENCE_CMD: ${{ inputs.command }}
+        AGENCE_POLICY_OVERRIDE: ${{ inputs.policy }}
+        FAIL_ON_BLOCK: ${{ inputs.fail_on_block }}
+        FAIL_ON_ESCALATE: ${{ inputs.fail_on_escalate }}
+      run: |
+        # Resolve policy: prefer workspace-relative user path, else bundled default
+        if [[ -n "$AGENCE_POLICY_OVERRIDE" ]]; then
+          export AGENCE_POLICY="${GITHUB_WORKSPACE}/${AGENCE_POLICY_OVERRIDE}"
+          if [[ ! -f "$AGENCE_POLICY" ]]; then
+            echo "::error title=Agence Guard::Policy file not found: ${AGENCE_POLICY}"
+            exit 1
+          fi
+        else
+          export AGENCE_POLICY="${AGENCE_ROOT}/codex/AIPOLICY.yaml"
+        fi
+
+        # Run classify (exits 0 always — no ledger side effects)
+        result=$(bun run lib/guard.ts classify "$AGENCE_CMD")
+        if [[ -z "$result" ]]; then
+          echo "::error title=Agence Guard::classify returned no output for: $AGENCE_CMD"
+          exit 1
+        fi
+
+        # Parse JSON fields (jq available on all GitHub-hosted runners)
+        tier=$(echo "$result"   | jq -r '.tier')
+        action=$(echo "$result" | jq -r '.action')
+        rule=$(echo "$result"   | jq -r '.rule')
+
+        # reason may contain special characters — use heredoc for GITHUB_OUTPUT
+        reason=$(echo "$result" | jq -r '.reason')
+
+        echo "tier=$tier"       >> "$GITHUB_OUTPUT"
+        echo "action=$action"   >> "$GITHUB_OUTPUT"
+        echo "rule=$rule"       >> "$GITHUB_OUTPUT"
+        {
+          echo "reason<<_AGENCE_EOF_"
+          echo "$reason"
+          echo "_AGENCE_EOF_"
+        } >> "$GITHUB_OUTPUT"
+
+        # Emit a visible annotation in the Actions UI
+        echo "::notice title=Agence Guard [$tier — $action]::$reason"
+
+        # Enforce fail modes
+        if [[ "$FAIL_ON_BLOCK" == "true" && "$tier" == "T3" ]]; then
+          echo "::error title=Agence Guard::Command blocked (T3/deny): $reason"
+          exit 1
+        fi
+
+        if [[ "$FAIL_ON_ESCALATE" == "true" && "$tier" == "T2" ]]; then
+          echo "::error title=Agence Guard::Command requires human escalation (T2): $reason"
+          exit 1
+        fi

@@ -1,0 +1,94 @@
+name: Agence Guard — Usage Examples
+
+# This workflow demonstrates how to use the Agence Guard action.
+# Real-world usage: add the `agence-guard` step before any command
+# that an AI agent proposes to run in your CI pipeline.
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'Command to classify (e.g. git push origin main)'
+        required: true
+        default: 'git status'
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Example 1: Classify a single command ─────────────────────────────────
+  classify:
+    name: Classify command
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gate command through Agence Guard
+        id: guard
+        uses: l-agence/agence@v1
+        with:
+          command: ${{ github.event.inputs.command }}
+          agent: ci
+          fail_on_block: 'true'
+          fail_on_escalate: 'false'
+
+      - name: Show classification result
+        run: |
+          echo "Tier:   ${{ steps.guard.outputs.tier }}"
+          echo "Action: ${{ steps.guard.outputs.action }}"
+          echo "Rule:   ${{ steps.guard.outputs.rule }}"
+          echo "Reason: ${{ steps.guard.outputs.reason }}"
+
+  # ── Example 2: Gate a series of AI-proposed commands ─────────────────────
+  gate-series:
+    name: Gate AI-proposed commands
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Safe read-only command — T0, auto-executes
+      - name: Guard — git status (expected T0)
+        uses: l-agence/agence@v1
+        with:
+          command: 'git status'
+          fail_on_block: 'true'
+
+      # Flagged command — T1, logged but allowed
+      - name: Guard — git add (expected T1/T2)
+        uses: l-agence/agence@v1
+        with:
+          command: 'git add .'
+          fail_on_block: 'true'
+          fail_on_escalate: 'false'
+
+      # Blocked command — T3, should fail step
+      - name: Guard — rm -rf /tmp (expected T3 block)
+        id: dangerous
+        uses: l-agence/agence@v1
+        with:
+          command: 'rm -rf /tmp/test'
+          fail_on_block: 'true'
+        continue-on-error: true   # allow the workflow to continue for demo purposes
+
+      - name: Verify block was caught
+        if: steps.dangerous.outcome == 'success'
+        run: |
+          echo "::error::Expected T3 block was not enforced!"
+          exit 1
+
+  # ── Example 3: Use a custom policy from the calling repo ─────────────────
+  custom-policy:
+    name: Custom policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # If your repo has its own codex/AIPOLICY.yaml, pass it here
+      - name: Guard with repo-local policy
+        uses: l-agence/agence@v1
+        with:
+          command: 'terraform plan'
+          policy: 'codex/AIPOLICY.yaml'   # path relative to GITHUB_WORKSPACE
+          agent: 'ci'
+          fail_on_block: 'true'
+          fail_on_escalate: 'true'

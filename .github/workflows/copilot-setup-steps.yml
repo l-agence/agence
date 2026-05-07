@@ -1,0 +1,52 @@
+name: "Copilot Setup Steps"
+
+# Runs automatically when this file changes (for validation), and can be
+# triggered manually from the Actions tab to verify the environment is healthy.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  # Job name MUST be `copilot-setup-steps` — Copilot cloud agent looks for this exact name.
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      contents: read  # needed to checkout and cache dependencies
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Bun runtime ──────────────────────────────────────────────────────────
+      # Matches the version used in .github/workflows/ci.yml so bun test works.
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # Cache + install TypeScript dependencies so Copilot can run bun test
+      # and execute lib/guard.ts, lib/session.ts, etc. without a cold install.
+      - name: Install Bun dependencies
+        run: bun install --frozen-lockfile
+
+      # ── jq ───────────────────────────────────────────────────────────────────
+      # Required by action.yml (parses guard classify JSON output) and by
+      # several agence shell scripts that format ledger / policy output.
+      - name: Install jq
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends jq
+
+      # ── ShellSpec ────────────────────────────────────────────────────────────
+      # Matches the install method in ci.yml so shellspec tests run identically.
+      - name: Install ShellSpec
+        run: |
+          curl -fsSL https://git.io/shellspec | sh -s -- --yes
+          echo "$HOME/.local/lib/shellspec" >> "$GITHUB_PATH"

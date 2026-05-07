@@ -82,6 +82,47 @@ Agence **governs all of the above**.
 
 ---
 
+## GitHub Action — Agence Guard
+
+[![GitHub Marketplace](https://img.shields.io/badge/GitHub%20Marketplace-Agence%20Guard-red?logo=github)](https://github.com/marketplace/actions/agence-guard)
+
+Gate AI agent commands in any CI workflow — one step, zero infrastructure:
+
+```yaml
+- name: Gate AI command
+  id: guard
+  uses: l-agence/agence@v1
+  with:
+    command: 'git push origin main'   # command proposed by your AI agent
+    agent: ci
+    fail_on_block: 'true'             # fail if T3-blocked
+
+- run: echo "Tier ${{ steps.guard.outputs.tier }} — ${{ steps.guard.outputs.reason }}"
+```
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `command` | Shell command to classify | **required** |
+| `policy` | Path to custom `AIPOLICY.yaml` (repo-relative) | bundled policy |
+| `agent` | Agent identity for MLS capability checks | `ci` |
+| `fail_on_block` | Exit 1 on T3 (deny) | `true` |
+| `fail_on_escalate` | Exit 1 on T2 (requires approval) | `false` |
+
+| Output | Values |
+|--------|--------|
+| `tier` | `T0` · `T1` · `T2` · `T3` |
+| `action` | `allow` · `flag` · `escalate` · `deny` |
+| `reason` | Human-readable decision |
+| `rule` | Matched policy rule |
+
+See [docs/marketplace/description.md](docs/marketplace/description.md) for full documentation.
+
+This PR starts with the **GitHub Action** path first for fast per-repo adoption; the **GitHub App** listing and webhook server can follow in a later phase or separate PR for org-level rollout across many repositories.
+
+For enterprise adoption, the next layer after the GitHub App is **shard onboarding** so orgs can separate teams, policies, and knowledge boundaries cleanly instead of forcing one shared shard model.
+
+---
+
 ## Install
 
 ### As a git submodule (recommended)
