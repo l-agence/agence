@@ -228,9 +228,18 @@ export function callLoop(agent: AgentMeta, systemPrompt: string, query: string, 
 
 // ─── Peers (Multi-Agent Consensus) ──────────────────────────────────────────
 
-export function callPeers(peerSkill: string, query: string, flavor = "code"): string {
+export function callPeers(
+  peerSkill: string, query: string,
+  flavor = "code", algo = "winner",
+): string {
   const peersTs = join(AGENCE_ROOT, "lib", "peers.ts");
-  const result = spawnSync("bun", ["run", peersTs, peerSkill, "--flavor", flavor, query], {
+  const args = [
+    "run", peersTs, peerSkill,
+    "--flavor", flavor,
+    "--consensus", algo,
+    query,
+  ];
+  const result = spawnSync("bun", args, {
     env: process.env as Record<string, string>,
     timeout: 180_000,
     maxBuffer: 1024 * 1024,

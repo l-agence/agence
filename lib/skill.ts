@@ -81,7 +81,7 @@ function loadProjectInstructions(): string | undefined {
 async function runSkill(
   skillName: string,
   query: string,
-  opts: { agent?: string; peers?: boolean; flavor?: string; json?: boolean; save?: boolean }
+  opts: { agent?: string; peers?: boolean; flavor?: string; algo?: string; json?: boolean; save?: boolean }
 ): Promise<number> {
   // MEM-005: ^extract has its own orchestrator
   if (skillName === "extract") return runExtract(query, opts);
@@ -148,7 +148,7 @@ async function runSkill(
 
   try {
     if (usePeers && peerSkill) {
-      output = callPeers(peerSkill, `${systemPrompt}\n\n${query}`, opts.flavor || "code");
+      output = callPeers(peerSkill, `${systemPrompt}\n\n${query}`, opts.flavor || "code", opts.algo || "winner");
     } else if (agentType === "tool" && agent) {
       output = callTool(agent, systemPrompt, query);
     } else if (agentType === "loop" && agent) {
@@ -257,6 +257,7 @@ Options:
   --agent @<a>.<tool>  Override binary: @ralph.aider (ralph loop via aider CLI)
   --peers              Use 3-tangent consensus (available for solve/review/analyze/plan)
   --flavor <f>         Peer flavor: code|light|heavy (default: code)
+  --consensus <a>      Consensus algorithm: winner|judge|merge (default: winner)
   --json               Output structured JSON
   --no-save            Don't save artifact to disk
 
@@ -323,6 +324,7 @@ async function main(): Promise<number> {
   let agent: string | undefined;
   let peers = false;
   let flavor: string | undefined;
+  let algo: string | undefined;
   let json = false;
   let save = true;
   const queryParts: string[] = [];
@@ -357,6 +359,9 @@ async function main(): Promise<number> {
       case "--flavor":
         flavor = args[++i];
         break;
+      case "--consensus":
+        algo = args[++i];
+        break;
       case "--json":
       case "-j":
         json = true;
@@ -380,7 +385,7 @@ async function main(): Promise<number> {
     return 1;
   }
 
-  return runSkill(canonicalSkill, query, { agent, peers, flavor, json, save });
+  return runSkill(canonicalSkill, query, { agent, peers, flavor, algo, json, save });
 }
 
 process.exit(await main());
