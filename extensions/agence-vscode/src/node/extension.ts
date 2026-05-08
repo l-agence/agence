@@ -14,9 +14,8 @@ let guardProvider: GuardTreeProvider;
 let healthProvider: HealthTreeProvider;
 let statusBar: AgenceStatusBar;
 
-export function activate(context: vscode.ExtensionContext): void {
-  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
-  const agenceRoot = workspaceRoot;
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  const agenceRoot = await findAgenceRoot();
 
   // Tree view providers (same as web)
   signalProvider = new SignalTreeProvider(agenceRoot);
@@ -130,4 +129,26 @@ export function deactivate(): void {
   guardProvider?.dispose();
   healthProvider?.dispose();
   statusBar?.dispose();
+}
+
+async function findAgenceRoot(): Promise<vscode.Uri | undefined> {
+  const folders = vscode.workspace.workspaceFolders;
+  if (!folders) { return undefined; }
+
+  for (const folder of folders) {
+    // Check if this folder IS the agence root (has .agencerc at root)
+    try {
+      await vscode.workspace.fs.stat(vscode.Uri.joinPath(folder.uri, ".agencerc"));
+      return folder.uri;
+    } catch { /* not here */ }
+
+    // Check if this folder contains .agence/ subdir with .agencerc
+    try {
+      const sub = vscode.Uri.joinPath(folder.uri, ".agence", ".agencerc");
+      await vscode.workspace.fs.stat(sub);
+      return vscode.Uri.joinPath(folder.uri, ".agence");
+    } catch { /* not here either */ }
+  }
+
+  return folders[0]?.uri;
 }

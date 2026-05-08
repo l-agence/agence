@@ -11,11 +11,9 @@ let guardProvider: GuardTreeProvider;
 let healthProvider: HealthTreeProvider;
 let statusBar: AgenceStatusBar;
 
-export function activate(context: vscode.ExtensionContext): void {
-  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
-
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   // Find .agence root (could be workspace root or .agence subdir)
-  const agenceRoot = findAgenceRoot(workspaceRoot);
+  const agenceRoot = await findAgenceRoot();
 
   // Tree view providers
   signalProvider = new SignalTreeProvider(agenceRoot);
@@ -128,11 +126,22 @@ export function deactivate(): void {
   statusBar?.dispose();
 }
 
-function findAgenceRoot(workspaceRoot: vscode.Uri | undefined): vscode.Uri | undefined {
-  if (!workspaceRoot) { return undefined; }
+async function findAgenceRoot(): Promise<vscode.Uri | undefined> {
+  const folders = vscode.workspace.workspaceFolders;
+  if (!folders) { return undefined; }
 
-  // If workspace IS the .agence dir (has codex/AIPOLICY.yaml)
-  // or if workspace contains .agence/ subdir
-  // We'll try both and the providers will handle missing files gracefully
-  return workspaceRoot;
+  for (const folder of folders) {
+    try {
+      await vscode.workspace.fs.stat(vscode.Uri.joinPath(folder.uri, ".agencerc"));
+      return folder.uri;
+    } catch { /* not here */ }
+
+    try {
+      const sub = vscode.Uri.joinPath(folder.uri, ".agence", ".agencerc");
+      await vscode.workspace.fs.stat(sub);
+      return vscode.Uri.joinPath(folder.uri, ".agence");
+    } catch { /* not here either */ }
+  }
+
+  return folders[0]?.uri;
 }
