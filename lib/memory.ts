@@ -17,6 +17,7 @@
 // Operations:
 //   ^retain  <source> <tags> <content>  — write row to persistent store
 //   ^recall  <tags> [--source X]        — query across stores, ranked
+//   ^recall  --grep <pat> [--regex]     — grep across stores + knowledge files
 //   ^cache   <tags> [--max N]           — hydrate working memory from all stores
 //   ^forget  <id> <source>              — remove row from store
 //   ^promote <id> <from> <to>           — move row between stores
@@ -32,8 +33,8 @@
 //   airun memory stats
 //   airun memory help
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, appendFileSync, chmodSync, statSync } from "fs";
-import { join } from "path";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, appendFileSync, chmodSync, statSync, readdirSync } from "fs";
+import { join, relative, extname } from "path";
 
 // ─── Environment ─────────────────────────────────────────────────────────────
 
@@ -538,6 +539,151 @@ export function distill(opts: DistillOpts): { promoted: MemoryRow[]; skipped: nu
   return { promoted, skipped: sourceRows.length - candidates.length - duplicates, duplicates };
 }
 
+// ─── Knowledge Search (grep) ─────────────────────────────────────────────────
+// Deterministic, zero-LLM content search across memory stores + knowledge files.
+
+/** Extensions to include when scanning knowledge artifact files */
+const SEARCH_EXTS = new Set([".md", ".json", ".jsonl", ".yaml", ".yml", ".txt", ".csv"]);
+
+/** Directories to scan for knowledge artifacts (relative to AGENCE_ROOT) */
+const KNOWLEDGE_DIRS = ["knowledge", "synthetic"];
+
+/** Max file size to search (skip large blobs) */
+const MAX_SEARCH_FILE = 512 * 1024; // 512KB
+
+export interface SearchHit {
+  /** "memory" for JSONL rows, "file" for artifact files */
+  kind: "memory" | "file";
+  /** File path (relative to AGENCE_ROOT) or memory row ID */
+  location: string;
+  /** The matching line(s) */
+  match: string;
+  /** 1-based line number (files) or undefined (memory rows) */
+  line?: number;
+  /** Memory source (shared/private) or undefined for files */
+  source?: MemorySource;
+}
+
+/**
+ * Walk a directory recursively, yielding file paths.
+ * Skips .git directories and non-searchable extensions.
+ */
+function* walkFiles(dir: string): Generator<string> {
+  if (!existsSync(dir)) return;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === ".git" || entry.name === "node_modules") continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      yield* walkFiles(full);
+    } else if (SEARCH_EXTS.has(extname(entry.name).toLowerCase())) {
+      yield full;
+    }
+  }
+}
+
+/**
+ * ^recall --grep — Search memory stores and knowledge files by regex or substring.
+ * Returns matching lines with location context. No LLM, pure grep.
+ */
+export function search(
+  pattern: string,
+  opts?: { source?: MemorySource; max?: number; regex?: boolean; filesOnly?: boolean; memoryOnly?: boolean }
+): SearchHit[] {
+  const max = opts?.max ?? 50;
+  const hits: SearchHit[] = [];
+
+  // Build matcher
+  let re: RegExp;
+  try {
+    re = opts?.regex ? new RegExp(pattern, "i") : new RegExp(escapeRegex(pattern), "i");
+  } catch (err: any) {
+    throw new Error(`Invalid regex pattern: ${err.message}`);
+  }
+
+  // 1. Search memory stores (JSONL content + tags)
+  if (!opts?.filesOnly) {
+    const sources: MemorySource[] = opts?.source
+      ? [opts.source]
+      : (Object.keys(STORE_MAP) as MemorySource[]);
+
+    for (const src of sources) {
+      for (const row of readStore(src)) {
+        if (hits.length >= max) break;
+        // Search content, tags, and id
+        const searchable = `${row.content} ${row.tags.join(" ")}`;
+        if (re.test(searchable)) {
+          // Extract matching line from content
+          const lines = row.content.split("\n");
+          const matchLine = lines.find(l => re.test(l)) ?? lines[0];
+          hits.push({
+            kind: "memory",
+            location: row.id,
+            match: matchLine.substring(0, 200),
+            source: src,
+          });
+        }
+      }
+      if (hits.length >= max) break;
+    }
+
+    // Also search working memory
+    if (!opts?.source) {
+      for (const row of readWorking()) {
+        if (hits.length >= max) break;
+        const searchable = `${row.content} ${row.tags.join(" ")}`;
+        if (re.test(searchable)) {
+          const lines = row.content.split("\n");
+          const matchLine = lines.find(l => re.test(l)) ?? lines[0];
+          hits.push({
+            kind: "memory",
+            location: `${row.id} (working)`,
+            match: matchLine.substring(0, 200),
+            source: row.source,
+          });
+        }
+      }
+    }
+  }
+
+  // 2. Search knowledge artifact files
+  if (!opts?.memoryOnly) {
+    for (const dir of KNOWLEDGE_DIRS) {
+      const absDir = join(AGENCE_ROOT, dir);
+      for (const filePath of walkFiles(absDir)) {
+        if (hits.length >= max) break;
+        try {
+          const stat = statSync(filePath);
+          if (stat.size > MAX_SEARCH_FILE) continue;
+
+          const content = readFileSync(filePath, "utf-8");
+          const lines = content.split("\n");
+          for (let i = 0; i < lines.length; i++) {
+            if (hits.length >= max) break;
+            if (re.test(lines[i])) {
+              hits.push({
+                kind: "file",
+                location: relative(AGENCE_ROOT, filePath),
+                match: lines[i].substring(0, 200),
+                line: i + 1,
+              });
+            }
+          }
+        } catch {
+          // skip unreadable files
+        }
+      }
+      if (hits.length >= max) break;
+    }
+  }
+
+  return hits;
+}
+
+/** Escape special regex characters for literal substring matching */
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 // ─── CLI Entry Point ─────────────────────────────────────────────────────────
 
 function printHelp(): void {
@@ -546,6 +692,7 @@ function printHelp(): void {
 Commands:
   retain <source> <tags> <content>      Store a memory row
   recall <tags> [--source X] [--max N]  Query memories by tags
+  recall --grep <pattern> [opts]        Grep across memories + knowledge files
   cache  <tags> [--max N] [--private]   Hydrate working memory cache
   forget <id> <source>                  Remove a row
   promote <id> <from> <to>              Move row between stores
@@ -557,6 +704,14 @@ Commands:
 Sources: shared, private
 Tags:    Comma-separated, alphanumeric with . _ - (max 16)
 
+Recall grep options:
+  --grep  <pattern>    Substring search (case-insensitive)
+  --regex <pattern>    Regex search (case-insensitive)
+  --source <X>         Limit memory search to source (shared/private)
+  --max <N>            Max results (default 50)
+  --files-only         Only search knowledge files, skip memory stores
+  --memory-only        Only search memory stores, skip knowledge files
+
 Promotion paths (distill):
   private → shared        Declassify private insights for team
 
@@ -564,6 +719,9 @@ Examples:
   airun memory retain shared "jwt,auth" "JWT tokens expire after 24h"
   airun memory recall "jwt,auth"
   airun memory recall "jwt" --source shared --max 10
+  airun memory recall --grep "JWT.*expir"
+  airun memory recall --regex "peer|consensus" --max 20
+  airun memory recall --grep "security" --files-only
   airun memory cache "deploy,k8s" --max 20
   airun memory forget sh-18f3a4b00 shared
   airun memory promote pr-18f3a4b00 private shared
@@ -627,26 +785,58 @@ async function main() {
       }
 
       case "recall": {
-        const tagStr = args[1];
-        if (!tagStr) {
-          console.error("Usage: airun memory recall <tags> [--source X] [--max N]");
-          process.exit(1);
-        }
+        // Check for grep mode: --grep or --regex as first arg (or anywhere)
+        let grepPattern: string | undefined;
+        let isRegex = false;
         let source: MemorySource | undefined;
         let max: number | undefined;
         let includeNegative = false;
-        for (let i = 2; i < args.length; i++) {
-          if (args[i] === "--source" && args[i + 1]) { source = args[++i] as MemorySource; }
+        let filesOnly = false;
+        let memoryOnly = false;
+
+        for (let i = 1; i < args.length; i++) {
+          if (args[i] === "--grep" && args[i + 1]) { grepPattern = args[++i]; isRegex = false; }
+          else if (args[i] === "--regex" && args[i + 1]) { grepPattern = args[++i]; isRegex = true; }
+          else if (args[i] === "--source" && args[i + 1]) { source = args[++i] as MemorySource; }
           else if (args[i] === "--max" && args[i + 1]) { max = parseInt(args[++i], 10); }
           else if (args[i] === "--negative") { includeNegative = true; }
+          else if (args[i] === "--files-only") { filesOnly = true; }
+          else if (args[i] === "--memory-only") { memoryOnly = true; }
         }
-        const tags = parseTags(tagStr);
-        const rows = recall(tags, { source, max, includeNegative });
-        if (rows.length === 0) {
-          console.log("No matching memories found.");
+
+        if (grepPattern) {
+          // Grep mode: search content across stores + knowledge files
+          const hits = search(grepPattern, { source, max, regex: isRegex, filesOnly, memoryOnly });
+          if (hits.length === 0) {
+            console.log(`No matches for ${isRegex ? "/" : "\""}${grepPattern}${isRegex ? "/i" : "\""}`);
+          } else {
+            console.log(`${hits.length} hit${hits.length === 1 ? "" : "s"} for ${isRegex ? "/" : "\""}${grepPattern}${isRegex ? "/i" : "\""}:\n`);
+            for (const h of hits) {
+              if (h.kind === "memory") {
+                console.log(`  [mem] ${h.location} (${h.source})`);
+                console.log(`        ${h.match}`);
+              } else {
+                console.log(`  [file] ${h.location}:${h.line}`);
+                console.log(`         ${h.match.trim()}`);
+              }
+              console.log();
+            }
+          }
         } else {
-          console.log(`Found ${rows.length} memor${rows.length === 1 ? "y" : "ies"}:\n`);
-          for (const r of rows) console.log(formatRow(r) + "\n");
+          // Tag mode (original behavior)
+          const tagStr = args[1];
+          if (!tagStr) {
+            console.error("Usage: airun memory recall <tags> [--source X] [--max N]\n       airun memory recall --grep <pattern> [--source X] [--max N]");
+            process.exit(1);
+          }
+          const tags = parseTags(tagStr);
+          const rows = recall(tags, { source, max, includeNegative });
+          if (rows.length === 0) {
+            console.log("No matching memories found.");
+          } else {
+            console.log(`Found ${rows.length} memor${rows.length === 1 ? "y" : "ies"}:\n`);
+            for (const r of rows) console.log(formatRow(r) + "\n");
+          }
         }
         break;
       }
