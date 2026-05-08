@@ -224,6 +224,7 @@ function cmdList(): number {
     "Red Team":  ["hack", "break"],
     "Knowledge": ["document", "test", "recon", "grasp", "glimpse", "extract"],
     "Ops":       ["deploy", "bundle", "brainstorm", "integrate"],
+    "Pipe":      ["sift"],
   };
 
   for (const [group, names] of Object.entries(groups)) {
@@ -292,6 +293,7 @@ async function main(): Promise<number> {
     queue:   "lib/queue.ts",
     diff:    "lib/diff.ts",
     btw:     "lib/btw.ts",
+    sift:    "lib/sift.ts",
   };
 
   if (args[0] in DELEGATES) {

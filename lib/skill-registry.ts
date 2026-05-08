@@ -48,7 +48,7 @@ export interface AgentMeta {
 
 export const REAL_SKILLS: ReadonlySet<string> = new Set([
   "break", "hack", "integrate", "bundle", "recon", "redoc",
-  "verify", "extract", "consensus",
+  "verify", "extract", "consensus", "sift",
 ]);
 
 export const SKILLS: Record<string, SkillDef> = {
@@ -129,6 +129,8 @@ export const SKILLS: Record<string, SkillDef> = {
                systemPrompt: "You are the release engineer. Run the ^bundle pipeline." },
   consensus: { name: "consensus", artifact: "report",   peerSkill: "consensus", description: "Multi-agent decision protocol", hasCode: true,
                systemPrompt: "You are a consensus coordinator. Present the question to multiple agents and aggregate their findings." },
+  sift:      { name: "sift",      artifact: "result",   description: "LLM pipe filter/summarizer (stdin → filtered stdout)", hasCode: true,
+               systemPrompt: "You are a pipe filter. Summarize, deduplicate, and condense the input." },
 };
 
 // ─── Agent Resolution ────────────────────────────────────────────────────────
