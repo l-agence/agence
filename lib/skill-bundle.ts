@@ -76,7 +76,7 @@ export async function runBundle(): Promise<number> {
     cwd: root, env, timeout: 30_000,
   });
   const packOutput = (packResult.stderr?.toString() || "") + (packResult.stdout?.toString() || "");
-  const hasLeak = /nexus\/|knowledge\/private|knowledge\/hermetic|\.ailedger|organic\//.test(packOutput);
+  const hasLeak = /nexus\/|knowledge\/private|\.ailedger|organic\//.test(packOutput);
   const fileCount = (packOutput.match(/total files:\s*(\d+)/i) || [])[1] || "?";
   const pkgSize = (packOutput.match(/package size:\s*([^\n]+)/i) || [])[1] || "?";
   results.push({

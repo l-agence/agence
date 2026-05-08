@@ -14,13 +14,13 @@ const AGENCE_ROOT = process.env.AGENCE_ROOT
 const ORG = resolveOrg(AGENCE_ROOT);
 
 export const ARTIFACT_ROUTES: Record<string, { scope: string; subdir: string }> = {
-  skill:    { scope: "synthetic", subdir: "skills" },
-  report:   { scope: "synthetic", subdir: "reports" },
-  solution: { scope: "synthetic", subdir: "solutions" },
-  analysis: { scope: "synthetic", subdir: "analyses" },
-  document: { scope: "synthetic", subdir: "docs" },
-  pattern:  { scope: "objectcode", subdir: "patterns" },
-  design:   { scope: "objectcode", subdir: "designs" },
+  skill:    { scope: "knowledge", subdir: "skills" },
+  report:   { scope: "knowledge", subdir: "reports" },
+  solution: { scope: "knowledge", subdir: "solutions" },
+  analysis: { scope: "knowledge", subdir: "analyses" },
+  document: { scope: "knowledge", subdir: "docs" },
+  pattern:  { scope: "knowledge", subdir: "patterns" },
+  design:   { scope: "knowledge", subdir: "designs" },
   result:   { scope: "organic", subdir: "results" },
 };
 
@@ -29,7 +29,7 @@ export function saveArtifact(artifactType: string, content: string, skillName: s
   if (!route) return null;
 
   let targetDir: string;
-  if (route.scope === "synthetic") {
+  if (route.scope === "knowledge") {
     targetDir = join(AGENCE_ROOT, route.scope, ORG, route.subdir);
   } else {
     targetDir = join(AGENCE_ROOT, route.scope, route.subdir);

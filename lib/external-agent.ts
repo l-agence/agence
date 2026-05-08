@@ -14,7 +14,7 @@
 //   - Flavor configurations (model + weight matrices)
 //   - Parallel dispatch (Promise.all)
 //   - Consensus delegation (imports consensus.ts)
-//   - Artifact persistence (saves to synthetic/analyses/)
+//   - Artifact persistence (saves to knowledge/analyses/)
 
 import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
@@ -333,7 +333,7 @@ export async function runPeers(
 
   // Save artifact — SEC: sanitize org name (B2) to prevent path traversal
   const org = resolveOrg(AGENCE_ROOT).replace(/\.\./g, "").replace(/[\/\\]/g, "_");
-  const outDir = join(AGENCE_ROOT, "synthetic", org, "analyses");
+  const outDir = join(AGENCE_ROOT, "knowledge", org, "analyses");
   if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
   const nonce = Math.random().toString(36).slice(2, 8);
   const outFile = join(outDir, `peers-${skill}-${Date.now()}-${nonce}.json`);

@@ -430,10 +430,10 @@ function sessionPrune(args: string[]): number {
 
   console.error(`[SESSION] Prune: ${candidates.length} files from ${sessionIds.size} sessions (older than ${days} days)`);
 
-  // Archive to hermetic if requested
-  const HERMETIC_DIR = join(AI_ROOT, "hermetic", resolveOrg(AI_ROOT));
-  const ARCHIVE_DIR = join(HERMETIC_DIR, "sessions");
-  const hermeticHasGit = existsSync(join(HERMETIC_DIR, ".git"));
+  // Archive to private knowledge if requested
+  const PRIVATE_DIR = join(AI_ROOT, "knowledge", "private");
+  const ARCHIVE_DIR = join(PRIVATE_DIR, "sessions");
+  const privateHasGit = existsSync(join(PRIVATE_DIR, ".git"));
 
   if (archive) {
     mkdirSync(ARCHIVE_DIR, { recursive: true });
@@ -461,17 +461,17 @@ function sessionPrune(args: string[]): number {
     removed++;
   }
 
-  // Commit archive to hermetic nested git if available
-  if (archive && !dryRun && hermeticHasGit && archived > 0) {
+  // Commit archive to private nested git if available
+  if (archive && !dryRun && privateHasGit && archived > 0) {
     try {
-      execSync(`git add sessions/`, { cwd: HERMETIC_DIR, stdio: "pipe" });
+      execSync(`git add sessions/`, { cwd: PRIVATE_DIR, stdio: "pipe" });
       execSync(
         `git commit -m "archive: ${sessionIds.size} sessions (${archived} files, older than ${days}d)"`,
-        { cwd: HERMETIC_DIR, stdio: "pipe" }
+        { cwd: PRIVATE_DIR, stdio: "pipe" }
       );
-      console.error(`  ✓ Committed ${archived} files to hermetic git`);
+      console.error(`  ✓ Committed ${archived} files to private git`);
     } catch {
-      console.error(`  ⚠ Hermetic git commit failed — files copied but not committed`);
+      console.error(`  ⚠ Private git commit failed — files copied but not committed`);
     }
   }
 
@@ -868,7 +868,7 @@ function cmdSave(args: string[]): number {
   mkdirSync(savesDir, { recursive: true });
 
   const g = gitState(AI_ROOT);
-  const orgRoot = resolveOrg(join(AI_ROOT, "synthetic"));
+  const orgRoot = resolveOrg(join(AI_ROOT, "knowledge"));
   const lessonsDir = join(orgRoot, "lessons");
   const lessonsCount = existsSync(lessonsDir)
     ? readdirSync(lessonsDir).filter(f => f.endsWith(".md") && f !== "INDEX.md").length : 0;
@@ -902,7 +902,7 @@ function cmdLearn(): number {
   const sessionsDir = join(AI_ROOT, "nexus", ".aisessions");
   const savesDir = join(AI_ROOT, "nexus", ".aisaves");
   const faultsDir = join(AI_ROOT, "nexus", "faults");
-  const orgRoot = resolveOrg(join(AI_ROOT, "synthetic"));
+  const orgRoot = resolveOrg(join(AI_ROOT, "knowledge"));
   const lessonsDir = join(orgRoot, "lessons");
 
   const countFiles = (dir: string, ext: string) =>

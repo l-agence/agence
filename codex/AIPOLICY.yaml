@@ -420,9 +420,9 @@ blacklist:
 capabilities:
 
   definitions:
-    CAP_READ_HERMETIC: "Access private/hermetic knowledge stores"
+    CAP_READ_PRIVATE: "Access private knowledge stores (knowledge/private/)"
     CAP_READ_NEXUS: "Access local state (sessions, ledger, signals)"
-    CAP_WRITE_SYNTHETIC: "Write to shared synthetic knowledge"
+    CAP_WRITE_KNOWLEDGE: "Write to shared knowledge store"
     CAP_WRITE_ORGANIC: "Write to organic work artifacts"
     CAP_EXEC_SHELL: "Execute shell commands"
     CAP_EXEC_INFRA: "Run infrastructure tools (terraform, docker, k8s, aws)"

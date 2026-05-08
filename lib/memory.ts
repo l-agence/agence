@@ -546,7 +546,7 @@ export function distill(opts: DistillOpts): { promoted: MemoryRow[]; skipped: nu
 const SEARCH_EXTS = new Set([".md", ".json", ".jsonl", ".yaml", ".yml", ".txt", ".csv"]);
 
 /** Directories to scan for knowledge artifacts (relative to AGENCE_ROOT) */
-const KNOWLEDGE_DIRS = ["knowledge", "synthetic"];
+const KNOWLEDGE_DIRS = ["knowledge"];
 
 /** Max file size to search (skip large blobs) */
 const MAX_SEARCH_FILE = 512 * 1024; // 512KB

@@ -211,24 +211,43 @@ export function resolveAgent(skillName: string, explicitAgent?: string): AgentMe
 const MAX_SKILL_MD_SIZE = 128 * 1024;
 const MAX_PERSONA_SIZE = 64 * 1024;
 
+/** Maps skill names to their group file (knowledge/{org}/skills/{group}.md) */
+const SKILL_GROUP: Record<string, string> = {
+  fix: "code", build: "code", feature: "code", refactor: "code", solve: "code",
+  review: "review", precommit: "review", simplify: "review", analyse: "review",
+  design: "review", pattern: "review", scope: "review", spec: "review", split: "review",
+  document: "knowledge", test: "knowledge", recon: "knowledge", grasp: "knowledge", glimpse: "knowledge",
+  break: "redteam", hack: "redteam",
+  deploy: "ops", brainstorm: "ops", integrate: "ops", "terminal-ops": "ops",
+  "peer-design": "peers", "peer-review": "peers", "peer-solve": "peers", "peer-analyse": "peers",
+};
+
 export function loadSkillMd(skillName: string): string | undefined {
   if (!AGENT_NAME_RE.test(skillName)) return undefined;
 
-  const rootSkillFile = join(AGENCE_ROOT, "synthetic", "skills", skillName, "SKILL.md");
-  const expectedRoot = resolve(AGENCE_ROOT, "synthetic", "skills");
-  if (!resolve(rootSkillFile).startsWith(expectedRoot)) return undefined;
+  const group = SKILL_GROUP[skillName];
+  if (!group) return undefined;
 
-  if (existsSync(rootSkillFile)) {
-    const content = readFileSync(rootSkillFile, "utf-8");
+  // Primary: org-scoped grouped file
+  const orgGroupFile = join(AGENCE_ROOT, "knowledge", ORG, "skills", `${group}.md`);
+  if (existsSync(orgGroupFile)) {
+    const content = readFileSync(orgGroupFile, "utf-8");
+
+    // Extract the section for this specific skill (between "# Skill: ^name" or "# ^name" and next "---" or EOF)
+    const skillHeader = new RegExp(`^#+ (?:Skill: )?\\^?${skillName.replace("-", "[-]?")}\\b`, "im");
+    const match = content.match(skillHeader);
+    if (match && match.index !== undefined) {
+      const start = match.index;
+      const rest = content.slice(start);
+      const endMatch = rest.indexOf("\n---\n");
+      const section = endMatch > 0 ? rest.slice(0, endMatch) : rest;
+      return section.length > MAX_SKILL_MD_SIZE ? section.slice(0, MAX_SKILL_MD_SIZE) : section;
+    }
+
+    // Fallback: return entire group file (skill header not found = ungrouped)
     return content.length > MAX_SKILL_MD_SIZE ? content.slice(0, MAX_SKILL_MD_SIZE) : content;
   }
 
-  // Fallback: org-scoped
-  const orgSkillFile = join(AGENCE_ROOT, "synthetic", ORG, "skills", skillName, "SKILL.md");
-  if (existsSync(orgSkillFile)) {
-    const content = readFileSync(orgSkillFile, "utf-8");
-    return content.length > MAX_SKILL_MD_SIZE ? content.slice(0, MAX_SKILL_MD_SIZE) : content;
-  }
   return undefined;
 }
 

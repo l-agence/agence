@@ -32,9 +32,9 @@ const AGENCE_ROOT = process.env.AGENCE_ROOT
 
 export const CAPABILITIES = {
   // Data access (Bell-LaPadula)
-  CAP_READ_HERMETIC:    "CAP_READ_HERMETIC",     // Read hermetic (private) knowledge
+  CAP_READ_PRIVATE:     "CAP_READ_PRIVATE",      // Read private knowledge (knowledge/private/)
   CAP_READ_NEXUS:       "CAP_READ_NEXUS",        // Read nexus (local state/sessions)
-  CAP_WRITE_SYNTHETIC:  "CAP_WRITE_SYNTHETIC",   // Write to shared synthetic store
+  CAP_WRITE_KNOWLEDGE:  "CAP_WRITE_KNOWLEDGE",   // Write to shared knowledge store
   CAP_WRITE_ORGANIC:    "CAP_WRITE_ORGANIC",     // Write to organic work artifacts
 
   // Execution
@@ -67,19 +67,19 @@ export type Capability = typeof CAPABILITIES[keyof typeof CAPABILITIES];
 export const SECURITY_LEVELS = {
   L0_PUBLIC:    0,   // Unrestricted (README, help text)
   L1_ORGANIC:   1,   // Team work artifacts (tasks, workflows, jobs)
-  L2_SYNTHETIC: 2,   // Shared knowledge (plans, lessons, docs)
+  L2_KNOWLEDGE: 2,   // Shared knowledge (plans, lessons, docs, analyses)
   L3_NEXUS:     3,   // Local state (sessions, ledger, signals)
-  L4_HERMETIC:  4,   // Private (personal todos, brainstorms, secrets)
+  L4_PRIVATE:   4,   // Private (personal todos, brainstorms, secrets)
 } as const;
 
 export type SecurityLevel = typeof SECURITY_LEVELS[keyof typeof SECURITY_LEVELS];
 
 // Agent clearance derived from capabilities
 export function agentClearance(caps: Capability[]): SecurityLevel {
-  if (caps.includes(CAPABILITIES.CAP_READ_HERMETIC)) return SECURITY_LEVELS.L4_HERMETIC;
+  if (caps.includes(CAPABILITIES.CAP_READ_PRIVATE)) return SECURITY_LEVELS.L4_PRIVATE;
   if (caps.includes(CAPABILITIES.CAP_READ_NEXUS))    return SECURITY_LEVELS.L3_NEXUS;
-  // All agents can read synthetic + organic by default
-  return SECURITY_LEVELS.L2_SYNTHETIC;
+  // All agents can read knowledge + organic by default
+  return SECURITY_LEVELS.L2_KNOWLEDGE;
 }
 
 // ─── Command → Required Capability Mapping ───────────────────────────────────
@@ -330,7 +330,7 @@ function deriveCapabilitiesFromTier(name: string, def: Record<string, unknown>):
       caps.push(CAPABILITIES.CAP_SIGNAL_HUMAN);
       caps.push(CAPABILITIES.CAP_MUTATE_GIT);
       caps.push(CAPABILITIES.CAP_READ_NEXUS);
-      caps.push(CAPABILITIES.CAP_WRITE_SYNTHETIC);
+      caps.push(CAPABILITIES.CAP_WRITE_KNOWLEDGE);
       break;
     case "T3":
       caps.push(CAPABILITIES.CAP_EXEC_SHELL);
@@ -342,8 +342,8 @@ function deriveCapabilitiesFromTier(name: string, def: Record<string, unknown>):
       caps.push(CAPABILITIES.CAP_PUBLISH);
       caps.push(CAPABILITIES.CAP_SPAWN_AGENT);
       caps.push(CAPABILITIES.CAP_READ_NEXUS);
-      caps.push(CAPABILITIES.CAP_READ_HERMETIC);
-      caps.push(CAPABILITIES.CAP_WRITE_SYNTHETIC);
+      caps.push(CAPABILITIES.CAP_READ_PRIVATE);
+      caps.push(CAPABILITIES.CAP_WRITE_KNOWLEDGE);
       break;
     case "T4":
       // Ensemble — full capabilities
@@ -460,21 +460,20 @@ export function pathSecurityLevel(filePath: string): SecurityLevel {
   // A traversal like `organic/../../etc/passwd` escapes the managed tree —
   // deny by default (fail-closed) rather than defaulting to L0_PUBLIC.
   if (!absPath.startsWith(AGENCE_ROOT + "/") && absPath !== AGENCE_ROOT) {
-    return SECURITY_LEVELS.L4_HERMETIC;
+    return SECURITY_LEVELS.L4_PRIVATE;
   }
   const rel = absPath.slice(AGENCE_ROOT.length + 1);
 
-  // Hermetic (L4) — private knowledge
-  if (/^knowledge\/private\//.test(rel)) return SECURITY_LEVELS.L4_HERMETIC;
-  if (/^knowledge\/hermetic\//.test(rel)) return SECURITY_LEVELS.L4_HERMETIC;
+  // Private (L4) — private knowledge
+  if (/^knowledge\/private\//.test(rel)) return SECURITY_LEVELS.L4_PRIVATE;
 
   // Nexus (L3) — local state, sessions, signals, ledger
   if (/^nexus\//.test(rel)) return SECURITY_LEVELS.L3_NEXUS;
   if (/^\.ailedger/.test(rel)) return SECURITY_LEVELS.L3_NEXUS;
 
-  // Synthetic (L2) — shared knowledge
-  if (/^knowledge\//.test(rel)) return SECURITY_LEVELS.L2_SYNTHETIC;
-  if (/^codex\//.test(rel)) return SECURITY_LEVELS.L2_SYNTHETIC;
+  // Knowledge (L2) — shared knowledge
+  if (/^knowledge\//.test(rel)) return SECURITY_LEVELS.L2_KNOWLEDGE;
+  if (/^codex\//.test(rel)) return SECURITY_LEVELS.L2_KNOWLEDGE;
 
   // Organic (L1) — work artifacts
   if (/^organic\//.test(rel)) return SECURITY_LEVELS.L1_ORGANIC;
