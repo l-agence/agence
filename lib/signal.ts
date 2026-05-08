@@ -615,27 +615,76 @@ function doOutput(data: string): number {
 
 // ─── List pending signals ────────────────────────────────────────────────────
 
-function doList(): number {
+function doList(jsonOut = false, watch = false): number {
   ensureDir(SIGNAL_DIR);
   const { readdirSync } = require("fs");
-  const files = readdirSync(SIGNAL_DIR).filter((f: string) => f.endsWith(".signal.json"));
-  if (files.length === 0) {
-    console.log("[signal] No pending signals");
-    return 0;
-  }
-  console.log(`[signal] ${files.length} pending signal(s):`);
-  for (const f of files) {
-    try {
-      const data = JSON.parse(readFileSync(join(SIGNAL_DIR, f), "utf-8"));
-      // SEC-004: Verify HMAC on list display
-      const verified = validateEnvelopeFields(data) && data.hmac && verifyEnvelope(data);
-      const mark = verified ? "✓" : data.hmac ? "✗ UNVERIFIED" : "⚠ unsigned";
-      console.log(`  [${mark}] ${data.type} ${data.from}→${data.to}: ${data.payload.slice(0, 60)} [${data.id}]`);
-    } catch {
-      console.log(`  (corrupt: ${f})`);
+
+  const printOnce = (): number => {
+    const files = readdirSync(SIGNAL_DIR).filter((f: string) => f.endsWith(".signal.json"));
+    if (jsonOut) {
+      const signals: any[] = [];
+      for (const f of files) {
+        try {
+          const data = JSON.parse(readFileSync(join(SIGNAL_DIR, f), "utf-8"));
+          const verified = validateEnvelopeFields(data) && data.hmac && verifyEnvelope(data);
+          signals.push({ id: data.id, type: data.type, from: data.from, to: data.to, payload: data.payload, verified, file: f });
+        } catch { signals.push({ file: f, error: "corrupt" }); }
+      }
+      console.log(JSON.stringify(signals));
+      return 0;
     }
-  }
-  return 0;
+    if (files.length === 0) {
+      console.log("[signal] No pending signals");
+      return 0;
+    }
+    console.log(`[signal] ${files.length} pending signal(s):`);
+    for (const f of files) {
+      try {
+        const data = JSON.parse(readFileSync(join(SIGNAL_DIR, f), "utf-8"));
+        // SEC-004: Verify HMAC on list display
+        const verified = validateEnvelopeFields(data) && data.hmac && verifyEnvelope(data);
+        const mark = verified ? "✓" : data.hmac ? "✗ UNVERIFIED" : "⚠ unsigned";
+        console.log(`  [${mark}] ${data.type} ${data.from}→${data.to}: ${data.payload.slice(0, 60)} [${data.id}]`);
+      } catch {
+        console.log(`  (corrupt: ${f})`);
+      }
+    }
+    return 0;
+  };
+
+  if (!watch) return printOnce();
+
+  // --watch mode: poll every 2s, print new signals as ndjson or text
+  let seen = new Set<string>();
+  const poll = () => {
+    const files: string[] = readdirSync(SIGNAL_DIR).filter((f: string) => f.endsWith(".signal.json"));
+    for (const f of files) {
+      if (seen.has(f)) continue;
+      seen.add(f);
+      try {
+        const data = JSON.parse(readFileSync(join(SIGNAL_DIR, f), "utf-8"));
+        const verified = validateEnvelopeFields(data) && data.hmac && verifyEnvelope(data);
+        if (jsonOut) {
+          console.log(JSON.stringify({ id: data.id, type: data.type, from: data.from, to: data.to, payload: data.payload, verified, file: f }));
+        } else {
+          const mark = verified ? "✓" : data.hmac ? "✗ UNVERIFIED" : "⚠ unsigned";
+          console.log(`  [${mark}] ${data.type} ${data.from}→${data.to}: ${data.payload.slice(0, 60)} [${data.id}]`);
+        }
+      } catch {
+        if (jsonOut) console.log(JSON.stringify({ file: f, error: "corrupt" }));
+        else console.log(`  (corrupt: ${f})`);
+      }
+    }
+    // Remove signals that disappeared (responded/pruned)
+    for (const s of seen) {
+      if (!files.includes(s)) seen.delete(s);
+    }
+  };
+  // Initial dump
+  if (!jsonOut) console.log("[signal] Watching for new signals (Ctrl+C to stop)...");
+  poll();
+  setInterval(poll, 2000);
+  return 0; // never reached in watch mode
 }
 
 // ─── Respond (human responds to a ^prompt or ^ask) ──────────────────────────
@@ -666,7 +715,7 @@ function doRespond(sigId: string, answer: string): number {
 
 // ─── Poll (agent checks if a ^prompt response has arrived) ───────────────────
 
-function doPoll(sigId: string): number {
+function doPoll(sigId: string, jsonOut = false): number {
   // SEC-004: Validate signal ID format
   if (!/^[a-f0-9]{8}$/.test(sigId)) {
     console.error(`[signal] Invalid signal ID format: ${sigId}`);
@@ -674,8 +723,11 @@ function doPoll(sigId: string): number {
   }
   const responsePath = join(SIGNAL_DIR, `${sigId}.response.json`);
   if (!existsSync(responsePath)) {
-    console.log(`export _SIGNAL_ANSWERED=0`);
-    console.log(`export _SIGNAL_ID=${sigId}`);
+    if (jsonOut) console.log(JSON.stringify({ answered: false, id: sigId }));
+    else {
+      console.log(`export _SIGNAL_ANSWERED=0`);
+      console.log(`export _SIGNAL_ID=${sigId}`);
+    }
     return 1; // no response yet
   }
   try {
@@ -687,20 +739,28 @@ function doPoll(sigId: string): number {
         .digest("hex");
       if (data.hmac !== expected) {
         process.stderr.write(`[signal] WARNING: HMAC verification failed for response ${sigId} — possible forgery\n`);
-        console.log(`export _SIGNAL_ANSWERED=0`);
-        console.log(`export _SIGNAL_ID=${sigId}`);
+        if (jsonOut) console.log(JSON.stringify({ answered: false, id: sigId, error: "hmac_failed" }));
+        else {
+          console.log(`export _SIGNAL_ANSWERED=0`);
+          console.log(`export _SIGNAL_ID=${sigId}`);
+        }
         return 1;
       }
     }
-    console.log(`export _SIGNAL_ANSWERED=1`);
-    console.log(`export _SIGNAL_ANSWER='${data.answer.replace(/'/g, "'\\''")}'`);
-    console.log(`export _SIGNAL_ID=${sigId}`);
+    if (jsonOut) {
+      console.log(JSON.stringify({ answered: true, id: sigId, answer: data.answer, responder: data.responder, timestamp: data.timestamp }));
+    } else {
+      console.log(`export _SIGNAL_ANSWERED=1`);
+      console.log(`export _SIGNAL_ANSWER='${data.answer.replace(/'/g, "'\\''")}'`);
+      console.log(`export _SIGNAL_ID=${sigId}`);
+    }
     // Cleanup
     try { unlinkSync(responsePath); } catch {}
     try { unlinkSync(join(SIGNAL_DIR, `${sigId}.signal.json`)); } catch {}
     return 0;
   } catch {
-    console.log(`export _SIGNAL_ANSWERED=0`);
+    if (jsonOut) console.log(JSON.stringify({ answered: false, id: sigId, error: "parse_error" }));
+    else console.log(`export _SIGNAL_ANSWERED=0`);
     return 1;
   }
 }
@@ -803,9 +863,12 @@ switch (cmd) {
     process.exit(doOutput(data));
     break;
   }
-  case "list":
-    process.exit(doList());
+  case "list": {
+    const listJson = args.includes("--json") || args.includes("-j");
+    const listWatch = args.includes("--watch") || args.includes("-w");
+    process.exit(doList(listJson, listWatch));
     break;
+  }
   case "respond": {
     const sigId = args[0];
     const answer = args[1];
@@ -814,9 +877,10 @@ switch (cmd) {
     break;
   }
   case "poll": {
-    const pollId = args[0];
-    if (!pollId) { console.error("Usage: airun signal poll <signal-id>"); process.exit(2); }
-    process.exit(doPoll(pollId));
+    const pollJson = args.includes("--json") || args.includes("-j");
+    const pollId = args.filter(a => a !== "--json" && a !== "-j")[0];
+    if (!pollId) { console.error("Usage: airun signal poll <signal-id> [--json]"); process.exit(2); }
+    process.exit(doPoll(pollId, pollJson));
     break;
   }
   case "prune":

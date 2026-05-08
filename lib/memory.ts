@@ -793,6 +793,7 @@ async function main() {
         let includeNegative = false;
         let filesOnly = false;
         let memoryOnly = false;
+        const jsonOut = args.includes("--json") || args.includes("-j");
 
         for (let i = 1; i < args.length; i++) {
           if (args[i] === "--grep" && args[i + 1]) { grepPattern = args[++i]; isRegex = false; }
@@ -802,12 +803,15 @@ async function main() {
           else if (args[i] === "--negative") { includeNegative = true; }
           else if (args[i] === "--files-only") { filesOnly = true; }
           else if (args[i] === "--memory-only") { memoryOnly = true; }
+          else if (args[i] === "--json" || args[i] === "-j") { /* already parsed */ }
         }
 
         if (grepPattern) {
           // Grep mode: search content across stores + knowledge files
           const hits = search(grepPattern, { source, max, regex: isRegex, filesOnly, memoryOnly });
-          if (hits.length === 0) {
+          if (jsonOut) {
+            console.log(JSON.stringify(hits));
+          } else if (hits.length === 0) {
             console.log(`No matches for ${isRegex ? "/" : "\""}${grepPattern}${isRegex ? "/i" : "\""}`);
           } else {
             console.log(`${hits.length} hit${hits.length === 1 ? "" : "s"} for ${isRegex ? "/" : "\""}${grepPattern}${isRegex ? "/i" : "\""}:\n`);
@@ -831,7 +835,9 @@ async function main() {
           }
           const tags = parseTags(tagStr);
           const rows = recall(tags, { source, max, includeNegative });
-          if (rows.length === 0) {
+          if (jsonOut) {
+            console.log(JSON.stringify(rows));
+          } else if (rows.length === 0) {
             console.log("No matching memories found.");
           } else {
             console.log(`Found ${rows.length} memor${rows.length === 1 ? "y" : "ies"}:\n`);
@@ -908,8 +914,9 @@ async function main() {
 
       case "list": {
         const source = args[1];
+        const listJson = args.includes("--json") || args.includes("-j");
         if (!source) {
-          console.error("Usage: airun memory list <source>");
+          console.error("Usage: airun memory list <source> [--json]");
           process.exit(1);
         }
         if (!isValidSource(source)) {
@@ -917,7 +924,9 @@ async function main() {
           process.exit(1);
         }
         const rows = list(source as MemorySource);
-        if (rows.length === 0) {
+        if (listJson) {
+          console.log(JSON.stringify(rows));
+        } else if (rows.length === 0) {
           console.log(`${source}: empty`);
         } else {
           console.log(`${source}: ${rows.length} row${rows.length === 1 ? "" : "s"}\n`);
@@ -928,13 +937,18 @@ async function main() {
 
       case "stats": {
         const s = stats();
-        console.log("Memory stores:");
-        for (const [name, count] of Object.entries(s)) {
-          const bar = "█".repeat(Math.min(count, 40));
-          console.log(`  ${name.padEnd(12)} ${String(count).padStart(4)}  ${bar}`);
+        const statsJson = args.includes("--json") || args.includes("-j");
+        if (statsJson) {
+          console.log(JSON.stringify({ ...s, total: Object.values(s).reduce((a, b) => a + b, 0) }));
+        } else {
+          console.log("Memory stores:");
+          for (const [name, count] of Object.entries(s)) {
+            const bar = "█".repeat(Math.min(count, 40));
+            console.log(`  ${name.padEnd(12)} ${String(count).padStart(4)}  ${bar}`);
+          }
+          const total = Object.values(s).reduce((a, b) => a + b, 0);
+          console.log(`  ${"total".padEnd(12)} ${String(total).padStart(4)}`);
         }
-        const total = Object.values(s).reduce((a, b) => a + b, 0);
-        console.log(`  ${"total".padEnd(12)} ${String(total).padStart(4)}`);
         break;
       }
 

@@ -246,10 +246,12 @@ function emitShellExports(decision: GuardDecision): void {
 // ─── Subcommands ─────────────────────────────────────────────────────────────
 
 function cmdCheck(argv: string[]): number {
-  const command = argv.join(" ").trim();
+  const jsonOut = argv.includes("--json") || argv.includes("-j");
+  const filteredArgs = argv.filter(a => a !== "--json" && a !== "-j");
+  const command = filteredArgs.join(" ").trim();
   if (!command) {
     console.error("[guard] Error: no command provided");
-    console.error("Usage: airun guard check <command...>");
+    console.error("Usage: airun guard check <command...> [--json]");
     return 2;
   }
 
@@ -271,7 +273,19 @@ function cmdCheck(argv: string[]): number {
   }
 
   logDecision(decision);
-  emitShellExports(decision);
+
+  if (jsonOut) {
+    console.log(JSON.stringify({
+      command: decision.command,
+      tier: decision.tier,
+      approved: decision.approved,
+      rule: decision.rule,
+      reason: decision.reason,
+      timestamp: decision.timestamp,
+    }));
+  } else {
+    emitShellExports(decision);
+  }
 
   // Also emit human-readable to stderr
   const icon = decision.approved ? "✓" : "✗";
