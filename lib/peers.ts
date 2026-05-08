@@ -17,7 +17,7 @@
 //   airun peers consensus "decision question"
 //   airun peers help
 
-import { runPeers, type Flavor } from "./external-agent.ts";
+import { runPeers, type Flavor, FLAVORS } from "./external-agent.ts";
 import type { ConsensusAlgo } from "./consensus.ts";
 
 const VALID_SKILLS = ["solve", "review", "analyze", "plan", "consensus"];
@@ -108,6 +108,11 @@ async function main(): Promise<number> {
     switch (filteredArgs[i]) {
       case "--flavor":
         flavor = (filteredArgs[++i] || "code") as Flavor;
+        if (!(flavor in FLAVORS)) {
+          console.error(`[peers] Unknown flavor: ${flavor}`);
+          console.error(`  Valid flavors: ${Object.keys(FLAVORS).join(", ")}`);
+          return 1;
+        }
         break;
       case "--consensus":
         algo = (filteredArgs[++i] || "winner") as ConsensusAlgo;
@@ -127,7 +132,7 @@ async function main(): Promise<number> {
 
   // Query from args or stdin
   let query = queryParts.join(" ");
-  if (!query && !process.stdin.isTTY) {
+  if (!query && process.stdin.isTTY === false) {
     query = await new Response(process.stdin as any).text();
   }
 

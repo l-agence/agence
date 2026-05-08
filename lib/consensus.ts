@@ -106,12 +106,16 @@ export function scorePeers(
   weights: Record<string, number>[],
   domain: string,
 ): ScoredPeer[] {
+  // SEC: Cap self-reported confidence at 95 (B3) — prevents adversarial
+  // peer from auto-winning by claiming 100% confidence
+  const CAP = 95;
   return peers.map((p, i) => {
     const w = weights[i]?.[domain] ?? 0.85;
+    const capped = Math.min(p.confidence, CAP);
     return {
       ...p,
       weight: w,
-      weightedScore: (p.confidence / 100) * w * 100,
+      weightedScore: (capped / 100) * w * 100,
     };
   });
 }
@@ -286,11 +290,14 @@ export function parsePeerResponse(
       reasoning: String(parsed.reasoning || ""),
     };
   } catch {
+    // SEC: Flag unparseable responses (B5) — low confidence + error marker
+    // so consensus algorithms can filter/deprioritize them
     return {
       ...base,
       finding: raw.slice(0, 500),
-      confidence: 30,
+      confidence: 10,
       reasoning: "(response was not structured JSON)",
+      error: "unparseable",
     };
   }
 }

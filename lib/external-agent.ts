@@ -153,6 +153,7 @@ async function callOpenAI(
 
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
+    signal: AbortSignal.timeout(PEER_TIMEOUT_MS),
     headers: {
       "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
@@ -167,9 +168,9 @@ async function callOpenAI(
   });
   if (!resp.ok) {
     const body = await resp.text();
-    throw new Error(`OpenAI ${resp.status}: ${body.slice(0, 200)}`);
+    throw new Error(`OpenAI ${resp.status}: ${sanitizeErrorBody(body)}`);
   }
-  const data = await resp.json() as any;
+  const data = await guardedJson(resp, "OpenAI");
   return data.choices?.[0]?.message?.content || "";
 }
 
@@ -182,6 +183,7 @@ async function callGemini(
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   const resp = await fetch(url, {
     method: "POST",
+    signal: AbortSignal.timeout(PEER_TIMEOUT_MS),
     headers: {
       "Content-Type": "application/json",
       "x-goog-api-key": apiKey,
@@ -194,9 +196,9 @@ async function callGemini(
   });
   if (!resp.ok) {
     const body = await resp.text();
-    throw new Error(`Gemini ${resp.status}: ${body.slice(0, 200)}`);
+    throw new Error(`Gemini ${resp.status}: ${sanitizeErrorBody(body)}`);
   }
-  const data = await resp.json() as any;
+  const data = await guardedJson(resp, "Gemini");
   return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
 
@@ -241,7 +243,10 @@ async function runJudge(
   peers: PeerResponse[], configs: PeerConfig[],
 ): Promise<ConsensusResult> {
   const { system, message } = buildJudgePrompt(query, peers);
-  const judgeConfig = configs[0];
+  // SEC: Pick a different provider for the judge when possible (B4)
+  const judgeConfig = configs.length > 1
+    ? configs.find(c => c.provider !== configs[0].provider) || configs[configs.length - 1]
+    : configs[0];
   try {
     console.error(`[peers] judge: synthesising via ${judgeConfig.name} (${judgeConfig.model})...`);
     const raw = await callProvider(judgeConfig, system, message);
@@ -326,10 +331,12 @@ export async function runPeers(
   // Output
   console.log(renderConsensus(result, format));
 
-  // Save artifact
-  const outDir = join(AGENCE_ROOT, "synthetic", resolveOrg(AGENCE_ROOT), "analyses");
+  // Save artifact — SEC: sanitize org name (B2) to prevent path traversal
+  const org = resolveOrg(AGENCE_ROOT).replace(/\.\./g, "").replace(/[\/\\]/g, "_");
+  const outDir = join(AGENCE_ROOT, "synthetic", org, "analyses");
   if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
-  const outFile = join(outDir, `peers-${skill}-${Date.now()}.json`);
+  const nonce = Math.random().toString(36).slice(2, 8);
+  const outFile = join(outDir, `peers-${skill}-${Date.now()}-${nonce}.json`);
   writeFileSync(outFile, JSON.stringify(result, null, 2));
   console.error(`[peers] Saved: ${outFile}`);
 
