@@ -97,7 +97,7 @@ describe("^vault init", () => {
       GH_TOKEN: "fake",
     });
     // Should attempt init regardless of push/remote failure
-    expect(r.stderr).toContain("Initializing hermetic vault");
+    expect(r.stderr).toContain("Initializing private vault");
     expect(r.stderr).toContain("testuser");
     // Vault dir should now have .git
     expect(existsSync(join(vaultDir, ".git"))).toBe(true);

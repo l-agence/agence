@@ -524,19 +524,20 @@ describe("skill.ts: metadata completeness", () => {
       "analyse", "design", "pattern", "scope", "spec", "split",
       "peer-design", "peer-review", "peer-solve", "peer-analyse",
       "hack", "break",
-      "document", "test", "recon", "grasp", "glimpse",
-      "deploy", "brainstorm",
+      "document", "test", "recon", "grasp", "glimpse", "extract",
+      "deploy", "bundle", "brainstorm", "integrate",
+      "sift",
     ];
     for (const name of expected) {
       expect(r.stdout).toContain(`^${name}`);
     }
   });
 
-  test("skill count is 30", () => {
+  test("skill count is 31", () => {
     const r = runSkill(["list"]);
     // Count lines with ^ prefix (skill entries in SKILLS map)
     const skillLines = r.stdout.split("\n").filter(l => l.trim().startsWith("^"));
-    expect(skillLines.length).toBe(30);
+    expect(skillLines.length).toBe(31);
   });
 });
 
@@ -567,10 +568,10 @@ describe("skill.ts: mixed agent routing", () => {
     const r = runSkill(["help"]);
     expect(r.exitCode).toBe(0);
     const out = r.stdout;
-    expect(out).toContain("persona");
-    expect(out).toContain("tool");
-    expect(out).toContain("loop");
-    expect(out).toContain("ensemble");
+    expect(out).toContain("--agent");
+    expect(out).toContain("--peers");
+    expect(out).toContain("--flavor");
+    expect(out).toContain("--json");
   });
 
   test("@aider routes as tool agent (stderr shows tool:@aider)", () => {

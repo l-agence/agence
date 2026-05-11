@@ -455,9 +455,9 @@ describe("Memory: MEM-003 skill context integration", () => {
   beforeEach(() => { tmp = makeTempRoot(); });
   afterEach(() => { cleanTempRoot(tmp); });
 
-  it("skill.ts compiles with memory imports", () => {
-    const SKILL_TS = join(AGENCE_ROOT, "lib", "skill.ts");
-    const r = spawnSync("bun", ["build", SKILL_TS, "--no-bundle"], {
+  it("skill modules compile with memory imports", () => {
+    const SKILL_EXEC_TS = join(AGENCE_ROOT, "lib", "skill-exec.ts");
+    const r = spawnSync("bun", ["build", SKILL_EXEC_TS, "--no-bundle"], {
       cwd: AGENCE_ROOT,
       timeout: 10_000,
     });
@@ -697,11 +697,12 @@ describe("Memory: MEM-005 ^ken orchestration primitives", () => {
     expect(r.stdout).toContain("private");
   });
 
-  it("skill.ts exports ken in SKILLS dict", async () => {
+  it("skill modules export extract with extraction cycle", async () => {
     const skillTs = readFileSync(join(AGENCE_ROOT, "lib", "skill.ts"), "utf-8");
-    expect(skillTs).toContain('"ken"');
-    expect(skillTs).toContain("Knowledge Extraction cycle");
-    expect(skillTs).toContain("runKen");
+    expect(skillTs).toContain('"extract"');
+    expect(skillTs).toContain("runExtract");
+    const registryTs = readFileSync(join(AGENCE_ROOT, "lib", "skill-registry.ts"), "utf-8");
+    expect(registryTs).toContain("Knowledge Extraction cycle");
   });
 
   it("lib/init.sh recognizes ^ken in skill names", () => {

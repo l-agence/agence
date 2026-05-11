@@ -124,7 +124,7 @@ function cmdInit(args: string[]): number {
   }
 
   const remote = vaultRemoteUrl(user);
-  stderr(`[vault] Initializing hermetic vault...`);
+  stderr(`[vault] Initializing private vault...`);
   stderr(`  User:   ${user}`);
   stderr(`  Path:   ${VAULT_DIR}`);
   stderr(`  Remote: ${remote}`);
@@ -156,7 +156,7 @@ function cmdInit(args: string[]): number {
   if (!check.includes(`"name"`)) {
     stderr(`  Creating remote repo: ${ghRepo} (private)`);
     try {
-      runOrFail(["gh", "repo", "create", ghRepo, "--private", "--description", "Agence hermetic knowledge vault (personal)"]);
+      runOrFail(["gh", "repo", "create", ghRepo, "--private", "--description", "Agence private knowledge vault (personal)"]);
       stderr(`  ✓ Created ${ghRepo}`);
     } catch (e: any) {
       stderr(`[vault] Warning: Could not create remote repo: ${e.message || e}`);

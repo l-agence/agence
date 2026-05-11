@@ -33,9 +33,9 @@
 
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
-import { spawnSync } from "child_process";
 import { loadMergedPolicy, confirmDeescalation, type MergedPolicy, type PolicyOverride, type Tier as PolicyTier } from "./policy.ts";
 import { checkCapability, type CapabilityDecision } from "./capability.ts";
+import { append as ledgerAppend } from "./ailedger.ts";
 
 // ─── Environment ─────────────────────────────────────────────────────────────
 
@@ -198,19 +198,16 @@ function logDecision(decision: GuardDecision): void {
   if (decision.tier !== "T2" && decision.tier !== "T3") return;
 
   try {
-    const airunPath = join(AGENCE_ROOT, "bin", "airun");
     const tag = decision.tier === "T3" ? "guard:deny" : "guard:escalate";
     const exitCode = decision.approved ? 0 : 1;
     // Truncate command for ledger (avoid bloating entries)
     const cmd = decision.command.length > 120
       ? decision.command.slice(0, 117) + "..."
       : decision.command;
-    // SEC-013: Use spawnSync argument array — no shell interpolation.
-    // Old execSync template literal allowed $() and backtick expansion
-    // in denied commands (the denial path was itself the exploit vector).
-    spawnSync(airunPath, ["ailedger", "append", "guard", tag, "", cmd, String(exitCode)], {
-      cwd: AGENCE_ROOT, timeout: 5000, stdio: "ignore",
-    });
+    // SEC-013: Direct in-process call — no shell interpolation possible.
+    // Previously used spawnSync (subprocess per decision). Now exec-in-process
+    // for economy: saves ~50-100MB RSS per T2/T3 decision on low-RAM boxes.
+    ledgerAppend("guard", tag, "", cmd, exitCode);
   } catch {
     // Best-effort — don't block execution if ledger fails
     console.error("[guard] Warning: failed to write ledger entry");
@@ -246,10 +243,12 @@ function emitShellExports(decision: GuardDecision): void {
 // ─── Subcommands ─────────────────────────────────────────────────────────────
 
 function cmdCheck(argv: string[]): number {
-  const command = argv.join(" ").trim();
+  const jsonOut = argv.includes("--json") || argv.includes("-j");
+  const filteredArgs = argv.filter(a => a !== "--json" && a !== "-j");
+  const command = filteredArgs.join(" ").trim();
   if (!command) {
     console.error("[guard] Error: no command provided");
-    console.error("Usage: airun guard check <command...>");
+    console.error("Usage: airun guard check <command...> [--json]");
     return 2;
   }
 
@@ -271,7 +270,19 @@ function cmdCheck(argv: string[]): number {
   }
 
   logDecision(decision);
-  emitShellExports(decision);
+
+  if (jsonOut) {
+    console.log(JSON.stringify({
+      command: decision.command,
+      tier: decision.tier,
+      approved: decision.approved,
+      rule: decision.rule,
+      reason: decision.reason,
+      timestamp: decision.timestamp,
+    }));
+  } else {
+    emitShellExports(decision);
+  }
 
   // Also emit human-readable to stderr
   const icon = decision.approved ? "✓" : "✗";

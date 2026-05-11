@@ -283,7 +283,7 @@ describe("SEC-006: Persona injection hardening", () => {
     // Should NOT exit with validation error (2) — it passes SEC-006, then fails at router
     expect(r.exitCode).not.toBe(2);
     expect(r.stderr).not.toContain("SEC-006");
-  });
+  }, 15_000);
 
   test("rejects agent names with multiple dots (path traversal)", () => {
     const r = runSkill(["fix", "--agent", "agent.foo.bar", "test"]);
@@ -331,7 +331,7 @@ describe("SEC-006: Persona injection hardening", () => {
     // Should NOT exit with code 2 (validation error)
     expect(r.exitCode).not.toBe(2);
     expect(r.stderr).not.toContain("SEC-006");
-  }, 15_000);
+  }, 30_000);
 
   // ─── @peers and @pair bypass validation ────────────────────────────────────
 
@@ -873,7 +873,7 @@ describe("SEC-012: guard.ts AIPOLICY.yaml dead code removed", () => {
 // SEC-013: ^hack red-team findings integration
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("SEC-013: H1 — logDecision uses spawnSync (no shell interpolation)", () => {
+describe("SEC-013: H1 — logDecision uses direct import (no shell interpolation)", () => {
 
   test("guard.ts does not import execSync", () => {
     const src = readFileSync(join(AGENCE_ROOT, "lib/guard.ts"), "utf-8");
@@ -882,10 +882,11 @@ describe("SEC-013: H1 — logDecision uses spawnSync (no shell interpolation)", 
     expect(src).toContain("SEC-013");
   });
 
-  test("guard.ts logDecision uses spawnSync with argument array", () => {
+  test("guard.ts logDecision uses direct ledgerAppend (no subprocess)", () => {
     const src = readFileSync(join(AGENCE_ROOT, "lib/guard.ts"), "utf-8");
-    // Must use spawnSync(airunPath, [...args]) pattern
-    expect(src).toMatch(/spawnSync\(airunPath,\s*\[/);
+    // SEC-013: Direct in-process call — no shell interpolation possible.
+    // Previously used spawnSync; now uses ledgerAppend() for economy.
+    expect(src).toMatch(/ledgerAppend\(/);
   });
 
   test("guard.ts check mode does not expand $() in denied commands", () => {

@@ -430,10 +430,10 @@ function sessionPrune(args: string[]): number {
 
   console.error(`[SESSION] Prune: ${candidates.length} files from ${sessionIds.size} sessions (older than ${days} days)`);
 
-  // Archive to hermetic if requested
-  const HERMETIC_DIR = join(AI_ROOT, "hermetic", resolveOrg(AI_ROOT));
-  const ARCHIVE_DIR = join(HERMETIC_DIR, "sessions");
-  const hermeticHasGit = existsSync(join(HERMETIC_DIR, ".git"));
+  // Archive to private knowledge if requested
+  const PRIVATE_DIR = join(AI_ROOT, "knowledge", "private");
+  const ARCHIVE_DIR = join(PRIVATE_DIR, "sessions");
+  const privateHasGit = existsSync(join(PRIVATE_DIR, ".git"));
 
   if (archive) {
     mkdirSync(ARCHIVE_DIR, { recursive: true });
@@ -461,17 +461,17 @@ function sessionPrune(args: string[]): number {
     removed++;
   }
 
-  // Commit archive to hermetic nested git if available
-  if (archive && !dryRun && hermeticHasGit && archived > 0) {
+  // Commit archive to private nested git if available
+  if (archive && !dryRun && privateHasGit && archived > 0) {
     try {
-      execSync(`git add sessions/`, { cwd: HERMETIC_DIR, stdio: "pipe" });
+      execSync(`git add sessions/`, { cwd: PRIVATE_DIR, stdio: "pipe" });
       execSync(
         `git commit -m "archive: ${sessionIds.size} sessions (${archived} files, older than ${days}d)"`,
-        { cwd: HERMETIC_DIR, stdio: "pipe" }
+        { cwd: PRIVATE_DIR, stdio: "pipe" }
       );
-      console.error(`  ✓ Committed ${archived} files to hermetic git`);
+      console.error(`  ✓ Committed ${archived} files to private git`);
     } catch {
-      console.error(`  ⚠ Hermetic git commit failed — files copied but not committed`);
+      console.error(`  ⚠ Private git commit failed — files copied but not committed`);
     }
   }
 
@@ -844,6 +844,260 @@ function cmdGCStatus(): number {
 
 // ─── Main Router ─────────────────────────────────────────────────────────────
 
+// ─── Git State Helper ────────────────────────────────────────────────────────
+
+function gitState(root: string): { branch: string; commit: string; dirty: number; recentCommits: string[] } {
+  const run = (cmd: string) => { try { return execSync(cmd, { cwd: root, encoding: "utf-8" }).trim(); } catch { return ""; } };
+  const branch = run("git rev-parse --abbrev-ref HEAD") || "unknown";
+  const commit = run("git rev-parse --short HEAD") || "unknown";
+  const dirtyStr = run("git status --short");
+  const dirty = dirtyStr ? dirtyStr.split("\n").filter(Boolean).length : 0;
+  const recentStr = run("git log --oneline -5");
+  const recentCommits = recentStr ? recentStr.split("\n").filter(Boolean) : [];
+  return { branch, commit, dirty, recentCommits };
+}
+
+// ─── Save ────────────────────────────────────────────────────────────────────
+
+function cmdSave(args: string[]): number {
+  const notes = args.join(" ");
+  const agentId = process.env.AGENCE_AGENT_PARAM || process.env.AI_AGENT || "@";
+  const sessionId = process.env.AGENCE_SESSION_ID || `save-${Date.now()}`;
+  const logId = `save-${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 15)}-${Math.random().toString(16).slice(2, 8)}`;
+  const savesDir = join(AI_ROOT, "nexus", ".aisaves");
+  mkdirSync(savesDir, { recursive: true });
+
+  const g = gitState(AI_ROOT);
+  const orgRoot = resolveOrg(join(AI_ROOT, "knowledge"));
+  const lessonsDir = join(orgRoot, "lessons");
+  const lessonsCount = existsSync(lessonsDir)
+    ? readdirSync(lessonsDir).filter(f => f.endsWith(".md") && f !== "INDEX.md").length : 0;
+  const sessionsCount = existsSync(savesDir)
+    ? readdirSync(savesDir).filter(f => f.endsWith(".json")).length : 0;
+
+  const payload = {
+    log_id: logId, agent_id: agentId, session_id: sessionId,
+    timestamp: isoNow(), user: process.env.USER || "unknown", cwd: process.cwd(),
+    notes,
+    git: { branch: g.branch, commit: g.commit, dirty_files: g.dirty, staged_files: 0 },
+    knowledge: { lessons_count: lessonsCount, sessions_count: sessionsCount },
+    recent_commits: g.recentCommits,
+  };
+
+  const saveFile = join(savesDir, `${logId}.json`);
+  writeFileSync(saveFile, JSON.stringify(payload, null, 2) + "\n");
+
+  console.log("");
+  console.log(`✓ Saved: ${logId}`);
+  console.log(`  Agent:   ${agentId} | Session: ${sessionId}`);
+  console.log(`  Git:     ${g.branch} @ ${g.commit} (${g.dirty} dirty)`);
+  console.log(`  File:    ${saveFile}`);
+  console.log(`  Next:    ^handoff @agent | ^commit | ^push`);
+  return 0;
+}
+
+// ─── Learn ───────────────────────────────────────────────────────────────────
+
+function cmdLearn(): number {
+  const sessionsDir = join(AI_ROOT, "nexus", ".aisessions");
+  const savesDir = join(AI_ROOT, "nexus", ".aisaves");
+  const faultsDir = join(AI_ROOT, "nexus", "faults");
+  const orgRoot = resolveOrg(join(AI_ROOT, "knowledge"));
+  const lessonsDir = join(orgRoot, "lessons");
+
+  const countFiles = (dir: string, ext: string) =>
+    existsSync(dir) ? readdirSync(dir).filter(f => f.endsWith(ext)).length : 0;
+
+  const sessionCount = countFiles(sessionsDir, ".meta.json");
+  const saveCount = countFiles(savesDir, ".json");
+  const faultCount = countFiles(faultsDir, ".md");
+  const lessonCount = existsSync(lessonsDir)
+    ? readdirSync(lessonsDir).filter(f => f.endsWith(".md") && f !== "INDEX.md").length : 0;
+
+  const faultNames = existsSync(faultsDir)
+    ? readdirSync(faultsDir).filter(f => f.endsWith(".md")).map(f => f.replace(/\.md$/, ""))
+    : [];
+
+  console.log("\n══════════════════════════════════════════════");
+  console.log("  AGENCE LEARN (^learn)");
+  console.log("══════════════════════════════════════════════\n");
+  console.log("  Step 1/3: Session history...");
+  console.log(`    Sessions: ${sessionCount} | Saves: ${saveCount}`);
+  console.log("  Step 2/3: Reviewing faults...");
+  console.log(`    Faults: ${faultCount}`);
+  for (const f of faultNames) console.log(`      - ${f}`);
+  console.log("  Step 3/3: Current codex...");
+
+  const countMarker = (file: string, marker: string) => {
+    try { return readFileSync(file, "utf-8").split("\n").filter(l => l.startsWith(marker)).length; } catch { return 0; }
+  };
+  const pCount = countMarker(join(AI_ROOT, "codex", "PRINCIPLES.md"), "## Maxim");
+  const lCount = countMarker(join(AI_ROOT, "codex", "LAWS.md"), "## Law");
+  const rCount = countMarker(join(AI_ROOT, "codex", "RULES.md"), "## Rule");
+  console.log(`    Principles: ${pCount} | Laws: ${lCount} | Rules: ${rCount}`);
+  console.log(`    Shared lessons: ${lessonCount}`);
+
+  console.log("\n══════════════════════════════════════════════");
+  console.log("  LEARN COMPLETE");
+  console.log(`  Sessions: ${sessionCount} | Faults: ${faultCount} | Lessons: ${lessonCount}`);
+  console.log("  Next: ^lesson add \"<insight>\" | ^fault list | ^commit\n");
+  return 0;
+}
+
+// ─── Handoff ─────────────────────────────────────────────────────────────────
+
+function cmdHandoff(args: string[]): number {
+  const target = args[0] || "";
+  const contextMsg = args.slice(1).join(" ");
+  const sourceAgent = process.env.AGENCE_AGENT_PARAM || process.env.AI_AGENT || "@";
+  const sessionId = process.env.AGENCE_SESSION_ID || `handoff-${Date.now()}`;
+  const handoffId = `handoff-${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 15)}-${Math.random().toString(16).slice(2, 8)}`;
+
+  if (!target) {
+    console.error("Usage: session handoff <@target_agent> [context message]");
+    return 1;
+  }
+  const targetName = target.replace(/^@/, "");
+  if (targetName !== "user" && !existsSync(join(AI_ROOT, "codex", "agents", targetName))) {
+    console.error(`Error: Unknown agent: ${target}`);
+    return 1;
+  }
+
+  const handoffsDir = join(AI_ROOT, "nexus", ".aihandoffs");
+  mkdirSync(handoffsDir, { recursive: true });
+  const g = gitState(AI_ROOT);
+
+  const payload = {
+    handoff_id: handoffId, timestamp: isoNow(),
+    source: { agent: sourceAgent, session_id: sessionId },
+    target: { agent: target, agent_dir: targetName },
+    context: contextMsg,
+    git: { branch: g.branch, commit: g.commit, dirty_files: g.dirty },
+    recent_commits: g.recentCommits,
+    status: "pending",
+  };
+
+  const handoffFile = join(handoffsDir, `${handoffId}.json`);
+  writeFileSync(handoffFile, JSON.stringify(payload, null, 2) + "\n");
+
+  console.log("\n══════════════════════════════════════════════");
+  console.log("  AGENCE HANDOFF (^handoff)");
+  console.log("══════════════════════════════════════════════");
+  console.log(`  From:    ${sourceAgent}`);
+  console.log(`  To:      ${target}`);
+  console.log(`  Session: ${sessionId}`);
+  console.log(`  ID:      ${handoffId}`);
+  if (contextMsg) console.log(`  Context: ${contextMsg}`);
+  console.log(`  Git:     ${g.branch} @ ${g.commit} (${g.dirty} dirty)`);
+  console.log(`\n  File: ${handoffFile}`);
+  console.log("\n══════════════════════════════════════════════");
+  console.log("  HANDOFF COMPLETE");
+  console.log(`  Next: agence @${targetName} ^pickup ${handoffId}\n`);
+  return 0;
+}
+
+// ─── Pickup ──────────────────────────────────────────────────────────────────
+
+function cmdPickup(args: string[]): number {
+  const pickupArg = args[0] || "";
+  const currentAgent = process.env.AGENCE_AGENT_PARAM || process.env.AI_AGENT || "@";
+  const currentName = currentAgent.replace(/^@/, "");
+  const handoffsDir = join(AI_ROOT, "nexus", ".aihandoffs");
+
+  if (!existsSync(handoffsDir)) {
+    console.log("\nNo handoffs directory found. Nothing to pick up.");
+    return 0;
+  }
+
+  if (!pickupArg) {
+    // List pending handoffs
+    console.log("\n══════════════════════════════════════════════");
+    console.log("  AGENCE PICKUP (^pickup) — pending handoffs");
+    console.log(`  Agent: ${currentAgent}`);
+    console.log("══════════════════════════════════════════════\n");
+
+    const files = readdirSync(handoffsDir).filter(f => f.startsWith("handoff-") && f.endsWith(".json")).sort().reverse();
+    let found = 0;
+    for (const fname of files) {
+      try {
+        const data = JSON.parse(readFileSync(join(handoffsDir, fname), "utf-8"));
+        const tClean = (data.target?.agent || "").replace(/^@/, "");
+        if (data.status === "pending" && (tClean === currentName || currentAgent === "@")) {
+          found++;
+          console.log(`  [${found}] ${data.handoff_id}`);
+          console.log(`      From: ${data.source?.agent || "?"} | Context: ${data.context || "<none>"}`);
+        }
+      } catch { /* skip */ }
+    }
+    if (found === 0) console.log(`  No pending handoffs for ${currentAgent}`);
+    else console.log(`\n  Accept with: agence ^pickup <handoff_id>`);
+    console.log("");
+    return 0;
+  }
+
+  // Accept a specific handoff
+  let handoffFile = join(handoffsDir, `${pickupArg}.json`);
+  if (!existsSync(handoffFile)) {
+    const match = readdirSync(handoffsDir).find(f => f.includes(pickupArg));
+    if (match) handoffFile = join(handoffsDir, match);
+    else { console.error(`Error: Handoff not found: ${pickupArg}`); return 1; }
+  }
+
+  const data = JSON.parse(readFileSync(handoffFile, "utf-8"));
+  if (data.status !== "pending") { console.error(`Error: Handoff already ${data.status}`); return 1; }
+
+  data.status = "accepted";
+  writeFileSync(handoffFile, JSON.stringify(data, null, 2) + "\n");
+
+  console.log("\n══════════════════════════════════════════════");
+  console.log("  AGENCE PICKUP — handoff accepted");
+  console.log(`  Transfer: ${data.source?.agent} → ${currentAgent}`);
+  console.log(`  ID:       ${data.handoff_id}`);
+  console.log(`  Context:  ${data.context || "<none>"}`);
+  console.log(`  Git:      ${data.git?.branch} @ ${data.git?.commit}`);
+  console.log("\n  Status: pending → accepted");
+  console.log("══════════════════════════════════════════════");
+  console.log("  Use ^save to checkpoint | ^handoff to forward\n");
+  return 0;
+}
+
+// ─── Pause ───────────────────────────────────────────────────────────────────
+
+function cmdPause(): number {
+  const agentId = process.env.AGENCE_AGENT_PARAM || process.env.AI_AGENT || "@";
+  const sessionId = process.env.AGENCE_SESSION_ID || `pause-${Date.now()}`;
+  const pauseId = `pause-${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 15)}-${Math.random().toString(16).slice(2, 8)}`;
+  const savesDir = join(AI_ROOT, "nexus", ".aisaves");
+  mkdirSync(savesDir, { recursive: true });
+
+  const g = gitState(AI_ROOT);
+
+  const payload = {
+    log_id: pauseId, type: "pause", agent_id: agentId,
+    session_id: sessionId, timestamp: isoNow(),
+    status: "paused", user: process.env.USER || "unknown", cwd: process.cwd(),
+    git: { branch: g.branch, commit: g.commit, dirty_files: g.dirty },
+    recent_commits: g.recentCommits,
+  };
+
+  const pauseFile = join(savesDir, `${pauseId}.json`);
+  writeFileSync(pauseFile, JSON.stringify(payload, null, 2) + "\n");
+
+  console.log("\n══════════════════════════════════════════════");
+  console.log("  AGENCE PAUSE (^pause)");
+  console.log(`  Agent:    ${agentId}`);
+  console.log(`  Session:  ${sessionId}`);
+  console.log(`  Pause ID: ${pauseId}`);
+  console.log(`  Git:      ${g.branch} @ ${g.commit} (${g.dirty} dirty)`);
+  console.log(`\n  File: ${pauseFile}`);
+  console.log("══════════════════════════════════════════════");
+  console.log("  SESSION PAUSED");
+  console.log(`  Resume with: agence ^resume ${pauseId}\n`);
+  // Output pause_id for bash capture
+  console.log(`_PAUSE_ID="${pauseId}"`);
+  return 0;
+}
+
 if (import.meta.main) {
   const [cmd, ...args] = process.argv.slice(2);
 
@@ -887,12 +1141,27 @@ if (import.meta.main) {
     case "gc-status":
       exitCode = cmdGCStatus();
       break;
+    case "save":
+      exitCode = cmdSave(args);
+      break;
+    case "learn":
+      exitCode = cmdLearn();
+      break;
+    case "handoff":
+      exitCode = cmdHandoff(args);
+      break;
+    case "pickup":
+      exitCode = cmdPickup(args);
+      break;
+    case "pause":
+      exitCode = cmdPause();
+      break;
     default:
       // Treat unknown arg as session ID (backward compat)
       if (cmd) {
         exitCode = sessionStatus(cmd);
       } else {
-        console.error("Usage: airun session <list|init|status|resume|prune|gc|gc-status> [args...]");
+        console.error("Usage: airun session <list|init|status|resume|prune|gc|gc-status|save|learn|handoff|pickup|pause> [args...]");
         exitCode = 1;
       }
   }

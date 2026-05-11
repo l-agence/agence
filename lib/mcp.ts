@@ -114,7 +114,7 @@ server.tool(
     query: z.string().describe("The task description or query for the skill"),
     agent: z.string().optional().describe("Optional agent override (e.g. '@sonya', '@ralph', '@linus')"),
     peers: z.boolean().optional().describe("Route through multi-LLM consensus (3 peers)"),
-    noSave: z.boolean().optional().describe("Don't save the artifact to synthetic/"),
+    noSave: z.boolean().optional().describe("Don't save the artifact to knowledge/"),
   },
   async ({ skill, query, agent, peers, noSave }) => {
     // SEC-012: Validate skill name (alphanumeric + hyphen only)

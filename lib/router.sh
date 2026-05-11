@@ -205,185 +205,57 @@ _yaml_get() {
 # Returns the model for the given provider + operational mode.
 # AGENCE_LLM_MODEL (explicit) always wins over the mode table.
 _router_model_for_mode() {
+  # Canonical model matrix lives in lib/router.ts — this is a thin delegation
   local provider="${1:-${AGENCE_LLM_PROVIDER:-}}"
   local mode="${2:-${AGENCE_ROUTER_MODE:-query}}"
   [[ -n "${AGENCE_LLM_MODEL:-}" ]] && { echo "$AGENCE_LLM_MODEL"; return 0; }
-  case "${mode}:${provider}" in
-    # QUERY — T0 free (general Q&A, status, quick lookups)
-    query:anthropic)   echo "claude-haiku-3-5" ;;
-    query:openai)      echo "gpt-4o-mini" ;;
-    query:azure)       echo "gpt-4o-mini" ;;
-    query:gemini)      echo "gemini-2.0-flash" ;;
-    query:mistral)     echo "mistral-small-latest" ;;
-    query:groq)        echo "llama-3.3-70b-versatile" ;;
-    query:openrouter)  echo "kwaipilot/kat-coder-latest" ;;
-    query:grok)        echo "grok-3-mini-fast" ;;
-    query:qwen)        echo "qwen-turbo" ;;
-    query:copilot)     echo "auto" ;;
-    query:cline)       echo "kwaipilot/kat-coder-latest" ;;
-    query:ollama)      echo "${ROUTER_DEFAULT_MODEL_OLLAMA:-llama3.2}" ;;
-    # PLAN — T1 cheap (architecture, step planning, analysis)
-    # Comparable: Cline Plan mode, Aider --architect
-    plan:anthropic)    echo "claude-haiku-3-5" ;;
-    plan:openai)       echo "gpt-4o-mini" ;;
-    plan:azure)        echo "gpt-4o-mini" ;;
-    plan:gemini)       echo "gemini-2.0-flash" ;;
-    plan:mistral)      echo "mistral-small-latest" ;;
-    plan:groq)         echo "llama-3.3-70b-versatile" ;;
-    plan:openrouter)   echo "meta-llama/llama-3.3-70b-instruct" ;;
-    plan:grok)         echo "grok-3-mini-fast" ;;
-    plan:qwen)         echo "qwen-plus" ;;
-    plan:copilot)      echo "auto" ;;
-    plan:cline)        echo "kwaipilot/kat-coder-latest" ;;
-    plan:ollama)       echo "${ROUTER_DEFAULT_MODEL_OLLAMA:-llama3.2}" ;;
-    # CODE — T2/T3 capable (code gen, editing, execution, tool calls)
-    # Comparable: Cline Act mode, Aider --editor-model
-    # Danger: HIGH — acts on real files/APIs/infra
-    code:anthropic)    echo "claude-sonnet-4-5" ;;
-    code:openai)       echo "gpt-4o" ;;
-    code:azure)        echo "gpt-4o" ;;
-    code:gemini)       echo "gemini-1.5-pro" ;;
-    code:mistral)      echo "codestral-latest" ;;
-    code:groq)         echo "llama-3.3-70b-versatile" ;;
-    code:openrouter)   echo "anthropic/claude-3.5-sonnet" ;;
-    code:grok)         echo "grok-3-fast" ;;
-    code:qwen)         echo "qwen-max" ;;
-    code:copilot)      echo "gpt-4.1" ;;
-    code:cline)        echo "claude-sonnet-4-5" ;;
-    code:ollama)       echo "${ROUTER_DEFAULT_MODEL_OLLAMA:-llama3.2}" ;;
-    *)                 echo "" ;;
-  esac
+
+  local _router_ts="${AGENCE_ROOT:-$(dirname "$(dirname "${BASH_SOURCE[0]}")")}/lib/router.ts"
+  if command -v bun &>/dev/null && [[ -f "$_router_ts" ]]; then
+    local _out
+    _out=$(bun run "$_router_ts" resolve-model \
+      --provider "$provider" --mode "$mode" 2>/dev/null)
+    if [[ $? -eq 0 && -n "$_out" ]]; then
+      # Output is: export AGENCE_LLM_MODEL="model-name"
+      local _model; _model=$(echo "$_out" | sed -n 's/^export AGENCE_LLM_MODEL="\(.*\)"$/\1/p')
+      [[ -n "$_model" ]] && { echo "$_model"; return 0; }
+    fi
+  fi
+  # Absolute fallback
+  echo "${ROUTER_DEFAULT_MODEL_ANTHROPIC:-claude-sonnet-4-5}"
 }
 
 router_load_config() {
   [[ "$_ROUTER_LOADED" == "1" ]] && return 0
 
-  # ── Bun delegation (preferred — typed resolution in lib/router.ts) ────────
-  # If bun is available and lib/router.ts exists, delegate provider+model
-  # resolution to the TS module. Falls back to bash logic on failure.
+  # All provider/model resolution lives in lib/router.ts (canonical)
   local _router_ts="${AGENCE_ROOT:-$(dirname "$(dirname "${BASH_SOURCE[0]}")")}/lib/router.ts"
-  if [[ "${AGENCE_ROUTER_NO_BUN:-0}" != "1" ]] && \
-     command -v bun &>/dev/null && [[ -f "$_router_ts" ]]; then
-    local _bun_out
-    _bun_out=$(bun run "$_router_ts" resolve-route \
-      ${AGENCE_LLM_PROVIDER:+--provider "$AGENCE_LLM_PROVIDER"} \
-      ${AGENCE_ROUTER_MODE:+--mode "$AGENCE_ROUTER_MODE"} \
-      ${AGENCE_BLAST_RADIUS:+--blast-radius "$AGENCE_BLAST_RADIUS"} \
-      2>&1 1>/dev/null) 2>/dev/null
-    # Try again capturing stdout (eval-safe exports)
-    local _bun_exports
-    _bun_exports=$(bun run "$_router_ts" resolve-route \
-      ${AGENCE_LLM_PROVIDER:+--provider "$AGENCE_LLM_PROVIDER"} \
-      ${AGENCE_ROUTER_MODE:+--mode "$AGENCE_ROUTER_MODE"} \
-      ${AGENCE_BLAST_RADIUS:+--blast-radius "$AGENCE_BLAST_RADIUS"} \
-      2>/dev/null)
-    if [[ $? -eq 0 && -n "$_bun_exports" ]]; then
-      eval "$_bun_exports"
-      export _ROUTER_LOADED=1
-      [[ "${AGENCE_DEBUG:-0}" == "1" ]] && \
-        echo "[router] Bun delegation: Provider=${AGENCE_LLM_PROVIDER}  Model=${AGENCE_LLM_MODEL}" >&2
-      return 0
-    fi
+  if ! command -v bun &>/dev/null; then
+    echo "[router] ERROR: bun is required for provider resolution." >&2
+    echo "[router]        Install: curl -fsSL https://bun.sh/install | bash" >&2
+    return 1
+  fi
+  if [[ ! -f "$_router_ts" ]]; then
+    echo "[router] ERROR: lib/router.ts not found at $_router_ts" >&2
+    return 1
+  fi
+
+  local _bun_exports
+  _bun_exports=$(bun run "$_router_ts" resolve-route \
+    ${AGENCE_LLM_PROVIDER:+--provider "$AGENCE_LLM_PROVIDER"} \
+    ${AGENCE_ROUTER_MODE:+--mode "$AGENCE_ROUTER_MODE"} \
+    ${AGENCE_BLAST_RADIUS:+--blast-radius "$AGENCE_BLAST_RADIUS"} \
+    2>/dev/null)
+  if [[ $? -eq 0 && -n "$_bun_exports" ]]; then
+    eval "$_bun_exports"
+    export _ROUTER_LOADED=1
     [[ "${AGENCE_DEBUG:-0}" == "1" ]] && \
-      echo "[router] Bun delegation failed, falling back to bash" >&2
+      echo "[router] Provider=${AGENCE_LLM_PROVIDER}  Model=${AGENCE_LLM_MODEL}" >&2
+    return 0
   fi
 
-  _router_check_deps || return 1
-
-  local cfg="$ROUTER_CONFIG_PATH"
-  [[ "${AGENCE_DEBUG:-0}" == "1" ]] && echo "[router] Loading config: $cfg" >&2
-
-  # ── Provider ────────────────────────────────────────────────────────────────
-  if [[ -z "${AGENCE_LLM_PROVIDER:-}" ]]; then
-    local _p; _p=$(_yaml_get "provider" "$cfg" 2>/dev/null || true)
-    if   [[ -n "$_p" ]];                              then export AGENCE_LLM_PROVIDER="$_p"
-    elif [[ -n "${ANTHROPIC_API_KEY:-}" ]];            then export AGENCE_LLM_PROVIDER="anthropic"
-    elif [[ -n "${OPENAI_API_KEY:-}" ]];               then export AGENCE_LLM_PROVIDER="openai"
-    elif [[ -n "${AZURE_OPENAI_API_KEY:-}" ]];         then export AGENCE_LLM_PROVIDER="azure"
-    elif [[ -n "${GEMINI_API_KEY:-}" ]];               then export AGENCE_LLM_PROVIDER="gemini"
-    elif [[ -n "${MISTRAL_API_KEY:-}" ]];              then export AGENCE_LLM_PROVIDER="mistral"
-    elif [[ -n "${GROQ_API_KEY:-}" ]];                 then export AGENCE_LLM_PROVIDER="groq"
-    elif [[ -n "${OPENROUTER_API_KEY:-}" ]];           then export AGENCE_LLM_PROVIDER="openrouter"
-    elif [[ -n "${GROK_API_KEY:-}" ]];                 then export AGENCE_LLM_PROVIDER="grok"
-    elif [[ -n "${DASHSCOPE_API_KEY:-}" ]];            then export AGENCE_LLM_PROVIDER="qwen"
-    elif [[ -n "${GITHUB_TOKEN:-}" ]];                 then export AGENCE_LLM_PROVIDER="copilot"
-    elif command -v gh &>/dev/null && gh auth token &>/dev/null 2>&1; then export AGENCE_LLM_PROVIDER="copilot"
-    elif curl -sf --max-time 1 \
-         "${OLLAMA_HOST:-http://localhost:11434}/api/tags" &>/dev/null; then
-      export AGENCE_LLM_PROVIDER="ollama"
-    else
-      echo "[router] ERROR: No LLM provider available." >&2
-      echo "[router]        Supported: anthropic openai azure gemini mistral groq openrouter grok qwen copilot cline ollama" >&2
-      echo "[router]        Set AGENCE_LLM_PROVIDER or configure: $cfg" >&2
-      return 1
-    fi
-  fi
-
-  # ── Model ──────────────────────────────────────────────────────────────────
-  if [[ -z "${AGENCE_LLM_MODEL:-}" ]]; then
-    local _m; _m=$(_yaml_get "model" "$cfg" 2>/dev/null || true)
-    if [[ -n "$_m" ]]; then
-      export AGENCE_LLM_MODEL="$_m"
-    else
-      case "$AGENCE_LLM_PROVIDER" in
-        anthropic)  export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_ANTHROPIC"  ;;
-        openai)     export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_OPENAI"     ;;
-        azure)      export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_AZURE"      ;;
-        gemini)     export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_GEMINI"     ;;
-        mistral)    export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_MISTRAL"    ;;
-        groq)       export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_GROQ"       ;;
-        openrouter) export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_OPENROUTER" ;;
-        grok)       export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_GROK"       ;;
-        qwen)       export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_QWEN"       ;;
-        copilot)    export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_COPILOT"    ;;
-        cline)      export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_CLINE"      ;;
-        ollama)     export AGENCE_LLM_MODEL="$ROUTER_DEFAULT_MODEL_OLLAMA"     ;;
-      esac
-    fi
-  fi
-
-  # ── Azure-specific ──────────────────────────────────────────────────────────
-  if [[ "$AGENCE_LLM_PROVIDER" == "azure" ]]; then
-    [[ -z "${AZURE_OPENAI_ENDPOINT:-}" ]] && {
-      local _e; _e=$(_yaml_get "azure_endpoint" "$cfg" 2>/dev/null || true)
-      [[ -n "$_e" ]] && export AZURE_OPENAI_ENDPOINT="$_e"
-    }
-    [[ -z "${AZURE_OPENAI_DEPLOYMENT:-}" ]] && {
-      local _d; _d=$(_yaml_get "azure_deployment" "$cfg" 2>/dev/null || true)
-      export AZURE_OPENAI_DEPLOYMENT="${_d:-$AGENCE_LLM_MODEL}"
-    }
-    [[ -z "${AZURE_OPENAI_API_VERSION:-}" ]] && {
-      local _av; _av=$(_yaml_get "azure_api_version" "$cfg" 2>/dev/null || true)
-      export AZURE_OPENAI_API_VERSION="${_av:-2024-02-01}"
-    }
-    if [[ -z "${AZURE_OPENAI_ENDPOINT:-}" || -z "${AZURE_OPENAI_API_KEY:-}" ]]; then
-      echo "[router] ERROR: Azure requires AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY" >&2
-      return 1
-    fi
-  fi
-
-  # ── Cline: resolve underlying key (prefer OpenRouter free tier) ────────────
-  if [[ "$AGENCE_LLM_PROVIDER" == "cline" ]]; then
-    # Priority: OPENROUTER_API_KEY (free kwaipilot) > CLINE_API_KEY > ANTHROPIC_API_KEY
-    if [[ -z "${CLINE_API_KEY:-}" && -n "${ANTHROPIC_API_KEY:-}" ]]; then
-      export CLINE_API_KEY="$ANTHROPIC_API_KEY"
-    fi
-    if [[ -z "${OPENROUTER_API_KEY:-}" && -z "${CLINE_API_KEY:-}" ]]; then
-      echo "[router] ERROR: cline: set OPENROUTER_API_KEY (free) or CLINE_API_KEY / ANTHROPIC_API_KEY" >&2
-      return 1
-    fi
-  fi
-
-  # ── Ollama host ─────────────────────────────────────────────────────────────
-  if [[ "$AGENCE_LLM_PROVIDER" == "ollama" && -z "${OLLAMA_HOST:-}" ]]; then
-    local _oh; _oh=$(_yaml_get "ollama_host" "$cfg" 2>/dev/null || true)
-    export OLLAMA_HOST="${_oh:-http://localhost:11434}"
-  fi
-
-  export _ROUTER_LOADED=1
-  [[ "${AGENCE_DEBUG:-0}" == "1" ]] && \
-    echo "[router] Provider=${AGENCE_LLM_PROVIDER}  Model=${AGENCE_LLM_MODEL}" >&2
-  return 0
+  echo "[router] ERROR: Provider resolution failed. Check API keys or run: agence ^routes" >&2
+  return 1
 }
 
 # ============================================================================

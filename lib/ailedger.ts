@@ -476,6 +476,10 @@ if (!subCmd) {
   console.error("  init                    Initialize nested git repo");
   console.error("  status                  Entry counts and chain health");
   console.error("  prune [--months N] [--dry-run]  Remove old local ledger files");
+  console.error("  tail [N]                Show last N entries (default: 20)");
+  console.error("  count                   Entry count for current month");
+  console.error("  list                    List all ledger files with counts");
+  console.error("  query [--type X] [--agent X] [--all]  Filter entries");
   console.error("  filter-test <string>    Test security filter on a string");
   process.exit(1);
 }
@@ -578,6 +582,54 @@ switch (subCmd) {
       rejected: r.rejected,
       reason: r.reason || null,
     }, null, 2));
+    break;
+  }
+
+  case "tail": {
+    const n = parseInt(args[0] || "20", 10);
+    const entries = readLocalEntries();
+    const sliced = entries.slice(-n);
+    for (const e of sliced) console.log(JSON.stringify(e));
+    break;
+  }
+
+  case "count": {
+    const entries = readLocalEntries();
+    console.log(entries.length);
+    break;
+  }
+
+  case "list": {
+    if (!existsSync(LOCAL_DIR)) {
+      console.error(`[ailedger] No ledger directory: ${LOCAL_DIR}`);
+      break;
+    }
+    const files = readdirSync(LOCAL_DIR).filter(f => f.endsWith(".jsonl")).sort();
+    if (files.length === 0) {
+      console.error("[ailedger] No ledger files");
+      break;
+    }
+    for (const f of files) {
+      const lines = readFileSync(join(LOCAL_DIR, f), "utf-8").trimEnd().split("\n").filter(Boolean);
+      console.log(`${f}\t${lines.length} entries`);
+    }
+    break;
+  }
+
+  case "query": {
+    let useAll = false;
+    const filters: Record<string, string> = {};
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === "--all") { useAll = true; }
+      else if (args[i] === "--type" && args[i + 1]) { filters.decision_type = args[++i]; }
+      else if (args[i] === "--agent" && args[i + 1]) { filters.agent = args[++i]; }
+      else if (args[i] === "--tag" && args[i + 1]) { filters.rationale_tag = args[++i]; }
+    }
+    let entries = useAll ? readShardEntries() : readLocalEntries();
+    for (const [k, v] of Object.entries(filters)) {
+      entries = entries.filter((e: any) => e[k] === v);
+    }
+    for (const e of entries) console.log(JSON.stringify(e));
     break;
   }
 

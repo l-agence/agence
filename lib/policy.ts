@@ -3,7 +3,7 @@
 //
 // Loads and merges policy from a 4-layer cascade:
 //   1. codex/AIPOLICY.yaml          (immutable base — ships with agence)
-//   2. knowledge/hermetic/*/policy.yaml  (per-org overrides)
+//   2. knowledge/private/*/policy.yaml  (per-org overrides)
 //   3. .agence/policy.yaml          (per-shard/project)
 //   4. ~/.config/agence/policy.yaml (per-user local)
 //
@@ -320,12 +320,12 @@ export function resolveCascade(): CascadeLayer[] {
   }
   layers.push({ path: basePath, isLocal: false, parsed: parsePolicyYaml(baseYaml) });
 
-  // Layer 2: Org overrides (knowledge/hermetic/*/policy.yaml)
-  const hermeticDir = join(AGENCE_ROOT, "knowledge", "hermetic");
-  if (existsSync(hermeticDir)) {
+  // Layer 2: Org overrides (knowledge/private/*/policy.yaml)
+  const privateDir = join(AGENCE_ROOT, "knowledge", "private");
+  if (existsSync(privateDir)) {
     try {
-      for (const org of readdirSync(hermeticDir)) {
-        const orgPolicy = join(hermeticDir, org, "policy.yaml");
+      for (const org of readdirSync(privateDir)) {
+        const orgPolicy = join(privateDir, org, "policy.yaml");
         const yaml = loadYamlFile(orgPolicy);
         if (yaml) layers.push({ path: orgPolicy, isLocal: false, parsed: parsePolicyYaml(yaml) });
       }

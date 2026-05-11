@@ -24,7 +24,7 @@ const AGENCE_ROOT = process.env.AGENCE_ROOT || AI_ROOT;
 
 type CmdType = "lesson" | "plan" | "issue" | "log" | "fault" | "todo" | "note" | "task" | "job" | "workflow" | "project";
 type SubCmd = "list" | "show" | "add";
-type Scope = "SYNTHETIC" | "NEXUS" | "HERMETIC" | "ORGANIC";
+type Scope = "KNOWLEDGE" | "NEXUS" | "PRIVATE" | "ORGANIC";
 
 interface ScopeInfo {
   scope: Scope;
@@ -53,8 +53,8 @@ function resolveScope(cmdType: CmdType, org: string): ScopeInfo {
     case "lesson":
     case "plan":
     case "issue":
-      scope = "SYNTHETIC";
-      baseDir = resolveOrgPath(join(AGENCE_ROOT, "synthetic"), org);
+      scope = "KNOWLEDGE";
+      baseDir = resolveOrgPath(join(AGENCE_ROOT, "knowledge"), org);
       break;
     case "log":
     case "fault":
@@ -63,8 +63,8 @@ function resolveScope(cmdType: CmdType, org: string): ScopeInfo {
       break;
     case "todo":
     case "note":
-      scope = "HERMETIC";
-      baseDir = resolveOrgPath(join(AGENCE_ROOT, "hermetic"), org);
+      scope = "PRIVATE";
+      baseDir = join(AGENCE_ROOT, "knowledge", "private");
       break;
     case "task":
     case "job":
@@ -74,8 +74,8 @@ function resolveScope(cmdType: CmdType, org: string): ScopeInfo {
       baseDir = join(AGENCE_ROOT, "organic");
       break;
     default:
-      scope = "SYNTHETIC";
-      baseDir = resolveOrgPath(join(AGENCE_ROOT, "synthetic"), org);
+      scope = "KNOWLEDGE";
+      baseDir = resolveOrgPath(join(AGENCE_ROOT, "knowledge"), org);
   }
 
   const dataDir = join(baseDir, `${cmdType}s`);

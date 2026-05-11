@@ -50,9 +50,9 @@ describe("Capability Definitions", () => {
 
   test("all security levels are ordered", () => {
     expect(SECURITY_LEVELS.L0_PUBLIC).toBeLessThan(SECURITY_LEVELS.L1_ORGANIC);
-    expect(SECURITY_LEVELS.L1_ORGANIC).toBeLessThan(SECURITY_LEVELS.L2_SYNTHETIC);
-    expect(SECURITY_LEVELS.L2_SYNTHETIC).toBeLessThan(SECURITY_LEVELS.L3_NEXUS);
-    expect(SECURITY_LEVELS.L3_NEXUS).toBeLessThan(SECURITY_LEVELS.L4_HERMETIC);
+    expect(SECURITY_LEVELS.L1_ORGANIC).toBeLessThan(SECURITY_LEVELS.L2_KNOWLEDGE);
+    expect(SECURITY_LEVELS.L2_KNOWLEDGE).toBeLessThan(SECURITY_LEVELS.L3_NEXUS);
+    expect(SECURITY_LEVELS.L3_NEXUS).toBeLessThan(SECURITY_LEVELS.L4_PRIVATE);
   });
 });
 
@@ -169,11 +169,11 @@ describe("loadAgentCapabilities", () => {
     expect(copilot.capabilities).not.toContain(CAPABILITIES.CAP_EXEC_INFRA);
   });
 
-  test("linus has explicit capabilities (HERMETIC read, no NET)", () => {
+  test("linus has explicit capabilities (PRIVATE read, no NET)", () => {
     resetCapabilityCache();
     const caps = loadAgentCapabilities();
     const linus = caps.get("linus")!;
-    expect(linus.capabilities).toContain(CAPABILITIES.CAP_READ_HERMETIC);
+    expect(linus.capabilities).toContain(CAPABILITIES.CAP_READ_PRIVATE);
     expect(linus.capabilities).toContain(CAPABILITIES.CAP_MUTATE_GIT);
     expect(linus.capabilities).not.toContain(CAPABILITIES.CAP_NET_EGRESS);
     expect(linus.capabilities).not.toContain(CAPABILITIES.CAP_RED_TEAM);
@@ -264,13 +264,13 @@ describe("checkDataAccess (Bell-LaPadula)", () => {
 
   test("linus can read hermetic (L4)", () => {
     resetCapabilityCache();
-    const r = checkDataAccess("linus", SECURITY_LEVELS.L4_HERMETIC);
+    const r = checkDataAccess("linus", SECURITY_LEVELS.L4_PRIVATE);
     expect(r.allowed).toBe(true);
   });
 
   test("copilot cannot read hermetic (L4)", () => {
     resetCapabilityCache();
-    const r = checkDataAccess("copilot", SECURITY_LEVELS.L4_HERMETIC);
+    const r = checkDataAccess("copilot", SECURITY_LEVELS.L4_PRIVATE);
     expect(r.allowed).toBe(false);
   });
 
@@ -284,14 +284,14 @@ describe("checkDataAccess (Bell-LaPadula)", () => {
 // ─── Path Security Labels ────────────────────────────────────────────────────
 
 describe("pathSecurityLevel", () => {
-  test("knowledge/private → L4 HERMETIC", () => {
+  test("knowledge/private → L4 PRIVATE", () => {
     expect(pathSecurityLevel(join(AGENCE_ROOT, "knowledge/private/todos/INDEX.md")))
-      .toBe(SECURITY_LEVELS.L4_HERMETIC);
+      .toBe(SECURITY_LEVELS.L4_PRIVATE);
   });
 
-  test("knowledge/hermetic → L4 HERMETIC", () => {
-    expect(pathSecurityLevel(join(AGENCE_ROOT, "knowledge/hermetic/acme.tld/notes.md")))
-      .toBe(SECURITY_LEVELS.L4_HERMETIC);
+  test("knowledge/private subdir → L4 PRIVATE", () => {
+    expect(pathSecurityLevel(join(AGENCE_ROOT, "knowledge/private/acme.tld/notes.md")))
+      .toBe(SECURITY_LEVELS.L4_PRIVATE);
   });
 
   test("nexus → L3 NEXUS", () => {
@@ -304,14 +304,14 @@ describe("pathSecurityLevel", () => {
       .toBe(SECURITY_LEVELS.L3_NEXUS);
   });
 
-  test("knowledge/ (non-private) → L2 SYNTHETIC", () => {
+  test("knowledge/ (non-private) → L2 KNOWLEDGE", () => {
     expect(pathSecurityLevel(join(AGENCE_ROOT, "knowledge/l-agence.org/plans/INDEX.md")))
-      .toBe(SECURITY_LEVELS.L2_SYNTHETIC);
+      .toBe(SECURITY_LEVELS.L2_KNOWLEDGE);
   });
 
-  test("codex/ → L2 SYNTHETIC", () => {
+  test("codex/ → L2 KNOWLEDGE", () => {
     expect(pathSecurityLevel(join(AGENCE_ROOT, "codex/AIPOLICY.yaml")))
-      .toBe(SECURITY_LEVELS.L2_SYNTHETIC);
+      .toBe(SECURITY_LEVELS.L2_KNOWLEDGE);
   });
 
   test("organic/ → L1 ORGANIC", () => {
@@ -328,8 +328,8 @@ describe("pathSecurityLevel", () => {
 // ─── Agent Clearance ─────────────────────────────────────────────────────────
 
 describe("agentClearance", () => {
-  test("CAP_READ_HERMETIC → L4", () => {
-    expect(agentClearance([CAPABILITIES.CAP_READ_HERMETIC])).toBe(SECURITY_LEVELS.L4_HERMETIC);
+  test("CAP_READ_PRIVATE → L4", () => {
+    expect(agentClearance([CAPABILITIES.CAP_READ_PRIVATE])).toBe(SECURITY_LEVELS.L4_PRIVATE);
   });
 
   test("CAP_READ_NEXUS → L3", () => {
@@ -337,7 +337,7 @@ describe("agentClearance", () => {
   });
 
   test("no read caps → L2 (default)", () => {
-    expect(agentClearance([CAPABILITIES.CAP_EXEC_SHELL])).toBe(SECURITY_LEVELS.L2_SYNTHETIC);
+    expect(agentClearance([CAPABILITIES.CAP_EXEC_SHELL])).toBe(SECURITY_LEVELS.L2_KNOWLEDGE);
   });
 });
 
@@ -380,7 +380,7 @@ describe("capability CLI", () => {
   test("labels knowledge/private → L4", () => {
     const r = runCap("labels", "knowledge/private/notes.md");
     expect(r.status).toBe(0);
-    expect(r.stdout).toContain("L4_HERMETIC");
+    expect(r.stdout).toContain("L4_PRIVATE");
   });
 });
 

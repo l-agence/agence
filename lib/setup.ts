@@ -6,7 +6,7 @@
 //   agence ^setup org             Set/change org namespace only
 //   agence ^setup keys            Configure API keys only
 //   agence ^setup recon           Launch initial recon scans only
-//   agence ^setup vault            Configure hermetic vault only
+//   agence ^setup vault            Configure private vault only
 //   agence ^setup status          Show current configuration
 //   agence ^setup help            This help
 //
@@ -120,9 +120,11 @@ function setRCVar(key: string, value: string): void {
 }
 
 function getRCVar(key: string): string | undefined {
+  // Env vars take precedence over .agencerc (standard convention)
+  if (process.env[key]) return process.env[key];
   const rc = readRC();
   const match = rc.match(new RegExp(`^export ${key}="([^"]*)"`, "m"));
-  return match?.[1] || process.env[key];
+  return match?.[1];
 }
 
 // ─── Step 1: Org namespace ───────────────────────────────────────────────────
@@ -489,12 +491,12 @@ async function setupVault(rl: readline.Interface): Promise<void> {
   console.error("  ║  Step 7/7: Hermetic Vault            ║");
   console.error("  ╚══════════════════════════════════════╝");
   console.error("");
-  console.error("  The hermetic vault backs knowledge/private/ with a user-owned");
+  console.error("  The private vault backs knowledge/private/ with a user-owned");
   console.error("  private GitHub repo (github.com/<you>/agence-vault).");
   console.error("  Content remains private — shared only via explicit ^vault commands.");
   console.error("");
 
-  const wantVault = await askYN(rl, "Set up hermetic vault?", true);
+  const wantVault = await askYN(rl, "Set up private vault?", true);
   if (!wantVault) {
     console.error("  ⏭  Skipped vault setup.");
     return;
@@ -594,7 +596,7 @@ Usage:
   agence ^setup registry        Configure artifact registry
   agence ^setup project         Configure project tracking
   agence ^setup status          Show current configuration
-  agence ^setup vault           Configure hermetic vault
+  agence ^setup vault           Configure private vault
   agence ^setup help            This help`);
       break;
 

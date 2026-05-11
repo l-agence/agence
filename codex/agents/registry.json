@@ -2,37 +2,70 @@
   "$schema": "../AIPOLICY.schema.json",
   "version": 1,
   "description": "Agent registry: structured config for routing, launching, and model resolution. Source of truth for bin/agence dispatch.",
-
   "models": {
-    "opus":    "claude-opus-4-5",
-    "sonnet":  "claude-sonnet-4-5",
-    "haiku":   "claude-haiku-3-5",
-    "gpt4":    "gpt-4-turbo",
-    "gpt4o":   "gpt-4o",
-    "mini":    "gpt-4o-mini",
-    "gemini":  "gemini-2-pro",
-    "flash":   "gemini-2-flash",
-    "o1":      "o1-pro",
-    "qwen":    "qwen-2.5-coder",
-    "deepseek":"deepseek-coder-v2",
-    "llama":   "llama-3.1-70b"
+    "opus": "claude-opus-4-5",
+    "sonnet": "claude-sonnet-4-5",
+    "haiku": "claude-haiku-3-5",
+    "gpt4": "gpt-4-turbo",
+    "gpt4o": "gpt-4o",
+    "mini": "gpt-4o-mini",
+    "gemini": "gemini-2-pro",
+    "flash": "gemini-2-flash",
+    "o1": "o1-pro",
+    "qwen": "qwen-2.5-coder",
+    "deepseek": "deepseek-coder-v2",
+    "llama": "llama-3.1-70b"
   },
-
   "pricing": {
-    "claude-opus-4-5":    { "input_per_1m": 15.00, "output_per_1m": 75.00 },
-    "claude-sonnet-4-5":  { "input_per_1m": 3.00,  "output_per_1m": 15.00 },
-    "claude-haiku-3-5":   { "input_per_1m": 0.80,  "output_per_1m": 4.00 },
-    "gpt-4o":             { "input_per_1m": 2.50,  "output_per_1m": 10.00 },
-    "gpt-4o-mini":        { "input_per_1m": 0.15,  "output_per_1m": 0.60 },
-    "gpt-4-turbo":        { "input_per_1m": 10.00, "output_per_1m": 30.00 },
-    "o1-pro":             { "input_per_1m": 15.00, "output_per_1m": 60.00 },
-    "gemini-2-pro":       { "input_per_1m": 1.25,  "output_per_1m": 5.00 },
-    "gemini-2-flash":     { "input_per_1m": 0.10,  "output_per_1m": 0.40 },
-    "deepseek-coder-v2":  { "input_per_1m": 0.14,  "output_per_1m": 0.28 },
-    "qwen-2.5-coder":    { "input_per_1m": 0.30,  "output_per_1m": 0.60 },
-    "llama-3.1-70b":     { "input_per_1m": 0.80,  "output_per_1m": 0.80 }
+    "claude-opus-4-5": {
+      "input_per_1m": 15.0,
+      "output_per_1m": 75.0
+    },
+    "claude-sonnet-4-5": {
+      "input_per_1m": 3.0,
+      "output_per_1m": 15.0
+    },
+    "claude-haiku-3-5": {
+      "input_per_1m": 0.8,
+      "output_per_1m": 4.0
+    },
+    "gpt-4o": {
+      "input_per_1m": 2.5,
+      "output_per_1m": 10.0
+    },
+    "gpt-4o-mini": {
+      "input_per_1m": 0.15,
+      "output_per_1m": 0.6
+    },
+    "gpt-4-turbo": {
+      "input_per_1m": 10.0,
+      "output_per_1m": 30.0
+    },
+    "o1-pro": {
+      "input_per_1m": 15.0,
+      "output_per_1m": 60.0
+    },
+    "gemini-2-pro": {
+      "input_per_1m": 1.25,
+      "output_per_1m": 5.0
+    },
+    "gemini-2-flash": {
+      "input_per_1m": 0.1,
+      "output_per_1m": 0.4
+    },
+    "deepseek-coder-v2": {
+      "input_per_1m": 0.14,
+      "output_per_1m": 0.28
+    },
+    "qwen-2.5-coder": {
+      "input_per_1m": 0.3,
+      "output_per_1m": 0.6
+    },
+    "llama-3.1-70b": {
+      "input_per_1m": 0.8,
+      "output_per_1m": 0.8
+    }
   },
-
   "agents": {
     "aider": {
       "type": "tool",
@@ -41,7 +74,8 @@
       "default_model": "sonnet",
       "launch_flags": "--no-auto-commits",
       "model_flag": "--model",
-      "description": "Offline code editor — git patches"
+      "description": "Offline code editor — git patches",
+      "category": "agent"
     },
     "claude": {
       "type": "tool",
@@ -50,17 +84,22 @@
       "default_model": "sonnet",
       "launch_flags": "",
       "model_flag": "--model",
-      "description": "Claude Code CLI — agentic assistant"
+      "description": "Claude Code CLI — agentic assistant",
+      "category": "agent"
     },
     "pilot": {
       "type": "tool",
-      "binary": ["copilot", "gh copilot"],
+      "binary": [
+        "copilot",
+        "gh copilot"
+      ],
       "install": "gh extension install github/gh-copilot",
       "default_model": null,
       "launch_flags": "",
       "model_flag": null,
       "fallback_cmd": "gh copilot suggest",
-      "description": "GitHub Copilot CLI"
+      "description": "GitHub Copilot CLI",
+      "category": "agent"
     },
     "aish": {
       "type": "tool",
@@ -69,7 +108,8 @@
       "default_model": null,
       "launch_flags": "",
       "model_flag": null,
-      "description": "Microsoft AI Shell"
+      "description": "Microsoft AI Shell",
+      "category": "agent"
     },
     "ralph": {
       "type": "loop",
@@ -77,74 +117,125 @@
       "provider": "anthropic",
       "default_model": "sonnet",
       "tier": "T1",
-      "skills": ["test", "review", "precommit", "break", "build", "feature", "document"],
+      "skills": [
+        "test",
+        "review",
+        "precommit",
+        "break",
+        "build",
+        "feature",
+        "document"
+      ],
       "backpressure": "bun test",
       "max_iterations": 10,
-      "description": "Ralph Wiggum autonomous iteration loop with Principal Skinner backpressure harness"
+      "description": "Ralph Wiggum autonomous iteration loop with Principal Skinner backpressure harness",
+      "category": "harness"
     },
     "sonya": {
       "type": "persona",
       "provider": "anthropic",
       "default_model": "sonnet",
       "tier": "T1",
-      "skills": ["design", "solve", "refactor", "analyse", "scope"],
-      "description": "Full-stack engineer"
+      "skills": [
+        "design",
+        "solve",
+        "refactor",
+        "analyse",
+        "scope"
+      ],
+      "description": "Full-stack engineer",
+      "category": "persona"
     },
     "claudia": {
       "type": "persona",
       "provider": "anthropic",
       "default_model": "opus",
       "tier": "T4",
-      "skills": ["design", "review", "analyse", "solve", "spec"],
-      "description": "Principal SRE/Architect"
+      "skills": [
+        "design",
+        "review",
+        "analyse",
+        "solve",
+        "spec"
+      ],
+      "description": "Principal SRE/Architect",
+      "category": "persona"
     },
     "chad": {
       "type": "persona",
       "provider": "openai",
       "default_model": "gpt4o",
       "tier": "T2",
-      "skills": ["scope", "spec", "split", "pattern", "build"],
-      "description": "DevOps/CloudOps specialist"
+      "skills": [
+        "scope",
+        "spec",
+        "split",
+        "pattern",
+        "build"
+      ],
+      "description": "DevOps/CloudOps specialist",
+      "category": "persona"
     },
     "aiko": {
       "type": "persona",
       "provider": "anthropic",
       "default_model": "haiku",
       "tier": "T1",
-      "skills": ["design", "build", "scope"],
-      "description": "Cloud architect/platform engineer"
+      "skills": [
+        "design",
+        "build",
+        "scope"
+      ],
+      "description": "Cloud architect/platform engineer",
+      "category": "persona"
     },
     "linus": {
       "type": "persona",
       "provider": "anthropic",
       "default_model": "sonnet",
       "tier": "T3",
-      "skills": ["review", "simplify", "refactor", "precommit"],
+      "skills": [
+        "review",
+        "simplify",
+        "refactor",
+        "precommit"
+      ],
       "capabilities": [
         "CAP_EXEC_SHELL",
         "CAP_EXEC_BUILD",
         "CAP_MUTATE_GIT",
         "CAP_READ_NEXUS",
-        "CAP_READ_HERMETIC",
-        "CAP_WRITE_SYNTHETIC",
+        "CAP_READ_PRIVATE",
+        "CAP_WRITE_KNOWLEDGE",
         "CAP_WRITE_ORGANIC"
       ],
-      "description": "Harsh code reviewer — Torvalds-inspired"
+      "description": "Harsh code reviewer — Torvalds-inspired",
+      "category": "persona"
     },
     "feynman": {
       "type": "persona",
       "provider": "anthropic",
       "default_model": "sonnet",
       "tier": "T2",
-      "skills": ["document", "analyse", "grasp", "glimpse"],
-      "description": "Explainer — Feynman-inspired teaching"
+      "skills": [
+        "document",
+        "analyse",
+        "grasp",
+        "glimpse"
+      ],
+      "description": "Explainer — Feynman-inspired teaching",
+      "category": "persona"
     },
     "aleph": {
       "type": "persona",
       "provider": "anthropic",
       "default_model": "sonnet",
       "tier": "T3",
-      "skills": ["hack", "break", "recon"],
+      "skills": [
+        "hack",
+        "break",
+        "recon"
+      ],
       "capabilities": [
         "CAP_EXEC_SHELL",
         "CAP_NET_EGRESS",
@@ -153,15 +244,23 @@
         "CAP_POLICY_READ",
         "CAP_WRITE_ORGANIC"
       ],
-      "description": "Red team / security analyst"
+      "description": "Red team / security analyst",
+      "category": "persona"
     },
     "copilot": {
       "type": "persona",
       "provider": "copilot",
       "default_model": null,
       "tier": "T2",
-      "skills": ["fix", "build", "feature", "refactor", "test"],
-      "description": "GitHub Copilot chat agent"
+      "skills": [
+        "fix",
+        "build",
+        "feature",
+        "refactor",
+        "test"
+      ],
+      "description": "GitHub Copilot chat agent",
+      "category": "persona"
     },
     "ci": {
       "type": "persona",
@@ -177,23 +276,31 @@
         "CAP_MUTATE_GIT",
         "CAP_PUBLISH",
         "CAP_READ_NEXUS",
-        "CAP_WRITE_SYNTHETIC",
+        "CAP_WRITE_KNOWLEDGE",
         "CAP_WRITE_ORGANIC"
       ],
-      "description": "GitHub Actions workflow identity with an explicit capability bundle for guard classification"
+      "description": "GitHub Actions workflow identity with an explicit capability bundle for guard classification",
+      "category": "persona"
     },
     "haiku": {
       "type": "persona",
       "provider": "anthropic",
       "default_model": "haiku",
       "tier": "T0",
-      "skills": ["fix", "split", "build", "break", "glimpse"],
+      "skills": [
+        "fix",
+        "split",
+        "build",
+        "break",
+        "glimpse"
+      ],
       "capabilities": [
         "CAP_EXEC_SHELL",
         "CAP_EXEC_BUILD",
         "CAP_WRITE_ORGANIC"
       ],
-      "description": "Fast/cheap Claude Haiku"
+      "description": "Fast/cheap Claude Haiku",
+      "category": "persona"
     },
     "azure": {
       "type": "tool",
@@ -203,7 +310,8 @@
       "launch_flags": "",
       "model_flag": null,
       "tier": "T3",
-      "description": "Azure DevOps CLI — pipelines, repos, boards"
+      "description": "Azure DevOps CLI — pipelines, repos, boards",
+      "category": "agent"
     },
     "devops": {
       "type": "tool",
@@ -213,40 +321,72 @@
       "launch_flags": "",
       "model_flag": null,
       "tier": "T2",
-      "description": "GitHub DevOps — actions, releases, deployments"
+      "description": "GitHub DevOps — actions, releases, deployments",
+      "category": "agent"
     },
     "peers": {
       "type": "ensemble",
-      "providers": ["anthropic", "openai", "gemini"],
+      "providers": [
+        "anthropic",
+        "openai",
+        "gemini"
+      ],
       "tier": "T4",
       "flavors": {
-        "code":  ["opus", "gpt4", "gemini"],
-        "light": ["haiku", "mini", "flash"],
-        "heavy": ["opus", "gpt4", "o1"]
+        "code": [
+          "opus",
+          "gpt4",
+          "gemini"
+        ],
+        "light": [
+          "haiku",
+          "mini",
+          "flash"
+        ],
+        "heavy": [
+          "opus",
+          "gpt4",
+          "o1"
+        ]
       },
       "default_flavor": "code",
       "tangents": 3,
-      "description": "3-tangent sequent — MIT-style weighted consensus (arXiv:2406.12708)"
+      "description": "3-tangent sequent — MIT-style weighted consensus (arXiv:2406.12708)",
+      "category": "ensemble"
     },
     "pair": {
       "type": "ensemble",
-      "providers": ["anthropic", "openai"],
+      "providers": [
+        "anthropic",
+        "openai"
+      ],
       "tier": "T3",
       "flavors": {
-        "code":  ["sonnet", "gpt4o"],
-        "light": ["haiku", "mini"],
-        "heavy": ["opus", "gpt4"]
+        "code": [
+          "sonnet",
+          "gpt4o"
+        ],
+        "light": [
+          "haiku",
+          "mini"
+        ],
+        "heavy": [
+          "opus",
+          "gpt4"
+        ]
       },
       "default_flavor": "code",
       "tangents": 2,
-      "description": "2-tangent sequent — lightweight consensus pair"
+      "description": "2-tangent sequent — lightweight consensus pair",
+      "category": "ensemble"
     },
     "test-agent": {
       "type": "persona",
       "provider": "test",
       "default_model": null,
       "tier": "T4",
-      "description": "Test harness agent — full capabilities for integration tests"
+      "description": "Test harness agent — full capabilities for integration tests",
+      "category": "persona"
     }
   }
 }
