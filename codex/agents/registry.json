@@ -205,8 +205,8 @@
         "CAP_EXEC_BUILD",
         "CAP_MUTATE_GIT",
         "CAP_READ_NEXUS",
-        "CAP_READ_HERMETIC",
-        "CAP_WRITE_SYNTHETIC",
+        "CAP_READ_PRIVATE",
+        "CAP_WRITE_KNOWLEDGE",
         "CAP_WRITE_ORGANIC"
       ],
       "description": "Harsh code reviewer — Torvalds-inspired",
@@ -276,7 +276,7 @@
         "CAP_MUTATE_GIT",
         "CAP_PUBLISH",
         "CAP_READ_NEXUS",
-        "CAP_WRITE_SYNTHETIC",
+        "CAP_WRITE_KNOWLEDGE",
         "CAP_WRITE_ORGANIC"
       ],
       "description": "GitHub Actions workflow identity with an explicit capability bundle for guard classification",

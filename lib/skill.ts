@@ -123,7 +123,7 @@ async function runSkill(
     systemPrompt += `\n\n[SKILL-REF-BEGIN skill=${skillName}]\n${skillMd}\n[SKILL-REF-END]`;
   }
 
-  // AGENCE.md convention: inject project-level instructions
+  // SEC-015: AGENCE.md boundary markers — strip nested markers from content
   const projectInstructions = loadProjectInstructions();
   if (projectInstructions) {
     const sanitized = projectInstructions

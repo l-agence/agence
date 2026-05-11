@@ -1,6 +1,6 @@
 {
   "name": "@l-agence/mcp-server-agence",
-  "version": "1.0.1",
+  "version": "1.5.0",
   "description": "MCP server for Agence — AI governance framework with policy enforcement, skills, memory, and multi-LLM consensus",
   "mcpName": "io.github.l-agence/agence",
   "repository": {

@@ -120,9 +120,11 @@ function setRCVar(key: string, value: string): void {
 }
 
 function getRCVar(key: string): string | undefined {
+  // Env vars take precedence over .agencerc (standard convention)
+  if (process.env[key]) return process.env[key];
   const rc = readRC();
   const match = rc.match(new RegExp(`^export ${key}="([^"]*)"`, "m"));
-  return match?.[1] || process.env[key];
+  return match?.[1];
 }
 
 // ─── Step 1: Org namespace ───────────────────────────────────────────────────
